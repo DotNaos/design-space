@@ -59,6 +59,17 @@ export const componentDescriptorSchema = z
 
 export type ComponentDescriptor = z.infer<typeof componentDescriptorSchema>;
 
+export const componentControlSchema = z
+  .object({
+    id: opaqueIdSchema,
+    label: z.string().trim().min(1).max(80),
+    kind: z.enum(["tailwind", "text"]),
+    prop: opaqueIdSchema,
+  })
+  .strict();
+
+export type ComponentControl = z.infer<typeof componentControlSchema>;
+
 export const browserOperationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("compile-tailwind"), value: z.string().max(10_000) }).strict(),
   z.object({ type: z.literal("read-source"), editTargetId: opaqueIdSchema }).strict(),

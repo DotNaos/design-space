@@ -127,6 +127,33 @@ describe("adapter contracts", () => {
       }),
     ).toThrowError(expect.objectContaining({ code: "INVALID_ADAPTER" }));
   });
+
+  it("accepts only unique target-owned item controls", () => {
+    expect(() => validateTargetModule({
+      ...valid,
+      adapters: [{
+        ...valid.adapters[0],
+        controls: [{ id: "surface", label: "Classes", kind: "tailwind", prop: "className" }],
+      }],
+    })).not.toThrow();
+    expect(() => validateTargetModule({
+      ...valid,
+      adapters: [{
+        ...valid.adapters[0],
+        controls: [
+          { id: "surface", label: "Classes", kind: "tailwind", prop: "className" },
+          { id: "surface", label: "Other classes", kind: "tailwind", prop: "styleName" },
+        ],
+      }],
+    })).toThrowError(expect.objectContaining({ code: "INVALID_ADAPTER" }));
+    expect(() => validateTargetModule({
+      ...valid,
+      adapters: [{
+        ...valid.adapters[0],
+        controls: [{ id: "unsafe", label: "Unsafe", kind: "command", prop: "shell" }],
+      }],
+    })).toThrowError(expect.objectContaining({ code: "INVALID_ADAPTER" }));
+  });
 });
 
 describe("local edit service", () => {

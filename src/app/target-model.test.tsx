@@ -1,14 +1,19 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { TargetModule } from "../shared/target-module";
+import type { ComponentFixture, TargetModule } from "../shared/target-module";
 import { projectPreviewSlots } from "../model";
 import {
   appendFixtureChild,
   createTargetViewModel,
+  duplicateFixtureComponent,
   findComponentFixture,
+  findFixtureLocation,
   findComponentInstance,
+  moveFixtureComponent,
+  removeFixtureComponent,
   renderTargetFixture,
+  updateFixtureProps,
 } from "./target-model";
 
 const genericTarget: TargetModule = {
@@ -25,7 +30,7 @@ const genericTarget: TargetModule = {
   adapters: [
     {
       component: { id: "panel", label: "Panel", group: "Layout", slots: [{ id: "content", label: "Content" }] },
-      render: (_props, context) => <section>{context.slotChildren.content}</section>,
+      render: (_props, context) => <section {...context.slotAttributes.content}>{context.slotChildren.content}</section>,
     },
     {
       component: { id: "copy", label: "Copy", group: "Content", slots: [] },
@@ -43,7 +48,10 @@ describe("target-driven application model", () => {
       "Copy",
     ]);
     render(renderTargetFixture(genericTarget, genericTarget.defaultFixture));
-    expect(screen.getByText("Hello from another target")).toBeVisible();
+    const copy = screen.getByText("Hello from another target");
+    expect(copy).toBeVisible();
+    expect(copy).toHaveAttribute("data-design-space-instance-id", "message");
+    expect(copy.closest("section")).toHaveAttribute("data-design-space-slot-id", "slot:welcome:content");
   });
 
   it("blocks fixture children assigned to undeclared slots", () => {
@@ -52,6 +60,19 @@ describe("target-driven application model", () => {
       defaultFixture: { ...genericTarget.defaultFixture, slots: { arbitrary: [] } },
     };
     expect(() => createTargetViewModel(invalid, false)).toThrow(/does not declare slot arbitrary/);
+  });
+
+  it("creates preview anchors for declared optional slots omitted by the fixture", () => {
+    const targetWithOmittedOptionalSlot: TargetModule = {
+      ...genericTarget,
+      defaultFixture: { ...genericTarget.defaultFixture, slots: {} },
+    };
+    const view = createTargetViewModel(targetWithOmittedOptionalSlot, false);
+    expect(projectPreviewSlots(view.catalog, view.root)).toMatchObject([
+      { label: "Content", occupied: false, childCount: 0 },
+    ]);
+    render(renderTargetFixture(targetWithOmittedOptionalSlot, targetWithOmittedOptionalSlot.defaultFixture));
+    expect(document.querySelector("section")).toHaveAttribute("data-design-space-slot-id", "slot:welcome:content");
   });
 
   it("resolves nested component slots and inserts into the selected nested fixture", () => {
@@ -87,5 +108,34 @@ describe("target-driven application model", () => {
     });
     expect(findComponentFixture(inserted, "stack")?.slots.content).toHaveLength(1);
     expect(findComponentFixture(nestedTarget.defaultFixture, "stack")?.slots.content).toHaveLength(0);
+  });
+
+  it("updates, reorders, duplicates, and removes fixture items immutably", () => {
+    const fixture: ComponentFixture = {
+      instanceId: "root",
+      adapterId: "panel",
+      slots: {
+        content: [
+          { kind: "component", node: { instanceId: "first", adapterId: "copy", props: { children: "First" }, slots: {} } },
+          { kind: "component", node: { instanceId: "second", adapterId: "copy", props: { children: "Second" }, slots: {} } },
+        ],
+      },
+    };
+
+    const updated = updateFixtureProps(fixture, "first", { children: "Changed" });
+    expect(findComponentFixture(updated, "first")?.props?.children).toBe("Changed");
+    expect(findComponentFixture(fixture, "first")?.props?.children).toBe("First");
+
+    const moved = moveFixtureComponent(updated, "first", 1);
+    expect((moved.slots.content[1] as { node: ComponentFixture }).node.instanceId).toBe("first");
+
+    let sequence = 0;
+    const duplicated = duplicateFixtureComponent(moved, "first", () => `copy-${++sequence}`);
+    expect(duplicated.duplicateId).toBe("copy-1");
+    expect(findFixtureLocation(duplicated.fixture, "copy-1")).toMatchObject({ index: 2, siblingCount: 3 });
+
+    const removed = removeFixtureComponent(duplicated.fixture, "copy-1");
+    expect(findComponentFixture(removed, "copy-1")).toBeUndefined();
+    expect(() => removeFixtureComponent(fixture, "root")).toThrow(/root component/);
   });
 });

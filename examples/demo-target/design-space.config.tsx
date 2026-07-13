@@ -20,29 +20,47 @@ const adapters: ComponentAdapter[] = [
         { id: "footer", label: "Footer", min: 0, max: 1 },
       ],
     },
+    controls: [{ id: "surface", label: "Tailwind classes", kind: "tailwind", prop: "className" }],
+    defaultProps: { className: cardSourceClassName },
     render: (props, context) => (
       <Card
         className={typeof props.className === "string" ? props.className : cardSourceClassName}
         header={context.slotChildren.header}
         body={context.slotChildren.body}
         footer={context.slotChildren.footer}
+        previewAttributes={context.previewAttributes}
+        slotAttributes={context.slotAttributes}
       />
     ),
   },
-  simpleAdapter("heading", "Heading", "Typography", (props) => (
-    <h2 className="text-2xl font-semibold tracking-tight">{stringProp(props, "children", "Quarterly planning")}</h2>
+  simpleAdapter("heading", "Heading", "Typography", {
+    className: "text-2xl font-semibold tracking-tight",
+    children: "Quarterly planning",
+  }, (props) => (
+    <h2 className={stringProp(props, "className", "")}>{stringProp(props, "children", "Quarterly planning")}</h2>
   )),
-  simpleAdapter("text", "Text", "Typography", (props) => (
-    <p className="max-w-md text-sm leading-6 text-zinc-400">{stringProp(props, "children", "Align the product and engineering teams around a review-ready direction.")}</p>
+  simpleAdapter("text", "Text", "Typography", {
+    className: "max-w-md text-sm leading-6 text-zinc-400",
+    children: "Align the product and engineering teams around a review-ready direction.",
+  }, (props) => (
+    <p className={stringProp(props, "className", "")}>{stringProp(props, "children", "")}</p>
   )),
-  simpleAdapter("badge", "Badge", "Data display", (props) => (
-    <span className="rounded-full bg-emerald-400/10 px-2 py-1 text-xs text-emerald-300">{stringProp(props, "children", "Ready")}</span>
+  simpleAdapter("badge", "Badge", "Data display", {
+    className: "rounded-full bg-emerald-400/10 px-2 py-1 text-xs text-emerald-300",
+    children: "Ready",
+  }, (props) => (
+    <span className={stringProp(props, "className", "")}>{stringProp(props, "children", "Ready")}</span>
   )),
-  simpleAdapter("button", "Button", "Actions", (props) => (
-    <button className="rounded-lg bg-indigo-500 px-3 py-2 text-xs font-medium text-white" type="button">{stringProp(props, "children", "Continue")}</button>
+  simpleAdapter("button", "Button", "Actions", {
+    className: "rounded-lg bg-indigo-500 px-3 py-2 text-xs font-medium text-white",
+    children: "Continue",
+  }, (props) => (
+    <button className={stringProp(props, "className", "")} type="button">{stringProp(props, "children", "Continue")}</button>
   )),
-  simpleAdapter("input", "Input", "Forms", () => (
-    <input className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm" placeholder="Project name" />
+  simpleAdapter("input", "Input", "Forms", {
+    className: "rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm",
+  }, (props) => (
+    <input className={stringProp(props, "className", "")} placeholder="Project name" />
   )),
   {
     component: {
@@ -52,7 +70,9 @@ const adapters: ComponentAdapter[] = [
       description: "Vertical layout primitive with an explicit content slot.",
       slots: [{ id: "content", label: "Content" }],
     },
-    render: (_props, context) => <div className="flex flex-col items-start gap-3">{context.slotChildren.content}</div>,
+    controls: [{ id: "surface", label: "Tailwind classes", kind: "tailwind", prop: "className" }],
+    defaultProps: { className: "flex flex-col items-start gap-3" },
+    render: (props, context) => <div {...context.slotAttributes.content} className={stringProp(props, "className", "")}>{context.slotChildren.content}</div>,
   },
 ];
 
@@ -99,9 +119,20 @@ function simpleAdapter(
   id: string,
   label: string,
   group: string,
+  defaultProps: Readonly<Record<string, unknown>>,
   render: ComponentAdapter["render"],
 ): ComponentAdapter {
-  return { component: { id, label, group, slots: [] }, render };
+  return {
+    component: { id, label, group, slots: [] },
+    controls: [
+      { id: "surface", label: "Tailwind classes", kind: "tailwind", prop: "className" },
+      ...(typeof defaultProps.children === "string"
+        ? [{ id: "content", label: "Content", kind: "text" as const, prop: "children" }]
+        : []),
+    ],
+    defaultProps,
+    render,
+  };
 }
 
 function stringProp(props: Readonly<Record<string, unknown>>, key: string, fallback: string) {

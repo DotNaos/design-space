@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import { z } from "zod";
 
-import { componentDescriptorSchema, opaqueIdSchema } from "../shared/contracts";
+import { componentControlSchema, componentDescriptorSchema, opaqueIdSchema } from "../shared/contracts";
 import type { TargetModule } from "../shared/target-module";
 import { DesignSpaceError } from "./errors";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
@@ -125,11 +125,18 @@ export function validateTargetModule(value: unknown): asserts value is TargetMod
   }
   const ids = new Set<string>();
   for (const adapter of target.adapters) {
+    const controls = z.array(componentControlSchema).max(40).safeParse(adapter?.controls ?? []);
+    const controlIds = controls.success ? controls.data.map((control) => control.id) : [];
+    const controlProps = controls.success ? controls.data.map((control) => control.prop) : [];
     if (
       !adapter ||
       typeof adapter !== "object" ||
       typeof adapter.render !== "function" ||
       !componentDescriptorSchema.safeParse(adapter.component).success ||
+      !controls.success ||
+      new Set(controlIds).size !== controlIds.length ||
+      new Set(controlProps).size !== controlProps.length ||
+      (adapter.defaultProps !== undefined && (!adapter.defaultProps || typeof adapter.defaultProps !== "object" || Array.isArray(adapter.defaultProps))) ||
       ids.has(adapter.component.id)
     ) {
       throw new DesignSpaceError("INVALID_ADAPTER", "A component adapter is invalid or duplicated");

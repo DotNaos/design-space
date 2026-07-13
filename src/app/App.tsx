@@ -11,6 +11,7 @@ import { ComponentTree } from "./components/ComponentTree";
 import { DiffSheet } from "./components/DiffSheet";
 import { FileBrowser } from "./components/FileBrowser";
 import { Inspector } from "./components/Inspector";
+import { MobileItemEditor } from "./components/MobileItemEditor";
 import { MobileNavigation, type MobileWorkspaceMode } from "./components/MobileNavigation";
 import { PreviewCanvas } from "./components/PreviewCanvas";
 import { SlotCatalogDialog } from "./components/SlotCatalogDialog";
@@ -23,18 +24,22 @@ import {
   findComponentFixture,
   findComponentInstance,
   renderTargetFixture,
+  resolveFixtureProps,
   type TargetViewModel,
 } from "./target-model";
 import type { SlotState } from "./types";
+import { useItemEditor } from "./use-item-editor";
 
 const initialVersion = "0".repeat(64);
 let draftInstanceSequence = 0;
 type TargetResult = { view: TargetViewModel; error?: never } | { view?: never; error: string };
 type SlotSelection = Extract<SelectionTarget, { kind: "slot" }>;
+type FixtureUndo = { fixture: ComponentFixture; compositionCss: Readonly<Record<string, string>>; undoRootEdit: boolean };
 
 export function App() {
   const [showInternals, setShowInternals] = useState(false);
   const [fixture, setFixture] = useState<ComponentFixture>(target.defaultFixture);
+  const [fixtureUndoStack, setFixtureUndoStack] = useState<FixtureUndo[]>([]);
   const targetResult = useMemo<TargetResult>(() => {
     try {
       return { view: createTargetViewModel(target, showInternals, fixture) } as const;
@@ -55,7 +60,17 @@ export function App() {
   const [runtimeMessage, setRuntimeMessage] = useState<string>();
   const [previewCss, setPreviewCss] = useState("");
   const [previewValue, setPreviewValue] = useState<string>();
+  const [compositionCss, setCompositionCss] = useState<Readonly<Record<string, string>>>({});
   const editTargetId = target.defaultEditTargetId;
+  const commitFixture = useCallback((next: ComponentFixture, metadata?: { undoRootEdit?: boolean }) => {
+    if (next === fixture) return;
+    setFixtureUndoStack((history) => [...history, {
+      fixture,
+      compositionCss,
+      undoRootEdit: Boolean(metadata?.undoRootEdit),
+    }]);
+    setFixture(next);
+  }, [compositionCss, fixture]);
 
   const readSource = useCallback(async () => {
     if (!editTargetId) {
@@ -108,6 +123,7 @@ export function App() {
     };
   }, [connected, editor.draftValue]);
 
+
   const prepare = useCallback(async () => {
     if (!connected || !editTargetId || !isDirty(editor)) return undefined;
     const draftValue = editor.draftValue;
@@ -153,6 +169,20 @@ export function App() {
     }
   }, [editor.phase, editor.preparedEdit, readSource]);
 
+  const itemEditorController = useItemEditor({
+    target,
+    fixture,
+    rootClassValue: editor.draftValue,
+    connected,
+    basePreviewCss: previewCss,
+    compositionCss,
+    createId: nextDraftId,
+    onCommitFixture: commitFixture,
+    onApplyRootClass: (value) => dispatch({ type: "edit", value }),
+    onApplyCompositionCss: (instanceId, css) => setCompositionCss((current) => ({ ...current, [instanceId]: css })),
+    onSelect: setSelection,
+  });
+
   if (!targetResult.view) return <BlockedTarget message={targetResult.error ?? "The target adapter is invalid."} />;
 
   const { view } = targetResult;
@@ -162,6 +192,7 @@ export function App() {
   const selectedInstance = findComponentInstance(view.root, selectedComponentInstanceId) ?? view.root;
   const selectedFixture = findComponentFixture(fixture, selectedInstance.instanceId) ?? fixture;
   const selectedAdapter = target.adapters.find((adapter) => adapter.component.id === selectedInstance.componentId)!;
+  const selectedProps = resolveFixtureProps(target, selectedFixture);
   const slots: SlotState[] = projectPreviewSlots(view.catalog, selectedInstance).map((slot) => ({
     id: slot.selection.slotId,
     selectionId: slot.selection.id,
@@ -187,13 +218,16 @@ export function App() {
   const editable = connected && Boolean(editTargetId) && selectedInstance.instanceId === view.root.instanceId;
   const tailwindReady = previewValue === editor.draftValue;
   const preview = renderTargetFixture(target, fixture, { className: editor.draftValue });
+  const selectionLabel = selection.kind === "slot"
+    ? slots.find((slot) => slot.id === selection.slotId)?.label ?? "Slot"
+    : selectedAdapter.component.label;
   const inspectorProps = {
     componentLabel: selectedAdapter.component.label,
     sourceLabel: target.files.find((file) => file.id === selectedAdapter.component.sourceFileId)?.label,
     editable,
     classNameValue: selectedInstance.instanceId === view.root.instanceId
       ? editor.draftValue
-      : typeof selectedFixture.props?.className === "string" ? selectedFixture.props.className : "",
+      : typeof selectedProps.className === "string" ? selectedProps.className : "",
     selection,
     slots,
     onClassNameChange: (value: string) => dispatch({ type: "edit" as const, value }),
@@ -228,12 +262,13 @@ export function App() {
       return false;
     }
     const child: ComponentFixture = {
-      instanceId: `draft-${++draftInstanceSequence}`,
+      instanceId: nextDraftId(),
       adapterId,
+      props: childAdapter.defaultProps,
       slots: Object.fromEntries(childAdapter.component.slots.map((slot) => [slot.id, []])),
     };
-    setFixture((current) => appendFixtureChild(
-      current,
+    commitFixture(appendFixtureChild(
+      fixture,
       targetSlot.componentInstanceId,
       targetSlot.slotId,
       { kind: "component", node: child },
@@ -255,17 +290,37 @@ export function App() {
 
   return (
     <div className="flex h-dvh w-full min-w-0 flex-col overflow-hidden bg-[#0d0e10] text-zinc-200">
-      <style data-design-space-tailwind-preview>{previewCss}</style>
+      <style data-design-space-tailwind-preview>{`${previewCss}\n${Object.values(compositionCss).join("\n")}`}</style>
       <TopBar
         targetLabel={target.project.label}
         connected={connected}
         runtimeLabel={connected ? "Preview ready" : "Connecting…"}
-        canUndo={editor.undoStack.length > 0}
+        canUndo={fixtureUndoStack.length > 0 || editor.undoStack.length > 0}
         canDiff={editable && tailwindReady && isDirty(editor) && editor.phase !== "stale" && editor.phase !== "compile-error"}
         canSave={editable && tailwindReady && editor.phase === "diff-ready" && Boolean(editor.preparedEdit)}
         saveLabel={editor.phase === "saving" ? "Saving…" : "Save"}
-        onUndo={() => dispatch({ type: "undo" })}
-        onReset={() => { dispatch({ type: "reset" }); setFixture(target.defaultFixture); setSelection(initialSelection(safeInitialView())); setRuntimeMessage(undefined); setShowDiff(false); setSlotPicker(undefined); }}
+        onUndo={() => {
+          const previous = fixtureUndoStack.at(-1);
+          if (previous) {
+            setFixture(previous.fixture);
+            setCompositionCss(previous.compositionCss);
+            if (previous.undoRootEdit) dispatch({ type: "undo" });
+            setFixtureUndoStack((history) => history.slice(0, -1));
+            setSelection({ kind: "component", id: previous.fixture.instanceId });
+            itemEditorController.close();
+          } else dispatch({ type: "undo" });
+        }}
+        onReset={() => {
+          dispatch({ type: "reset" });
+          setFixture(target.defaultFixture);
+          setFixtureUndoStack([]);
+          setCompositionCss({});
+          setSelection(initialSelection(safeInitialView()));
+          setRuntimeMessage(undefined);
+          setShowDiff(false);
+          setSlotPicker(undefined);
+          itemEditorController.close();
+        }}
         onDiff={() => void prepare()}
         onSave={() => void save()}
       />
@@ -286,7 +341,18 @@ export function App() {
         {(workspaceMode === "catalog" || workspaceMode === "search") && <CatalogPanel className="hidden w-64 lg:flex" entries={catalogEntries} selectedId={selectedCatalogId} onSelect={browseCatalogComponent} />}
         {workspaceMode === "inspector" && <Inspector className="hidden w-72 lg:flex xl:hidden" {...inspectorProps} />}
         <div className={`${mobileMode === "preview" ? "flex" : "hidden"} relative min-h-0 min-w-0 flex-1 lg:flex`}>
-          <PreviewCanvas preview={<PreviewBoundary resetKey={editor.draftValue}>{preview}</PreviewBoundary>} rootInstanceId={view.root.instanceId} selectedComponentInstanceId={selectedInstance.instanceId} slots={slots} selection={selection} onSelect={selectTarget} />
+          <PreviewCanvas
+            preview={<PreviewBoundary resetKey={editor.draftValue}>{preview}</PreviewBoundary>}
+            rootInstanceId={view.root.instanceId}
+            selectedComponentInstanceId={selectedInstance.instanceId}
+            selection={selection}
+            selectionLabel={selectionLabel}
+            slots={slots}
+            onEditComponent={(instanceId) => {
+              if (isMobileWorkspace()) itemEditorController.open(instanceId);
+            }}
+            onSelect={selectTarget}
+          />
           <Inspector className="hidden w-72 xl:flex" {...inspectorProps} />
         </div>
       </div>
@@ -295,9 +361,42 @@ export function App() {
         <span className="truncate">{runtimeMessage ?? status}</span>
         <span className="ml-auto hidden shrink-0 lg:block">Local runtime · writes confined to registered targets</span>
       </footer>
-      <MobileNavigation active={mobileMode} onChange={setMobileMode} />
+      <MobileNavigation
+        active={mobileMode}
+        onChange={(mode) => {
+          if (mode === "inspector" && selection.kind === "component") itemEditorController.open(selection.id);
+          else setMobileMode(mode);
+        }}
+      />
       {showDiff && editor.preparedEdit && <DiffSheet diff={editor.preparedEdit.exactDiff} onClose={() => setShowDiff(false)} />}
       <SlotCatalogDialog open={Boolean(slotPicker)} slotLabel={pickerSlot?.label ?? "slot"} entries={pickerEntries} onClose={() => setSlotPicker(undefined)} onSelect={selectPickerComponent} />
+      {itemEditorController.model && (
+        <MobileItemEditor
+          componentLabel={itemEditorController.model.adapter.component.label}
+          sourceLabel={target.files.find((file) => file.id === itemEditorController.model?.adapter.component.sourceFileId)?.label}
+          controls={itemEditorController.model.adapter.controls ?? []}
+          controlValues={itemEditorController.model.controlValues}
+          preview={itemEditorController.model.preview}
+          previewCss={itemEditorController.model.previewCss}
+          rootInstanceId={itemEditorController.model.view.root.instanceId}
+          selectedInstanceId={itemEditorController.model.instance.instanceId}
+          slots={itemEditorController.model.slots}
+          compileError={itemEditorController.model.compileError}
+          compilePending={itemEditorController.model.compilePending}
+          sourceBacked={itemEditorController.model.sourceBacked}
+          canMoveUp={Boolean(itemEditorController.model.location && itemEditorController.model.location.index > 0)}
+          canMoveDown={Boolean(itemEditorController.model.location && itemEditorController.model.location.index < itemEditorController.model.location.siblingCount - 1)}
+          canDuplicate={itemEditorController.model.canDuplicate}
+          canDelete={itemEditorController.model.canDelete}
+          onControlChange={itemEditorController.updateControl}
+          onSelectComponent={itemEditorController.selectComponent}
+          onMove={itemEditorController.move}
+          onDuplicate={itemEditorController.duplicate}
+          onDelete={itemEditorController.remove}
+          onCancel={itemEditorController.close}
+          onApply={itemEditorController.apply}
+        />
+      )}
     </div>
   );
 
@@ -336,6 +435,14 @@ function statusLabel(phase: string, dirty: boolean, connected: boolean, composit
 
 function messageFor(error: unknown) {
   return error instanceof Error ? error.message : "The local operation failed.";
+}
+
+function nextDraftId() {
+  return `draft-${++draftInstanceSequence}`;
+}
+
+function isMobileWorkspace() {
+  return window.matchMedia("(max-width: 1023px)").matches;
 }
 
 function BlockedTarget({ message }: { message: string }) {

@@ -1,13 +1,26 @@
 import type { ReactNode } from "react";
 
-import type { ComponentDescriptor } from "./contracts";
+import type { ComponentControl, ComponentDescriptor } from "./contracts";
+
+export type PreviewElementAttributes = Readonly<{
+  "data-design-space-instance-id": string;
+  "data-design-space-parent-slot-id"?: string;
+}>;
+
+export type PreviewSlotAttributes = Readonly<{
+  "data-design-space-slot-id": string;
+}>;
 
 export interface AdapterRenderContext {
   slotChildren: Readonly<Record<string, readonly ReactNode[]>>;
+  previewAttributes: PreviewElementAttributes;
+  slotAttributes: Readonly<Record<string, PreviewSlotAttributes>>;
 }
 
 export interface ComponentAdapter<Props extends object = Record<string, unknown>> {
   component: ComponentDescriptor;
+  controls?: readonly ComponentControl[];
+  defaultProps?: Readonly<Props>;
   render: {
     bivarianceHack(props: Readonly<Props>, context: AdapterRenderContext): ReactNode;
   }["bivarianceHack"];
