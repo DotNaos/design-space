@@ -1,0 +1,49 @@
+{
+  "name": "@dotnaos/design-space",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.14",
+  "bin": {
+    "design-space": "./scripts/cli.ts"
+  },
+  "exports": {
+    "./server": "./src/server/index.ts",
+    "./contracts": "./src/shared/contracts.ts",
+    "./target": "./src/shared/target-module.ts"
+  },
+  "scripts": {
+    "dev": "bun ./scripts/dev.ts",
+    "dev:raw": "bun ./scripts/dev.ts --raw",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "bun run typecheck && bun run test && bun run build && bun run verify:local-only",
+    "verify:local-only": "bun ./scripts/verify-local-only.ts"
+  },
+  "dependencies": {
+    "@heroui/react": "^3.0.5",
+    "@heroui/styles": "^3.0.5",
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/bun": "^1.2.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
+    "portless": "^0.6.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.6",
+    "vitest": "^2.1.8"
+  }
+}

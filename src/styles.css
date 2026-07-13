@@ -1,0 +1,6 @@
+@import "tailwindcss" source(none);
+@import "@heroui/styles";
+
+@source "./app";
+@source "../examples/demo-target";
+@source inline("rounded-none rounded-xl rounded-2xl rounded-3xl p-4 p-6 p-8 shadow-none shadow-lg shadow-2xl bg-slate-900 bg-zinc-950 border border-zinc-700");
