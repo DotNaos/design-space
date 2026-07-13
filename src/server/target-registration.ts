@@ -160,11 +160,12 @@ export function validateTargetModule(value: unknown): asserts value is TargetMod
 function validateFixture(
   fixture: TargetModule["defaultFixture"],
   target: Pick<TargetModule, "adapters">,
-  activeInstances: Set<string>,
+  instanceIds: Set<string>,
 ): void {
-  if (!opaqueIdSchema.safeParse(fixture.instanceId).success || activeInstances.has(fixture.instanceId)) {
-    throw new DesignSpaceError("INVALID_ADAPTER", "The target fixture has an invalid or recursive instance");
+  if (!opaqueIdSchema.safeParse(fixture.instanceId).success || instanceIds.has(fixture.instanceId)) {
+    throw new DesignSpaceError("INVALID_ADAPTER", "The target fixture has an invalid or duplicated instance");
   }
+  instanceIds.add(fixture.instanceId);
   const adapter = target.adapters.find((item) => item.component.id === fixture.adapterId);
   if (!adapter || !fixture.slots || typeof fixture.slots !== "object" || Array.isArray(fixture.slots)) {
     throw new DesignSpaceError("INVALID_ADAPTER", "The target fixture references an invalid adapter");
@@ -173,11 +174,10 @@ function validateFixture(
   if (Object.keys(fixture.slots).some((slotId) => !declaredSlots.has(slotId))) {
     throw new DesignSpaceError("INVALID_ADAPTER", "The target fixture uses an undeclared slot");
   }
-  const nextActive = new Set(activeInstances).add(fixture.instanceId);
   for (const children of Object.values(fixture.slots)) {
     if (!Array.isArray(children)) throw new DesignSpaceError("INVALID_ADAPTER", "Fixture slot content must be an array");
     for (const child of children) {
-      if (child.kind === "component") validateFixture(child.node, target, nextActive);
+      if (child.kind === "component") validateFixture(child.node, target, instanceIds);
       else if (child.kind !== "text" || typeof child.value !== "string") {
         throw new DesignSpaceError("INVALID_ADAPTER", "Fixture children must be components or text");
       }

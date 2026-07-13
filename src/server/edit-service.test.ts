@@ -99,6 +99,34 @@ describe("adapter contracts", () => {
       expect.objectContaining({ code: "INVALID_ADAPTER" }),
     );
   });
+
+  it("rejects duplicate fixture instance IDs across sibling branches", () => {
+    expect(() =>
+      validateTargetModule({
+        ...valid,
+        defaultFixture: {
+          instanceId: "card-instance",
+          adapterId: "card",
+          slots: {
+            body: [
+              { kind: "component", node: { instanceId: "copy-instance", adapterId: "copy", slots: {} } },
+              { kind: "component", node: { instanceId: "copy-instance", adapterId: "copy", slots: {} } },
+            ],
+          },
+        },
+        adapters: [
+          {
+            component: { id: "card", label: "Card", group: "Layout", slots: [{ id: "body", label: "Body" }] },
+            render: () => null,
+          },
+          {
+            component: { id: "copy", label: "Copy", group: "Content", slots: [] },
+            render: () => null,
+          },
+        ],
+      }),
+    ).toThrowError(expect.objectContaining({ code: "INVALID_ADAPTER" }));
+  });
 });
 
 describe("local edit service", () => {
@@ -134,6 +162,12 @@ describe("local edit service", () => {
     expect("css" in result && result.css).toContain(".mt-96");
     expect("css" in result && result.css).toContain(".bg-red-500");
     expect("css" in result && result.css).toContain(".grid-cols-7");
+  });
+
+  it("accepts named Tailwind group and peer markers", async () => {
+    const { service } = await fixture();
+    const value = "group/card peer/draft";
+    await expect(service.execute({ type: "compile-tailwind", value })).resolves.toMatchObject({ value });
   });
 
   it("prepares an exact diff and saves only the marked string", async () => {

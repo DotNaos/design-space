@@ -8,7 +8,6 @@ import { DesignSpaceError } from "./errors";
 import { validateTailwindClassList } from "./tailwind";
 
 const maximumCacheEntries = 100;
-const selectorOnlyTokens = new Set(["dark", "group", "peer"]);
 const cache = new Map<string, TailwindPreview>();
 let themeSource: Promise<string> | undefined;
 const require = createRequire(import.meta.url);
@@ -24,7 +23,7 @@ export async function compileTailwindPreview(unsafeValue: string): Promise<Tailw
   const tokens = value ? value.split(" ") : [];
   const css = await build(tokens);
   for (const token of tokens) {
-    if (!selectorOnlyTokens.has(token) && (await build([token])) === (await build([]))) {
+    if (!isSelectorOnlyToken(token) && (await build([token])) === (await build([]))) {
       throw new DesignSpaceError("INVALID_TAILWIND", `Unknown Tailwind class: ${token}`);
     }
   }
@@ -32,6 +31,10 @@ export async function compileTailwindPreview(unsafeValue: string): Promise<Tailw
   if (cache.size >= maximumCacheEntries) cache.delete(cache.keys().next().value ?? "");
   cache.set(value, preview);
   return preview;
+}
+
+function isSelectorOnlyToken(token: string): boolean {
+  return /^(?:dark|group|peer|(?:group|peer)\/[a-z0-9_-]+)$/i.test(token);
 }
 
 async function build(tokens: readonly string[]): Promise<string> {
