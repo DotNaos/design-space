@@ -11,7 +11,9 @@ import { ComponentTree } from "./components/ComponentTree";
 import { DiffSheet } from "./components/DiffSheet";
 import { FileBrowser } from "./components/FileBrowser";
 import { Inspector } from "./components/Inspector";
+import { MobileNavigation, type MobileWorkspaceMode } from "./components/MobileNavigation";
 import { PreviewCanvas } from "./components/PreviewCanvas";
+import { SlotCatalogDialog } from "./components/SlotCatalogDialog";
 import { TopBar } from "./components/TopBar";
 import { LocalOperationError, runLocalOperation } from "./api";
 import { PreviewBoundary } from "./PreviewBoundary";
@@ -28,6 +30,7 @@ import type { SlotState } from "./types";
 const initialVersion = "0".repeat(64);
 let draftInstanceSequence = 0;
 type TargetResult = { view: TargetViewModel; error?: never } | { view?: never; error: string };
+type SlotSelection = Extract<SelectionTarget, { kind: "slot" }>;
 
 export function App() {
   const [showInternals, setShowInternals] = useState(false);
@@ -44,9 +47,11 @@ export function App() {
   const [connected, setConnected] = useState(false);
   const [selection, setSelection] = useState<SelectionTarget>(() => initialSelection(targetResult));
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("tree");
+  const [mobileMode, setMobileMode] = useState<MobileWorkspaceMode>("preview");
   const [selectedFileId, setSelectedFileId] = useState<string>();
   const [selectedCatalogId, setSelectedCatalogId] = useState<string>();
   const [showDiff, setShowDiff] = useState(false);
+  const [slotPicker, setSlotPicker] = useState<SlotSelection>();
   const [runtimeMessage, setRuntimeMessage] = useState<string>();
   const [previewCss, setPreviewCss] = useState("");
   const [previewValue, setPreviewValue] = useState<string>();
@@ -164,6 +169,21 @@ export function App() {
     count: slot.childCount,
     childLabel: childLabel(selectedFixture, slot.selection.slotId),
   }));
+  const catalogEntries = target.adapters.map((item) => ({ ...item.component, slotCount: item.component.slots.length }));
+  const pickerParent = slotPicker ? findComponentInstance(view.root, slotPicker.componentInstanceId) : undefined;
+  const pickerParentAdapter = target.adapters.find((adapter) => adapter.component.id === pickerParent?.componentId);
+  const pickerSlot = pickerParentAdapter?.component.slots.find((slot) => slot.id === slotPicker?.slotId);
+  const pickerEntries = catalogEntries.filter((entry) => {
+    if (!pickerSlot || pickerSlot.max === 0 || pickerSlot.accepts && !pickerSlot.accepts.includes(entry.id)) return false;
+    const adapter = target.adapters.find((candidate) => candidate.component.id === entry.id);
+    return !adapter?.component.slots.some((slot) => (slot.min ?? 0) > 0);
+  });
+  const selectTarget = (next: SelectionTarget) => {
+    setSelection(next);
+    if (next.kind !== "slot") return;
+    const parent = findComponentFixture(fixture, next.componentInstanceId);
+    if ((parent?.slots[next.slotId]?.length ?? 0) === 0) setSlotPicker(next);
+  };
   const editable = connected && Boolean(editTargetId) && selectedInstance.instanceId === view.root.instanceId;
   const tailwindReady = previewValue === editor.draftValue;
   const preview = renderTargetFixture(target, fixture, { className: editor.draftValue });
@@ -177,35 +197,35 @@ export function App() {
     selection,
     slots,
     onClassNameChange: (value: string) => dispatch({ type: "edit" as const, value }),
-    onSelectSlot: (slot: SlotState) => setSelection({
-      kind: "slot",
-      id: slot.selectionId,
-      componentInstanceId: selectedInstance.instanceId,
-      slotId: slot.id,
+    onSelectSlot: (slot: SlotState) => selectTarget({
+      kind: "slot", id: slot.selectionId, componentInstanceId: selectedInstance.instanceId, slotId: slot.id,
     }),
-    onAddToSlot: () => setWorkspaceMode("catalog" as const),
+    onAddToSlot: (slot: SlotState) => {
+      const next = { kind: "slot", id: slot.selectionId, componentInstanceId: selectedInstance.instanceId, slotId: slot.id } as const;
+      setSelection(next);
+      setSlotPicker(next);
+    },
   };
 
-  const selectCatalogComponent = (adapterId: string) => {
+  const insertCatalogComponent = (adapterId: string, targetSlot: SlotSelection) => {
     setSelectedCatalogId(adapterId);
-    if (selection.kind !== "slot") return;
     const childAdapter = target.adapters.find((adapter) => adapter.component.id === adapterId);
-    const parentInstance = findComponentInstance(view.root, selection.componentInstanceId);
-    const parentFixture = findComponentFixture(fixture, selection.componentInstanceId);
+    const parentInstance = findComponentInstance(view.root, targetSlot.componentInstanceId);
+    const parentFixture = findComponentFixture(fixture, targetSlot.componentInstanceId);
     const parentAdapter = target.adapters.find((adapter) => adapter.component.id === parentInstance?.componentId);
-    const parentSlot = parentAdapter?.component.slots.find((slot) => slot.id === selection.slotId);
-    const currentChildren = parentFixture?.slots[selection.slotId] ?? [];
+    const parentSlot = parentAdapter?.component.slots.find((slot) => slot.id === targetSlot.slotId);
+    const currentChildren = parentFixture?.slots[targetSlot.slotId] ?? [];
     if (!childAdapter || !parentSlot || parentSlot.accepts && !parentSlot.accepts.includes(adapterId)) {
       setRuntimeMessage("That component is not accepted by the selected slot.");
-      return;
+      return false;
     }
     if (parentSlot.max !== undefined && currentChildren.length >= parentSlot.max) {
       setRuntimeMessage("The selected slot is already at its maximum size.");
-      return;
+      return false;
     }
     if (childAdapter.component.slots.some((slot) => (slot.min ?? 0) > 0)) {
       setRuntimeMessage("That component requires a target-owned fixture before it can be inserted.");
-      return;
+      return false;
     }
     const child: ComponentFixture = {
       instanceId: `draft-${++draftInstanceSequence}`,
@@ -214,16 +234,27 @@ export function App() {
     };
     setFixture((current) => appendFixtureChild(
       current,
-      selection.componentInstanceId,
-      selection.slotId,
+      targetSlot.componentInstanceId,
+      targetSlot.slotId,
       { kind: "component", node: child },
     ));
     setRuntimeMessage(undefined);
     setWorkspaceMode("tree");
+    setMobileMode("preview");
+    return true;
+  };
+  const browseCatalogComponent = (adapterId: string) => { setSelectedCatalogId(adapterId); };
+  const selectPickerComponent = (adapterId: string) => {
+    if (slotPicker && insertCatalogComponent(adapterId, slotPicker)) setSlotPicker(undefined);
   };
 
+  const status = statusLabel(editor.phase, isDirty(editor), connected, fixture !== target.defaultFixture);
+  const statusDot = runtimeMessage
+    ? "bg-rose-400"
+    : editor.phase === "stale" ? "bg-amber-400" : connected ? "bg-emerald-400" : "bg-zinc-500";
+
   return (
-    <div className="flex h-dvh min-w-[720px] flex-col overflow-hidden bg-[#0d0e10] text-zinc-200">
+    <div className="flex h-dvh w-full min-w-0 flex-col overflow-hidden bg-[#0d0e10] text-zinc-200">
       <style data-design-space-tailwind-preview>{previewCss}</style>
       <TopBar
         targetLabel={target.project.label}
@@ -234,27 +265,39 @@ export function App() {
         canSave={editable && tailwindReady && editor.phase === "diff-ready" && Boolean(editor.preparedEdit)}
         saveLabel={editor.phase === "saving" ? "Saving…" : "Save"}
         onUndo={() => dispatch({ type: "undo" })}
-        onReset={() => { dispatch({ type: "reset" }); setFixture(target.defaultFixture); setSelection(initialSelection(safeInitialView())); setRuntimeMessage(undefined); setShowDiff(false); }}
+        onReset={() => { dispatch({ type: "reset" }); setFixture(target.defaultFixture); setSelection(initialSelection(safeInitialView())); setRuntimeMessage(undefined); setShowDiff(false); setSlotPicker(undefined); }}
         onDiff={() => void prepare()}
         onSave={() => void save()}
       />
-      <div className="flex min-h-0 flex-1">
-        <ActivityRail active={workspaceMode} onChange={setWorkspaceMode} />
-        {workspaceMode === "tree" && <ComponentTree pageLabel={target.defaultFixture.label ?? target.project.label} rows={view.rows} selectedId={selection.id} showInternals={showInternals} onSelect={setSelection} onToggleInternals={() => setShowInternals((value) => !value)} />}
-        {workspaceMode === "files" && <FileBrowser files={target.files} selectedId={selectedFileId} onSelect={setSelectedFileId} />}
-        {(workspaceMode === "catalog" || workspaceMode === "search") && <CatalogPanel entries={target.adapters.map((item) => ({ ...item.component, slotCount: item.component.slots.length }))} selectedId={selectedCatalogId} onSelect={selectCatalogComponent} />}
-        {workspaceMode === "inspector" && <Inspector className="flex xl:hidden" {...inspectorProps} />}
-        <div className="relative flex min-w-0 flex-1">
-          <PreviewCanvas preview={<PreviewBoundary resetKey={editor.draftValue}>{preview}</PreviewBoundary>} rootInstanceId={view.root.instanceId} selectedComponentInstanceId={selectedInstance.instanceId} slots={slots} selection={selection} onSelect={setSelection} />
-          <Inspector className="hidden xl:flex" {...inspectorProps} />
-          {showDiff && editor.preparedEdit && <DiffSheet diff={editor.preparedEdit.exactDiff} onClose={() => setShowDiff(false)} />}
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <ActivityRail className="hidden lg:flex" active={workspaceMode} onChange={setWorkspaceMode} />
+
+        {mobileMode !== "preview" && (
+          <div className="flex min-h-0 min-w-0 flex-1 lg:hidden">
+            {mobileMode === "tree" && <ComponentTree className="flex w-full border-r-0" pageLabel={target.defaultFixture.label ?? target.project.label} rows={view.rows} selectedId={selection.id} showInternals={showInternals} onSelect={selectTarget} onToggleInternals={() => setShowInternals((value) => !value)} />}
+            {mobileMode === "files" && <FileBrowser className="flex w-full border-r-0" files={target.files} selectedId={selectedFileId} onSelect={setSelectedFileId} />}
+            {mobileMode === "catalog" && <CatalogPanel className="flex w-full border-r-0" entries={catalogEntries} selectedId={selectedCatalogId} onSelect={browseCatalogComponent} />}
+            {mobileMode === "inspector" && <Inspector className="flex w-full border-l-0" {...inspectorProps} />}
+          </div>
+        )}
+
+        {workspaceMode === "tree" && <ComponentTree className="hidden w-64 lg:flex" pageLabel={target.defaultFixture.label ?? target.project.label} rows={view.rows} selectedId={selection.id} showInternals={showInternals} onSelect={selectTarget} onToggleInternals={() => setShowInternals((value) => !value)} />}
+        {workspaceMode === "files" && <FileBrowser className="hidden w-64 lg:flex" files={target.files} selectedId={selectedFileId} onSelect={setSelectedFileId} />}
+        {(workspaceMode === "catalog" || workspaceMode === "search") && <CatalogPanel className="hidden w-64 lg:flex" entries={catalogEntries} selectedId={selectedCatalogId} onSelect={browseCatalogComponent} />}
+        {workspaceMode === "inspector" && <Inspector className="hidden w-72 lg:flex xl:hidden" {...inspectorProps} />}
+        <div className={`${mobileMode === "preview" ? "flex" : "hidden"} relative min-h-0 min-w-0 flex-1 lg:flex`}>
+          <PreviewCanvas preview={<PreviewBoundary resetKey={editor.draftValue}>{preview}</PreviewBoundary>} rootInstanceId={view.root.instanceId} selectedComponentInstanceId={selectedInstance.instanceId} slots={slots} selection={selection} onSelect={selectTarget} />
+          <Inspector className="hidden w-72 xl:flex" {...inspectorProps} />
         </div>
       </div>
-      <footer className="flex h-6 shrink-0 items-center border-t border-white/10 bg-[#101113] px-3 text-[9px] text-zinc-600">
-        <span className={`mr-2 size-1.5 rounded-full ${runtimeMessage ? "bg-rose-400" : editor.phase === "stale" ? "bg-amber-400" : connected ? "bg-emerald-400" : "bg-zinc-500"}`} />
-        <span>{runtimeMessage ?? statusLabel(editor.phase, isDirty(editor), connected, fixture !== target.defaultFixture)}</span>
-        <span className="ml-auto">Local runtime · writes confined to registered targets</span>
+      <footer aria-live="polite" className="flex h-6 shrink-0 items-center border-t border-white/10 bg-[#101113] px-3 text-[9px] text-zinc-600" role="status">
+        <span className={`mr-2 size-1.5 shrink-0 rounded-full ${statusDot}`} />
+        <span className="truncate">{runtimeMessage ?? status}</span>
+        <span className="ml-auto hidden shrink-0 lg:block">Local runtime · writes confined to registered targets</span>
       </footer>
+      <MobileNavigation active={mobileMode} onChange={setMobileMode} />
+      {showDiff && editor.preparedEdit && <DiffSheet diff={editor.preparedEdit.exactDiff} onClose={() => setShowDiff(false)} />}
+      <SlotCatalogDialog open={Boolean(slotPicker)} slotLabel={pickerSlot?.label ?? "slot"} entries={pickerEntries} onClose={() => setSlotPicker(undefined)} onSelect={selectPickerComponent} />
     </div>
   );
 

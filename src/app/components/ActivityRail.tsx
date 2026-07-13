@@ -10,9 +10,9 @@ const actions: { label: string; mode: WorkspaceMode; icon: typeof Boxes; narrowO
   { label: "Inspector", mode: "inspector", icon: SlidersHorizontal, narrowOnly: true },
 ];
 
-export function ActivityRail(props: { active: WorkspaceMode; onChange: (mode: WorkspaceMode) => void }) {
+export function ActivityRail(props: { active: WorkspaceMode; onChange: (mode: WorkspaceMode) => void; className?: string }) {
   return (
-    <nav aria-label="Workspace tools" className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-white/10 bg-[#101113] py-2">
+    <nav aria-label="Workspace tools" className={`${props.className ?? "flex"} w-12 shrink-0 flex-col items-center gap-1 border-r border-white/10 bg-[#101113] py-2`}>
       {actions.map(({ label, mode, icon: Icon, narrowOnly }) => {
         const active = props.active === mode;
         return (

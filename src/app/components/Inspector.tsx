@@ -22,7 +22,7 @@ export function Inspector(props: InspectorProps) {
     : undefined;
 
   return (
-    <aside className={`${props.className ?? "flex"} w-72 shrink-0 flex-col overflow-y-auto border-l border-white/10 bg-[#141518]`}>
+    <aside className={`${props.className ?? "flex w-72"} min-w-0 shrink-0 flex-col overflow-y-auto border-l border-white/10 bg-[#141518]`}>
       <div className="border-b border-white/10 px-4 py-3">
         <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-600">Inspector</p>
         <h2 className="mt-1 text-sm font-medium text-zinc-100">{selectedSlot ? `${selectedSlot.label} slot` : props.componentLabel}</h2>
@@ -33,7 +33,7 @@ export function Inspector(props: InspectorProps) {
         <p className="mb-2 text-[10px] leading-4 text-zinc-500">Direct children: declared slots only</p>
         <div className="divide-y divide-white/5 border-y border-white/5">
           {props.slots.map((slot) => (
-            <button key={slot.id} className="flex w-full items-center gap-2 py-2 text-left" type="button" onClick={() => props.onSelectSlot(slot)}>
+            <button key={slot.id} aria-selected={selectedSlotId === slot.id} className="flex min-h-11 w-full items-center gap-2 py-2 text-left" type="button" onClick={() => props.onSelectSlot(slot)}>
               <CircleDot size={11} className={slot.count ? "text-emerald-400" : "text-zinc-600"} />
               <span className="flex-1 text-xs text-zinc-300">{slot.label}</span>
               <span className="text-[10px] text-zinc-600">{slot.count} item{slot.count === 1 ? "" : "s"}</span>

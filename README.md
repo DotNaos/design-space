@@ -31,10 +31,11 @@ This split is intentional: the local developer chooses the target by the directo
 - An expandable target-owned component catalog and a project/file browser.
 - A component tree where all child-capable components declare named slots. Undeclared children are rejected.
 - Used and empty slot states in both the tree and preview. Selecting either surface selects the same stable slot ID.
+- Selecting an empty slot in the tree or preview opens a searchable component picker filtered to adapters accepted by that slot; insertion returns directly to the live preview.
 - Internal HTML collapsed inside components by default, with an explicit reveal control.
 - Live Tailwind drafts compiled on demand against the full Tailwind theme, including valid classes that do not yet appear in source. Unknown utilities and external CSS resources are rejected before Diff or Save.
 - Undo, reset, stale-source protection, one-time saves, atomic writes, and compile-error recovery.
-- Desktop and narrow layouts. On narrow windows, the Inspector is available from the sliders icon instead of permanently compressing the canvas.
+- A dedicated phone layout with one full-width workspace at a time, labeled bottom navigation, touch-sized tree/catalog rows, a fitted preview, a mobile diff sheet, and full-screen Tree, Files, Catalog, and Inspector surfaces.
 
 ## Target-owned adapters
 

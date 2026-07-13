@@ -2,6 +2,7 @@ import { Maximize2, Minus, MousePointer2, Plus } from "lucide-react";
 import type { Selection, SlotState } from "../types";
 
 type PreviewCanvasProps = {
+  className?: string;
   preview: React.ReactNode;
   rootInstanceId: string;
   selectedComponentInstanceId: string;
@@ -15,22 +16,22 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const empty = props.slots.filter((slot) => slot.count === 0);
 
   return (
-    <main className="relative min-w-0 flex-1 overflow-hidden bg-[#0d0e10]">
+    <main className={`${props.className ?? "flex"} relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[#0d0e10]`}>
       <div
         className="absolute inset-0 opacity-40"
         style={{ backgroundImage: "radial-gradient(circle, #3f3f46 1px, transparent 1px)", backgroundSize: "20px 20px" }}
       />
 
       <div className="absolute left-3 top-3 z-10 flex items-center gap-1 rounded-lg border border-white/10 bg-[#17181b]/95 p-1 shadow-xl">
-        <button aria-label="Select" className="grid size-7 place-items-center rounded-md bg-indigo-500 text-white" type="button"><MousePointer2 size={14} /></button>
-        <span className="mx-1 h-4 w-px bg-white/10" />
-        <button aria-label="Zoom out" className="grid size-7 place-items-center text-zinc-500 hover:text-zinc-200" type="button"><Minus size={14} /></button>
-        <span className="px-1 text-[10px] text-zinc-500">100%</span>
-        <button aria-label="Zoom in" className="grid size-7 place-items-center text-zinc-500 hover:text-zinc-200" type="button"><Plus size={14} /></button>
-        <button aria-label="Fit canvas" className="grid size-7 place-items-center text-zinc-500 hover:text-zinc-200" type="button"><Maximize2 size={14} /></button>
+        <button aria-label="Select" className="grid size-11 place-items-center rounded-md bg-indigo-500 text-white lg:size-7" type="button"><MousePointer2 size={14} /></button>
+        <span className="mx-1 hidden h-4 w-px bg-white/10 lg:block" />
+        <button aria-label="Zoom out" className="hidden size-7 place-items-center text-zinc-500 hover:text-zinc-200 lg:grid" type="button"><Minus size={14} /></button>
+        <span className="hidden px-1 text-[10px] text-zinc-500 lg:inline">100%</span>
+        <button aria-label="Zoom in" className="hidden size-7 place-items-center text-zinc-500 hover:text-zinc-200 lg:grid" type="button"><Plus size={14} /></button>
+        <button aria-label="Fit canvas" className="hidden size-7 place-items-center text-zinc-500 hover:text-zinc-200 lg:grid" type="button"><Maximize2 size={14} /></button>
       </div>
 
-      <div className="absolute inset-0 flex items-center justify-center p-12">
+      <div className="absolute inset-0 flex items-start justify-center overflow-auto px-4 py-16 lg:items-center lg:p-12">
         <div className="w-full max-w-[620px]" onClick={() => props.onSelect({ kind: "component", id: props.rootInstanceId })}>
           <div className={`relative transition-shadow ${props.selection.kind === "component" ? "ring-1 ring-indigo-400 ring-offset-4 ring-offset-[#0d0e10]" : ""}`}>
             {props.preview}
@@ -52,14 +53,14 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
           {empty.map((slot) => (
             <button
               key={slot.selectionId}
-              className={`mt-4 flex h-20 w-full items-center justify-center rounded-xl border border-dashed text-xs transition-colors ${props.selection.id === slot.selectionId ? "border-indigo-400 bg-indigo-500/10 text-indigo-300" : "border-zinc-600 bg-zinc-900/40 text-zinc-500 hover:border-zinc-400"}`}
+              className={`mt-4 flex h-16 w-full items-center justify-center rounded-xl border border-dashed px-3 text-center text-[11px] transition-colors lg:h-20 lg:text-xs ${props.selection.id === slot.selectionId ? "border-indigo-400 bg-indigo-500/10 text-indigo-300" : "border-zinc-600 bg-zinc-900/40 text-zinc-500 hover:border-zinc-400"}`}
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
                 props.onSelect({ kind: "slot", id: slot.selectionId, componentInstanceId: props.selectedComponentInstanceId, slotId: slot.id });
               }}
             >
-              <span><span className="font-medium text-zinc-300">{slot.label} slot</span> · Drop a component</span>
+              <span><span className="font-medium text-zinc-300">{slot.label} slot</span> · Add component</span>
             </button>
           ))}
         </div>

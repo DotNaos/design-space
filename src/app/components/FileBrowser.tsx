@@ -3,12 +3,13 @@ import { ChevronDown, FileCode2, FolderOpen } from "lucide-react";
 import type { TargetFileEntry } from "../../shared/target-module";
 
 export function FileBrowser(props: {
+  className?: string;
   files: readonly TargetFileEntry[];
   selectedId?: string;
   onSelect: (id: string) => void;
 }) {
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-white/10 bg-[#141518]">
+    <aside className={`${props.className ?? "flex w-64"} min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
       <div className="flex h-11 items-center justify-between border-b border-white/10 px-3">
         <h2 className="text-xs font-medium text-zinc-300">Project files</h2>
         <span className="text-[9px] text-emerald-400">Allowlisted</span>
@@ -34,7 +35,8 @@ function renderChildren(
   return files.filter((file) => file.parentId === parentId).map((file) => (
     <div key={file.id}>
       <button
-        className={`flex h-8 w-full items-center gap-2 pr-2 text-left ${selectedId === file.id ? "bg-indigo-500/10 text-indigo-200" : "hover:bg-white/[0.03]"}`}
+        aria-selected={selectedId === file.id}
+        className={`flex h-11 w-full items-center gap-2 pr-2 text-left lg:h-8 ${selectedId === file.id ? "bg-indigo-500/10 text-indigo-200" : "hover:bg-white/[0.03]"}`}
         style={{ paddingLeft: 10 + depth * 16 }}
         type="button"
         onClick={() => onSelect(file.id)}
