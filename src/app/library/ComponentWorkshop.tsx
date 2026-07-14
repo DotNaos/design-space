@@ -82,10 +82,7 @@ export function ComponentWorkshop(props: {
             key={slot.id}
             slot={slot}
             catalogComponents={props.catalogComponents}
-            onChange={(nextSlot) => {
-              const { id: _stableId, ...patch } = nextSlot;
-              props.onChange(updateComponentSlot(props.document, slot.id, patch));
-            }}
+            onChange={(nextSlot) => props.onChange(updateComponentSlot(props.document, slot.id, () => nextSlot))}
             onRemove={() => props.onChange(removeComponentSlot(props.document, slot.id))}
           />
         ))}

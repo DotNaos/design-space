@@ -9,6 +9,7 @@ import {
   moveDesignComponent,
   removeDesignComponent,
   removeComponentProperty,
+  updateComponentSlot,
   updateDocumentLabel,
   updateDesignProps,
 } from "./document-commands";
@@ -58,6 +59,28 @@ describe("design document commands", () => {
     const next = addComponentSlot(component, { id: "body", label: "Body" }, "panel.root", "content", () => "outlet.body");
     expect(next.component?.slots).toEqual([{ id: "body", label: "Body" }]);
     expect(next.root.slots.content).toEqual([{ kind: "slot-outlet", id: "outlet.body", slotId: "body" }]);
+  });
+
+  it("replaces complete slot contracts so omitted constraints stay cleared", () => {
+    const component = componentDocument();
+    component.component!.slots = [{
+      id: "body",
+      label: "Body",
+      max: 2,
+      accepts: ["catalog.heading"],
+      acceptsText: true,
+    }];
+
+    const next = updateComponentSlot(component, "body", (slot) => ({
+      id: slot.id,
+      label: slot.label,
+      acceptsText: slot.acceptsText,
+    }));
+
+    expect(next.component?.slots[0]).toEqual({ id: "body", label: "Body", acceptsText: true });
+    expect(component.component?.slots[0]).toMatchObject({ max: 2, accepts: ["catalog.heading"] });
+    expect(() => updateComponentSlot(component, "body", (slot) => ({ ...slot, id: "renamed" })))
+      .toThrow("A component slot ID cannot be changed.");
   });
 
   it("renames screens and keeps component document labels synchronized", () => {

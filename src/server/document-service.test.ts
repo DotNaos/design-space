@@ -23,6 +23,8 @@ interface FixtureState {
   compileFails: boolean;
   compileCalls: number;
   materializeCalls: number;
+  materializationMode: "current" | "malformed-document" | "stale-all" | "stale-document";
+  mutatesDuringRoundTripLoad: boolean;
   returnsUnknownFile: boolean;
   mutatesDuringCompile: boolean;
 }
@@ -45,6 +47,8 @@ describe("durable document service", () => {
       compileFails: false,
       compileCalls: 0,
       materializeCalls: 0,
+      materializationMode: "current",
+      mutatesDuringRoundTripLoad: false,
       returnsUnknownFile: false,
       mutatesDuringCompile: false,
     };
@@ -64,13 +68,25 @@ describe("durable document service", () => {
           "screen.home": {
             sourceFileIds: ["document.source", "view.source"],
             writeFileIds: ["document.source", "view.source"],
-            load: (sources) => JSON.parse(sources["document.source"]),
+            load: async (sources) => {
+              if (
+                state.mutatesDuringRoundTripLoad &&
+                sources["document.source"] !== `${canonicalJson(initialDocument, 2)}\n`
+              ) {
+                await writeFile(viewPath, "// concurrent round-trip loader mutation\n");
+              }
+              return JSON.parse(sources["document.source"]);
+            },
             strictUi: () => state.strictViolations,
             materialize: (document) => {
               state.materializeCalls += 1;
+              const serializedDocument = state.materializationMode === "current" ? document : initialDocument;
+              const renderedDocument = state.materializationMode === "stale-all" ? initialDocument : document;
               const output: Record<string, string> = {
-                "document.source": `${canonicalJson(document, 2)}\n`,
-                "view.source": renderView(document),
+                "document.source": state.materializationMode === "malformed-document"
+                  ? "{ malformed document source\n"
+                  : `${canonicalJson(serializedDocument, 2)}\n`,
+                "view.source": renderView(renderedDocument),
               };
               if (state.returnsUnknownFile) output["arbitrary.output"] = "unsafe";
               return output;
@@ -185,6 +201,62 @@ describe("durable document service", () => {
       snapshot.sourceVersions,
     )).rejects.toMatchObject({ code: "INVALID_REGISTRATION" });
   });
+
+  it.each([
+    ["entirely stale", "stale-all"],
+    ["partially stale", "stale-document"],
+  ] as const)("rejects %s materialized sources that do not reload to the proposed document", async (_, mode) => {
+    const { documentPath, viewPath, service, state } = await fixture();
+    state.materializationMode = mode;
+    const snapshot = await service.read("screen.home");
+    const beforeDocument = await readFile(documentPath, "utf8");
+    const beforeView = await readFile(viewPath, "utf8");
+
+    await expect(service.prepare(
+      "screen.home",
+      { ...snapshot.document, label: "Draft that must survive materialization" },
+      snapshot.documentDigest,
+      snapshot.sourceVersions,
+    )).rejects.toMatchObject({
+      code: "INVALID_REGISTRATION",
+      message: "The target materialization did not preserve the document",
+    });
+    expect(state.compileCalls).toBe(0);
+    expect(await readFile(documentPath, "utf8")).toBe(beforeDocument);
+    expect(await readFile(viewPath, "utf8")).toBe(beforeView);
+  });
+
+  it("rejects malformed materialized document sources before compiling or issuing a challenge", async () => {
+    const { service, state } = await fixture();
+    state.materializationMode = "malformed-document";
+    const snapshot = await service.read("screen.home");
+
+    await expect(service.prepare(
+      "screen.home",
+      { ...snapshot.document, label: "Malformed round trip" },
+      snapshot.documentDigest,
+      snapshot.sourceVersions,
+    )).rejects.toMatchObject({ code: "INVALID_DOCUMENT" });
+    expect(state.compileCalls).toBe(0);
+  });
+
+  it.each(["current", "malformed-document"] as const)(
+    "preserves stale-source errors during a %s round-trip loader callback",
+    async (mode) => {
+      const { service, state } = await fixture();
+      state.materializationMode = mode;
+      state.mutatesDuringRoundTripLoad = true;
+      const snapshot = await service.read("screen.home");
+
+      await expect(service.prepare(
+        "screen.home",
+        { ...snapshot.document, label: "Concurrent round trip" },
+        snapshot.documentDigest,
+        snapshot.sourceVersions,
+      )).rejects.toMatchObject({ code: "STALE_SOURCE" });
+      expect(state.compileCalls).toBe(0);
+    },
+  );
 
   it("allows warnings but returns compile failures without a challenge and then recovers", async () => {
     const { documentPath, service, state } = await fixture();

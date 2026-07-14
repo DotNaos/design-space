@@ -162,15 +162,18 @@ export function updateComponentDefinition(
 export function updateComponentSlot(
   document: DesignDocument,
   slotId: string,
-  patch: Partial<Omit<ComponentSlotDraft, "id">>,
+  update: (slot: ComponentSlotDraft) => ComponentSlotDraft,
 ): DesignDocument {
   if (document.kind !== "component" || !document.component) throw new Error("Only component documents define slots.");
-  if (!document.component.slots.some((slot) => slot.id === slotId)) throw new Error(`Slot ${slotId} was not found.`);
+  const currentSlot = document.component.slots.find((slot) => slot.id === slotId);
+  if (!currentSlot) throw new Error(`Slot ${slotId} was not found.`);
+  const nextSlot = update(currentSlot);
+  if (nextSlot.id !== slotId) throw new Error("A component slot ID cannot be changed.");
   return {
     ...document,
     component: {
       ...document.component,
-      slots: document.component.slots.map((slot) => slot.id === slotId ? { ...slot, ...patch } : slot),
+      slots: document.component.slots.map((slot) => slot.id === slotId ? nextSlot : slot),
     },
   };
 }

@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { expect, it, vi } from "vitest";
 
 import type { DesignDocument } from "../../shared/design-document";
@@ -37,6 +38,49 @@ it("keeps the complete component workshop scrollable on a phone and creates an e
 
   await user.click(screen.getByRole("button", { name: "Implementation" }));
   expect(screen.queryByRole("button", { name: "Edit component body" })).not.toBeInTheDocument();
+});
+
+it("removes cleared maximum and accepted-component constraints from the saved slot", async () => {
+  const user = userEvent.setup();
+  const onChange = vi.fn();
+  function Harness() {
+    const [document, setDocument] = useState<DesignDocument>({
+      ...component,
+      component: {
+        ...component.component!,
+        slots: [{
+          id: "content",
+          label: "Content",
+          max: 2,
+          accepts: ["catalog.heading"],
+          acceptsText: true,
+        }],
+      },
+    });
+    return (
+      <ComponentWorkshop
+        className="flex w-full"
+        document={document}
+        catalogComponents={[{ id: "catalog.heading", label: "Heading", controls: [] }]}
+        onChange={(nextDocument) => {
+          setDocument(nextDocument);
+          onChange(nextDocument);
+        }}
+        onEditImplementation={vi.fn()}
+      />
+    );
+  }
+  render(<Harness />);
+
+  await user.clear(screen.getByRole("spinbutton", { name: "Maximum children" }));
+  let changed = onChange.mock.lastCall?.[0] as DesignDocument;
+  expect(changed.component?.slots[0]).not.toHaveProperty("max");
+  expect(changed.component?.slots[0]).toHaveProperty("accepts", ["catalog.heading"]);
+
+  await user.click(screen.getByRole("button", { name: "Any component" }));
+  changed = onChange.mock.lastCall?.[0] as DesignDocument;
+  expect(changed.component?.slots[0]).not.toHaveProperty("max");
+  expect(changed.component?.slots[0]).not.toHaveProperty("accepts");
 });
 
 const component: DesignDocument = {

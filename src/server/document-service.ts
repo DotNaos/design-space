@@ -40,6 +40,7 @@ import { TrustedDocumentLibrary, type DocumentLibrarySnapshot } from "./document
 import { ManagedDocumentCreation } from "./managed-document-creation";
 import type { NewFileTransactionHooks } from "./new-file-transaction";
 import { assertStillRegistered } from "./path-security";
+import { loadRegisteredDocument } from "./registered-document-loader";
 import { sourceVersion } from "./source-editor";
 import { TargetTailwindService } from "./target-tailwind-service";
 import type {
@@ -121,7 +122,7 @@ export class DocumentService {
     const sourceVersions = versionsFor(sources);
     let document: DesignDocument;
     try {
-      document = await this.#load(documentTarget, sources);
+      document = await loadRegisteredDocument(documentTarget, sources, this.#context(documentTarget, sources));
     } catch (error) {
       await this.#assertSourcesUnchanged(documentTarget, sourceVersions);
       throw error;
@@ -182,7 +183,7 @@ export class DocumentService {
     assertSameVersions(baseSourceVersions, currentSourceVersions);
     let currentDocument: DesignDocument;
     try {
-      currentDocument = await this.#load(documentTarget, sources);
+      currentDocument = await loadRegisteredDocument(documentTarget, sources, this.#context(documentTarget, sources));
     } catch (error) {
       await this.#assertSourcesUnchanged(documentTarget, currentSourceVersions);
       throw error;
@@ -286,6 +287,19 @@ export class DocumentService {
     const nextWriteSources = validateMaterialization(documentTarget, materialized);
     const nextSources = freezeRecord({ ...sources, ...nextWriteSources });
     const nextSourceVersions = versionsFor(nextSources);
+    let reloadedDocument: DesignDocument;
+    try {
+      reloadedDocument = await loadRegisteredDocument(documentTarget, nextSources, this.#context(documentTarget, nextSources));
+    } catch (error) {
+      await this.#assertValidationInputsUnchanged(documentTarget, currentSourceVersions, library);
+      await this.#tailwind.assertUnchanged(tailwindSourceVersions);
+      throw error;
+    }
+    await this.#assertValidationInputsUnchanged(documentTarget, currentSourceVersions, library);
+    await this.#tailwind.assertUnchanged(tailwindSourceVersions);
+    if (digestDocument(reloadedDocument) !== documentDigest) {
+      throw new DesignSpaceError("INVALID_REGISTRATION", "The target materialization did not preserve the document");
+    }
     const strictUi = createStrictUiEvidence({
       ...this.#evidenceContext,
       documentId,
@@ -475,23 +489,6 @@ export class DocumentService {
   ): Promise<void> {
     await this.#assertSourcesUnchanged(document, sourceVersions);
     await this.#library.assertUnchanged(library.sourceVersions);
-  }
-
-  async #load(
-    documentTarget: RegisteredDocumentTarget,
-    sources: Readonly<Record<string, string>>,
-  ): Promise<DesignDocument> {
-    let loaded: unknown;
-    try {
-      loaded = await documentTarget.load(sources, this.#context(documentTarget, sources));
-    } catch {
-      throw new DesignSpaceError("INVALID_DOCUMENT", "The registered document could not be loaded");
-    }
-    const parsed = designDocumentSchema.safeParse(loaded);
-    if (!parsed.success || parsed.data.id !== documentTarget.id) {
-      throw new DesignSpaceError("INVALID_DOCUMENT", "The registered document has an invalid shape or identity");
-    }
-    return parsed.data;
   }
 
 }
