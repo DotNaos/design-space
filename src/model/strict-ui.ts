@@ -8,11 +8,7 @@ import type {
 } from "../shared/design-document";
 import type { StrictUiLocation, StrictUiViolation } from "../shared/strict-ui";
 import type { ComponentAdapter, TargetModule } from "../shared/target-module";
-
-type StrictControl = NonNullable<ComponentAdapter["controls"]>[number] & {
-  required?: boolean;
-  options?: readonly { value: string | number }[];
-};
+import { validateControls, validatePublicPropertyDefaults } from "./strict-ui-properties";
 
 type StrictSlot = ComponentAdapter["component"]["slots"][number] & { acceptsText?: boolean };
 
@@ -27,7 +23,9 @@ export function validateStrictUi(
   const nodeIds = new Set<string>();
   const outlets: DesignSlotOutletNode[] = [];
   const publicSlots = new Map(document.component?.slots.map((slot) => [slot.id, slot]) ?? []);
-  visitNode(target, library, document.root, nodeIds, outlets, publicSlots, violations);
+  const publicProperties = new Map(document.component?.properties.map((property) => [property.id, property]) ?? []);
+  validatePublicPropertyDefaults(document.component?.properties ?? [], violations);
+  visitNode(target, library, document.root, nodeIds, outlets, publicSlots, publicProperties, violations);
   validateOutlets(document, outlets, violations);
   validatePropertyBindings(target, document, library, violations);
   if (hasAuthoredComponentCycle(document, library)) {
@@ -126,6 +124,7 @@ function visitNode(
   nodeIds: Set<string>,
   outlets: DesignSlotOutletNode[],
   publicSlots: ReadonlyMap<string, ComponentSlotDraft>,
+  publicProperties: ReadonlyMap<string, ComponentPropertyDraft>,
   violations: StrictUiViolation[],
 ): void {
   if (nodeIds.has(node.instanceId)) {
@@ -140,7 +139,7 @@ function visitNode(
     return;
   }
 
-  validateControls(adapter, node, violations);
+  validateControls(adapter, node, publicProperties, violations);
   const declaredSlots = new Map(adapter.component.slots.map((slot) => [slot.id, slot]));
   for (const slotId of Object.keys(node.slots)) {
     if (!declaredSlots.has(slotId)) {
@@ -158,60 +157,7 @@ function visitNode(
       violations.push(issue("slot.missing", `${slot.label} must be represented, even when empty.`, slotLocation(node.instanceId, slot.id)));
       continue;
     }
-    validateSlot(target, library, node, slot, children, nodeIds, outlets, publicSlots, violations);
-  }
-}
-
-function validateControls(adapter: ComponentAdapter, node: DesignComponentNode, violations: StrictUiViolation[]): void {
-  const controls = (adapter.controls ?? []) as readonly StrictControl[];
-  const declaredProps = new Set(controls.map((control) => control.prop));
-  for (const prop of Object.keys(node.props ?? {})) {
-    if (!declaredProps.has(prop)) {
-      violations.push(issue(
-        "property.undeclared",
-        `${adapter.component.label} does not declare the ${prop} property.`,
-        { kind: "control", instanceId: node.instanceId, controlId: prop },
-      ));
-    }
-  }
-  for (const control of controls) {
-    const defaults = adapter.defaultProps as Readonly<Record<string, unknown>> | undefined;
-    const value = node.props && Object.prototype.hasOwnProperty.call(node.props, control.prop)
-      ? node.props[control.prop]
-      : defaults?.[control.prop];
-    const location: StrictUiLocation = { kind: "control", instanceId: node.instanceId, controlId: control.id };
-    if (control.required && (value === undefined || value === null || value === "")) {
-      violations.push({
-        ...issue("property.required", `${control.label} is required.`, location),
-        suggestion: `Set ${control.label} before saving.`,
-      });
-      continue;
-    }
-    if (value === undefined || value === null) continue;
-    const valid = control.kind === "boolean"
-      ? typeof value === "boolean"
-      : control.kind === "number"
-        ? typeof value === "number" && Number.isFinite(value)
-        : typeof value === "string";
-    if (!valid) violations.push(issue("property.type", `${control.label} has the wrong value type.`, location));
-    if (control.kind === "text" && typeof value === "string" && control.maxLength !== undefined && value.length > control.maxLength) {
-      violations.push(issue("property.maxLength", `${control.label} exceeds its maximum length.`, location));
-    }
-    if (control.kind === "number" && typeof value === "number") {
-      if (control.min !== undefined && value < control.min) {
-        violations.push(issue("property.minimum", `${control.label} is below its minimum.`, location));
-      }
-      if (control.max !== undefined && value > control.max) {
-        violations.push(issue("property.maximum", `${control.label} exceeds its maximum.`, location));
-      }
-    }
-    if (
-      control.kind === "select" &&
-      (typeof value === "string" || typeof value === "number") &&
-      !control.options?.some((option) => option.value === value)
-    ) {
-      violations.push(issue("property.option", `${control.label} uses an unavailable option.`, location));
-    }
+    validateSlot(target, library, node, slot, children, nodeIds, outlets, publicSlots, publicProperties, violations);
   }
 }
 
@@ -224,6 +170,7 @@ function validateSlot(
   nodeIds: Set<string>,
   outlets: DesignSlotOutletNode[],
   publicSlots: ReadonlyMap<string, ComponentSlotDraft>,
+  publicProperties: ReadonlyMap<string, ComponentPropertyDraft>,
   violations: StrictUiViolation[],
 ): void {
   const location = slotLocation(node.instanceId, slot.id);
@@ -251,7 +198,7 @@ function validateSlot(
     if (slot.accepts && !slot.accepts.includes(child.node.adapterId)) {
       violations.push(issue("slot.child", `${slot.label} does not accept ${child.node.adapterId}.`, location));
     }
-    visitNode(target, library, child.node, nodeIds, outlets, publicSlots, violations);
+    visitNode(target, library, child.node, nodeIds, outlets, publicSlots, publicProperties, violations);
   }
 }
 
