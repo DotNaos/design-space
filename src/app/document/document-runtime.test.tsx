@@ -113,7 +113,59 @@ it("anchors explicit outlets in component documents", () => {
   render(<>{renderDesignDocument(target, panel, [panel])}</>);
 
   expect(document.querySelector('[data-design-space-outlet-id="panel.body.outlet"]'))
-    .toHaveAttribute("data-design-space-slot-id", "slot:panel.template:content");
+    .toHaveAttribute("data-design-space-slot-id", "slot:panel.template:body");
+});
+
+it.each([
+  ["a public class default", "bg-public", "bg-public"],
+  ["an explicitly empty public class", "", ""],
+  ["an explicitly null public class", null, ""],
+])("renders a component document with %s exactly like a later instance", (_label, defaultValue, expectedClass) => {
+  const componentDocument: DesignDocument = {
+    schemaVersion: 2,
+    id: "component.surface",
+    label: "Surface",
+    kind: "component",
+    component: {
+      id: "surface",
+      label: "Surface",
+      group: "Custom",
+      properties: [{
+        id: "surface.class",
+        label: "Class",
+        prop: "surface",
+        kind: "tailwind",
+        defaultValue,
+      }],
+      slots: [],
+    },
+    root: {
+      instanceId: "surface.template",
+      adapterId: "stack",
+      props: { className: "implementation-class" },
+      propertyBindings: { className: "surface.class" },
+      slots: { content: [] },
+    },
+  };
+  const targetWithDefault: TargetModule = {
+    ...target,
+    adapters: target.adapters.map((adapter) => adapter.component.id === "stack"
+      ? { ...adapter, defaultProps: { className: "adapter-default" } }
+      : adapter),
+  };
+  const screenDocument: DesignDocument = {
+    schemaVersion: 2,
+    id: "screen.surface",
+    label: "Surface screen",
+    kind: "screen",
+    root: { instanceId: "surface.instance", adapterId: "surface", slots: {} },
+  };
+
+  const workshop = render(<>{renderDesignDocument(targetWithDefault, componentDocument, [componentDocument])}</>);
+  expect(workshop.container.firstElementChild).toHaveAttribute("class", expectedClass);
+  workshop.unmount();
+  const placed = render(<>{renderDesignDocument(targetWithDefault, screenDocument, [componentDocument])}</>);
+  expect(placed.container.firstElementChild).toHaveAttribute("class", expectedClass);
 });
 
 it("applies a public property only to its explicitly bound implementation control", () => {
@@ -189,6 +241,79 @@ it("scopes authored component internals per outer instance", () => {
   ]);
 });
 
+it("keeps the outer public instance evidence when an implementation root is authored", () => {
+  const inner: DesignDocument = {
+    schemaVersion: 2,
+    id: "component.inner",
+    label: "Inner",
+    kind: "component",
+    component: { id: "inner", label: "Inner", group: "Custom", properties: [], slots: [] },
+    root: { instanceId: "inner.root", adapterId: "stack", slots: { content: [] } },
+  };
+  const outer: DesignDocument = {
+    schemaVersion: 2,
+    id: "component.outer",
+    label: "Outer",
+    kind: "component",
+    component: { id: "outer", label: "Outer", group: "Custom", properties: [], slots: [] },
+    root: { instanceId: "outer.inner", adapterId: "inner", slots: {} },
+  };
+  const screenDocument: DesignDocument = {
+    schemaVersion: 2,
+    id: "screen.outer",
+    label: "Outer screen",
+    kind: "screen",
+    root: { instanceId: "outer.instance", adapterId: "outer", slots: {} },
+  };
+
+  const { container } = render(<>{renderDesignDocument(target, screenDocument, [outer, inner])}</>);
+
+  expect(container.firstElementChild).toHaveAttribute("data-design-space-instance-id", "outer.instance");
+  expect(container.querySelector('[data-design-space-instance-id="outer.instance--outer.inner"]')).not.toBeInTheDocument();
+});
+
+it("allows a finite instance of a component inside its own projected slot", () => {
+  const recursiveBySlot: DesignDocument = {
+    schemaVersion: 2,
+    id: "component.slot-container",
+    label: "Slot container",
+    kind: "component",
+    component: {
+      id: "slot-container",
+      label: "Slot container",
+      group: "Custom",
+      properties: [],
+      slots: [{ id: "content", label: "Content" }],
+    },
+    root: {
+      instanceId: "slot-container.root",
+      adapterId: "stack",
+      slots: { content: [{ kind: "slot-outlet", id: "slot-container.outlet", slotId: "content" }] },
+    },
+  };
+  const screenDocument: DesignDocument = {
+    schemaVersion: 2,
+    id: "screen.finite-recursion",
+    label: "Finite recursion",
+    kind: "screen",
+    root: {
+      instanceId: "slot-container.outer",
+      adapterId: "slot-container",
+      slots: {
+        content: [{
+          kind: "component",
+          node: { instanceId: "slot-container.inner", adapterId: "slot-container", slots: { content: [] } },
+        }],
+      },
+    },
+  };
+
+  const { container } = render(<>{renderDesignDocument(target, screenDocument, [recursiveBySlot])}</>);
+
+  expect(container.querySelector('[data-design-space-instance-id="slot-container.outer"]')).toBeInTheDocument();
+  expect(container.querySelector('[data-design-space-instance-id="slot-container.inner"]')).toBeInTheDocument();
+});
+
 it("instruments fragment adapters without changing their layout box", () => {
   const fragmentDocument: DesignDocument = {
     schemaVersion: 2,
@@ -207,17 +332,49 @@ it("instruments fragment adapters without changing their layout box", () => {
 });
 
 it("stops authored component cycles with a recoverable error instead of overflowing the stack", () => {
+  const forwarder: DesignDocument = {
+    schemaVersion: 2,
+    id: "component.forwarder",
+    label: "Forwarder",
+    kind: "component",
+    component: {
+      id: "forwarder",
+      label: "Forwarder",
+      group: "Custom",
+      properties: [],
+      slots: [{ id: "content", label: "Content" }],
+    },
+    root: {
+      instanceId: "forwarder.root",
+      adapterId: "stack",
+      slots: { content: [{ kind: "slot-outlet", id: "forwarder.outlet", slotId: "content" }] },
+    },
+  };
   const recursive: DesignDocument = {
-    ...panel,
-    root: { instanceId: "panel.template", adapterId: "panel", slots: { body: [] } },
+    schemaVersion: 2,
+    id: "component.recursive",
+    label: "Recursive",
+    kind: "component",
+    component: { id: "recursive", label: "Recursive", group: "Custom", properties: [], slots: [] },
+    root: {
+      instanceId: "recursive.forwarder",
+      adapterId: "forwarder",
+      slots: {
+        content: [{
+          kind: "component",
+          node: { instanceId: "recursive.again", adapterId: "recursive", slots: {} },
+        }],
+      },
+    },
   };
   const screenDocument: DesignDocument = {
     schemaVersion: 2,
     id: "screen.recursive",
     label: "Recursive",
     kind: "screen",
-    root: { instanceId: "panel.one", adapterId: "panel", slots: { body: [] } },
+    root: { instanceId: "recursive.instance", adapterId: "recursive", slots: {} },
   };
 
-  expect(() => renderDesignDocument(target, screenDocument, [recursive])).toThrow("Recursive authored component: panel → panel");
+  expect(() => renderDesignDocument(target, screenDocument, [recursive, forwarder]))
+    .toThrow("Recursive authored component: recursive → recursive");
 });

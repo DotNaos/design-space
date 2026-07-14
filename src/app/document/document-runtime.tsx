@@ -20,7 +20,9 @@ export function renderDesignDocument(
   document: DesignDocument,
   library: readonly DesignDocument[],
 ): ReactNode {
-  const preview = renderNode(target, document.root, library, undefined, {}, []);
+  const preview = document.kind === "component" && document.component
+    ? renderComponentImplementation(target, document, document.component, library)
+    : renderNode(target, document.root, library, undefined, {}, []);
   const PreviewRoot = target.previewRoot;
   return PreviewRoot ? <PreviewRoot>{preview}</PreviewRoot> : preview;
 }
@@ -31,6 +33,7 @@ interface TemplateBindingContext {
   externalSlots: DesignComponentNode["slots"];
   externalContext?: TemplateBindingContext;
   publicInstanceId: string;
+  callerAuthoredPath: readonly string[];
 }
 
 export function DesignDocumentPreview(props: {
@@ -49,31 +52,33 @@ function renderNode(
   inheritedProps: Readonly<Record<string, unknown>>,
   authoredPath: readonly string[],
   templateContext?: TemplateBindingContext,
+  authoredAttributes?: PreviewElementAttributes,
 ): ReactNode {
   const boundProps = resolveBoundProps(node, templateContext);
   const adapter = target.adapters.find((item) => item.component.id === node.adapterId);
   if (adapter) {
+    const previewAttributes = authoredAttributes ?? previewAttributesFor(node.instanceId, parentSlotSelectionId);
+    const publicInstanceId = previewAttributes["data-design-space-instance-id"];
     const slotChildren = Object.fromEntries(adapter.component.slots.map((slot) => [
       slot.id,
       (node.slots[slot.id] ?? []).flatMap((child) => renderChild(
         target,
         child,
         library,
-        slotSelectionId(node.instanceId, slot.id),
+        slotSelectionId(publicInstanceId, slot.id),
         {},
         {},
         authoredPath,
         templateContext,
       )),
     ]));
-    const previewAttributes = previewAttributesFor(node.instanceId, parentSlotSelectionId);
     const slotAttributes = Object.fromEntries(adapter.component.slots.map((slot) => [
       slot.id,
-      { "data-design-space-slot-id": slotSelectionId(node.instanceId, slot.id) } satisfies PreviewSlotAttributes,
+      { "data-design-space-slot-id": slotSelectionId(publicInstanceId, slot.id) } satisfies PreviewSlotAttributes,
     ]));
     const htmlAttributes = Object.fromEntries(flattenInternalHtml(adapter.component.internalHtml ?? []).map((item) => [
       item.id,
-      { "data-design-space-html-id": htmlSelectionId(node.instanceId, item.id) },
+      { "data-design-space-html-id": htmlSelectionId(publicInstanceId, item.id) },
     ]));
     const context: AdapterRenderContext = { slotChildren, previewAttributes, slotAttributes, htmlAttributes };
     const rendered = adapter.render({ ...adapter.defaultProps, ...node.props, ...inheritedProps, ...boundProps }, context);
@@ -90,7 +95,7 @@ function renderNode(
   const defaults = Object.fromEntries(authored.component.properties.flatMap((property) => property.defaultValue === undefined
     ? []
     : [[property.prop, property.defaultValue]]));
-  const previewAttributes = previewAttributesFor(node.instanceId, parentSlotSelectionId);
+  const previewAttributes = authoredAttributes ?? previewAttributesFor(node.instanceId, parentSlotSelectionId);
   const publicProps = { ...defaults, ...node.props, ...inheritedProps, ...boundProps };
   const scopedTemplate = scopeTemplateNode(authored.root, node.instanceId);
   const bindingContext: TemplateBindingContext = {
@@ -98,7 +103,8 @@ function renderNode(
     values: publicProps,
     externalSlots,
     externalContext: templateContext,
-    publicInstanceId: node.instanceId,
+    publicInstanceId: previewAttributes["data-design-space-instance-id"],
+    callerAuthoredPath: authoredPath,
   };
   const rendered = renderTemplateNode(
     target,
@@ -120,7 +126,18 @@ function renderTemplateNode(
   authoredPath: readonly string[],
 ): ReactNode {
   const adapter = target.adapters.find((item) => item.component.id === template.adapterId);
-  if (!adapter) return renderNode(target, template, library, undefined, {}, authoredPath, bindingContext);
+  if (!adapter) {
+    return renderNode(
+      target,
+      template,
+      library,
+      undefined,
+      {},
+      authoredPath,
+      bindingContext,
+      authoredAttributes,
+    );
+  }
   const slotChildren = Object.fromEntries(adapter.component.slots.map((slot) => [
     slot.id,
     (template.slots[slot.id] ?? []).flatMap((child) => renderChild(
@@ -176,12 +193,39 @@ function renderChild(
         outletSelectionId,
         {},
         inheritedProps,
-        authoredPath,
+        templateContext?.callerAuthoredPath ?? authoredPath,
         templateContext?.externalContext,
       )),
     ];
   }
   return [renderNode(target, child.node, library, parentSlotSelectionId, inheritedProps, authoredPath, templateContext)];
+}
+
+function renderComponentImplementation(
+  target: TargetModule,
+  document: DesignDocument,
+  definition: ComponentDefinitionDraft,
+  library: readonly DesignDocument[],
+): ReactNode {
+  const values = Object.fromEntries(definition.properties.flatMap((property) => (
+    property.defaultValue === undefined ? [] : [[property.prop, property.defaultValue]]
+  )));
+  const externalSlots = Object.fromEntries(definition.slots.map((slot) => [slot.id, []]));
+  const bindingContext: TemplateBindingContext = {
+    definition,
+    values,
+    externalSlots,
+    publicInstanceId: document.root.instanceId,
+    callerAuthoredPath: [],
+  };
+  return renderTemplateNode(
+    target,
+    document.root,
+    library,
+    bindingContext,
+    previewAttributesFor(document.root.instanceId),
+    [definition.id],
+  );
 }
 
 function previewAttributesFor(instanceId: string, parentSlotSelectionId?: string): PreviewElementAttributes {

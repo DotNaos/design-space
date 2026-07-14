@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { cloneElement, Fragment, isValidElement, type ReactElement, type ReactNode } from "react";
 
 import dashboardSource from "./dashboard.design.json";
 import panelSource from "./panel.design.json";
@@ -31,6 +31,7 @@ interface ProductionTemplateContext {
   publicValues: Readonly<Record<string, ProductionValue>>;
   externalSlots: Readonly<Record<string, readonly ProductionChild[]>>;
   externalContext?: ProductionTemplateContext;
+  callerAuthoredPath: readonly string[];
 }
 
 const dashboard = dashboardSource as ProductionScreenDocument;
@@ -86,18 +87,16 @@ function renderNode(
       publicValues: values,
       externalSlots: node.slots,
       externalContext: templateContext,
+      callerAuthoredPath: authoredPath,
     };
-    return (
-      <div key={key} data-production-component={component.id} data-production-instance={node.instanceId}>
-        {renderNode(
-          component.root,
-          components,
-          component.root.instanceId,
-          [...authoredPath, node.adapterId],
-          nextTemplateContext,
-        )}
-      </div>
+    const rendered = renderNode(
+      component.root,
+      components,
+      component.root.instanceId,
+      [...authoredPath, node.adapterId],
+      nextTemplateContext,
     );
+    return instrumentProductionComponent(rendered, component.id, node.instanceId, key);
   }
   const props = { ...node.props, ...boundProps };
   return renderTarget(
@@ -133,18 +132,34 @@ function renderChild(
   authoredPath: readonly string[],
   templateContext?: ProductionTemplateContext,
 ): ReactNode[] {
-  if (child.kind === "text") return [<span key={key}>{child.value}</span>];
+  if (child.kind === "text") return [<span key={key} style={{ display: "contents" }}>{child.value}</span>];
   if (child.kind === "slot-outlet") {
     if (!templateContext) return [];
     return (templateContext.externalSlots[child.slotId] ?? []).flatMap((external, index) => renderChild(
       external,
       `${key}-${index}`,
       components,
-      authoredPath,
+      templateContext.callerAuthoredPath,
       templateContext.externalContext,
     ));
   }
   return [renderNode(child.node, components, key, authoredPath, templateContext)];
+}
+
+function instrumentProductionComponent(
+  node: ReactNode,
+  componentId: string,
+  instanceId: string,
+  key: string,
+): ReactNode {
+  const attributes = {
+    "data-production-component": componentId,
+    "data-production-instance": instanceId,
+  };
+  if (!isValidElement(node) || node.type === Fragment || typeof node.type !== "string") {
+    return <span key={key} {...attributes} style={{ display: "contents" }}>{node}</span>;
+  }
+  return cloneElement(node as ReactElement<Record<string, unknown>>, { key, ...attributes });
 }
 
 function resolveBoundProps(

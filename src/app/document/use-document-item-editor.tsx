@@ -65,7 +65,7 @@ export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
       control.prop,
       props[control.prop],
     ])) as Readonly<Record<string, DesignValue | undefined>>;
-    const tailwindInput = collectDocumentTailwind(options.target, options.library, session.draft.root);
+    const tailwindInput = collectDocumentTailwind(options.target, options.library, session.draft);
     const location = findDesignNodeLocation(session.draft.root, instance.instanceId);
     const parentNode = location ? findDesignNode(session.draft.root, location.parentInstanceId) : undefined;
     const parentAdapter = parentNode ? resolveDocumentAdapter(options.target, options.library, parentNode.adapterId) : undefined;

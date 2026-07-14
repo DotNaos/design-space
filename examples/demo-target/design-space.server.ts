@@ -29,7 +29,7 @@ export const registration = {
   documentRegistration: {
     version: "demo.strict-ui.v1",
     tailwindClassList: (document: DesignDocument, context: DocumentTargetContext) =>
-      collectDocumentTailwind(target, context.libraryDocuments, document.root),
+      collectDocumentTailwind(target, context.libraryDocuments, document),
     documents: {
       "screen.dashboard": documentTarget("dashboard.document"),
       "component.panel": documentTarget("panel.document"),

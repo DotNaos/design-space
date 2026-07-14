@@ -69,7 +69,7 @@ describe("server-owned document Tailwind validation", () => {
       documentRegistration: {
         version: "tailwind.document.v1",
         tailwindClassList: (document, context) =>
-          collectDocumentTailwind(targetModule, context.libraryDocuments, document.root),
+          collectDocumentTailwind(targetModule, context.libraryDocuments, document),
         documents: {
           "screen.home": {
             sourceFileIds: ["document.source"],

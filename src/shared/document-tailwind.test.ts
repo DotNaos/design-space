@@ -178,3 +178,148 @@ it("keeps implementation and adapter Tailwind when an optional binding is unset"
   expect(collectDocumentTailwind(targetWithDefault, [panel("rounded-xl")], screen.root)).toBe("rounded-xl");
   expect(collectDocumentTailwind(targetWithDefault, [panel()], screen.root)).toBe("p-4");
 });
+
+it.each([
+  ["a public default", "bg-public", "bg-public"],
+  ["an explicit empty override", "", ""],
+  ["an explicit null override", null, ""],
+])("collects a component document implementation with %s", (_label, defaultValue, expected) => {
+  const componentDocument: DesignDocument = {
+    schemaVersion: 2,
+    id: "component.surface",
+    label: "Surface",
+    kind: "component",
+    component: {
+      id: "surface",
+      label: "Surface",
+      group: "Custom",
+      properties: [{
+        id: "surface.class",
+        label: "Class",
+        prop: "surface",
+        kind: "tailwind",
+        defaultValue,
+      }],
+      slots: [],
+    },
+    root: {
+      instanceId: "surface.root",
+      adapterId: "stack",
+      props: { className: "implementation-class" },
+      propertyBindings: { className: "surface.class" },
+      slots: { content: [] },
+    },
+  };
+  const targetWithDefault: TargetModule = {
+    ...target,
+    adapters: target.adapters.map((adapter) => ({ ...adapter, defaultProps: { className: "adapter-default" } })),
+  };
+
+  expect(collectDocumentTailwind(targetWithDefault, [componentDocument], componentDocument)).toBe(expected);
+});
+
+it("collects a finite self-instance reached through a projected slot", () => {
+  const slotContainer: DesignDocument = {
+    schemaVersion: 2,
+    id: "component.slot-container",
+    label: "Slot container",
+    kind: "component",
+    component: {
+      id: "slot-container",
+      label: "Slot container",
+      group: "Custom",
+      properties: [{
+        id: "slot-container.surface",
+        label: "Surface",
+        prop: "surface",
+        kind: "tailwind",
+        defaultValue: "outer-token",
+      }],
+      slots: [{ id: "content", label: "Content" }],
+    },
+    root: {
+      instanceId: "slot-container.root",
+      adapterId: "stack",
+      propertyBindings: { className: "slot-container.surface" },
+      slots: {
+        content: [{ kind: "slot-outlet", id: "slot-container.outlet", slotId: "content" }],
+      },
+    },
+  };
+  const screen: DesignDocument = {
+    schemaVersion: 2,
+    id: "screen.finite-recursion",
+    label: "Finite recursion",
+    kind: "screen",
+    root: {
+      instanceId: "slot-container.outer",
+      adapterId: "slot-container",
+      slots: {
+        content: [{
+          kind: "component",
+          node: {
+            instanceId: "slot-container.inner",
+            adapterId: "slot-container",
+            props: { surface: "nested-token" },
+            slots: { content: [] },
+          },
+        }],
+      },
+    },
+  };
+
+  expect(collectDocumentTailwind(target, [slotContainer], screen)).toBe("outer-token nested-token");
+});
+
+it("bounds genuine authored definition cycles without recursing forever", () => {
+  const forwarder: DesignDocument = {
+    schemaVersion: 2,
+    id: "component.forwarder",
+    label: "Forwarder",
+    kind: "component",
+    component: {
+      id: "forwarder",
+      label: "Forwarder",
+      group: "Custom",
+      properties: [],
+      slots: [{ id: "content", label: "Content" }],
+    },
+    root: {
+      instanceId: "forwarder.root",
+      adapterId: "stack",
+      slots: { content: [{ kind: "slot-outlet", id: "forwarder.outlet", slotId: "content" }] },
+    },
+  };
+  const recursive: DesignDocument = {
+    schemaVersion: 2,
+    id: "component.recursive",
+    label: "Recursive",
+    kind: "component",
+    component: {
+      id: "recursive",
+      label: "Recursive",
+      group: "Custom",
+      properties: [],
+      slots: [],
+    },
+    root: {
+      instanceId: "recursive.forwarder",
+      adapterId: "forwarder",
+      slots: {
+        content: [{
+          kind: "component",
+          node: { instanceId: "recursive.again", adapterId: "recursive", slots: {} },
+        }],
+      },
+    },
+  };
+  const screen: DesignDocument = {
+    schemaVersion: 2,
+    id: "screen.recursive",
+    label: "Recursive screen",
+    kind: "screen",
+    root: { instanceId: "recursive.instance", adapterId: "recursive", slots: {} },
+  };
+
+  expect(collectDocumentTailwind(target, [recursive, forwarder], screen)).toBe("");
+});

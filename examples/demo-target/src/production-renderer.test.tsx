@@ -106,6 +106,102 @@ describe("target-owned production renderer", () => {
     expect(screen.getByText("Forwarded through both layers")).toBeVisible();
   });
 
+  it("keeps authored expansion layout-transparent and loose text box-free", () => {
+    const surface: ProductionComponentDocument = {
+      id: "component.surface",
+      component: { id: "surface", properties: [] },
+      root: {
+        instanceId: "surface.stack",
+        adapterId: "stack",
+        slots: {
+          content: [{ kind: "slot-outlet", id: "surface.content.outlet", slotId: "content" }],
+        },
+      },
+    };
+    const screenDocument: ProductionScreenDocument = {
+      id: "screen.surface",
+      root: {
+        instanceId: "surface.instance",
+        adapterId: "surface",
+        slots: {
+          content: [{ kind: "text", id: "surface.copy", value: "Loose production text" }],
+        },
+      },
+    };
+
+    const { container } = render(<>{renderProductionDocument(screenDocument, [surface])}</>);
+
+    expect(container.firstElementChild?.tagName).toBe("DIV");
+    expect(container.firstElementChild).toHaveAttribute("data-production-component", "component.surface");
+    expect(container.firstElementChild).toHaveAttribute("data-production-instance", "surface.instance");
+    expect(screen.getByText("Loose production text")).toHaveStyle({ display: "contents" });
+  });
+
+  it("allows a finite instance of a component inside its own projected slot", () => {
+    const slotContainer: ProductionComponentDocument = {
+      id: "component.slot-container",
+      component: { id: "slot-container", properties: [] },
+      root: {
+        instanceId: "slot-container.stack",
+        adapterId: "stack",
+        slots: {
+          content: [{ kind: "slot-outlet", id: "slot-container.outlet", slotId: "content" }],
+        },
+      },
+    };
+    const screenDocument: ProductionScreenDocument = {
+      id: "screen.finite-recursion",
+      root: {
+        instanceId: "slot-container.outer",
+        adapterId: "slot-container",
+        slots: {
+          content: [{
+            kind: "component",
+            node: { instanceId: "slot-container.inner", adapterId: "slot-container", slots: { content: [] } },
+          }],
+        },
+      },
+    };
+
+    const { container } = render(<>{renderProductionDocument(screenDocument, [slotContainer])}</>);
+
+    expect(container.querySelector('[data-production-instance="slot-container.outer"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-production-instance="slot-container.inner"]')).toBeInTheDocument();
+  });
+
+  it("still rejects a genuine authored definition cycle", () => {
+    const forwarder: ProductionComponentDocument = {
+      id: "component.forwarder",
+      component: { id: "forwarder", properties: [] },
+      root: {
+        instanceId: "forwarder.stack",
+        adapterId: "stack",
+        slots: { content: [{ kind: "slot-outlet", id: "forwarder.outlet", slotId: "content" }] },
+      },
+    };
+    const recursive: ProductionComponentDocument = {
+      id: "component.recursive",
+      component: { id: "recursive", properties: [] },
+      root: {
+        instanceId: "recursive.forwarder",
+        adapterId: "forwarder",
+        slots: {
+          content: [{
+            kind: "component",
+            node: { instanceId: "recursive.again", adapterId: "recursive", slots: {} },
+          }],
+        },
+      },
+    };
+    const screenDocument: ProductionScreenDocument = {
+      id: "screen.recursive",
+      root: { instanceId: "recursive.instance", adapterId: "recursive", slots: {} },
+    };
+
+    expect(() => renderProductionDocument(screenDocument, [recursive, forwarder]))
+      .toThrow("Recursive production component: recursive -> recursive");
+  });
+
   it("preserves explicit empty classes instead of restoring adapter defaults", () => {
     const screenDocument: ProductionScreenDocument = {
       id: "screen.unstyled-card",
