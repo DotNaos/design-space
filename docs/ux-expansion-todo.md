@@ -21,10 +21,10 @@ Status legend: `[ ]` queued, `[-]` active, `[x]` verified, `[!]` blocked on a de
 
 ## 0. Audit, coordination, and design gate
 
-- [-] **UX-001 — Baseline UX audit.** Capture the current laptop and 390×844 flows, including panel layout, direct selection, slot selection, picker, diff, Tailwind editing, zoom extremes, and footer/status presentation. Record concrete problems rather than generic polish notes.
+- [x] **UX-001 — Baseline UX audit.** Capture the current laptop and 390×844 flows, including panel layout, direct selection, slot selection, picker, diff, Tailwind editing, zoom extremes, and footer/status presentation. Record concrete problems rather than generic polish notes.
 - [x] **UX-002 — Coordinate repository ownership.** Confirm no active Design Space or Component Lab task owns the same files. Keep the inactive DotNaos/ui worktree and shared `/Users/oli/projects/ui` checkout read-only.
-- [ ] **UX-003 — Produce and select A/B/C directions.** Create three compact mockup directions grounded in the current product. Each direction must show the laptop workspace and the mobile preview-plus-drawer pattern. Generated controls are directional, not literal requirements. Wait for the user's selection before broad UI implementation.
-- [ ] **UX-004 — Component Lab reference audit.** Inspect its canvas, gesture, grid, selection, and overlay behavior read-only. Record the exact reusable ideas and the parts intentionally replaced.
+- [-] **UX-003 — Produce and select A/B/C directions.** Create three compact mockup directions grounded in the current product. Each direction must show the laptop workspace and the mobile preview-plus-drawer pattern. Generated controls are directional, not literal requirements. Wait for the user's selection before broad UI implementation.
+- [x] **UX-004 — Component Lab reference audit.** Inspect its canvas, gesture, grid, selection, and overlay behavior read-only. Record the exact reusable ideas and the parts intentionally replaced.
 - [ ] **UX-005 — Interaction state model.** Define Select, Hover, Insert, Interact, Context Menu, Panel Editing, Draft, Diff, Stale, and Blocked states so that canvas clicks and keyboard commands cannot trigger ambiguous behavior.
 
 ## 1. Laptop shell and navigation
@@ -113,6 +113,30 @@ Status legend: `[ ]` queued, `[-]` active, `[x]` verified, `[!]` blocked on a de
 | Remove Design Space logo | UX-013 |
 | Remove AI-like footer wording | UX-015 |
 
+## Baseline and reference evidence
+
+Current-run visual evidence is stored outside the repository so screenshots cannot enter target production artifacts:
+
+- `01-mobile-baseline.png` — 390×844 mobile workspace at Fit. The preview is small relative to the available canvas, the dock consumes a persistent row, the gesture hint competes with the task, and the footer reads like an assistant/evidence surface rather than an editor state.
+- `02-laptop-baseline.png` — laptop workspace. Docs/Files/Catalog and Component Tree occupy two permanent left columns, neither side panel exposes a splitter, the brand consumes top-bar space, and selection/slot labels use the current purple/green visual language.
+- `03-laptop-picker-baseline.png` — laptop slot-selection state. The selected Footer slot remains visible, but the modal picker model does not establish a stable side-by-side relationship between the canvas context and compatible components.
+
+The implementation audit confirms the visible causes:
+
+- `DocumentWorkspace.tsx` renders Workspace Browser and Component Tree as two fixed `lg:w-60` columns, a fixed desktop editor, a persistent status footer, and modal Diff/Picker surfaces.
+- `PreviewCanvas.tsx` already supports direct DOM hit testing and anchored trackpad/touch zoom, but its root selection immediately opens editing, its dots use one fixed world step, it still advertises drag-to-pan, and all overlays share one viewport layer without collision placement.
+- `SlotCatalogDialog.tsx` and `DiffSheet.tsx` both use blurred bottom modals on laptop. The diff remains a plain `<pre>` rather than a structured code view.
+- `ComponentTree.tsx` exposes explicit slot occupancy and collapsed internal HTML, but has no hover-to-canvas channel or keyboard/context command layer.
+
+Read-only Component Lab findings from `/Users/oli/projects/ui`:
+
+- Reuse the concepts from `apps/component-lab/src/workspace/labWorkspace.tsx` and `state/useLabPanels.ts`: pointer splitters, clamped persisted widths, a single switchable utility panel, and a narrow-width floating fallback.
+- Reuse the math and lifecycle ideas from `workspace/previewCanvas.tsx` and `previewCanvasGrid.ts`: cursor-anchored wheel zoom, two-finger wheel pan, adaptive world-grid steps, root-derived grid origin, `ResizeObserver`, and animation-frame batching.
+- Reuse the selection/source concepts from `packages/react-ui/src/devtools/ComponentHierarchyInspector.tsx`, `ElementSelectionBridge.tsx`, and `SelectedComponentOverlay.tsx`: stable DOM metadata, most-specific inspectable targets, synchronized tree/canvas selection, source lookup, and portal overlays.
+- Reuse the editor configuration seam from `apps/component-lab/src/source/sourceEditorConfig.ts`, but replace its read-only/minimal language setup with target-aware official Tailwind intelligence.
+- Intentionally do not copy Component Lab's grab-first pointer layer, viewport-relative overlay labels, crowded DevTools presentation, or its fixed-radius dot SVG. Design Space needs trackpad-first navigation, collision-aware overlays, explicit composition commands, and world-consistent grid rendering.
+
 ## Progress log
 
-- **2026-07-14:** Captured the full request as stable work items. Coordination found no overlapping active Design Space or Component Lab task. Broad UI implementation remains gated on `UX-003`.
+- **2026-07-14:** Captured the full request as stable work items. Coordination found no overlapping active Design Space or Component Lab task.
+- **2026-07-14:** Completed the current laptop/mobile baseline audit and read-only Component Lab reference audit. The exact reuse and intentional replacement boundaries are recorded above. Broad UI implementation remains gated on the user's `UX-003` choice.
