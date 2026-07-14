@@ -85,6 +85,13 @@ export function validatePropertyBindingContract(
   }
 }
 
+export function isValidRequiredControlValue(control: ComponentControl, value: unknown): boolean {
+  if (isEmpty(value)) return false;
+  const violations: StrictUiViolation[] = [];
+  validateValue(control, value, { kind: "document" }, "property", violations);
+  return violations.length === 0;
+}
+
 function validateControl(
   adapter: ComponentAdapter,
   node: DesignComponentNode,

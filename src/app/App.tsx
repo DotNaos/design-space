@@ -418,9 +418,7 @@ function LegacyWorkspace() {
           canMoveDown={Boolean(itemEditorController.model.location && itemEditorController.model.location.index < itemEditorController.model.location.siblingCount - 1)}
           canDuplicate={itemEditorController.model.canDuplicate}
           canDelete={itemEditorController.model.canDelete}
-          onControlChange={(prop, value) => {
-            if (value !== undefined) itemEditorController.updateControl(prop, value);
-          }}
+          onControlChange={itemEditorController.updateControl}
           onSelectComponent={itemEditorController.selectComponent}
           onSelectSlot={(slot) => {
             const instanceId = itemEditorController.model?.instance.instanceId;

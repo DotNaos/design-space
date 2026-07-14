@@ -4,6 +4,7 @@ import type { ComponentControl } from "../shared/contracts";
 import type { ComponentPropertyDraft, DesignDocument } from "../shared/design-document";
 import type { TargetModule } from "../shared/target-module";
 import { validateStrictUi } from "./strict-ui";
+import { isValidRequiredControlValue } from "./strict-ui-properties";
 
 function target(
   controls: ComponentControl[],
@@ -46,6 +47,33 @@ const requiredTitle: ComponentControl = {
 };
 
 describe("Strict UI public property defaults", () => {
+  it("uses every control constraint when validating a required fallback", () => {
+    expect(isValidRequiredControlValue(
+      { id: "count", label: "Count", kind: "number", prop: "count", required: true, min: 1, max: 4 },
+      0,
+    )).toBe(false);
+    expect(isValidRequiredControlValue(
+      { id: "title", label: "Title", kind: "text", prop: "title", required: true, maxLength: 4 },
+      "",
+    )).toBe(false);
+    expect(isValidRequiredControlValue(
+      { id: "title", label: "Title", kind: "text", prop: "title", required: true, maxLength: 4 },
+      "Longer",
+    )).toBe(false);
+    expect(isValidRequiredControlValue({
+      id: "variant",
+      label: "Variant",
+      kind: "select",
+      prop: "variant",
+      required: true,
+      options: [{ id: "empty", label: "Empty", value: "" }],
+    }, "")).toBe(false);
+    expect(isValidRequiredControlValue(
+      { id: "enabled", label: "Enabled", kind: "boolean", prop: "enabled", required: true },
+      false,
+    )).toBe(true);
+  });
+
   it("lets a valid public default satisfy a required implementation property", () => {
     const document = component(
       [{ id: "public-title", label: "Title", kind: "text", prop: "title", required: true, defaultValue: "Planning" }],

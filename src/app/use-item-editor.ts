@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { projectPreviewSlots, type SelectionTarget } from "../model";
+import { isValidRequiredControlValue, projectPreviewSlots, type SelectionTarget } from "../model";
 import type { TailwindPreview } from "../shared/contracts";
 import type { DesignValue } from "../shared/design-document";
 import type { ComponentFixture, TargetModule } from "../shared/target-module";
@@ -58,8 +58,8 @@ export function useItemEditor(options: UseItemEditorOptions) {
       const value = instance.instanceId === view.root.instanceId && control.prop === "className"
         ? session.rootClassValue
         : toDesignValue(props[control.prop]);
-      return [control.prop, value ?? defaultControlValue(control.kind)];
-    })) as Readonly<Record<string, DesignValue>>;
+      return [control.prop, value !== undefined ? value : control.required ? defaultControlValue(control.kind) : undefined];
+    })) as Readonly<Record<string, DesignValue | undefined>>;
     const tailwindInput = collectTailwindValues(options.target, session.draftFixture, session.rootClassValue);
     const location = findFixtureLocation(session.draftFixture, instance.instanceId);
     const parent = location ? findComponentInstance(view.root, location.parentInstanceId) : undefined;
@@ -135,12 +135,14 @@ export function useItemEditor(options: UseItemEditorOptions) {
     setCompileError(undefined);
   };
 
-  const updateControl = (prop: string, value: DesignValue) => {
+  const updateControl = (prop: string, value: DesignValue | undefined) => {
     setSession((current) => {
       if (!current) return current;
       const fixture = findComponentFixture(current.draftFixture, current.selectedInstanceId);
       const adapter = options.target.adapters.find((candidate) => candidate.component.id === fixture?.adapterId);
-      if (!fixture || !adapter?.controls?.some((control) => control.prop === prop)) return current;
+      const control = adapter?.controls?.find((candidate) => candidate.prop === prop);
+      if (!fixture || !adapter || !control) return current;
+      if (value === undefined && control.required && !isValidRequiredControlValue(control, adapter.defaultProps?.[prop])) return current;
       if (prop === "className" && typeof value === "string" && current.selectedInstanceId === current.draftFixture.instanceId && options.target.defaultEditTargetId) {
         return { ...current, rootClassValue: value };
       }

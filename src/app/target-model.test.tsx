@@ -269,6 +269,8 @@ describe("target-driven application model", () => {
     const updated = updateFixtureProps(fixture, "first", { children: "Changed" });
     expect(findComponentFixture(updated, "first")?.props?.children).toBe("Changed");
     expect(findComponentFixture(fixture, "first")?.props?.children).toBe("First");
+    const cleared = updateFixtureProps(updated, "first", { children: undefined });
+    expect(findComponentFixture(cleared, "first")?.props).toBeUndefined();
 
     const moved = moveFixtureComponent(updated, "first", 1);
     expect((moved.slots.content[1] as { node: ComponentFixture }).node.instanceId).toBe("first");

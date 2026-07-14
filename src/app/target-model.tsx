@@ -165,7 +165,7 @@ export function updateFixtureProps(
   instanceId: string,
   props: Readonly<Record<string, unknown>>,
 ): ComponentFixture {
-  if (root.instanceId === instanceId) return { ...root, props: { ...root.props, ...props } };
+  if (root.instanceId === instanceId) return { ...root, props: mergeFixtureProps(root.props, props) };
   let found = false;
   const slots = Object.fromEntries(Object.entries(root.slots).map(([slotId, children]) => [
     slotId,
@@ -325,7 +325,7 @@ function updateFixturePropsIfFound(
   instanceId: string,
   props: Readonly<Record<string, unknown>>,
 ): ComponentFixture {
-  if (root.instanceId === instanceId) return { ...root, props: { ...root.props, ...props } };
+  if (root.instanceId === instanceId) return { ...root, props: mergeFixtureProps(root.props, props) };
   let changed = false;
   const slots = Object.fromEntries(Object.entries(root.slots).map(([slotId, children]) => [
     slotId,
@@ -338,6 +338,18 @@ function updateFixturePropsIfFound(
     }),
   ]));
   return changed ? { ...root, slots } : root;
+}
+
+function mergeFixtureProps(
+  current: Readonly<Record<string, unknown>> | undefined,
+  updates: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> | undefined {
+  const next = { ...current };
+  for (const [prop, value] of Object.entries(updates)) {
+    if (value === undefined) delete next[prop];
+    else next[prop] = value;
+  }
+  return Object.keys(next).length ? next : undefined;
 }
 
 function updateParentSlot(
