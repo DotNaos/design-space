@@ -25,6 +25,10 @@ function createPortableUuid(): string {
   return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
 }
 
+export function createPortableDraftId(): string {
+  return `draft-${createPortableUuid().toLowerCase()}`;
+}
+
 export function collectDesignIds(root: DesignComponentNode): Set<string> {
   const ids = new Set<string>();
   const visit = (node: DesignComponentNode) => {

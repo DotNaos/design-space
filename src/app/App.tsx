@@ -30,6 +30,7 @@ import {
 import type { SlotState } from "./types";
 import { useItemEditor } from "./use-item-editor";
 import { DocumentWorkspace } from "./DocumentWorkspace";
+import { createPortableDraftId } from "./document/design-id";
 import { usesDocumentWorkspace } from "./workspace-selection";
 
 const initialVersion = "0".repeat(64);
@@ -181,7 +182,7 @@ function LegacyWorkspace() {
     connected,
     basePreviewCss: previewCss,
     compositionCss,
-    createId: nextDraftId,
+    createId: createPortableDraftId,
     onCommitFixture: commitFixture,
     onApplyRootClass: (value) => dispatch({ type: "edit", value }),
     onApplyCompositionCss: (instanceId, css) => setCompositionCss((current) => ({ ...current, [instanceId]: css })),
@@ -267,7 +268,7 @@ function LegacyWorkspace() {
       return false;
     }
     const child: ComponentFixture = {
-      instanceId: nextDraftId(),
+      instanceId: createPortableDraftId(),
       adapterId,
       props: childAdapter.defaultProps,
       slots: Object.fromEntries(childAdapter.component.slots.map((slot) => [slot.id, []])),
@@ -378,7 +379,7 @@ function LegacyWorkspace() {
           diff={editor.preparedEdit.exactDiff}
           saving={editor.phase === "saving"}
           onClose={() => setShowDiff(false)}
-          onSave={() => void save().then(() => setShowDiff(false))}
+          onSave={() => void save()}
         />
       )}
       <SlotCatalogDialog open={Boolean(slotPicker)} slotLabel={pickerSlot?.label ?? "slot"} entries={pickerEntries} onClose={() => setSlotPicker(undefined)} onSelect={selectPickerComponent} />
@@ -456,10 +457,6 @@ function statusLabel(phase: string, dirty: boolean, connected: boolean, composit
 
 function messageFor(error: unknown) {
   return error instanceof Error ? error.message : "The local operation failed.";
-}
-
-function nextDraftId() {
-  return `draft-${globalThis.crypto.randomUUID()}`;
 }
 
 function isMobileWorkspace() {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createDesignIdFactory } from "./design-id";
+import { createDesignIdFactory, createPortableDraftId } from "./design-id";
 
 describe("design identities", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -30,6 +30,7 @@ describe("design identities", () => {
     });
     const createId = createDesignIdFactory({ instanceId: "root", adapterId: "stack", slots: { content: [] } });
 
+    expect(createPortableDraftId()).toBe("draft-00010203-0405-4607-8809-0a0b0c0d0e0f");
     expect(createId()).toBe("draft-00010203-0405-4607-8809-0a0b0c0d0e0f");
   });
 });
