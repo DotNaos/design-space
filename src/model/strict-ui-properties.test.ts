@@ -48,7 +48,7 @@ const requiredTitle: ComponentControl = {
 describe("Strict UI public property defaults", () => {
   it("lets a valid public default satisfy a required implementation property", () => {
     const document = component(
-      [{ id: "public-title", label: "Title", kind: "text", prop: "title", defaultValue: "Planning" }],
+      [{ id: "public-title", label: "Title", kind: "text", prop: "title", required: true, defaultValue: "Planning" }],
       { title: "public-title" },
     );
 
@@ -64,16 +64,25 @@ describe("Strict UI public property defaults", () => {
     expect(validateStrictUi(target([requiredTitle]), document)).toEqual([]);
   });
 
-  it("preserves an implementation fallback for an unset optional public property", () => {
+  it("preserves an optional implementation fallback for an unset optional public property", () => {
     const document = component(
       [{ id: "public-title", label: "Title", kind: "text", prop: "title" }],
       { title: "public-title" },
     );
+    const optionalTitle = { ...requiredTitle, required: false };
 
-    expect(validateStrictUi(target([requiredTitle], { title: "Fallback" }), document)).toEqual([]);
-    expect(validateStrictUi(target([requiredTitle]), document)).toEqual([
-      expect.objectContaining({ ruleId: "property.required" }),
-    ]);
+    expect(validateStrictUi(target([optionalTitle], { title: "Fallback" }), document)).toEqual([]);
+  });
+
+  it("rejects an optional public property bound to a required implementation property", () => {
+    const document = component(
+      [{ id: "public-title", label: "Title", kind: "text", prop: "title", defaultValue: "Fallback" }],
+      { title: "public-title" },
+    );
+
+    expect(validateStrictUi(target([requiredTitle]), document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "binding.required" }),
+    ]));
   });
 
   it("continues to report an incompatible public binding", () => {
@@ -85,6 +94,73 @@ describe("Strict UI public property defaults", () => {
     expect(validateStrictUi(target([requiredTitle]), document)).toEqual(expect.arrayContaining([
       expect.objectContaining({ ruleId: "binding.type" }),
     ]));
+  });
+
+  it("requires public value constraints to fit the implementation contract", () => {
+    const controls: ComponentControl[] = [
+      { id: "name", label: "Name", kind: "text", prop: "name", maxLength: 20 },
+      { id: "count", label: "Count", kind: "number", prop: "count", min: 1, max: 10 },
+      {
+        id: "variant",
+        label: "Variant",
+        kind: "select",
+        prop: "variant",
+        options: [{ id: "primary", label: "Primary", value: "primary" }],
+      },
+    ];
+    const properties: ComponentPropertyDraft[] = [
+      { id: "public-name", label: "Name", kind: "text", prop: "name", maxLength: 40 },
+      { id: "public-count", label: "Count", kind: "number", prop: "count", min: 0, max: 100 },
+      {
+        id: "public-variant",
+        label: "Variant",
+        kind: "select",
+        prop: "variant",
+        options: [
+          { label: "Primary", value: "primary" },
+          { label: "Danger", value: "danger" },
+        ],
+      },
+    ];
+    const bindings = { name: "public-name", count: "public-count", variant: "public-variant" };
+
+    expect(validateStrictUi(target(controls), component(properties, bindings))).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "binding.maxLength" }),
+      expect.objectContaining({ ruleId: "binding.minimum" }),
+      expect.objectContaining({ ruleId: "binding.maximum" }),
+      expect.objectContaining({ ruleId: "binding.options" }),
+    ]));
+  });
+
+  it("accepts public value constraints that narrow the implementation contract", () => {
+    const controls: ComponentControl[] = [
+      { id: "name", label: "Name", kind: "text", prop: "name", maxLength: 20 },
+      { id: "count", label: "Count", kind: "number", prop: "count", min: 1, max: 10 },
+      {
+        id: "variant",
+        label: "Variant",
+        kind: "select",
+        prop: "variant",
+        options: [
+          { id: "primary", label: "Primary", value: "primary" },
+          { id: "danger", label: "Danger", value: "danger" },
+        ],
+      },
+    ];
+    const properties: ComponentPropertyDraft[] = [
+      { id: "public-name", label: "Name", kind: "text", prop: "name", maxLength: 12 },
+      { id: "public-count", label: "Count", kind: "number", prop: "count", min: 2, max: 8 },
+      {
+        id: "public-variant",
+        label: "Variant",
+        kind: "select",
+        prop: "variant",
+        options: [{ label: "Primary", value: "primary" }],
+      },
+    ];
+    const bindings = { name: "public-name", count: "public-count", variant: "public-variant" };
+
+    expect(validateStrictUi(target(controls), component(properties, bindings))).toEqual([]);
   });
 
   it("rejects invalid defaults against every public property contract", () => {

@@ -47,6 +47,44 @@ export function validateControls(
   for (const control of controls) validateControl(adapter, node, control, publicProperties, violations);
 }
 
+export function validatePropertyBindingContract(
+  property: ComponentPropertyDraft,
+  control: ComponentControl,
+  location: StrictUiLocation,
+  violations: StrictUiViolation[],
+): void {
+  if (control.required && !property.required) {
+    violations.push(issue(
+      "binding.required",
+      `${property.label} must be required before it can supply required ${control.label}.`,
+      location,
+    ));
+  }
+  if (property.kind === "text" && control.kind === "text" && control.maxLength !== undefined) {
+    if (property.maxLength === undefined || property.maxLength > control.maxLength) {
+      violations.push(issue(
+        "binding.maxLength",
+        `${property.label} must limit text to ${control.maxLength} characters or fewer.`,
+        location,
+      ));
+    }
+  }
+  if (property.kind === "number" && control.kind === "number") {
+    if (control.min !== undefined && (property.min === undefined || property.min < control.min)) {
+      violations.push(issue("binding.minimum", `${property.label} must use a minimum of ${control.min} or greater.`, location));
+    }
+    if (control.max !== undefined && (property.max === undefined || property.max > control.max)) {
+      violations.push(issue("binding.maximum", `${property.label} must use a maximum of ${control.max} or less.`, location));
+    }
+  }
+  if (property.kind === "select" && control.kind === "select") {
+    const supported = new Set(control.options.map((option) => option.value));
+    if (property.options.some((option) => !supported.has(option.value))) {
+      violations.push(issue("binding.options", `${property.label} includes an option that ${control.label} does not accept.`, location));
+    }
+  }
+}
+
 function validateControl(
   adapter: ComponentAdapter,
   node: DesignComponentNode,

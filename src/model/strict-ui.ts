@@ -8,7 +8,11 @@ import type {
 } from "../shared/design-document";
 import type { StrictUiLocation, StrictUiViolation } from "../shared/strict-ui";
 import type { ComponentAdapter, TargetModule } from "../shared/target-module";
-import { validateControls, validatePublicPropertyDefaults } from "./strict-ui-properties";
+import {
+  validateControls,
+  validatePropertyBindingContract,
+  validatePublicPropertyDefaults,
+} from "./strict-ui-properties";
 
 type StrictSlot = ComponentAdapter["component"]["slots"][number] & { acceptsText?: boolean };
 
@@ -76,6 +80,8 @@ function validatePropertyBindings(
         `${property.label} (${property.kind}) cannot bind to ${control.label} (${control.kind}).`,
         { kind: "control", instanceId: binding.instanceId, controlId: control.id },
       ));
+    } else {
+      validatePropertyBindingContract(property, control, location, violations);
     }
   }
   for (const property of properties.values()) {
