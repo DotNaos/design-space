@@ -49,6 +49,74 @@ describe("useDocumentWorkspace managed creation", () => {
     expect(runLocalOperationMock).toHaveBeenCalledWith({ type: "read-document", documentId: "component.managed" });
   });
 
+  it("serializes overlapping refreshes so an older snapshot cannot replace a newer one", async () => {
+    const catalog = documentCatalog([homeDocument]);
+    const delayed = deferred<DocumentSnapshot>();
+    const newer = { ...homeDocument, label: "Newer source" };
+    let readCalls = 0;
+    runLocalOperationMock.mockImplementation(async (operation) => {
+      const request = operation as DocumentOperation;
+      if (request.type === "list-documents") return catalog as never;
+      if (request.type === "read-document") {
+        readCalls += 1;
+        if (readCalls === 1) return snapshot(homeDocument, "1") as never;
+        if (readCalls === 2) return delayed.promise as never;
+        return snapshot(newer, "2") as never;
+      }
+      throw new Error(`Unexpected operation ${request.type}`);
+    });
+
+    const { result } = renderHook(() => useDocumentWorkspace(target));
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    act(() => {
+      first = result.current.refresh();
+      second = result.current.refresh();
+    });
+    await waitFor(() => expect(readCalls).toBe(2));
+    expect(readCalls).toBe(2);
+    delayed.resolve(snapshot(homeDocument, "1"));
+    await act(async () => Promise.all([first, second]));
+
+    expect(readCalls).toBe(3);
+    expect(result.current.session?.draft.label).toBe("Newer source");
+    expect(result.current.connected).toBe(true);
+  });
+
+  it("runs a queued refresh after an older refresh fails", async () => {
+    const catalog = documentCatalog([homeDocument]);
+    const delayed = deferred<DocumentSnapshot>();
+    let readCalls = 0;
+    runLocalOperationMock.mockImplementation(async (operation) => {
+      const request = operation as DocumentOperation;
+      if (request.type === "list-documents") return catalog as never;
+      if (request.type === "read-document") {
+        readCalls += 1;
+        if (readCalls === 1) return snapshot(homeDocument, "1") as never;
+        if (readCalls === 2) return delayed.promise as never;
+        return snapshot({ ...homeDocument, label: "Recovered" }, "2") as never;
+      }
+      throw new Error(`Unexpected operation ${request.type}`);
+    });
+
+    const { result } = renderHook(() => useDocumentWorkspace(target));
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    act(() => {
+      first = result.current.refresh();
+      second = result.current.refresh();
+    });
+    await waitFor(() => expect(readCalls).toBe(2));
+    delayed.reject(new LocalOperationError("LOCAL_RUNTIME_ERROR", "Older refresh failed."));
+    await act(async () => Promise.all([first, second]));
+
+    expect(result.current.connected).toBe(true);
+    expect(result.current.message).toBeUndefined();
+    expect(result.current.session?.draft.label).toBe("Recovered");
+  });
+
   it("discards a delayed prepare result after the document changes again", async () => {
     const catalog = documentCatalog([homeDocument]);
     let resolvePrepare!: (value: PreparedDocumentSave) => void;
@@ -346,4 +414,14 @@ function installOperationHandler(
     }
     throw new Error(`Unexpected operation ${request.type}`);
   });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }

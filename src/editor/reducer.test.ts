@@ -75,7 +75,7 @@ describe("editor lifecycle", () => {
     expect(editorReducer(edited, { type: "save-started", preparedEditId: "missing" })).toBe(edited);
   });
 
-  it("keeps a prepared diff retryable after saving fails", () => {
+  it("invalidates the one-time prepared challenge after saving fails", () => {
     const edited = editorReducer(createEditorState("old", "v1"), { type: "edit", value: "new" });
     const prepared = editorReducer(edited, {
       type: "prepare-succeeded",
@@ -92,11 +92,30 @@ describe("editor lifecycle", () => {
     });
 
     expect(failed).toMatchObject({
-      phase: "diff-ready",
+      phase: "draft-editing",
       draftValue: "new",
-      preparedEdit: { id: "prepared-retry", exactDiff: "- old\n+ new" },
+      preparedEdit: undefined,
     });
-    expect(editorReducer(failed, { type: "save-started", preparedEditId: "prepared-retry" }).phase).toBe("saving");
+    expect(editorReducer(failed, { type: "save-started", preparedEditId: "prepared-retry" })).toBe(failed);
+  });
+
+  it("keeps operational prepare failures retryable without reporting a compile error", () => {
+    const edited = editorReducer(createEditorState("old", "v1"), { type: "edit", value: "new" });
+    const failed = editorReducer(edited, { type: "prepare-failed" });
+
+    expect(failed).toMatchObject({
+      phase: "draft-editing",
+      draftValue: "new",
+      compileFailure: undefined,
+      preparedEdit: undefined,
+    });
+    expect(editorReducer(failed, {
+      type: "prepare-succeeded",
+      preparedEditId: "fresh-challenge",
+      sourceVersion: "v1",
+      draftValue: "new",
+      exactDiff: "- old\n+ new",
+    }).phase).toBe("diff-ready");
   });
 
   it("invalidates a stale save challenge even when refreshing the source fails", () => {

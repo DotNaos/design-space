@@ -8,11 +8,12 @@ import type { DesignDocument } from "../shared/design-document";
 import type {
   DocumentCatalog,
   DocumentSnapshot,
+  PreparedDocumentCreate,
   PreparedDocumentSave,
   SavedDocument,
 } from "../shared/document-transactions";
 import type { TargetModule } from "../shared/target-module";
-import { runLocalOperation } from "./api";
+import { LocalOperationError, runLocalOperation } from "./api";
 import { DocumentWorkspace } from "./DocumentWorkspace";
 
 vi.mock("./api", async (importOriginal) => {
@@ -24,6 +25,7 @@ const runLocalOperationMock = vi.mocked(runLocalOperation);
 const originalMatchMedia = window.matchMedia;
 
 beforeEach(() => {
+  runLocalOperationMock.mockReset();
   window.localStorage.clear();
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
@@ -93,6 +95,76 @@ it("opens a default component document in Library mode after loading", async () 
   const projectBrowser = screen.getByRole("region", { name: "Project browser" });
   expect(within(projectBrowser).getByRole("button", { name: "Panel" })).toHaveAttribute("aria-current", "page");
   expect(screen.queryByText("Screens")).not.toBeInTheDocument();
+});
+
+it("blocks an unsourced fallback after the initial read fails and recovers on focus", async () => {
+  let failNextCatalogRead = true;
+  runLocalOperationMock.mockImplementation(async (operation) => {
+    if (operation.type === "list-documents") {
+      if (failNextCatalogRead) {
+        failNextCatalogRead = false;
+        throw new LocalOperationError("LOCAL_RUNTIME_ERROR", "The local runtime is offline.");
+      }
+      return catalog as never;
+    }
+    if (operation.type === "read-document") {
+      return snapshot(operation.documentId === screenDocument.id ? screenDocument : panelDocument) as never;
+    }
+    if (operation.type === "compile-tailwind") return { value: operation.value, css: "" } as never;
+    throw new Error(`Unexpected operation ${operation.type}`);
+  });
+
+  render(<DocumentWorkspace target={target} />);
+  expect(await screen.findByText("Document workspace blocked")).toBeInTheDocument();
+  expect(screen.queryByText("Mobile home")).not.toBeInTheDocument();
+
+  window.dispatchEvent(new Event("focus"));
+  expect((await screen.findAllByText("Mobile home")).length).toBeGreaterThan(0);
+});
+
+it("lets a connected empty project create its first screen", async () => {
+  runLocalOperationMock.mockImplementation(async (operation) => {
+    if (operation.type === "list-documents") return emptyCatalog as never;
+    throw new Error(`Unexpected operation ${operation.type}`);
+  });
+
+  render(<DocumentWorkspace target={target} />);
+
+  expect(await screen.findByText("No screens yet")).toBeInTheDocument();
+  expect(screen.queryByText("Document workspace blocked")).not.toBeInTheDocument();
+  await userEvent.click(screen.getAllByRole("button", { name: "Create screen" })[0]!);
+  expect(await screen.findByRole("dialog", { name: "Create screen" })).toBeInTheDocument();
+});
+
+it("shows a truthful empty Library and requires a fresh create diff after save failure", async () => {
+  runLocalOperationMock.mockImplementation(async (operation) => {
+    if (operation.type === "list-documents") return standaloneCatalog as never;
+    if (operation.type === "read-document") return snapshot(standaloneScreen) as never;
+    if (operation.type === "compile-tailwind") return { value: operation.value, css: "" } as never;
+    if (operation.type === "prepare-document-create") return preparedCreation(operation.label) as never;
+    if (operation.type === "save-document") {
+      throw new LocalOperationError("CHALLENGE_EXPIRED", "The prepared creation expired.");
+    }
+    throw new Error(`Unexpected operation ${operation.type}`);
+  });
+
+  render(<DocumentWorkspace target={target} />);
+  expect((await screen.findAllByText("Only screen")).length).toBeGreaterThan(0);
+  await userEvent.click(screen.getAllByRole("button", { name: "Library" })[0]!);
+
+  expect(await screen.findByText("No components yet")).toBeInTheDocument();
+  expect(screen.queryByText("Only screen")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Reset document" })).toBeDisabled();
+  await userEvent.click(screen.getAllByRole("button", { name: "Create component" })[0]!);
+  expect(await screen.findByRole("dialog", { name: "Create component" })).toBeInTheDocument();
+  await userEvent.type(screen.getByRole("textbox", { name: "Name" }), "Profile card");
+  await userEvent.click(screen.getByRole("button", { name: "Review source" }));
+  expect(await screen.findByRole("dialog", { name: "Exact source diff" })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+  expect(await screen.findByRole("dialog", { name: "Create component" })).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent("Prepare a fresh source diff");
+  expect(screen.queryByRole("dialog", { name: "Exact source diff" })).not.toBeInTheDocument();
 });
 
 function installServer(
@@ -207,6 +279,34 @@ const screenDocument: DesignDocument = {
   root: { instanceId: "panel.instance", adapterId: "panel", slots: { body: [] } },
 };
 
+const standaloneScreen: DesignDocument = {
+  schemaVersion: 2,
+  id: screenDocument.id,
+  label: "Only screen",
+  kind: "screen",
+  root: { instanceId: "standalone.root", adapterId: "stack", slots: { content: [] } },
+};
+
+const createdComponent: DesignDocument = {
+  schemaVersion: 2,
+  id: "component.created",
+  label: "Profile card",
+  kind: "component",
+  component: {
+    id: "profile-card",
+    label: "Profile card",
+    group: "Surfaces",
+    recipeId: "recipe.component.panel",
+    properties: [],
+    slots: [{ id: "body", label: "Body" }],
+  },
+  root: {
+    instanceId: "created.template",
+    adapterId: "stack",
+    slots: { content: [{ kind: "slot-outlet", id: "created.body", slotId: "body" }] },
+  },
+};
+
 const catalog: DocumentCatalog = {
   state: "catalog",
   documents: [
@@ -216,6 +316,42 @@ const catalog: DocumentCatalog = {
   recipes: [],
   files: [{ id: "mobile.source", label: "mobile.design.json", kind: "file" }],
 };
+
+const standaloneCatalog: DocumentCatalog = {
+  state: "catalog",
+  documents: [{ id: standaloneScreen.id, label: standaloneScreen.label, kind: "screen", origin: "registered" }],
+  recipes: [{ id: "recipe.component.panel", label: "Panel component", kind: "component" }],
+  files: [{ id: "standalone.source", label: "standalone.design.json", kind: "file" }],
+};
+
+const emptyCatalog: DocumentCatalog = {
+  state: "catalog",
+  documents: [],
+  recipes: [{ id: "recipe.screen.blank", label: "Blank screen", kind: "screen" }],
+  files: [],
+};
+
+function preparedCreation(label: string): PreparedDocumentCreate {
+  const document = {
+    ...createdComponent,
+    label,
+    component: { ...createdComponent.component!, label },
+  };
+  return {
+    state: "create-ready",
+    challengeId: "22222222-2222-4222-8222-222222222222",
+    documentId: document.id,
+    createdDocument: document,
+    documentDigest: digest("d"),
+    nextSourceVersions: { "created.source": digest("d") },
+    changes: [{ fileId: "created.source", label: "created.design.json", beforeVersion: null, nextVersion: digest("d") }],
+    diff: `+ ${label}`,
+    strictUi: evidence(document.id),
+    compile: { status: "passed", checkedAt: "2026-07-14T00:00:00.000Z" },
+    transactionDigest: digest("e"),
+    expiresAt: "2026-07-14T00:05:00.000Z",
+  };
+}
 
 const target: TargetModule = {
   project: { id: "mobile-workspace", label: "Mobile workspace" },

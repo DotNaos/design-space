@@ -156,22 +156,56 @@ export function documentSessionReducer(
       return state.prepared?.challengeId === action.challengeId ? { ...state, phase: "saving" } : state;
     case "save-failed":
       if (state.phase !== "saving" || state.prepared?.challengeId !== action.challengeId) return state;
-      return { ...invalidate(state), phase: isDocumentDirty(state) ? "editing" : "ready" };
-    case "save-succeeded":
+      return {
+        ...invalidate(state),
+        phase: state.staleSnapshot ? "stale" : isDocumentDirty(state) ? "editing" : "ready",
+      };
+    case "save-succeeded": {
       if (state.prepared?.challengeId !== action.challengeId) return state;
+      const observed = state.staleSnapshot;
+      const observationMatchesSave = Boolean(
+        observed &&
+        observed.documentDigest === action.documentDigest &&
+        sameVersions(observed.sourceVersions, action.sourceVersions)
+      );
+      if (observed && !observationMatchesSave) {
+        return {
+          phase: "stale",
+          base: state.draft,
+          draft: state.draft,
+          baseDocumentDigest: action.documentDigest,
+          sourceVersions: action.sourceVersions,
+          past: [],
+          future: [],
+          strictUi: state.strictUi,
+          staleSnapshot: observed,
+        };
+      }
+      const savedDocument = observationMatchesSave ? observed!.document : state.draft;
       return {
         phase: "saved",
-        base: state.draft,
-        draft: state.draft,
+        base: savedDocument,
+        draft: savedDocument,
         baseDocumentDigest: action.documentDigest,
         sourceVersions: action.sourceVersions,
         past: [],
         future: [],
         strictUi: state.strictUi,
       };
+    }
     case "source-changed":
       if (sameVersions(action.sourceVersions, state.sourceVersions)) return state;
-      if (isDocumentDirty(state) || state.phase === "saving" || state.prepared) {
+      if (state.phase === "saving" && state.prepared) {
+        return {
+          ...state,
+          staleSnapshot: {
+            document: action.document,
+            documentDigest: action.documentDigest,
+            sourceVersions: action.sourceVersions,
+          },
+        };
+      }
+      if (isDocumentDirty(state) || state.prepared) {
         return {
           ...invalidate(state),
           phase: "stale",

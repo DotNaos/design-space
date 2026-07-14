@@ -107,6 +107,73 @@ describe("document session", () => {
     expect(documentSessionReducer(stale, { type: "reset" }).draft).toBe(remote);
   });
 
+  it("reconciles a poll that observes the saved document before the save response", () => {
+    const draft = { ...base, label: "Saved draft" };
+    const checking = documentSessionReducer(
+      documentSessionReducer(createDocumentSession(base, "a".repeat(64), versions), { type: "edit", document: draft }),
+      { type: "check-started", checkId: "check-save" },
+    );
+    const prepared = documentSessionReducer(checking, {
+      type: "prepare-succeeded",
+      checkId: "check-save",
+      evidence: evidence(),
+      prepared: { challengeId: "challenge-save", documentDigest: "b".repeat(64), exactDiff: "diff", expiresAt: "later" },
+    });
+    const saving = documentSessionReducer(prepared, { type: "save-started", challengeId: "challenge-save" });
+    const observedDocument = structuredClone(draft);
+    const observed = documentSessionReducer(saving, {
+      type: "source-changed",
+      document: observedDocument,
+      documentDigest: "b".repeat(64),
+      sourceVersions: { "screen.source": "b".repeat(64) },
+    });
+
+    expect(observed).toMatchObject({
+      phase: "saving",
+      prepared: { challengeId: "challenge-save" },
+      staleSnapshot: { document: observedDocument },
+    });
+    const saved = documentSessionReducer(observed, {
+      type: "save-succeeded",
+      challengeId: "challenge-save",
+      documentDigest: "b".repeat(64),
+      sourceVersions: { "screen.source": "b".repeat(64) },
+    });
+    expect(saved).toMatchObject({ phase: "saved", base: observedDocument, draft: observedDocument });
+    expect(isDocumentDirty(saved)).toBe(false);
+  });
+
+  it("becomes stale when a save fails after polling observes a changed source", () => {
+    const draft = { ...base, label: "My draft" };
+    const remote = { ...base, label: "Remote source" };
+    const checking = documentSessionReducer(
+      documentSessionReducer(createDocumentSession(base, "a".repeat(64), versions), { type: "edit", document: draft }),
+      { type: "check-started", checkId: "check-conflict" },
+    );
+    const prepared = documentSessionReducer(checking, {
+      type: "prepare-succeeded",
+      checkId: "check-conflict",
+      evidence: evidence(),
+      prepared: { challengeId: "challenge-conflict", documentDigest: "b".repeat(64), exactDiff: "diff", expiresAt: "later" },
+    });
+    const saving = documentSessionReducer(prepared, { type: "save-started", challengeId: "challenge-conflict" });
+    const observed = documentSessionReducer(saving, {
+      type: "source-changed",
+      document: remote,
+      documentDigest: "c".repeat(64),
+      sourceVersions: { "screen.source": "c".repeat(64) },
+    });
+    const failed = documentSessionReducer(observed, { type: "save-failed", challengeId: "challenge-conflict" });
+
+    expect(failed).toMatchObject({
+      phase: "stale",
+      draft,
+      prepared: undefined,
+      staleSnapshot: { document: remote },
+    });
+    expect(documentSessionReducer(failed, { type: "reset" }).draft).toBe(remote);
+  });
+
   it("recovers from compile errors on the next edit", () => {
     const edited = documentSessionReducer(createDocumentSession(base, "a".repeat(64), versions), {
       type: "edit",

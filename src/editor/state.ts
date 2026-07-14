@@ -46,6 +46,7 @@ export type EditorAction =
       readonly draftValue: string;
       readonly exactDiff: string;
     }
+  | { readonly type: "prepare-failed" }
   | { readonly type: "save-started"; readonly preparedEditId: string }
   | {
       readonly type: "save-failed";

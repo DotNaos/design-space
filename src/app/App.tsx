@@ -31,6 +31,7 @@ import type { SlotState } from "./types";
 import { useItemEditor } from "./use-item-editor";
 import { DocumentWorkspace } from "./DocumentWorkspace";
 import { createPortableDraftId } from "./document/design-id";
+import { isLegacyPrepareCompileFailure } from "./legacy-prepare-error";
 import { usesDocumentWorkspace } from "./workspace-selection";
 
 const initialVersion = "0".repeat(64);
@@ -156,7 +157,8 @@ function LegacyWorkspace() {
       return prepared;
     } catch (error) {
       if (error instanceof LocalOperationError && error.code === "STALE_SOURCE") await readSource();
-      else dispatch({ type: "compile-failed", message: messageFor(error) });
+      else if (isLegacyPrepareCompileFailure(error)) dispatch({ type: "compile-failed", message: messageFor(error) });
+      else dispatch({ type: "prepare-failed" });
       setRuntimeMessage(messageFor(error));
       return undefined;
     }

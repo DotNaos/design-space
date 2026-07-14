@@ -13,6 +13,7 @@ export function WorkspaceTopBar(props: {
   checking: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  canReset: boolean;
   canDiff: boolean;
   canSave: boolean;
   saving: boolean;
@@ -41,7 +42,7 @@ export function WorkspaceTopBar(props: {
         <span className="mr-2 hidden max-w-40 truncate text-[10px] text-zinc-600 xl:block">{props.targetLabel} · {props.documentLabel}</span>
         <Button aria-label="Undo" isIconOnly className="size-10 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canUndo} onPress={props.onUndo}><Undo2 size={15} /></Button>
         <Button aria-label="Redo" isIconOnly className="size-10 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canRedo} onPress={props.onRedo}><Redo2 size={15} /></Button>
-        <Button aria-label="Reset document" isIconOnly className="size-10 lg:size-8" size="sm" variant="ghost" onPress={props.onReset}><RotateCcw size={14} /></Button>
+        <Button aria-label="Reset document" isIconOnly className="size-10 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canReset} onPress={props.onReset}><RotateCcw size={14} /></Button>
         <Button aria-label="Prepare exact diff" isIconOnly className="size-10 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canDiff} onPress={props.onDiff}><FileDiff size={15} /></Button>
         <Button aria-label={props.saving ? "Saving" : "Save"} isIconOnly className="size-10 bg-indigo-500 text-white hover:bg-indigo-400 lg:size-8" size="sm" isDisabled={!props.canSave} onPress={props.onSave}>{props.saving ? <LoaderCircle className="animate-spin" size={15} /> : <Save size={15} />}</Button>
       </div>

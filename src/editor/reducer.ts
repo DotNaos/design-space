@@ -131,6 +131,14 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         },
         compileFailure: undefined,
       };
+    case "prepare-failed":
+      if (state.phase === "stale") return state;
+      return {
+        ...state,
+        phase: editingPhase(state, state.draftValue),
+        preparedEdit: undefined,
+        compileFailure: undefined,
+      };
     case "save-started":
       if (state.preparedEdit?.id !== action.preparedEditId) return state;
       return { ...state, phase: "saving" };
@@ -139,7 +147,12 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       if (action.reason === "stale-source" || state.staleSource) {
         return { ...state, phase: "stale", preparedEdit: undefined, compileFailure: undefined };
       }
-      return { ...state, phase: "diff-ready" };
+      return {
+        ...state,
+        phase: editingPhase(state, state.draftValue),
+        preparedEdit: undefined,
+        compileFailure: undefined,
+      };
     case "save-succeeded":
       if (state.preparedEdit?.id !== action.preparedEditId) return state;
       return {

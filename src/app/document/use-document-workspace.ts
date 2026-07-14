@@ -56,6 +56,7 @@ export function useDocumentWorkspace(target: TargetModule): DocumentWorkspaceCon
   const [activeDocumentId, setActiveDocumentId] = useState(target.defaultDocumentId ?? initialEntries[0]?.id);
   const [sessions, setSessions] = useState<Readonly<Record<string, DocumentSessionState>>>({});
   const sessionsRef = useRef<Readonly<Record<string, DocumentSessionState>>>({});
+  const refreshQueue = useRef<Promise<void>>(Promise.resolve());
   const checkSequence = useRef(0);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -108,7 +109,7 @@ export function useDocumentWorkspace(target: TargetModule): DocumentWorkspaceCon
     };
   }, [target.project.id]);
 
-  const refresh = useCallback(async () => {
+  const runRefresh = useCallback(async () => {
     try {
       const nextCatalog = await runLocalOperation<DocumentCatalog>({ type: "list-documents" });
       const snapshots = await Promise.all(nextCatalog.documents.map((entry) => runLocalOperation<DocumentSnapshot>({
@@ -134,6 +135,12 @@ export function useDocumentWorkspace(target: TargetModule): DocumentWorkspaceCon
       setLoading(false);
     }
   }, [loadSnapshot, target.defaultDocumentId]);
+
+  const refresh = useCallback((): Promise<void> => {
+    const next = refreshQueue.current.then(runRefresh, runRefresh);
+    refreshQueue.current = next;
+    return next;
+  }, [runRefresh]);
 
   useEffect(() => {
     void refresh();
