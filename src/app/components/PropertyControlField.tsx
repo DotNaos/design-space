@@ -21,19 +21,28 @@ export function PropertyControlField(props: {
     );
   }
   if (control.kind === "number") {
-    const value = typeof props.value === "number" ? props.value : undefined;
+    const value = typeof props.value === "number" && Number.isFinite(props.value) ? props.value : undefined;
     const step = control.step ?? 1;
     const changeBy = (offset: -1 | 1) => {
       const baseline = value ?? control.min ?? 0;
       const next = baseline + (step * offset);
-      props.onChange(Math.min(control.max ?? Number.POSITIVE_INFINITY, Math.max(control.min ?? Number.NEGATIVE_INFINITY, next)));
+      const bounded = Math.min(control.max ?? Number.POSITIVE_INFINITY, Math.max(control.min ?? Number.NEGATIVE_INFINITY, next));
+      if (Number.isFinite(bounded)) props.onChange(bounded);
     };
     return (
       <label className="block">
         <Label className="text-[10px] text-zinc-500">{control.label}{control.unit ? ` · ${control.unit}` : ""}</Label>
         <span className="mt-1 flex min-h-11 overflow-hidden rounded-lg border border-white/10 bg-black/20">
           <button aria-label={`Decrease ${control.label}`} className="grid w-11 place-items-center border-r border-white/10 text-zinc-500" type="button" onClick={() => changeBy(-1)}><Minus size={14} /></button>
-          <input aria-label={control.label} className="min-w-0 flex-1 bg-transparent px-3 text-center text-base text-zinc-200 outline-none lg:text-sm" max={control.max} min={control.min} placeholder={control.required ? "Required" : "Not set"} step={step} type="number" value={value ?? ""} onChange={(event) => props.onChange(event.currentTarget.value === "" ? undefined : Number(event.currentTarget.value))} />
+          <input aria-label={control.label} className="min-w-0 flex-1 bg-transparent px-3 text-center text-base text-zinc-200 outline-none lg:text-sm" max={control.max} min={control.min} placeholder={control.required ? "Required" : "Not set"} step={step} type="number" value={value ?? ""} onChange={(event) => {
+            const raw = event.currentTarget.value;
+            if (raw === "") {
+              props.onChange(undefined);
+              return;
+            }
+            const next = Number(raw);
+            if (Number.isFinite(next)) props.onChange(next);
+          }} />
           <button aria-label={`Increase ${control.label}`} className="grid w-11 place-items-center border-l border-white/10 text-zinc-500" type="button" onClick={() => changeBy(1)}><Plus size={14} /></button>
         </span>
       </label>

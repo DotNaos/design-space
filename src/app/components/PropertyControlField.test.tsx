@@ -29,4 +29,34 @@ describe("PropertyControlField", () => {
     fireEvent.change(input, { target: { value: "" } });
     expect(onChange).toHaveBeenLastCalledWith(undefined);
   });
+
+  it("does not emit a non-finite value from numeric text input", () => {
+    const onChange = vi.fn();
+    render(
+      <PropertyControlField
+        control={{ id: "columns", kind: "number", label: "Columns", prop: "columns" }}
+        value={3}
+        onChange={onChange}
+      />,
+    );
+    const input = screen.getByRole("spinbutton", { name: "Columns" });
+    Object.defineProperty(input, "value", { configurable: true, value: "1e999", writable: true });
+
+    expect(() => fireEvent.change(input)).not.toThrow();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("does not emit when a finite step operation overflows", () => {
+    const onChange = vi.fn();
+    render(
+      <PropertyControlField
+        control={{ id: "scale", kind: "number", label: "Scale", prop: "scale", step: Number.MAX_VALUE }}
+        value={Number.MAX_VALUE}
+        onChange={onChange}
+      />,
+    );
+
+    expect(() => fireEvent.click(screen.getByRole("button", { name: "Increase Scale" }))).not.toThrow();
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
