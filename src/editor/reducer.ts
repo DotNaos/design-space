@@ -54,6 +54,8 @@ function undo(state: EditorState): EditorState {
 
 function reset(state: EditorState): EditorState {
   const latest = state.staleSource;
+  if (state.phase === "stale" && !latest) return state;
+
   return {
     ...state,
     phase: "preview-ready",
@@ -71,14 +73,21 @@ function sourceChanged(
   state: EditorState,
   action: Extract<EditorAction, { type: "source-changed" }>,
 ): EditorState {
-  if (action.sourceVersion === state.sourceVersion) return state;
+  const staleSource = { value: action.value, version: action.sourceVersion };
+  if (action.sourceVersion === state.sourceVersion) {
+    return state.phase === "stale" && !state.staleSource ? { ...state, staleSource } : state;
+  }
 
-  if (isDirty(state) || state.preparedEdit !== undefined || state.phase === "saving") {
+  if (state.phase === "saving" && state.preparedEdit) {
+    return { ...state, staleSource, compileFailure: undefined };
+  }
+
+  if (isDirty(state) || state.preparedEdit !== undefined) {
     return {
       ...state,
       phase: "stale",
       preparedEdit: undefined,
-      staleSource: { value: action.value, version: action.sourceVersion },
+      staleSource,
       compileFailure: undefined,
     };
   }
@@ -127,6 +136,9 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return { ...state, phase: "saving" };
     case "save-failed":
       if (state.phase !== "saving" || state.preparedEdit?.id !== action.preparedEditId) return state;
+      if (action.reason === "stale-source" || state.staleSource) {
+        return { ...state, phase: "stale", preparedEdit: undefined, compileFailure: undefined };
+      }
       return { ...state, phase: "diff-ready" };
     case "save-succeeded":
       if (state.preparedEdit?.id !== action.preparedEditId) return state;

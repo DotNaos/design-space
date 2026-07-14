@@ -85,7 +85,11 @@ describe("editor lifecycle", () => {
       exactDiff: "- old\n+ new",
     });
     const saving = editorReducer(prepared, { type: "save-started", preparedEditId: "prepared-retry" });
-    const failed = editorReducer(saving, { type: "save-failed", preparedEditId: "prepared-retry" });
+    const failed = editorReducer(saving, {
+      type: "save-failed",
+      preparedEditId: "prepared-retry",
+      reason: "transient",
+    });
 
     expect(failed).toMatchObject({
       phase: "diff-ready",
@@ -93,6 +97,92 @@ describe("editor lifecycle", () => {
       preparedEdit: { id: "prepared-retry", exactDiff: "- old\n+ new" },
     });
     expect(editorReducer(failed, { type: "save-started", preparedEditId: "prepared-retry" }).phase).toBe("saving");
+  });
+
+  it("invalidates a stale save challenge even when refreshing the source fails", () => {
+    const edited = editorReducer(createEditorState("old", "v1"), { type: "edit", value: "new" });
+    const prepared = editorReducer(edited, {
+      type: "prepare-succeeded",
+      preparedEditId: "prepared-stale",
+      sourceVersion: "v1",
+      draftValue: "new",
+      exactDiff: "- old\n+ new",
+    });
+    const saving = editorReducer(prepared, { type: "save-started", preparedEditId: "prepared-stale" });
+    const stale = editorReducer(saving, {
+      type: "save-failed",
+      preparedEditId: "prepared-stale",
+      reason: "stale-source",
+    });
+
+    expect(stale).toMatchObject({ phase: "stale", draftValue: "new", preparedEdit: undefined });
+    expect(stale.staleSource).toBeUndefined();
+    expect(editorReducer(stale, { type: "reset" })).toBe(stale);
+    expect(editorReducer(stale, { type: "save-started", preparedEditId: "prepared-stale" })).toBe(stale);
+  });
+
+  it("finishes a save when polling observes its new source version before the save response", () => {
+    const edited = editorReducer(createEditorState("old", "v1"), { type: "edit", value: "new" });
+    const prepared = editorReducer(edited, {
+      type: "prepare-succeeded",
+      preparedEditId: "prepared-race",
+      sourceVersion: "v1",
+      draftValue: "new",
+      exactDiff: "- old\n+ new",
+    });
+    const saving = editorReducer(prepared, { type: "save-started", preparedEditId: "prepared-race" });
+    const observed = editorReducer(saving, {
+      type: "source-changed",
+      value: "new",
+      sourceVersion: "v2",
+    });
+
+    expect(observed).toMatchObject({
+      phase: "saving",
+      preparedEdit: { id: "prepared-race" },
+      staleSource: { value: "new", version: "v2" },
+    });
+
+    expect(editorReducer(observed, {
+      type: "save-succeeded",
+      preparedEditId: "prepared-race",
+      savedValue: "new",
+      sourceVersion: "v2",
+    })).toEqual({
+      phase: "saved",
+      savedValue: "new",
+      draftValue: "new",
+      sourceVersion: "v2",
+      undoStack: [],
+    });
+  });
+
+  it("invalidates a retry when polling observes a source change during a failed save", () => {
+    const edited = editorReducer(createEditorState("old", "v1"), { type: "edit", value: "new" });
+    const prepared = editorReducer(edited, {
+      type: "prepare-succeeded",
+      preparedEditId: "prepared-conflict",
+      sourceVersion: "v1",
+      draftValue: "new",
+      exactDiff: "diff",
+    });
+    const saving = editorReducer(prepared, { type: "save-started", preparedEditId: "prepared-conflict" });
+    const observed = editorReducer(saving, {
+      type: "source-changed",
+      value: "external",
+      sourceVersion: "v2",
+    });
+    const failed = editorReducer(observed, {
+      type: "save-failed",
+      preparedEditId: "prepared-conflict",
+      reason: "transient",
+    });
+
+    expect(failed).toMatchObject({
+      phase: "stale",
+      preparedEdit: undefined,
+      staleSource: { value: "external", version: "v2" },
+    });
   });
 });
 

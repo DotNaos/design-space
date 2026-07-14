@@ -47,7 +47,11 @@ export type EditorAction =
       readonly exactDiff: string;
     }
   | { readonly type: "save-started"; readonly preparedEditId: string }
-  | { readonly type: "save-failed"; readonly preparedEditId: string }
+  | {
+      readonly type: "save-failed";
+      readonly preparedEditId: string;
+      readonly reason: "transient" | "stale-source";
+    }
   | {
       readonly type: "save-succeeded";
       readonly preparedEditId: string;

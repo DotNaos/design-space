@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import target from "virtual:design-space-target";
 
 import { createEditorState, editorReducer, isDirty } from "../editor";
@@ -67,6 +67,7 @@ function LegacyWorkspace() {
   const [previewCss, setPreviewCss] = useState("");
   const [previewValue, setPreviewValue] = useState<string>();
   const [compositionCss, setCompositionCss] = useState<Readonly<Record<string, string>>>({});
+  const sourceReadSequence = useRef(0);
   const editTargetId = target.defaultEditTargetId;
   const commitFixture = useCallback((next: ComponentFixture, metadata?: { undoRootEdit?: boolean }) => {
     if (next === fixture) return;
@@ -83,12 +84,15 @@ function LegacyWorkspace() {
       setConnected(true);
       return;
     }
+    const readId = ++sourceReadSequence.current;
     try {
       const snapshot = await runLocalOperation<SourceSnapshot>({ type: "read-source", editTargetId });
+      if (readId !== sourceReadSequence.current) return;
       dispatch({ type: "source-changed", value: snapshot.value, sourceVersion: snapshot.version });
       setConnected(true);
       setRuntimeMessage(undefined);
     } catch (error) {
+      if (readId !== sourceReadSequence.current) return;
       setConnected(false);
       setRuntimeMessage(messageFor(error));
     }
@@ -168,10 +172,16 @@ function LegacyWorkspace() {
       dispatch({ type: "save-succeeded", preparedEditId, savedValue: result.value, sourceVersion: result.version });
       setShowDiff(false);
       setRuntimeMessage(undefined);
+      await readSource();
       window.setTimeout(() => dispatch({ type: "preview-ready" }), 900);
     } catch (error) {
-      dispatch({ type: "save-failed", preparedEditId });
-      if (error instanceof LocalOperationError && error.code === "STALE_SOURCE") await readSource();
+      const staleSource = error instanceof LocalOperationError && error.code === "STALE_SOURCE";
+      dispatch({
+        type: "save-failed",
+        preparedEditId,
+        reason: staleSource ? "stale-source" : "transient",
+      });
+      if (staleSource) await readSource();
       setRuntimeMessage(messageFor(error));
     }
   }, [editor.phase, editor.preparedEdit, readSource]);
@@ -318,6 +328,10 @@ function LegacyWorkspace() {
           } else dispatch({ type: "undo" });
         }}
         onReset={() => {
+          if (editor.phase === "stale" && !editor.staleSource) {
+            void readSource();
+            return;
+          }
           dispatch({ type: "reset" });
           setFixture(target.defaultFixture);
           setFixtureUndoStack([]);
