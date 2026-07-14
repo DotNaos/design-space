@@ -147,6 +147,34 @@ describe("target-owned managed document creation", () => {
     });
   });
 
+  it.each([
+    ["screen", "blank-screen", "component"],
+    ["component", "stack-component", "screen"],
+  ] as const)("keeps a saved managed %s document's kind immutable", async (kind, recipeId, nextKind) => {
+    const { registered, root } = await fixture();
+    const service = new DocumentService(registered, { createManagedDocumentId: () => firstUuid });
+    const created = await service.prepareCreate(recipeId, `Managed ${kind}`);
+    if (created.state !== "create-ready") throw new Error("Expected a ready managed creation");
+    await service.save(created.challengeId);
+
+    const snapshot = await service.read(`${kind}.${firstUuid}`);
+    const path = join(root, "managed", `${firstUuid}.design.json`);
+    const before = await readFile(path, "utf8");
+
+    await expect(service.prepare(
+      snapshot.documentId,
+      makeDocument(snapshot.documentId, snapshot.document.label, nextKind),
+      snapshot.documentDigest,
+      snapshot.sourceVersions,
+    )).rejects.toMatchObject({
+      code: "INVALID_REQUEST",
+      message: "The document kind cannot be changed after creation",
+    });
+
+    expect(await readFile(path, "utf8")).toBe(before);
+    await expect(service.read(snapshot.documentId)).resolves.toMatchObject({ document: { kind } });
+  });
+
   it("returns Strict UI and compile blocks without creating a destination", async () => {
     const strict = await fixture();
     strict.state.violations = [{

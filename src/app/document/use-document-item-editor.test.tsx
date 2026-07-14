@@ -1,9 +1,21 @@
-import { act, renderHook } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { beforeEach, expect, it, vi } from "vitest";
 
 import type { DesignDocument } from "../../shared/design-document";
 import type { TargetModule } from "../../shared/target-module";
+import { runLocalOperation } from "../api";
 import { useDocumentItemEditor } from "./use-document-item-editor";
+
+vi.mock("../api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api")>();
+  return { ...actual, runLocalOperation: vi.fn() };
+});
+
+const runLocalOperationMock = vi.mocked(runLocalOperation);
+
+beforeEach(() => {
+  runLocalOperationMock.mockReset();
+});
 
 const target: TargetModule = {
   project: { id: "item-editor", label: "Item editor" },
@@ -23,6 +35,26 @@ const initialDocument: DesignDocument = {
   label: "Home",
   kind: "screen",
   root: { instanceId: "copy.one", adapterId: "copy", props: { children: "Initial" }, slots: {} },
+};
+
+const tailwindTarget: TargetModule = {
+  project: { id: "tailwind-item-editor", label: "Tailwind item editor" },
+  defaultAdapterId: "surface",
+  defaultFixture: { instanceId: "surface.one", adapterId: "surface", slots: {} },
+  files: [],
+  adapters: [{
+    component: { id: "surface", label: "Surface", group: "Layout", slots: [] },
+    controls: [{ id: "style", label: "Classes", kind: "tailwind", prop: "className" }],
+    render: (props, context) => <div {...context.previewAttributes} className={String(props.className ?? "")} />,
+  }],
+};
+
+const tailwindDocument: DesignDocument = {
+  schemaVersion: 2,
+  id: "screen.tailwind",
+  label: "Tailwind screen",
+  kind: "screen",
+  root: { instanceId: "surface.one", adapterId: "surface", props: { className: "p-4" }, slots: {} },
 };
 
 it("closes a private item draft when a newer source snapshot arrives with the same ids", () => {
@@ -54,3 +86,54 @@ it("closes a private item draft when a newer source snapshot arrives with the sa
   expect(result.current.model).toBeUndefined();
   expect(onCommit).not.toHaveBeenCalled();
 });
+
+it("removes stale compiled CSS when the last Tailwind class is cleared in the same editor session", async () => {
+  runLocalOperationMock.mockImplementation(async (operation) => {
+    if (operation.type === "compile-tailwind") {
+      return { value: operation.value, css: ".p-4{padding:1rem}" } as never;
+    }
+    throw new Error(`Unexpected operation ${operation.type}`);
+  });
+
+  render(<TailwindEditorHarness />);
+  fireEvent.click(screen.getByRole("button", { name: "Open editor" }));
+
+  await waitFor(() => expect(runLocalOperationMock).toHaveBeenCalledWith({
+    type: "compile-tailwind",
+    value: "p-4",
+  }));
+  await waitFor(() => expect(screen.getByTestId("item-preview-css")).toHaveTextContent(".p-4{padding:1rem}"));
+  expect(screen.getByTestId("compile-state")).toHaveTextContent("tailwind:ready");
+
+  fireEvent.click(screen.getByRole("button", { name: "Clear classes" }));
+
+  await waitFor(() => expect(screen.getByTestId("compile-state")).toHaveTextContent("plain:ready"));
+  expect(screen.getByTestId("item-preview-css")).toBeEmptyDOMElement();
+  expect(runLocalOperationMock).toHaveBeenCalledTimes(1);
+});
+
+function TailwindEditorHarness() {
+  const editor = useDocumentItemEditor({
+    target: tailwindTarget,
+    document: tailwindDocument,
+    library: [],
+    connected: true,
+    sourceSnapshotKey: "source-v1",
+    createId: () => "surface.next",
+    onCommit: vi.fn(),
+    onSelect: vi.fn(),
+  });
+  const model = editor.model;
+  const compileState = !model
+    ? "closed"
+    : `${model.hasTailwind ? "tailwind" : "plain"}:${model.compilePending ? "pending" : model.compileError ? "error" : "ready"}`;
+
+  return (
+    <>
+      <button type="button" onClick={() => editor.open("surface.one")}>Open editor</button>
+      <button type="button" onClick={() => editor.updateControl("className", undefined)}>Clear classes</button>
+      <style data-testid="item-preview-css">{model?.previewCss}</style>
+      <output data-testid="compile-state">{compileState}</output>
+    </>
+  );
+}

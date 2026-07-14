@@ -95,6 +95,7 @@ export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
 
   useEffect(() => {
     if (!model?.hasTailwind) {
+      setPreviewCss("");
       setCompilePending(false);
       setCompileError(undefined);
       setCompiledValue(model?.tailwindInput);

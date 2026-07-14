@@ -192,6 +192,9 @@ export class DocumentService {
     if (digestDocument(currentDocument) !== baseDocumentDigest) {
       throw new DesignSpaceError("STALE_SOURCE", "The document changed after the editor loaded it");
     }
+    if (document.kind !== currentDocument.kind) {
+      throw new DesignSpaceError("INVALID_REQUEST", "The document kind cannot be changed after creation");
+    }
     const library = await this.#library.capture(documentId, sources);
 
     const documentDigest = digestDocument(document);

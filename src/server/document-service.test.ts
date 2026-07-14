@@ -33,14 +33,14 @@ describe("durable document service", () => {
   const roots: string[] = [];
   afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-  async function fixture(serviceOptions: DocumentServiceOptions = {}) {
+  async function fixture(serviceOptions: DocumentServiceOptions = {}, sourceDocument: DesignDocument = initialDocument) {
     const root = await mkdtemp(join(tmpdir(), "design-space-documents-"));
     roots.push(root);
     const documentPath = join(root, "home.design.json");
     const viewPath = join(root, "home.generated.tsx");
     const targetPath = join(root, "target.tsx");
-    await writeFile(documentPath, `${canonicalJson(initialDocument, 2)}\n`);
-    await writeFile(viewPath, renderView(initialDocument));
+    await writeFile(documentPath, `${canonicalJson(sourceDocument, 2)}\n`);
+    await writeFile(viewPath, renderView(sourceDocument));
     await writeFile(targetPath, "export const target = {};\n");
     const state: FixtureState = {
       strictViolations: [],
@@ -65,7 +65,7 @@ describe("durable document service", () => {
         version: "test.strict.v1",
         tailwindClassList: () => "",
         documents: {
-          "screen.home": {
+          [sourceDocument.id]: {
             sourceFileIds: ["document.source", "view.source"],
             writeFileIds: ["document.source", "view.source"],
             load: async (sources) => {
@@ -80,8 +80,8 @@ describe("durable document service", () => {
             strictUi: () => state.strictViolations,
             materialize: (document) => {
               state.materializeCalls += 1;
-              const serializedDocument = state.materializationMode === "current" ? document : initialDocument;
-              const renderedDocument = state.materializationMode === "stale-all" ? initialDocument : document;
+              const serializedDocument = state.materializationMode === "current" ? document : sourceDocument;
+              const renderedDocument = state.materializationMode === "stale-all" ? sourceDocument : document;
               const output: Record<string, string> = {
                 "document.source": state.materializationMode === "malformed-document"
                   ? "{ malformed document source\n"
@@ -167,6 +167,55 @@ describe("durable document service", () => {
     await expect(service.save(first.challengeId)).resolves.toMatchObject({ state: "saved", documentId: "screen.home" });
     await expect(service.save(second.challengeId)).rejects.toMatchObject({ code: "STALE_SOURCE" });
     await expect(service.read("screen.home")).resolves.toMatchObject({ document: { label: "Updated home" } });
+  });
+
+  it.each([
+    ["screen to component", initialDocument, "component"],
+    ["component to screen", componentDocument, "screen"],
+  ] as const)("rejects changing an existing document from %s before validation or a save challenge", async (
+    _,
+    sourceDocument,
+    nextKind,
+  ) => {
+    let issuedIds = 0;
+    const { documentPath, viewPath, service, state } = await fixture({
+      createId: () => {
+        issuedIds += 1;
+        return "33333333-3333-4333-8333-333333333333";
+      },
+    }, sourceDocument);
+    const snapshot = await service.read(sourceDocument.id);
+    const proposed: DesignDocument = nextKind === "component"
+      ? {
+          ...snapshot.document,
+          kind: "component",
+          component: {
+            id: "authored.switched",
+            label: "Switched",
+            group: "Custom",
+            properties: [],
+            slots: [],
+          },
+        }
+      : screenFrom(snapshot.document);
+    const beforeDocument = await readFile(documentPath, "utf8");
+    const beforeView = await readFile(viewPath, "utf8");
+
+    await expect(service.prepare(
+      sourceDocument.id,
+      proposed,
+      snapshot.documentDigest,
+      snapshot.sourceVersions,
+    )).rejects.toMatchObject({
+      code: "INVALID_REQUEST",
+      message: "The document kind cannot be changed after creation",
+    });
+
+    expect(issuedIds).toBe(0);
+    expect(state.materializeCalls).toBe(0);
+    expect(state.compileCalls).toBe(0);
+    expect(await readFile(documentPath, "utf8")).toBe(beforeDocument);
+    expect(await readFile(viewPath, "utf8")).toBe(beforeView);
   });
 
   it("blocks Strict UI errors without materializing or issuing a save challenge", async () => {
@@ -426,4 +475,24 @@ describe("durable document service", () => {
 
 function renderView(document: DesignDocument): string {
   return `export const documentLabel = ${JSON.stringify(document.label)};\n`;
+}
+
+const componentDocument: DesignDocument = {
+  schemaVersion: 2,
+  id: "component.notice",
+  label: "Notice",
+  kind: "component",
+  component: {
+    id: "authored.notice",
+    label: "Notice",
+    group: "Custom",
+    properties: [],
+    slots: [],
+  },
+  root: { instanceId: "notice.root", adapterId: "stack", slots: { content: [] } },
+};
+
+function screenFrom(document: DesignDocument): DesignDocument {
+  const { component: _component, ...screen } = document;
+  return { ...screen, kind: "screen" };
 }
