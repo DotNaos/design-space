@@ -259,14 +259,14 @@ describe("core Strict UI validation", () => {
   });
 
   it("aggregates fixed children and multiple outlet ranges", () => {
-    const targetWithPairSlot: TargetModule = {
+    const targetWithAggregateSlot: TargetModule = {
       ...target,
       adapters: target.adapters.map((adapter) => adapter.component.id === "card"
         ? {
             ...adapter,
             component: {
               ...adapter.component,
-              slots: adapter.component.slots.map((slot) => ({ ...slot, min: 2, max: 2 })),
+              slots: adapter.component.slots.map((slot) => ({ ...slot, min: 1, max: 3 })),
             },
           }
         : adapter),
@@ -282,8 +282,8 @@ describe("core Strict UI validation", () => {
         group: "Surfaces",
         properties: [],
         slots: [
-          { id: "primary", label: "Primary", min: 1, max: 1, accepts: ["text"] },
-          { id: "secondary", label: "Secondary", min: 0, max: 1, accepts: [], acceptsText: true },
+          { id: "primary", label: "Primary", min: 0, max: 2, accepts: ["text"] },
+          { id: "secondary", label: "Secondary", min: 0, max: 2, accepts: [], acceptsText: true },
         ],
       },
       root: {
@@ -300,7 +300,7 @@ describe("core Strict UI validation", () => {
       },
     };
 
-    expect(validateStrictUi(targetWithPairSlot, authored)).toEqual(expect.arrayContaining([
+    expect(validateStrictUi(targetWithAggregateSlot, authored)).toEqual(expect.arrayContaining([
       expect.objectContaining({ ruleId: "slot.maximum" }),
     ]));
   });
