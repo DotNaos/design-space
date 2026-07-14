@@ -34,6 +34,7 @@ interface TemplateBindingContext {
   externalContext?: TemplateBindingContext;
   publicInstanceId: string;
   callerAuthoredPath: readonly string[];
+  mapInternalSelectionsToPublicInstance: boolean;
 }
 
 export function DesignDocumentPreview(props: {
@@ -57,15 +58,14 @@ function renderNode(
   const boundProps = resolveBoundProps(node, templateContext);
   const adapter = target.adapters.find((item) => item.component.id === node.adapterId);
   if (adapter) {
-    const previewAttributes = authoredAttributes ?? previewAttributesFor(node.instanceId, parentSlotSelectionId);
-    const publicInstanceId = previewAttributes["data-design-space-instance-id"];
+    const previewAttributes = selectionAttributesFor(node, parentSlotSelectionId, templateContext, authoredAttributes);
     const slotChildren = Object.fromEntries(adapter.component.slots.map((slot) => [
       slot.id,
       (node.slots[slot.id] ?? []).flatMap((child) => renderChild(
         target,
         child,
         library,
-        slotSelectionId(publicInstanceId, slot.id),
+        slotSelectionId(node.instanceId, slot.id),
         {},
         {},
         authoredPath,
@@ -74,11 +74,11 @@ function renderNode(
     ]));
     const slotAttributes = Object.fromEntries(adapter.component.slots.map((slot) => [
       slot.id,
-      { "data-design-space-slot-id": slotSelectionId(publicInstanceId, slot.id) } satisfies PreviewSlotAttributes,
+      { "data-design-space-slot-id": slotSelectionId(node.instanceId, slot.id) } satisfies PreviewSlotAttributes,
     ]));
     const htmlAttributes = Object.fromEntries(flattenInternalHtml(adapter.component.internalHtml ?? []).map((item) => [
       item.id,
-      { "data-design-space-html-id": htmlSelectionId(publicInstanceId, item.id) },
+      { "data-design-space-html-id": htmlSelectionId(node.instanceId, item.id) },
     ]));
     const context: AdapterRenderContext = { slotChildren, previewAttributes, slotAttributes, htmlAttributes };
     const rendered = adapter.render({ ...adapter.defaultProps, ...node.props, ...inheritedProps, ...boundProps }, context);
@@ -95,7 +95,7 @@ function renderNode(
   const defaults = Object.fromEntries(authored.component.properties.flatMap((property) => property.defaultValue === undefined
     ? []
     : [[property.prop, property.defaultValue]]));
-  const previewAttributes = authoredAttributes ?? previewAttributesFor(node.instanceId, parentSlotSelectionId);
+  const previewAttributes = selectionAttributesFor(node, parentSlotSelectionId, templateContext, authoredAttributes);
   const publicProps = { ...defaults, ...node.props, ...inheritedProps, ...boundProps };
   const scopedTemplate = scopeTemplateNode(authored.root, node.instanceId);
   const bindingContext: TemplateBindingContext = {
@@ -105,6 +105,7 @@ function renderNode(
     externalContext: templateContext,
     publicInstanceId: previewAttributes["data-design-space-instance-id"],
     callerAuthoredPath: authoredPath,
+    mapInternalSelectionsToPublicInstance: true,
   };
   const rendered = renderTemplateNode(
     target,
@@ -153,11 +154,11 @@ function renderTemplateNode(
   ]));
   const slotAttributes = Object.fromEntries(adapter.component.slots.map((slot) => [
     slot.id,
-    { "data-design-space-slot-id": slotSelectionId(authoredAttributes["data-design-space-instance-id"], slot.id) } satisfies PreviewSlotAttributes,
+    { "data-design-space-slot-id": slotSelectionId(template.instanceId, slot.id) } satisfies PreviewSlotAttributes,
   ]));
   const htmlAttributes = Object.fromEntries(flattenInternalHtml(adapter.component.internalHtml ?? []).map((item) => [
     item.id,
-    { "data-design-space-html-id": htmlSelectionId(authoredAttributes["data-design-space-instance-id"], item.id) },
+    { "data-design-space-html-id": htmlSelectionId(template.instanceId, item.id) },
   ]));
   const rendered = adapter.render(
     { ...adapter.defaultProps, ...template.props, ...resolveBoundProps(template, bindingContext) },
@@ -217,6 +218,7 @@ function renderComponentImplementation(
     externalSlots,
     publicInstanceId: document.root.instanceId,
     callerAuthoredPath: [],
+    mapInternalSelectionsToPublicInstance: false,
   };
   return renderTemplateNode(
     target,
@@ -233,6 +235,18 @@ function previewAttributesFor(instanceId: string, parentSlotSelectionId?: string
     "data-design-space-instance-id": instanceId,
     ...(parentSlotSelectionId ? { "data-design-space-parent-slot-id": parentSlotSelectionId } : {}),
   };
+}
+
+function selectionAttributesFor(
+  node: DesignComponentNode,
+  parentSlotSelectionId: string | undefined,
+  templateContext: TemplateBindingContext | undefined,
+  authoredAttributes: PreviewElementAttributes | undefined,
+): PreviewElementAttributes {
+  if (authoredAttributes) return authoredAttributes;
+  return templateContext?.mapInternalSelectionsToPublicInstance
+    ? previewAttributesFor(templateContext.publicInstanceId)
+    : previewAttributesFor(node.instanceId, parentSlotSelectionId);
 }
 
 function outletAnchor(outletId: string, parentSlotSelectionId: string): ReactElement {

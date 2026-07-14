@@ -41,7 +41,9 @@ function designNodeToFixture(node: DesignComponentNode): ComponentFixture {
       children.flatMap<FixtureChild>((child) => {
         if (child.kind === "text") return [{ kind: "text", id: child.id, value: child.value }];
         if (child.kind === "component") return [{ kind: "component", node: designNodeToFixture(child.node) }];
-        return [];
+        // Fixtures have no executable outlet kind. An empty child preserves structural
+        // occupancy without rendering content or projecting the component's public slot.
+        return [{ kind: "text", id: child.id, value: "" }];
       }),
     ])),
   };

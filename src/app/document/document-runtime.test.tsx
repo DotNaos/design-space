@@ -1,9 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { createContext, useContext, type ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { DesignDocument } from "../../shared/design-document";
 import type { TargetModule } from "../../shared/target-module";
+import { PreviewCanvas } from "../components/PreviewCanvas";
+import { indexPreviewDom } from "../dom/dom-snapshot";
 import { DesignDocumentPreview, renderDesignDocument } from "./document-runtime";
 
 const target: TargetModule = {
@@ -168,7 +170,7 @@ it.each([
   expect(placed.container.firstElementChild).toHaveAttribute("class", expectedClass);
 });
 
-it("applies a public property only to its explicitly bound implementation control", () => {
+it("applies a public property and maps implementation clicks to the public authored instance", () => {
   const boundPanel: DesignDocument = {
     ...panel,
     component: {
@@ -196,14 +198,34 @@ it("applies a public property only to its explicitly bound implementation contro
     root: { instanceId: "panel.bound", adapterId: "panel", props: { title: "Bound title" }, slots: {} },
   };
 
-  render(<>{renderDesignDocument(target, screenDocument, [boundPanel])}</>);
+  const workshop = render(<>{renderDesignDocument(target, boundPanel, [boundPanel])}</>);
+  expect(screen.getByText("Default title")).toHaveAttribute("data-design-space-instance-id", "bound.copy");
+  expect(screen.getByText("Static sibling")).toHaveAttribute("data-design-space-instance-id", "static.copy");
+  workshop.unmount();
 
-  expect(screen.getByText("Bound title")).toHaveAttribute("data-design-space-instance-id", "panel.bound--bound.copy");
-  expect(screen.getByText("Static sibling")).toHaveAttribute("data-design-space-instance-id", "panel.bound--static.copy");
+  const onSelect = vi.fn();
+  render(
+    <PreviewCanvas
+      compact
+      preview={renderDesignDocument(target, screenDocument, [boundPanel])}
+      rootInstanceId="panel.bound"
+      selectedComponentInstanceId="panel.bound"
+      selection={{ kind: "component", id: "panel.bound" }}
+      selectionLabel="Panel"
+      slots={[]}
+      onSelect={onSelect}
+    />,
+  );
+
+  expect(screen.getByText("Bound title")).toHaveAttribute("data-design-space-instance-id", "panel.bound");
+  expect(screen.getByText("Static sibling")).toHaveAttribute("data-design-space-instance-id", "panel.bound");
+  expect(document.querySelector('[data-design-space-instance-id^="panel.bound--"]')).not.toBeInTheDocument();
   expect(screen.getByText("Bound title").closest("div")).toHaveClass("root-surface");
+  fireEvent.click(screen.getByText("Static sibling"));
+  expect(onSelect).toHaveBeenCalledWith({ kind: "component", id: "panel.bound" });
 });
 
-it("scopes authored component internals per outer instance", () => {
+it("maps authored component internals to each outer public instance", () => {
   const nestedPanel: DesignDocument = {
     ...panel,
     root: {
@@ -235,10 +257,77 @@ it("scopes authored component internals per outer instance", () => {
 
   render(<>{renderDesignDocument(target, documentWithTwoPanels, [nestedPanel])}</>);
 
-  expect([...document.querySelectorAll('[data-design-space-instance-id$="--internal.copy"]')].map((element) => element.getAttribute("data-design-space-instance-id"))).toEqual([
-    "panel.one--internal.copy",
-    "panel.two--internal.copy",
-  ]);
+  expect(screen.getAllByText("Internal").map((element) => element.getAttribute("data-design-space-instance-id")))
+    .toEqual(["panel.one", "panel.two"]);
+  expect(document.querySelector('[data-design-space-instance-id$="--internal.copy"]')).not.toBeInTheDocument();
+});
+
+it("keeps sibling implementation slot and HTML evidence uniquely scoped behind the public boundary", () => {
+  const targetWithBoxes: TargetModule = {
+    ...target,
+    adapters: [...target.adapters, {
+      component: {
+        id: "box",
+        label: "Box",
+        group: "Layout",
+        slots: [{ id: "content", label: "Content" }],
+        internalHtml: [{ id: "surface", tagName: "header" }],
+      },
+      render: (props, context) => (
+        <section {...context.previewAttributes}>
+          <header {...context.htmlAttributes.surface}>{String(props.label)}</header>
+          <div {...context.slotAttributes.content}>{context.slotChildren.content}</div>
+        </section>
+      ),
+    }],
+  };
+  const boxedPanel: DesignDocument = {
+    ...panel,
+    root: {
+      ...panel.root,
+      slots: { content: [
+        { kind: "component", node: { instanceId: "box.one", adapterId: "box", props: { label: "First box" }, slots: { content: [] } } },
+        { kind: "component", node: { instanceId: "box.two", adapterId: "box", props: { label: "Second box" }, slots: { content: [] } } },
+        ...panel.root.slots.content,
+      ] },
+    },
+  };
+  const screenDocument: DesignDocument = {
+    schemaVersion: 2,
+    id: "screen.boxes",
+    label: "Boxes",
+    kind: "screen",
+    root: {
+      instanceId: "panel.boxes",
+      adapterId: "panel",
+      slots: { body: [{ kind: "component", node: { instanceId: "copy.external", adapterId: "text", props: { children: "Projected" }, slots: {} } }] },
+    },
+  };
+
+  const workshop = render(<>{renderDesignDocument(targetWithBoxes, boxedPanel, [boxedPanel])}</>);
+  expect(screen.getByText("First box")).toHaveAttribute("data-design-space-html-id", "html:box.one:surface");
+  expect(workshop.container.querySelector('[data-design-space-slot-id="slot:box.two:content"]')).toBeInTheDocument();
+  workshop.unmount();
+
+  const { container } = render(<>{renderDesignDocument(targetWithBoxes, screenDocument, [boxedPanel])}</>);
+  expect(screen.getAllByText(/box$/).map((element) => element.closest("section")?.dataset.designSpaceInstanceId))
+    .toEqual(["panel.boxes", "panel.boxes"]);
+  expect(screen.getByText("First box")).toHaveAttribute("data-design-space-html-id", "html:panel.boxes--box.one:surface");
+  expect(screen.getByText("Second box")).toHaveAttribute("data-design-space-html-id", "html:panel.boxes--box.two:surface");
+  expect(container.querySelector('[data-design-space-slot-id="slot:panel.boxes--box.one:content"]')).toBeInTheDocument();
+  expect(container.querySelector('[data-design-space-slot-id="slot:panel.boxes--box.two:content"]')).toBeInTheDocument();
+  expect(container.querySelector('[data-design-space-slot-id="slot:panel.boxes:content"]')).not.toBeInTheDocument();
+  expect(container.querySelector('[data-design-space-outlet-id="panel.boxes--panel.body.outlet"]'))
+    .toHaveAttribute("data-design-space-slot-id", "slot:panel.boxes:body");
+  expect(screen.getByText("Projected")).toHaveAttribute("data-design-space-instance-id", "copy.external");
+
+  const snapshot = indexPreviewDom(container);
+  const snapshotIds = collectSnapshotIds(snapshot["panel.boxes"]);
+  expect(new Set(snapshotIds).size).toBe(snapshotIds.length);
+  const indexedHtmlIds = [...container.querySelectorAll<HTMLElement>('[data-design-space-html-id^="html:panel.boxes:"]')]
+    .map((element) => element.dataset.designSpaceHtmlId);
+  expect(new Set(indexedHtmlIds).size).toBe(indexedHtmlIds.length);
+  expect(indexedHtmlIds).not.toContain("html:panel.boxes:surface");
 });
 
 it("keeps the outer public instance evidence when an implementation root is authored", () => {
@@ -248,7 +337,16 @@ it("keeps the outer public instance evidence when an implementation root is auth
     label: "Inner",
     kind: "component",
     component: { id: "inner", label: "Inner", group: "Custom", properties: [], slots: [] },
-    root: { instanceId: "inner.root", adapterId: "stack", slots: { content: [] } },
+    root: {
+      instanceId: "inner.root",
+      adapterId: "stack",
+      slots: {
+        content: [{
+          kind: "component",
+          node: { instanceId: "inner.copy", adapterId: "text", props: { children: "Nested implementation" }, slots: {} },
+        }],
+      },
+    },
   };
   const outer: DesignDocument = {
     schemaVersion: 2,
@@ -270,6 +368,8 @@ it("keeps the outer public instance evidence when an implementation root is auth
 
   expect(container.firstElementChild).toHaveAttribute("data-design-space-instance-id", "outer.instance");
   expect(container.querySelector('[data-design-space-instance-id="outer.instance--outer.inner"]')).not.toBeInTheDocument();
+  expect(screen.getByText("Nested implementation")).toHaveAttribute("data-design-space-instance-id", "outer.instance");
+  expect(container.querySelector('[data-design-space-instance-id$="--inner.copy"]')).not.toBeInTheDocument();
 });
 
 it("allows a finite instance of a component inside its own projected slot", () => {
@@ -378,3 +478,12 @@ it("stops authored component cycles with a recoverable error instead of overflow
   expect(() => renderDesignDocument(target, screenDocument, [recursive, forwarder]))
     .toThrow("Recursive authored component: recursive → recursive");
 });
+
+interface SnapshotNode {
+  id: string;
+  children?: readonly SnapshotNode[];
+}
+
+function collectSnapshotIds(nodes: readonly SnapshotNode[] | undefined): string[] {
+  return (nodes ?? []).flatMap((node) => [node.id, ...collectSnapshotIds(node.children)]);
+}
