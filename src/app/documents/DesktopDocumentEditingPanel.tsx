@@ -12,6 +12,7 @@ type ItemEditor = ReturnType<typeof useDocumentItemEditor>;
 export function DesktopDocumentEditingPanel(props: {
   definitionEditor: boolean;
   document: DesignDocument;
+  documents: readonly DesignDocument[];
   recipe?: ComponentCreationRecipe;
   catalogComponents: readonly BindingComponentOption[];
   files: readonly { id: string; label: string }[];
@@ -25,8 +26,9 @@ export function DesktopDocumentEditingPanel(props: {
   if (props.definitionEditor) {
     return (
       <DocumentDefinitionPanel
-        className="hidden w-80 lg:flex"
+        className="flex h-full w-full border-l-0"
         document={props.document}
+        documents={props.documents}
         recipe={props.recipe}
         catalogComponents={props.catalogComponents}
         onChange={props.onDocumentChange}
@@ -37,10 +39,10 @@ export function DesktopDocumentEditingPanel(props: {
       />
     );
   }
-  if (!model) return <InspectorPrompt onEdit={() => props.itemEditor.open(props.selectedNodeId)} />;
+  if (!model) return <InspectorPrompt className="grid h-full w-full border-l-0" onEdit={() => props.itemEditor.open(props.selectedNodeId)} />;
   return (
     <DocumentInspector
-      className="hidden w-80 lg:flex"
+      className="flex h-full w-full border-l-0"
       componentLabel={model.adapter.component.label}
       sourceLabel={model.adapter.sourceFileId ? props.files.find((file) => file.id === model.adapter.sourceFileId)?.label : undefined}
       controls={model.adapter.controls}

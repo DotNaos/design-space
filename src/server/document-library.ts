@@ -1,10 +1,8 @@
-import { readFile } from "node:fs/promises";
-
 import { designDocumentSchema, type DesignDocument } from "../shared/design-document";
 import type { SourceVersionMap } from "../shared/document-transactions";
 import { assertSameVersions, freezeRecord, versionsFor } from "./document-service-values";
 import { DesignSpaceError } from "./errors";
-import { assertStillRegistered } from "./path-security";
+import { readRegisteredFile } from "./registered-file-reader";
 import type {
   DocumentTargetContext,
   RegisteredDocumentTarget,
@@ -78,8 +76,7 @@ export class TrustedDocumentLibrary {
     for (const fileId of [...fileIds].sort((left, right) => left.localeCompare(right, "en"))) {
       const file = this.#target.files.get(fileId);
       if (!file) throw new DesignSpaceError("INVALID_REGISTRATION", "A document dependency is not registered");
-      await assertStillRegistered(this.#target.root, file.path);
-      entries.push([fileId, await readFile(file.path, "utf8")]);
+      entries.push([fileId, await readRegisteredFile(this.#target.root, file.path)]);
     }
     return freezeRecord(Object.fromEntries(entries));
   }

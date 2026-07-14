@@ -36,7 +36,7 @@ function renderChildren(
     <div key={file.id}>
       <button
         aria-selected={selectedId === file.id}
-        className={`flex h-11 w-full items-center gap-2 pr-2 text-left lg:h-8 ${selectedId === file.id ? "bg-indigo-500/10 text-indigo-200" : "hover:bg-white/[0.03]"}`}
+        className={`flex h-11 w-full items-center gap-2 pr-2 text-left lg:h-8 ${selectedId === file.id ? "bg-sky-500/10 text-sky-200" : "hover:bg-white/[0.03]"}`}
         style={{ paddingLeft: 10 + depth * 16 }}
         type="button"
         onClick={() => onSelect(file.id)}

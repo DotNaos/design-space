@@ -14,8 +14,8 @@ export function workspaceStatusTone(phase: string | undefined, connected: boolea
   return connected ? "bg-emerald-400" : "bg-zinc-500";
 }
 
-export function InspectorPrompt({ onEdit }: { onEdit: () => void }) {
-  return <aside className="hidden w-80 shrink-0 place-items-center border-l border-white/10 bg-[#141518] px-6 text-center lg:grid"><button className="text-xs text-zinc-500 hover:text-zinc-200" type="button" onClick={onEdit}>Edit selected item</button></aside>;
+export function InspectorPrompt({ className, onEdit }: { className?: string; onEdit: () => void }) {
+  return <aside className={`${className ?? "grid w-80"} min-h-0 min-w-0 shrink-0 place-items-center border-l border-white/10 bg-[#141518] px-6 text-center`}><button className="text-xs text-zinc-500 hover:text-zinc-200" type="button" onClick={onEdit}>Edit selected item</button></aside>;
 }
 
 export function BlockedOrLoading(props: { loading: boolean; message?: string }) {

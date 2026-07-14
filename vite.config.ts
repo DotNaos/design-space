@@ -13,6 +13,7 @@ import {
   LocalOperationService,
   resolveServerProjectRoot,
 } from "./src/server";
+import { createViteFileSystemPolicy } from "./src/server/vite-file-system-policy";
 
 const root = import.meta.dirname;
 
@@ -52,25 +53,7 @@ export default defineConfig(async () => {
       host: "127.0.0.1",
       port: serverPort,
       strictPort: true,
-      fs: {
-        strict: true,
-        allow: [root, registeredTarget.targetModulePath],
-        deny: [
-          ".env",
-          ".env.*",
-          "*.{crt,pem,key,p12,pfx,cer,der}",
-          ".npmrc",
-          ".yarnrc.yml",
-          "**/.git/**",
-          "**/.github/**",
-          "**/design-space.server.*",
-          "**/src/server/**",
-          "**/vite.config.*",
-          "**/package.json",
-          "**/bun.lock*",
-          "**/tsconfig*.json",
-        ],
-      },
+      fs: createViteFileSystemPolicy(root, registeredTarget.targetModulePath),
     },
     build: { sourcemap: true },
   };

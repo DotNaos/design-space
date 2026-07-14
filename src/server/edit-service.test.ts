@@ -219,10 +219,11 @@ describe("adapter contracts", () => {
         ...valid.adapters[0],
         component: {
           ...valid.adapters[0].component,
+          slots: [{ id: "body", label: "Body" }],
           internalHtml: [{
             id: "card.surface",
             tagName: "article",
-            children: [{ id: "card.header", tagName: "header" }],
+            children: [{ id: "card.body", tagName: "div", slotId: "body" }],
           }],
         },
       }],
@@ -238,6 +239,16 @@ describe("adapter contracts", () => {
             tagName: "article",
             children: [{ id: "card.surface", tagName: "header" }],
           }],
+        },
+      }],
+    })).toThrowError(expect.objectContaining({ code: "INVALID_ADAPTER" }));
+    expect(() => validateTargetModule({
+      ...valid,
+      adapters: [{
+        ...valid.adapters[0],
+        component: {
+          ...valid.adapters[0].component,
+          internalHtml: [{ id: "card.surface", tagName: "article", slotId: "missing" }],
         },
       }],
     })).toThrowError(expect.objectContaining({ code: "INVALID_ADAPTER" }));

@@ -38,7 +38,7 @@ export interface TargetViewModelOptions {
 
 export function createTargetViewModel(
   target: TargetModule,
-  revealInternalHtml: boolean,
+  revealInternalHtml: boolean | ReadonlySet<string>,
   fixture: ComponentFixture = target.defaultFixture,
   componentDocuments: readonly DesignDocument[] = [],
   options: TargetViewModelOptions = {},
@@ -77,7 +77,9 @@ export function createTargetViewModel(
     ? createTolerantCatalog(definitions)
     : createAdapterCatalog(definitions);
   const root = fixtureToInstance(fixture);
-  const revealedInstances = revealInternalHtml ? collectInstanceIds(root) : undefined;
+  const revealedInstances = typeof revealInternalHtml === "boolean"
+    ? revealInternalHtml ? collectInstanceIds(root) : undefined
+    : revealInternalHtml;
   return {
     catalog,
     root,
@@ -274,6 +276,7 @@ function toModelHtmlTree(node: InternalHtmlNode): HtmlTreeNode {
     kind: "html" as const,
     id: node.id,
     tagName: node.tagName,
+    slotId: node.slotId,
     children: node.children?.map(toModelHtmlTree),
   };
 }

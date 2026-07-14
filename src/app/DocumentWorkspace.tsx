@@ -1,48 +1,42 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { projectPreviewSlots, type SelectionTarget } from "../model";
+import type { SelectionTarget } from "../model";
 import type { TailwindPreview } from "../shared/contracts";
 import type { DesignDocument } from "../shared/design-document";
-import type { PreparedDocumentCreate } from "../shared/document-transactions";
-import type { StrictUiViolation } from "../shared/strict-ui";
 import type { TargetModule } from "../shared/target-module";
-import { ComponentTree } from "./components/ComponentTree";
-import { DiffSheet } from "./components/DiffSheet";
-import { MobileItemEditor } from "./components/MobileItemEditor";
-import { PreviewCanvas } from "./components/PreviewCanvas";
-import { SlotCatalogDialog } from "./components/SlotCatalogDialog";
+import { DiffPanel } from "./components/DiffPanel";
 import { runLocalOperation } from "./api";
 import type { ProductMode } from "./documents/DocumentNavigator";
-import { CreateDocumentSheet } from "./documents/CreateDocumentSheet";
 import { DesktopDocumentEditingPanel } from "./documents/DesktopDocumentEditingPanel";
 import { DocumentDefinitionPanel } from "./documents/DocumentDefinitionPanel";
+import { DocumentWorkspaceDialogs } from "./documents/DocumentWorkspaceDialogs";
+import { DocumentWorkspacePanels } from "./documents/DocumentWorkspacePanels";
 import { EmptyModeState } from "./documents/EmptyModeState";
-import { WorkspaceBrowser, type WorkspaceBrowserView } from "./documents/WorkspaceBrowser";
+import type { WorkspaceBrowserView } from "./documents/WorkspaceBrowser";
+import type { WorkspaceSidebarView } from "./documents/WorkspaceSidebar";
 import { documentCatalog, resolveDocumentAdapter, wouldCreateAuthoredComponentCycle } from "./document/document-adapters";
-import { findDesignNode, insertDesignChild } from "./document/document-commands";
+import { findDesignNode } from "./document/document-commands";
 import { createDesignIdFactory } from "./document/design-id";
 import { createLegacyDocument, documentToFixture } from "./document/fixture-document";
 import { DesignDocumentPreview } from "./document/document-runtime";
 import { isDocumentDirty } from "./document/document-session";
 import { buildDesignDocumentTree } from "./document/document-tree";
+import { createDocumentWorkspaceRouting } from "./document/document-workspace-routing";
+import { projectDocumentSlots } from "./document/document-workspace-projections";
 import type { PreviewDomSnapshot } from "./dom/dom-snapshot";
-import { shouldOpenSlotPicker, slotHasCapacity } from "./document/slot-capacity";
+import { useDocumentCreationFlow } from "./document/use-document-creation-flow";
+import { useDocumentSelectionInteractions } from "./document/use-document-selection-interactions";
+import { useWorkspaceKeyboardCommands } from "./document/use-workspace-keyboard-commands";
 import { collectDocumentTailwind, useDocumentItemEditor } from "./document/use-document-item-editor";
 import { useDocumentWorkspace } from "./document/use-document-workspace";
-import {
-  BlockedOrLoading,
-  workspaceStatusText,
-  workspaceStatusTone,
-} from "./document/WorkspaceStates";
+import { BlockedOrLoading } from "./document/WorkspaceStates";
 import { PreviewBoundary } from "./PreviewBoundary";
 import { MobileDock, type MobilePane } from "./shell/MobileDock";
 import { WorkspaceTopBar } from "./shell/WorkspaceTopBar";
-import { StrictUiSheet } from "./strict-ui/StrictUiSheet";
 import { createTargetViewModel, findComponentInstance } from "./target-model";
 import type { SlotState } from "./types";
 
 type SlotSelection = Extract<SelectionTarget, { kind: "slot" }>;
-type ReadyDocumentCreate = Extract<PreparedDocumentCreate, { state: "create-ready" }>;
 export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const controller = useDocumentWorkspace(target);
   const session = controller.session;
@@ -53,35 +47,41 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const [mode, setMode] = useState<ProductMode>(document.kind === "component" ? "library" : "app");
   const [mobilePane, setMobilePane] = useState<MobilePane>("canvas");
   const [browserView, setBrowserView] = useState<WorkspaceBrowserView>("documents");
+  const [sidebarView, setSidebarView] = useState<WorkspaceSidebarView>("tree");
   const [selectedCatalogId, setSelectedCatalogId] = useState<string>();
-  const [showInternals, setShowInternals] = useState(false);
+  const [revealedInternals, setRevealedInternals] = useState<ReadonlySet<string>>(() => new Set());
   const [selection, setSelection] = useState<SelectionTarget>({ kind: "component", id: document.root.instanceId });
   const [slotPicker, setSlotPicker] = useState<SlotSelection>();
   const [insertMode, setInsertMode] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
   const [showStrictUi, setShowStrictUi] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [createBusy, setCreateBusy] = useState(false);
-  const [createSaving, setCreateSaving] = useState(false);
-  const [createError, setCreateError] = useState<string>();
-  const [preparedCreate, setPreparedCreate] = useState<ReadyDocumentCreate>();
   const [definitionEditor, setDefinitionEditor] = useState(true);
   const [pendingEditId, setPendingEditId] = useState<string>();
   const [previewCss, setPreviewCss] = useState("");
   const [compiledTailwind, setCompiledTailwind] = useState<string>();
   const [previewError, setPreviewError] = useState<string>();
   const [observedDom, setObservedDom] = useState<PreviewDomSnapshot>({});
+  const [hoveredSelection, setHoveredSelection] = useState<SelectionTarget>();
+  const [requestedFileId, setRequestedFileId] = useState<string>();
+  const creation = useDocumentCreationFlow({
+    prepareCreate: controller.prepareCreate,
+    saveCreate: controller.saveCreate,
+    onCreated: (createdDocument) => {
+      setMode(createdDocument.kind === "screen" ? "app" : "library");
+      setMobilePane("canvas");
+    },
+  });
   const modeDocumentKind = mode === "app" ? "screen" : "component";
   const modeDocumentAvailable = Boolean(session && document.kind === modeDocumentKind);
   const canCreateInMode = controller.creationRecipes.some((recipe) => recipe.kind === modeDocumentKind);
   const componentDocuments = library.filter((candidate) => candidate.kind === "component");
   const viewResult = useMemo(() => {
     try {
-      return { view: createTargetViewModel(target, showInternals, fixture, componentDocuments, { contractValidation: "tolerant" }) } as const;
+      return { view: createTargetViewModel(target, revealedInternals, fixture, componentDocuments, { contractValidation: "tolerant" }) } as const;
     } catch (error) {
       return { error: error instanceof Error ? error.message : "The target adapter is invalid." } as const;
     }
-  }, [componentDocuments, fixture, showInternals, target]);
+  }, [componentDocuments, fixture, revealedInternals, target]);
   const view = viewResult.view;
   const selectedComponentId = selection.kind === "component"
     ? selection.id
@@ -89,14 +89,18 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const selectedNode = findDesignNode(document.root, selectedComponentId) ?? document.root;
   const selectedInstance = view ? findComponentInstance(view.root, selectedNode.instanceId) ?? view.root : undefined;
   const selectedAdapter = resolveDocumentAdapter(target, library, selectedNode.adapterId);
-  const slots: SlotState[] = view && selectedInstance ? projectPreviewSlots(view.catalog, selectedInstance, { contractValidation: "tolerant" }).map((slot) => ({
-    id: slot.selection.slotId,
-    selectionId: slot.selection.id,
-    label: slot.label,
-    count: slot.childCount,
-    childLabel: childLabel(target, library, selectedNode, slot.selection.slotId),
-  })) : [];
-  const rows = useMemo(() => buildDesignDocumentTree(target, document, library, showInternals, observedDom), [document, library, observedDom, showInternals, target]);
+  const slots: SlotState[] = view && selectedInstance
+    ? projectDocumentSlots(target, library, selectedNode, view.catalog, selectedInstance)
+    : [];
+  const rows = useMemo(() => buildDesignDocumentTree(target, document, library, revealedInternals, observedDom), [document, library, observedDom, revealedInternals, target]);
+  const internalTreeIds = useMemo(() => {
+    const implementationIds = rows.flatMap((row) => row.kind === "internals-summary" ? [row.disclosureId] : []);
+    if (implementationIds.length > 0) return implementationIds;
+    return [...new Set(rows.flatMap((row) => (
+      row.kind === "component" && row.internalHtml ? [row.selection.id] : []
+    )))];
+  }, [rows]);
+  const showInternals = internalTreeIds.length > 0 && internalTreeIds.every((id) => revealedInternals.has(id));
   const selectedHtmlRow = selection.kind === "html" ? rows.find((row) => row.kind === "html" && row.selection.id === selection.id) : undefined;
   const catalog = useMemo(() => documentCatalog(target, library), [library, target]);
   const catalogEntries = catalog.map((entry) => ({ ...entry.component, slotCount: entry.component.slots.length }));
@@ -131,6 +135,9 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     setSelectedCatalogId(document.component?.id);
     setDefinitionEditor(true);
     setObservedDom({});
+    setRevealedInternals(new Set());
+    setHoveredSelection(undefined);
+    setRequestedFileId(undefined);
     itemEditor.close();
   }, [document.id, document.kind, document.root.instanceId, sourceSnapshotKey]);
   useEffect(() => {
@@ -160,9 +167,6 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
       window.clearTimeout(timer);
     };
   }, [controller.connected, session?.draft.id, tailwindInput]);
-  if (controller.loading || (!session && !controller.connected) || (session && !view)) {
-    return <BlockedOrLoading loading={controller.loading} message={viewResult.error ?? controller.message} />;
-  }
   const preview = itemEditor.model?.preview ?? <DesignDocumentPreview target={target} document={document} library={library} />;
   const selectionLabel = selection.kind === "slot"
     ? slots.find((slot) => slot.id === selection.slotId)?.label ?? "Slot"
@@ -178,54 +182,31 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const dirty = Boolean(activeSession && isDocumentDirty(activeSession));
   const tailwindReady = compiledTailwind === tailwindInput && !previewError;
   const selectedRecipe = target.componentRecipes?.find((recipe) => recipe.id === document.component?.recipeId);
-  const canvasSelection = itemEditor.model
-    ? { kind: "component" as const, id: itemEditor.model.instance.instanceId }
-    : selection;
+  const editorSelectionMatches = itemEditor.model && (
+    selection.kind === "html" && selection.componentInstanceId === itemEditor.model.instance.instanceId
+  );
+  const canvasSelection = editorSelectionMatches
+    ? selection
+    : itemEditor.model
+      ? { kind: "component" as const, id: itemEditor.model.instance.instanceId }
+      : selection;
   const canvasSlots = itemEditor.model?.slots ?? slots;
   const canvasRootId = itemEditor.model?.view.root.instanceId ?? view?.root.instanceId ?? document.root.instanceId;
   const canvasSelectedId = itemEditor.model?.instance.instanceId ?? selectedNode.instanceId;
   const canvasSelectionLabel = itemEditor.model?.adapter.component.label ?? selectionLabel;
-
-  const selectTarget = (next: SelectionTarget, openEmptySlot = true) => {
-    setSelection(next);
-    if (next.kind === "slot" && openEmptySlot) {
-      const parent = findDesignNode(document.root, next.componentInstanceId);
-      const adapter = parent ? resolveDocumentAdapter(target, library, parent.adapterId) : undefined;
-      const slot = adapter?.component.slots.find((candidate) => candidate.id === next.slotId);
-      const childCount = parent?.slots[next.slotId]?.length ?? 0;
-      if (slot && shouldOpenSlotPicker(slot, childCount, insertMode)) {
-        setInsertMode(false);
-        setSlotPicker(next);
-      }
-    }
-  };
-
-  const insertComponent = (adapterId: string, targetSlot: SlotSelection): boolean => {
-    if (wouldCreateAuthoredComponentCycle(document, library, adapterId)) return false;
-    const parent = findDesignNode(document.root, targetSlot.componentInstanceId);
-    const parentAdapter = parent ? resolveDocumentAdapter(target, library, parent.adapterId) : undefined;
-    const slot = parentAdapter?.component.slots.find((candidate) => candidate.id === targetSlot.slotId);
-    const childAdapter = resolveDocumentAdapter(target, library, adapterId);
-    const children = parent?.slots[targetSlot.slotId] ?? [];
-    if (!parent || !slot || !childAdapter || (slot.accepts && !slot.accepts.includes(adapterId))) return false;
-    if (!slotHasCapacity(slot, children.length)) return false;
-    const instanceId = createId();
-    controller.edit(insertDesignChild(document, parent.instanceId, slot.id, {
-      kind: "component",
-      node: {
-        instanceId,
-        adapterId,
-        props: { ...childAdapter.defaultProps },
-        slots: Object.fromEntries(childAdapter.component.slots.map((childSlot) => [childSlot.id, []])),
-      },
-    }));
-    setSelection({ kind: "component", id: instanceId });
-    setDefinitionEditor(false);
-    setPendingEditId(instanceId);
-    setMobilePane("inspect");
-    setSlotPicker(undefined);
-    return true;
-  };
+  const outletSlotDefinition = selection.kind === "slot-outlet"
+    ? document.component?.slots.find((slot) => slot.id === selection.slotId)
+    : undefined;
+  const selectedSlot = selection.kind === "slot"
+    ? slots.find((slot) => slot.id === selection.slotId)
+    : outletSlotDefinition
+      ? {
+          ...outletSlotDefinition,
+          selectionId: selection.id,
+          count: 0,
+          acceptedLabels: outletSlotDefinition.accepts?.map((adapterId) => resolveDocumentAdapter(target, library, adapterId)?.component.label ?? adapterId),
+        }
+      : undefined;
 
   const switchMode = (next: ProductMode) => {
     setMode(next);
@@ -255,67 +236,95 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     setMobilePane("inspect");
   };
 
-  const prepareCreate = async (recipeId: string, label: string) => {
-    setCreateBusy(true);
-    setCreateError(undefined);
-    const result = await controller.prepareCreate(recipeId, label);
-    setCreateBusy(false);
-    if (!result) {
-      setCreateError("The local target could not prepare this document.");
-      return;
-    }
-    if (result.state === "strict-blocked") {
-      setCreateError(result.strictUi.violations[0]?.message ?? "Strict UI blocked this starting structure.");
-      return;
-    }
-    if (result.state === "compile-blocked") {
-      setCreateError(result.compile.message ?? "The target could not compile this starting structure.");
-      return;
-    }
-    setShowCreate(false);
-    setPreparedCreate(result);
-  };
-
-  const saveCreate = async () => {
-    const creation = preparedCreate;
-    if (!creation) return;
-    setCreateSaving(true);
-    const saved = await controller.saveCreate(creation.challengeId, creation.documentId);
-    setCreateSaving(false);
-    setPreparedCreate(undefined);
-    if (!saved) {
-      setCreateError("The one-time save could not be completed. Prepare a fresh source diff to try again.");
-      setShowCreate(true);
-      return;
-    }
-    setMode(creation.createdDocument.kind === "screen" ? "app" : "library");
-    setMobilePane("canvas");
-  };
-
-  const openViolation = (violation: StrictUiViolation) => {
-    const location = violation.location;
-    if (location.kind === "instance" || location.kind === "control") {
-      setSelection({ kind: "component", id: location.instanceId });
-      setPendingEditId(location.instanceId);
+  const interactions = useDocumentSelectionInteractions({
+    target,
+    document,
+    library,
+    files: controller.files,
+    slots,
+    selection,
+    insertMode,
+    createId,
+    itemEditor,
+    edit: controller.edit,
+    onSelect: setSelection,
+    onEdit: (instanceId) => {
+      setSelection({ kind: "component", id: instanceId });
       setDefinitionEditor(false);
+      itemEditor.open(instanceId);
+      setMobilePane("canvas");
+    },
+    onOpenPicker: (slot) => {
+      setInsertMode(false);
+      setSlotPicker(slot);
+      setMobilePane("canvas");
+    },
+    onInserted: (instanceId) => {
+      setDefinitionEditor(false);
+      setPendingEditId(instanceId);
       setMobilePane("inspect");
-    } else if (location.kind === "slot") {
-      selectTarget({
-        kind: "slot",
-        id: `slot:${encodeURIComponent(location.instanceId)}:${encodeURIComponent(location.slotId)}`,
-        componentInstanceId: location.instanceId,
-        slotId: location.slotId,
-      }, false);
+      setSlotPicker(undefined);
+    },
+    onOpenSource: (fileId) => {
+      setRequestedFileId(fileId);
+      setBrowserView("files");
+      setSidebarView("files");
+      setMobilePane("files");
+    },
+    onReveal: () => {
+      setSidebarView("tree");
       setMobilePane("tree");
-    } else if (location.kind === "slot-outlet" && location.outletId) {
-      setSelection({ kind: "slot-outlet", id: `outlet:${location.outletId}`, outletId: location.outletId, slotId: location.slotId });
-      setMobilePane("tree");
-    } else {
-      setBrowserView("documents");
-      setMobilePane("documents");
-    }
-    setShowStrictUi(false);
-  };
+    },
+  });
+
+  const routing = createDocumentWorkspaceRouting({
+    document, selection, selectedNodeInstanceId: selectedNode.instanceId,
+    definitionEditor, modeDocumentAvailable, itemEditor, interactions,
+    setSelection, setDefinitionEditor, setPendingEditId, setMobilePane,
+    setBrowserView, setInsertMode, setSlotPicker, setShowStrictUi,
+  });
+
+  useWorkspaceKeyboardCommands({
+    enabled: modeDocumentAvailable && !interactions.contextMenu && !slotPicker && !showDiff && !creation.isOpen && !showStrictUi,
+    onDelete: () => itemEditor.model ? itemEditor.remove() : interactions.deleteSelection(selection),
+  });
+
+  if (controller.loading || (!session && !controller.connected) || (session && !view)) {
+    return <BlockedOrLoading loading={controller.loading} message={viewResult.error ?? controller.message} />;
+  }
+
+  const desktopEditor = modeDocumentAvailable ? (
+    <DesktopDocumentEditingPanel
+      definitionEditor={definitionEditor}
+      document={document}
+      documents={library}
+      recipe={selectedRecipe}
+      catalogComponents={catalogComponents}
+      files={controller.files}
+      selectedNodeId={selectedNode.instanceId}
+      itemEditor={itemEditor}
+      onDocumentChange={controller.edit}
+      onDefinitionEditorChange={setDefinitionEditor}
+      onSelectSlot={(slot, instanceId) => interactions.selectTarget({ kind: "slot", id: slot.selectionId, componentInstanceId: instanceId, slotId: slot.id })}
+    />
+  ) : (
+    <EmptyModeState className="flex h-full w-full" mode={mode} canCreate={canCreateInMode} onCreate={creation.open} />
+  );
+  const mobileDefinition = definitionEditor && modeDocumentAvailable ? (
+    <DocumentDefinitionPanel
+      className="flex h-full w-full border-l-0"
+      document={document}
+      documents={library}
+      recipe={selectedRecipe}
+      catalogComponents={catalogComponents}
+      onChange={controller.edit}
+      onEditImplementation={() => {
+        setDefinitionEditor(false);
+        itemEditor.open(document.root.instanceId);
+        setMobilePane("canvas");
+      }}
+    />
+  ) : desktopEditor;
 
   return (
     <div className="flex h-dvh w-full min-w-0 flex-col overflow-hidden bg-[#0d0e10] text-zinc-200">
@@ -327,10 +336,11 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         connected={controller.connected}
         strictUi={activeSession?.strictUi}
         checking={activeSession?.phase === "checking"}
-        canUndo={Boolean(activeSession?.past.length)} canRedo={Boolean(activeSession?.future.length)}
-        canReset={modeDocumentAvailable}
-        canDiff={Boolean(activeSession && dirty && controller.connected && activeSession.phase !== "stale" && tailwindReady)}
-        canSave={activeSession?.phase === "diff-ready" && Boolean(preparedSave)}
+        canUndo={!itemEditor.model && Boolean(activeSession?.past.length)} canRedo={!itemEditor.model && Boolean(activeSession?.future.length)}
+        canReset={modeDocumentAvailable && !itemEditor.model}
+        canStrictUi={modeDocumentAvailable && !itemEditor.model}
+        canDiff={Boolean(!itemEditor.model && activeSession && dirty && controller.connected && activeSession.phase !== "stale" && tailwindReady)}
+        canSave={!itemEditor.model && activeSession?.phase === "diff-ready" && Boolean(preparedSave)}
         saving={activeSession?.phase === "saving"}
         onModeChange={switchMode}
         onUndo={controller.undo}
@@ -343,158 +353,118 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         })}
         onSave={() => void controller.save().then((result) => result && setShowDiff(false))}
       />
-      <div className="flex min-h-0 min-w-0 flex-1">
-        <WorkspaceBrowser
-          className={`${mobilePane === "documents" || mobilePane === "files" || mobilePane === "catalog" ? "flex w-full" : "hidden"} lg:flex lg:w-60`}
-          view={browserView}
-          mode={mode}
-          entries={controller.entries}
-          files={controller.files}
-          catalogEntries={catalog}
-          activeDocumentId={modeDocumentAvailable ? controller.activeDocumentId : undefined}
-          selectedComponentId={selectedCatalogId}
-          canCreate={canCreateInMode}
-          onViewChange={(next) => {
-            setBrowserView(next);
-            if (mobilePane === "documents" || mobilePane === "files" || mobilePane === "catalog") setMobilePane(next);
-          }}
-          onModeChange={switchMode}
-          onDocumentSelect={(id) => { controller.selectDocument(id); setMobilePane("canvas"); }}
-          onCatalogSelect={selectCatalogEntry}
-          onCreate={() => { setCreateError(undefined); setShowCreate(true); }}
-        />
-        {modeDocumentAvailable && <ComponentTree
-          className={`${mobilePane === "tree" ? "flex w-full" : "hidden"} border-r-0 lg:flex lg:w-60 lg:border-r`}
-          pageLabel={document.label}
-          rows={rows}
-          selectedId={selection.id}
-          showInternals={showInternals}
-          insertMode={insertMode}
-          prompt={insertMode ? "Choose a slot with room, then pick a compatible component." : undefined}
-          toggleLabel={document.kind === "component" ? "Show implementation" : undefined}
-          toggleHint={document.kind === "component" ? "Public slots stay visible while internals collapse" : undefined}
-          strictUiViolations={controller.liveViolations}
-          onInsert={() => {
-            setInsertMode((current) => !current);
-            setSlotPicker(undefined);
-            setMobilePane("tree");
-          }}
-          onSelect={selectTarget}
-          onToggleInternals={() => setShowInternals((current) => !current)}
-        />}
-        {!modeDocumentAvailable && (mobilePane === "tree" || mobilePane === "inspect") && <EmptyModeState className="flex w-full lg:hidden" mode={mode} canCreate={canCreateInMode} onCreate={() => { setCreateError(undefined); setShowCreate(true); }} />}
-        <div className={`${mobilePane === "canvas" ? "flex" : "hidden"} relative min-h-0 min-w-0 flex-1 lg:flex`}>
-          {modeDocumentAvailable ? <>
-            <PreviewCanvas
-              cameraKey={document.id}
-              preview={<PreviewBoundary resetKey={`${document.id}:${itemEditor.model?.tailwindInput ?? tailwindInput}`}>{preview}</PreviewBoundary>}
-              rootInstanceId={canvasRootId}
-              selectedComponentInstanceId={canvasSelectedId}
-              selection={canvasSelection}
-              selectionLabel={canvasSelectionLabel}
-              slots={canvasSlots}
-              strictUiViolations={controller.liveViolations}
-              onEditComponent={(instanceId) => {
-                setSelection({ kind: "component", id: instanceId });
-                setDefinitionEditor(false);
-                itemEditor.open(instanceId);
-              }}
-              onDomSnapshot={setObservedDom}
-              onSelect={selectTarget}
-            />
-            <DesktopDocumentEditingPanel
-              definitionEditor={definitionEditor} document={document} recipe={selectedRecipe}
-              catalogComponents={catalogComponents} files={controller.files} selectedNodeId={selectedNode.instanceId}
-              itemEditor={itemEditor} onDocumentChange={controller.edit} onDefinitionEditorChange={setDefinitionEditor} onSelectSlot={(slot, instanceId) => selectTarget({ kind: "slot", id: slot.selectionId, componentInstanceId: instanceId, slotId: slot.id })}
-            />
-          </> : (
-            <EmptyModeState mode={mode} canCreate={canCreateInMode} onCreate={() => { setCreateError(undefined); setShowCreate(true); }} />
-          )}
-        </div>
-        {modeDocumentAvailable && mobilePane === "inspect" && definitionEditor && <DocumentDefinitionPanel className="flex w-full border-l-0 lg:hidden" document={document} recipe={selectedRecipe} catalogComponents={catalogComponents} onChange={controller.edit} onEditImplementation={() => { setDefinitionEditor(false); itemEditor.open(document.root.instanceId); }} />}
-      </div>
-      <footer aria-live="polite" className="flex h-6 shrink-0 items-center border-t border-white/10 bg-[#101113] px-3 text-[9px] text-zinc-600" role="status"><span className={`mr-2 size-1.5 rounded-full ${workspaceStatusTone(activeSession?.phase, controller.connected, activeSession ? previewError : undefined)}`} /><span className="truncate">{controller.message ?? (activeSession ? previewError ?? workspaceStatusText(activeSession.phase, dirty) : `No ${modeDocumentKind}s yet · create one from a registered recipe`)}</span><span className="ml-auto hidden lg:block">Local only · registered targets · current evidence required</span></footer>
-      <MobileDock active={mobilePane} onChange={(pane) => {
-        setInsertMode(false);
-        if (pane === "documents" || pane === "files" || pane === "catalog") setBrowserView(pane);
-        if (!modeDocumentAvailable && (pane === "tree" || pane === "canvas" || pane === "inspect")) {
-          setMobilePane(pane);
-          return;
-        }
-        if (pane === "inspect") {
-          if (definitionEditor && selection.kind === "component" && selection.id === document.root.instanceId) {
-            setMobilePane("inspect");
-          } else {
-            setDefinitionEditor(false);
-            itemEditor.open(selectedNode.instanceId);
+      <DocumentWorkspacePanels
+        projectId={target.project.id}
+        documentId={document.id}
+        documentLabel={document.label}
+        documentKind={document.kind}
+        mode={mode}
+        mobilePane={mobilePane}
+        mobileEditorOpen={Boolean(itemEditor.model)}
+        sidebarView={sidebarView}
+        browserView={browserView}
+        modeDocumentAvailable={modeDocumentAvailable}
+        canCreate={canCreateInMode}
+        entries={controller.entries}
+        files={controller.files}
+        catalog={catalog}
+        activeDocumentId={controller.activeDocumentId}
+        selectedCatalogId={selectedCatalogId}
+        requestedFileId={requestedFileId}
+        rows={rows}
+        selection={selection}
+        hoveredSelection={hoveredSelection}
+        showInternals={showInternals}
+        insertMode={insertMode}
+        strictUiViolations={controller.liveViolations}
+        preview={<PreviewBoundary resetKey={`${document.id}:${itemEditor.model?.tailwindInput ?? tailwindInput}`}>{preview}</PreviewBoundary>}
+        canvasRootId={canvasRootId}
+        canvasSelectedId={canvasSelectedId}
+        canvasSelection={canvasSelection}
+        canvasSelectionLabel={canvasSelectionLabel}
+        canvasSlots={canvasSlots}
+        selectedSlot={selectedSlot}
+        slotPicker={slotPicker}
+        pickerLabel={pickerSlot?.label ?? "slot"}
+        pickerEntries={pickerEntries}
+        actionMessage={interactions.actionError ?? controller.message ?? previewError}
+        slotDependencyMessage={interactions.slotDependencyMessage}
+        rightOverride={showDiff && preparedSave ? (
+          <DiffPanel
+            diff={preparedSave.exactDiff}
+            saving={activeSession?.phase === "saving"}
+            onClose={() => setShowDiff(false)}
+            onSave={() => void controller.save().then((result) => result && setShowDiff(false))}
+          />
+        ) : undefined}
+        desktopEditor={desktopEditor}
+        mobileDefinition={mobileDefinition}
+        onBrowserViewChange={(next) => {
+          setBrowserView(next);
+          setSidebarView(next);
+        }}
+        onSidebarViewChange={(next) => {
+          setSidebarView(next);
+          if (next !== "tree") setBrowserView(next);
+        }}
+        onModeChange={switchMode}
+        onDocumentSelect={(id) => {
+          itemEditor.close();
+          controller.selectDocument(id);
+          setMobilePane("canvas");
+        }}
+        onFileOpened={() => setRequestedFileId(undefined)}
+        onCatalogSelect={selectCatalogEntry}
+        onCreate={creation.open}
+        onSelect={routing.selectWorkspaceTarget}
+        onCanvasSelect={routing.selectCanvasTarget}
+        onHover={setHoveredSelection}
+        onToggleInsert={() => {
+          setInsertMode((current) => !current);
+          setSlotPicker(undefined);
+        }}
+        onToggleInternals={(componentInstanceId) => setRevealedInternals((current) => {
+          if (componentInstanceId) {
+            const next = new Set(current);
+            if (next.has(componentInstanceId)) next.delete(componentInstanceId);
+            else next.add(componentInstanceId);
+            return next;
           }
-        } else setMobilePane(pane);
-      }} />
-      {showDiff && preparedSave && (
-        <DiffSheet
-          diff={preparedSave.exactDiff}
-          saving={activeSession?.phase === "saving"}
-          onClose={() => setShowDiff(false)}
-          onSave={() => void controller.save().then((result) => result && setShowDiff(false))}
-        />
-      )}
-      <SlotCatalogDialog open={modeDocumentAvailable && Boolean(slotPicker)} slotLabel={pickerSlot?.label ?? "slot"} entries={pickerEntries} onClose={() => { setInsertMode(false); setSlotPicker(undefined); }} onSelect={(id) => slotPicker && insertComponent(id, slotPicker)} />
-      <CreateDocumentSheet open={showCreate} mode={mode} recipes={controller.creationRecipes} busy={createBusy} error={createError} onClose={() => setShowCreate(false)} onPrepare={(recipeId, label) => void prepareCreate(recipeId, label)} />
-      {preparedCreate && <DiffSheet diff={preparedCreate.diff} saving={createSaving} onClose={() => setPreparedCreate(undefined)} onSave={() => void saveCreate()} />}
-      <StrictUiSheet open={Boolean(activeSession) && showStrictUi} evidence={activeSession?.strictUi} liveViolations={activeSession ? controller.liveViolations : []} checking={activeSession?.phase === "checking"} onClose={() => setShowStrictUi(false)} onSelect={openViolation} onRecheck={() => void controller.prepare()} />
-      {modeDocumentAvailable && itemEditor.model && (
-        <MobileItemEditor
-          componentLabel={itemEditor.model.adapter.component.label}
-          sourceLabel={itemEditor.model.adapter.sourceFileId ? controller.files.find((file) => file.id === itemEditor.model?.adapter.sourceFileId)?.label : undefined}
-          controls={itemEditor.model.adapter.controls}
-          controlValues={itemEditor.model.controlValues}
-          preview={<PreviewBoundary resetKey={`${itemEditor.model.session.draft.id}:${itemEditor.model.tailwindInput}`}>{itemEditor.model.preview}</PreviewBoundary>}
-          previewCss={itemEditor.model.previewCss}
-          rootInstanceId={itemEditor.model.view.root.instanceId}
-          selectedInstanceId={itemEditor.model.instance.instanceId}
-          slots={itemEditor.model.slots}
-          compileError={itemEditor.model.compileError}
-          compilePending={itemEditor.model.compilePending}
-          sourceBacked
-          canMoveUp={Boolean(itemEditor.model.location && itemEditor.model.location.index > 0)}
-          canMoveDown={Boolean(itemEditor.model.location && itemEditor.model.location.index < itemEditor.model.location.siblingCount - 1)}
-          canDuplicate={itemEditor.model.canDuplicate}
-          canDelete={itemEditor.model.canDelete}
-          onControlChange={itemEditor.updateControl}
-          onSelectComponent={itemEditor.selectComponent}
-          onEditDefinition={() => {
-            itemEditor.close();
-            setDefinitionEditor(true);
-            setMobilePane("inspect");
-          }}
-          onSelectSlot={(slot) => {
-            const instanceId = itemEditor.model?.instance.instanceId;
-            if (!instanceId) return;
-            itemEditor.close();
-            selectTarget({ kind: "slot", id: slot.selectionId, componentInstanceId: instanceId, slotId: slot.id });
-            setMobilePane(slot.count ? "tree" : "canvas");
-          }}
-          onMove={itemEditor.move}
-          onDuplicate={itemEditor.duplicate}
-          onDelete={itemEditor.remove}
-          onCancel={() => {
-            itemEditor.close();
-            setMobilePane("canvas");
-          }}
-          onApply={() => {
-            itemEditor.apply();
-            setMobilePane("canvas");
-          }}
-        />
-      )}
+          return showInternals ? new Set() : new Set(internalTreeIds);
+        })}
+        onOpenSlot={interactions.openSlotCatalog}
+        onClearSlot={interactions.clearSlot}
+        onRemoveOutlet={interactions.removeOutlet}
+        onRemoveSlotDefinition={interactions.removeSlotDefinition}
+        onClosePicker={() => {
+          setInsertMode(false);
+          setSlotPicker(undefined);
+        }}
+        onInsertComponent={(id) => slotPicker && interactions.insertComponent(id, slotPicker)}
+        onContextMenu={(request) => {
+          if (itemEditor.model) {
+            if (request.selection.kind === "component") routing.selectWorkspaceTarget(request.selection);
+            return;
+          }
+          interactions.openContextMenu(request);
+        }}
+        onEditComponent={routing.editWorkspaceComponent}
+        onDomSnapshot={setObservedDom}
+        onMobileDrawerClose={() => setMobilePane("canvas")}
+      />
+      <MobileDock active={mobilePane} onChange={routing.onMobilePaneChange} />
+      <DocumentWorkspaceDialogs
+        workspace={{ controller, activeSession, creation, interactions, itemEditor, mode, modeDocumentAvailable, slotPicker, pickerLabel: pickerSlot?.label ?? "slot", pickerEntries, showDiff, showStrictUi }}
+        actions={{
+          setShowDiff, setShowStrictUi,
+          closeSlotPicker: () => { setInsertMode(false); setSlotPicker(undefined); },
+          openViolation: routing.openViolation,
+          editDefinition: () => { itemEditor.close(); setDefinitionEditor(true); setMobilePane("inspect"); },
+          selectSlot: (slot, occupied) => { itemEditor.close(); interactions.selectTarget(slot); setMobilePane(occupied ? "tree" : "canvas"); },
+          closeItemEditor: () => { itemEditor.close(); setMobilePane("canvas"); },
+          applyItemEditor: () => { itemEditor.apply(); setMobilePane("canvas"); },
+        }}
+      />
     </div>
   );
-}
-
-function childLabel(target: TargetModule, library: readonly DesignDocument[], parent: DesignDocument["root"], slotId: string) {
-  const child = parent.slots[slotId]?.[0];
-  if (!child) return undefined;
-  if (child.kind === "text") return "Text";
-  if (child.kind === "slot-outlet") return "Slot outlet";
-  return resolveDocumentAdapter(target, library, child.node.adapterId)?.component.label;
 }

@@ -8,11 +8,14 @@ import {
   addComponentProperty,
   addComponentSlot,
   removeComponentProperty,
-  removeComponentSlot,
   updateComponentDefinition,
   updateComponentProperty,
   updateComponentSlot,
 } from "../document/document-commands";
+import {
+  authoredSlotDependencyMessage,
+  removeAuthoredSlotDefinition,
+} from "../document/workspace-selection-actions";
 import { ComponentPropertyEditor } from "./ComponentPropertyEditor";
 import { ComponentPropertyBindings, type BindingComponentOption } from "./ComponentPropertyBindings";
 import { ComponentSlotEditor } from "./ComponentSlotEditor";
@@ -22,6 +25,7 @@ const propertyKinds: ComponentPropertyDraft["kind"][] = ["text", "tailwind", "bo
 export function ComponentWorkshop(props: {
   className?: string;
   document: DesignDocument;
+  documents: readonly DesignDocument[];
   recipe?: ComponentCreationRecipe;
   catalogComponents: readonly BindingComponentOption[];
   onChange: (document: DesignDocument) => void;
@@ -55,7 +59,7 @@ export function ComponentWorkshop(props: {
   return (
     <aside className={`${props.className ?? "flex w-80"} h-full min-h-0 min-w-0 shrink-0 scroll-pb-[calc(7rem+env(safe-area-inset-bottom))] flex-col overflow-y-auto overscroll-contain border-l border-white/10 bg-[#141518] lg:scroll-pb-0`}>
       <header className="sticky top-0 z-10 border-b border-white/10 bg-[#141518]/95 px-4 py-3 backdrop-blur">
-        <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-indigo-400">Component workshop</p>
+        <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-sky-400">Component workshop</p>
         <h2 className="mt-1 text-sm font-semibold text-zinc-100">{definition.label}</h2>
         <p className="mt-1 text-[10px] text-zinc-600">{props.recipe?.label ?? "Target-owned component recipe"}</p>
       </header>
@@ -82,8 +86,17 @@ export function ComponentWorkshop(props: {
             key={slot.id}
             slot={slot}
             catalogComponents={props.catalogComponents}
+            removeBlockedReason={authoredSlotDependencyMessage(props.document, props.documents, slot.id)}
             onChange={(nextSlot) => props.onChange(updateComponentSlot(props.document, slot.id, () => nextSlot))}
-            onRemove={() => props.onChange(removeComponentSlot(props.document, slot.id))}
+            onRemove={() => {
+              const result = removeAuthoredSlotDefinition({
+                document: props.document,
+                documents: props.documents,
+                slotId: slot.id,
+                selection: { kind: "component", id: props.document.root.instanceId },
+              });
+              if (result.status === "applied") props.onChange(result.document);
+            }}
           />
         ))}
       </WorkshopSection>

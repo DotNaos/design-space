@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
 
 import {
   documentOperationSchema,
@@ -39,7 +38,7 @@ import { DesignSpaceError } from "./errors";
 import { TrustedDocumentLibrary, type DocumentLibrarySnapshot } from "./document-library";
 import { ManagedDocumentCreation } from "./managed-document-creation";
 import type { NewFileTransactionHooks } from "./new-file-transaction";
-import { assertStillRegistered } from "./path-security";
+import { readRegisteredFile } from "./registered-file-reader";
 import { loadRegisteredDocument } from "./registered-document-loader";
 import { sourceVersion } from "./source-editor";
 import { TargetTailwindService } from "./target-tailwind-service";
@@ -471,8 +470,7 @@ export class DocumentService {
     const entries: Array<[string, string]> = [];
     for (const fileId of [...document.sourceFileIds].sort((left, right) => left.localeCompare(right, "en"))) {
       const file = this.#target.files.get(fileId)!;
-      await assertStillRegistered(this.#target.root, file.path);
-      entries.push([fileId, await readFile(file.path, "utf8")]);
+      entries.push([fileId, await readRegisteredFile(this.#target.root, file.path)]);
     }
     return freezeRecord(Object.fromEntries(entries));
   }

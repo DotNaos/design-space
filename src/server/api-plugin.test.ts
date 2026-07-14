@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { createServer, request as requestHttp } from "node:http";
 import { connect, type AddressInfo } from "node:net";
 
@@ -110,4 +111,24 @@ it("guards the single local endpoint before dispatching typed operations", async
       server.close((error) => (error ? reject(error) : resolve())),
     );
   }
+});
+
+it("disposes the local operation service when the Vite server closes", () => {
+  const httpServer = new EventEmitter();
+  let disposals = 0;
+  const plugin = designSpaceApiPlugin({
+    execute: async () => undefined,
+    dispose: () => {
+      disposals += 1;
+    },
+  });
+
+  (plugin.configureServer as Function)({
+    httpServer,
+    middlewares: { use() {} },
+  });
+  httpServer.emit("close");
+  httpServer.emit("close");
+
+  expect(disposals).toBe(1);
 });

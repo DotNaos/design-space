@@ -22,11 +22,11 @@ export function MobileNavigation(props: {
           <button
             key={mode}
             aria-current={active ? "page" : undefined}
-            className={`relative flex min-w-0 flex-col items-center justify-center gap-1 text-[9px] transition-colors ${active ? "text-indigo-300" : "text-zinc-500"}`}
+            className={`relative flex min-w-0 flex-col items-center justify-center gap-1 text-[9px] transition-colors ${active ? "text-sky-300" : "text-zinc-500"}`}
             type="button"
             onClick={() => props.onChange(mode)}
           >
-            {active && <span className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-indigo-400" />}
+            {active && <span className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-sky-400" />}
             <Icon size={17} strokeWidth={active ? 2.2 : 1.8} />
             <span className="truncate">{label}</span>
           </button>

@@ -7,6 +7,7 @@ import { ScreenWorkshop } from "./ScreenWorkshop";
 export function DocumentDefinitionPanel(props: {
   className?: string;
   document: DesignDocument;
+  documents: readonly DesignDocument[];
   recipe?: ComponentCreationRecipe;
   catalogComponents: readonly BindingComponentOption[];
   onChange: (document: DesignDocument) => void;
@@ -16,6 +17,7 @@ export function DocumentDefinitionPanel(props: {
     <ComponentWorkshop
       className={props.className}
       document={props.document}
+      documents={props.documents}
       recipe={props.recipe}
       catalogComponents={props.catalogComponents}
       onChange={props.onChange}

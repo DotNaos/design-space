@@ -29,7 +29,11 @@ beforeEach(() => {
   window.localStorage.clear();
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
-    value: vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+    value: vi.fn((query: string) => ({
+      matches: query.includes("max-width"),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
   });
 });
 
@@ -91,6 +95,7 @@ it("opens a default component document in Library mode after loading", async () 
 
   render(<DocumentWorkspace target={componentTarget} />);
 
+  await userEvent.click(await screen.findByRole("button", { name: "Open Project" }));
   expect(await screen.findByText("Components")).toBeVisible();
   const projectBrowser = screen.getByRole("region", { name: "Project browser" });
   expect(within(projectBrowser).getByRole("button", { name: "Panel" })).toHaveAttribute("aria-current", "page");
@@ -152,7 +157,7 @@ it("shows a truthful empty Library and requires a fresh create diff after save f
   expect((await screen.findAllByText("Only screen")).length).toBeGreaterThan(0);
   await userEvent.click(screen.getAllByRole("button", { name: "Library" })[0]!);
 
-  expect(await screen.findByText("No components yet")).toBeInTheDocument();
+  expect(await screen.findByText("No components are registered yet.")).toBeInTheDocument();
   expect(screen.queryByText("Only screen")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Reset document" })).toBeDisabled();
   await userEvent.click(screen.getAllByRole("button", { name: "Create component" })[0]!);
@@ -165,6 +170,37 @@ it("shows a truthful empty Library and requires a fresh create diff after save f
   expect(await screen.findByRole("dialog", { name: "Create component" })).toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent("Prepare a fresh source diff");
   expect(screen.queryByRole("dialog", { name: "Exact source diff" })).not.toBeInTheDocument();
+});
+
+it("keeps one item draft while canvas selection moves between rendered components", async () => {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn((query: string) => ({
+      matches: query.includes("min-width"),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  });
+  runLocalOperationMock.mockImplementation(async (operation) => {
+    if (operation.type === "list-documents") return editingCatalog as never;
+    if (operation.type === "read-document") return snapshot(editingScreen) as never;
+    if (operation.type === "compile-tailwind") return { value: operation.value, css: ".p-4{padding:1rem}" } as never;
+    throw new Error(`Unexpected operation ${operation.type}`);
+  });
+
+  render(<DocumentWorkspace target={target} />);
+  const alpha = await screen.findByText("Alpha");
+  fireEvent.doubleClick(alpha);
+  const content = await screen.findByRole("textbox", { name: "Content" });
+  await userEvent.clear(content);
+  await userEvent.type(content, "Alpha draft");
+  expect(screen.getByRole("button", { name: "Reset document" })).toBeDisabled();
+
+  fireEvent.click(screen.getByText("Beta"));
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "Content" })).toHaveValue("Beta"));
+
+  fireEvent.click(screen.getByText("Alpha draft"));
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "Content" })).toHaveValue("Alpha draft"));
 });
 
 function installServer(
@@ -287,6 +323,23 @@ const standaloneScreen: DesignDocument = {
   root: { instanceId: "standalone.root", adapterId: "stack", slots: { content: [] } },
 };
 
+const editingScreen: DesignDocument = {
+  schemaVersion: 2,
+  id: "screen.editing",
+  label: "Editing canvas",
+  kind: "screen",
+  root: {
+    instanceId: "editing.root",
+    adapterId: "stack",
+    slots: {
+      content: [
+        { kind: "component", node: { instanceId: "text.alpha", adapterId: "text", props: { children: "Alpha" }, slots: {} } },
+        { kind: "component", node: { instanceId: "text.beta", adapterId: "text", props: { children: "Beta" }, slots: {} } },
+      ],
+    },
+  },
+};
+
 const createdComponent: DesignDocument = {
   schemaVersion: 2,
   id: "component.created",
@@ -322,6 +375,13 @@ const standaloneCatalog: DocumentCatalog = {
   documents: [{ id: standaloneScreen.id, label: standaloneScreen.label, kind: "screen", origin: "registered" }],
   recipes: [{ id: "recipe.component.panel", label: "Panel component", kind: "component" }],
   files: [{ id: "standalone.source", label: "standalone.design.json", kind: "file" }],
+};
+
+const editingCatalog: DocumentCatalog = {
+  state: "catalog",
+  documents: [{ id: editingScreen.id, label: editingScreen.label, kind: "screen", origin: "registered" }],
+  recipes: [],
+  files: [{ id: "editing.source", label: "editing.design.json", kind: "file" }],
 };
 
 const emptyCatalog: DocumentCatalog = {

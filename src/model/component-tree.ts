@@ -13,9 +13,14 @@ export type ComponentTreeRow =
       readonly depth: number;
       readonly label: string;
       readonly selection: Extract<SelectionTarget, { kind: "component" }>;
+      readonly internalHtml?: {
+        readonly nodeCount: number;
+        readonly collapsed: boolean;
+      };
     }
   | {
       readonly kind: "internals-summary";
+      readonly disclosureId: string;
       readonly depth: number;
       readonly label: string;
       readonly nodeCount: number;
@@ -25,7 +30,14 @@ export type ComponentTreeRow =
       readonly kind: "html";
       readonly depth: number;
       readonly label: string;
+      readonly selfClosing: boolean;
       readonly selection: Extract<SelectionTarget, { kind: "html" }>;
+    }
+  | {
+      readonly kind: "html-close";
+      readonly depth: number;
+      readonly label: string;
+      readonly id: string;
     }
   | {
       readonly kind: "slot";
@@ -80,20 +92,27 @@ function appendHtmlRows(
   nodes: readonly HtmlTreeNode[],
   depth: number,
   componentInstanceId: string,
+  appendSlot: (slotId: string, depth: number) => void,
 ) {
   for (const node of nodes) {
+    const selectionId = htmlSelectionId(componentInstanceId, node.id);
+    const selfClosing = voidHtmlTags.has(node.tagName);
     rows.push({
       kind: "html",
       depth,
       label: node.tagName,
+      selfClosing,
       selection: {
         kind: "html",
-        id: htmlSelectionId(componentInstanceId, node.id),
+        id: selectionId,
         componentInstanceId,
         nodeId: node.id,
       },
     });
-    appendHtmlRows(rows, node.children ?? [], depth + 1, componentInstanceId);
+    if (selfClosing) continue;
+    appendHtmlRows(rows, node.children ?? [], depth + 1, componentInstanceId, appendSlot);
+    if (node.slotId) appendSlot(node.slotId, depth + 1);
+    rows.push({ kind: "html-close", depth, label: node.tagName, id: selectionId });
   }
 }
 
@@ -107,32 +126,30 @@ function appendInstanceRows(
   const adapter = catalog.adapters.get(instance.componentId);
   if (!adapter) return;
 
+  const internals = adapter.internalHtml ?? [];
+  const internalsRevealed = options.revealInternalHtml?.has(instance.instanceId) ?? false;
+
   rows.push({
     kind: "component",
     depth,
     label: adapter.label,
     selection: { kind: "component", id: instance.instanceId },
+    internalHtml: internals.length > 0
+      ? { nodeCount: countHtmlNodes(internals), collapsed: !internalsRevealed }
+      : undefined,
   });
 
-  const internals = adapter.internalHtml ?? [];
-  if (internals.length > 0) {
-    const revealed = options.revealInternalHtml?.has(instance.instanceId) ?? false;
-    rows.push({
-      kind: "internals-summary",
-      depth: depth + 1,
-      label: "Internal HTML",
-      nodeCount: countHtmlNodes(internals),
-      collapsed: !revealed,
-    });
-    if (revealed) appendHtmlRows(rows, internals, depth + 2, instance.instanceId);
-  }
-
   const contentBySlot = new Map(instance.slots.map((content) => [content.slotId, content.children]));
-  for (const slot of adapter.slots) {
+  const placedSlots = new Set<string>();
+  const appendSlot = (slotId: string, slotDepth: number) => {
+    if (placedSlots.has(slotId)) return;
+    const slot = adapter.slots.find((candidate) => candidate.id === slotId);
+    if (!slot) return;
+    placedSlots.add(slotId);
     const children = contentBySlot.get(slot.id) ?? [];
     rows.push({
       kind: "slot",
-      depth: depth + 1,
+      depth: slotDepth,
       label: slot.label,
       occupied: children.length > 0,
       childCount: children.length,
@@ -141,13 +158,22 @@ function appendInstanceRows(
 
     for (const child of children) {
       if (child.kind === "component") {
-        appendInstanceRows(rows, catalog, child.instance, depth + 2, options);
+        appendInstanceRows(rows, catalog, child.instance, slotDepth + 1, options);
       } else {
-        rows.push({ kind: "text", depth: depth + 2, label: child.value, id: child.id });
+        rows.push({ kind: "text", depth: slotDepth + 1, label: child.value, id: child.id });
       }
     }
+  };
+
+  if (internalsRevealed) {
+    appendHtmlRows(rows, internals, depth + 1, instance.instanceId, appendSlot);
   }
+  for (const slot of adapter.slots) appendSlot(slot.id, depth + 1);
 }
+
+const voidHtmlTags = new Set([
+  "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr",
+]);
 
 export function buildComponentTree(
   catalog: AdapterCatalog,

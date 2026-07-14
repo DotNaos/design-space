@@ -194,8 +194,8 @@ describe("target-driven application model", () => {
     expect(view.rows.find((row) => row.kind === "html")?.selection.id)
       .toBe("html:first-panel:panel.surface");
     expect(view.rows.filter((row) => row.kind === "html")).toMatchObject([
-      { depth: 2, label: "section" },
-      { depth: 3, label: "div" },
+      { depth: 1, label: "section" },
+      { depth: 2, label: "div" },
     ]);
     render(renderTargetFixture(targetWithDom, targetWithDom.defaultFixture));
     expect(document.querySelector('[data-design-space-html-id="html:first-panel:panel.surface"]'))

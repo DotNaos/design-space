@@ -4,10 +4,12 @@ import type { DesignDocument } from "../../shared/design-document";
 import {
   addComponentSlot,
   bindComponentProperty,
+  clearDesignSlot,
   duplicateDesignComponent,
   insertDesignChild,
   moveDesignComponent,
   removeDesignComponent,
+  removeDesignSlotOutlet,
   removeComponentProperty,
   updateComponentSlot,
   updateDocumentLabel,
@@ -59,6 +61,22 @@ describe("design document commands", () => {
     const next = addComponentSlot(component, { id: "body", label: "Body" }, "panel.root", "content", () => "outlet.body");
     expect(next.component?.slots).toEqual([{ id: "body", label: "Body" }]);
     expect(next.root.slots.content).toEqual([{ kind: "slot-outlet", id: "outlet.body", slotId: "body" }]);
+  });
+
+  it("clears only the selected slot and removes a selected outlet by stable ID", () => {
+    const cleared = clearDesignSlot(screen, "root", "content");
+    expect(cleared.root.slots.content).toEqual([]);
+    expect(screen.root.slots.content).toHaveLength(2);
+
+    const component = addComponentSlot(
+      componentDocument(),
+      { id: "body", label: "Body" },
+      "panel.root",
+      "content",
+      () => "outlet.body",
+    );
+    expect(removeDesignSlotOutlet(component, "outlet.body").root.slots.content).toEqual([]);
+    expect(() => removeDesignSlotOutlet(component, "missing.outlet")).toThrow("was not found");
   });
 
   it("replaces complete slot contracts so omitted constraints stay cleared", () => {

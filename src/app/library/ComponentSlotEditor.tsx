@@ -20,6 +20,7 @@ export interface ComponentSlotEditorProps {
   catalogComponents: readonly AcceptedComponentOption[];
   onChange: (slot: ComponentSlotDraft) => void;
   onRemove?: () => void;
+  removeBlockedReason?: string;
 }
 
 export function ComponentSlotEditor(props: ComponentSlotEditorProps) {
@@ -66,11 +67,12 @@ export function ComponentSlotEditor(props: ComponentSlotEditorProps) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1"><StableIdField id={slot.id} /></div>
         {props.onRemove ? (
-          <Button aria-label={`Remove ${slot.label} slot`} isIconOnly size="sm" variant="ghost" onPress={props.onRemove}>
+          <Button aria-label={`Remove ${slot.label} slot`} isDisabled={Boolean(props.removeBlockedReason)} isIconOnly size="sm" variant="ghost" onPress={props.onRemove}>
             <Trash2 size={14} />
           </Button>
         ) : null}
       </div>
+      {props.removeBlockedReason ? <p className="text-[10px] leading-4 text-amber-200/80">{props.removeBlockedReason}</p> : null}
 
       <ContractTextInput label="Slot label" value={slot.label} onChange={(label) => props.onChange({ ...slot, label })} />
 

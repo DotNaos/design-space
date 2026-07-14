@@ -73,13 +73,95 @@ describe("component document tree", () => {
         kind: "html",
         id: "dom.0",
         tagName: "section",
+        slotId: "content",
         children: [{ kind: "html", id: "dom.0.0", tagName: "button" }],
       }],
     });
 
+    expect(rows.filter((row) => row.kind === "internals-summary")).toMatchObject([
+      { label: "Implementation" },
+    ]);
+    expect(rows.find((row) => row.kind === "component" && row.label === "Stack"))
+      .toMatchObject({ internalHtml: { nodeCount: 2, collapsed: false } });
     expect(rows.filter((row) => row.kind === "html")).toMatchObject([
-      { label: "section", depth: 4, selection: { id: "html:panel.template:dom.0" } },
-      { label: "button", depth: 5, selection: { id: "html:panel.template:dom.0.0" } },
+      { label: "section", depth: 3, selection: { id: "html:panel.template:dom.0" } },
+      { label: "button", depth: 4, selection: { id: "html:panel.template:dom.0.0" } },
+    ]);
+    expect(rows.filter((row) => row.kind === "html-close")).toMatchObject([
+      { label: "button", depth: 4 },
+      { label: "section", depth: 3 },
+    ]);
+    const contentSlot = rows.find((row) => row.kind === "slot" && row.selection.slotId === "content");
+    const sectionOpen = rows.findIndex((row) => row.kind === "html" && row.label === "section");
+    const sectionClose = rows.findIndex((row) => row.kind === "html-close" && row.label === "section");
+    expect(contentSlot).toMatchObject({ depth: 4 });
+    expect(rows.indexOf(contentSlot!)).toBeGreaterThan(sectionOpen);
+    expect(rows.indexOf(contentSlot!)).toBeLessThan(sectionClose);
+  });
+
+  it("keeps the component implementation and its root HTML disclosure independent", () => {
+    const observed = {
+      "panel.template": [{ kind: "html" as const, id: "dom.0", tagName: "section" }],
+    };
+    const collapsed = buildDesignDocumentTree(target, panel, [panel], new Set(), observed);
+    const implementation = collapsed.find((row) => row.kind === "internals-summary");
+    expect(implementation).toBeDefined();
+    if (!implementation || implementation.kind !== "internals-summary") return;
+
+    const implementationOnly = buildDesignDocumentTree(
+      target,
+      panel,
+      [panel],
+      new Set([implementation.disclosureId]),
+      observed,
+    );
+    expect(implementationOnly.find((row) => row.kind === "internals-summary"))
+      .toMatchObject({ collapsed: false });
+    expect(implementationOnly.find((row) => row.kind === "component" && row.label === "Stack"))
+      .toMatchObject({ internalHtml: { nodeCount: 1, collapsed: true } });
+    expect(implementationOnly.filter((row) => row.kind === "html")).toHaveLength(0);
+
+    const withRootHtml = buildDesignDocumentTree(
+      target,
+      panel,
+      [panel],
+      new Set([implementation.disclosureId, "panel.template"]),
+      observed,
+    );
+    expect(withRootHtml.find((row) => row.kind === "internals-summary"))
+      .toMatchObject({ collapsed: false });
+    expect(withRootHtml.filter((row) => row.kind === "html"))
+      .toMatchObject([{ selection: { id: "html:panel.template:dom.0" }, label: "section" }]);
+  });
+
+  it("reveals observed HTML for only the requested component instance", () => {
+    const dashboard: DesignDocument = {
+      schemaVersion: 2,
+      id: "screen.dashboard",
+      label: "Dashboard",
+      kind: "screen",
+      root: {
+        instanceId: "root.stack",
+        adapterId: "stack",
+        slots: {
+          content: [{
+            kind: "component",
+            node: { instanceId: "child.stack", adapterId: "stack", slots: { content: [] } },
+          }],
+        },
+      },
+    };
+    const rows = buildDesignDocumentTree(target, dashboard, [], new Set(["child.stack"]), {
+      "root.stack": [{ kind: "html", id: "root.dom", tagName: "main" }],
+      "child.stack": [{ kind: "html", id: "child.dom", tagName: "section" }],
+    });
+
+    expect(rows.filter((row) => row.kind === "component")).toMatchObject([
+      { selection: { id: "root.stack" }, internalHtml: { nodeCount: 1, collapsed: true } },
+      { selection: { id: "child.stack" }, internalHtml: { nodeCount: 1, collapsed: false } },
+    ]);
+    expect(rows.filter((row) => row.kind === "html")).toMatchObject([
+      { selection: { id: "html:child.stack:child.dom" }, label: "section" },
     ]);
   });
 });

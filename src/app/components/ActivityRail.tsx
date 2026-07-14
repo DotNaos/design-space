@@ -23,7 +23,7 @@ export function ActivityRail(props: { active: WorkspaceMode; onChange: (mode: Wo
           type="button"
           onClick={() => props.onChange(mode)}
         >
-          {active && <span className="absolute -left-1.5 h-5 w-0.5 rounded-full bg-indigo-400" />}
+          {active && <span className="absolute -left-1.5 h-5 w-0.5 rounded-full bg-sky-400" />}
           <Icon size={17} />
         </button>
       );})}

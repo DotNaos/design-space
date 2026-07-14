@@ -46,7 +46,7 @@ export function DocumentNavigator(props: {
             <button
               key={entry.id}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-3 text-left text-xs lg:min-h-9 ${active ? "border-indigo-400 bg-indigo-500/10 text-zinc-100" : "border-transparent text-zinc-400 hover:bg-white/[0.03]"}`}
+              className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-3 text-left text-xs lg:min-h-9 ${active ? "border-sky-400 bg-sky-500/10 text-zinc-100" : "border-transparent text-zinc-400 hover:bg-white/[0.03]"}`}
               type="button"
               onClick={() => props.onSelect(entry.id)}
             >

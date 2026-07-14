@@ -260,6 +260,41 @@ describe("preview canvas", () => {
     expect(screen.getByTestId("canvas-world").style.transform).not.toBe(beforePan);
   });
 
+  it("starts touch pan and pinch gestures on an empty-slot overlay", async () => {
+    render(
+      <PreviewCanvas
+        preview={(
+          <div data-design-space-instance-id="root">
+            <div data-design-space-slot-id="slot:root:footer" />
+          </div>
+        )}
+        rootInstanceId="root"
+        selectedComponentInstanceId="root"
+        selection={{ kind: "component", id: "root" }}
+        selectionLabel="Root"
+        slots={[{ id: "footer", selectionId: "slot:root:footer", label: "Footer", count: 0 }]}
+        onSelect={() => undefined}
+      />,
+    );
+    const canvas = screen.getByRole("main", { name: "Preview canvas" });
+    const slot = canvas.querySelector<HTMLElement>('[data-design-space-slot-id="slot:root:footer"]')!;
+    Object.defineProperties(canvas, {
+      setPointerCapture: { configurable: true, value: vi.fn() },
+      hasPointerCapture: { configurable: true, value: vi.fn(() => false) },
+      releasePointerCapture: { configurable: true, value: vi.fn() },
+    });
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(rect(0, 0, 390, 300));
+    vi.spyOn(slot, "getBoundingClientRect").mockReturnValue(rect(40, 60, 240, 40));
+    fireEvent(window, new Event("resize"));
+    const overlay = await screen.findByRole("button", { name: "Add to empty Footer slot" });
+
+    dispatchPointer(overlay, "pointerdown", 1, 100, 80);
+    dispatchPointer(overlay, "pointerdown", 2, 200, 80);
+    dispatchPointer(overlay, "pointermove", 2, 300, 80);
+
+    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(2)");
+  });
+
   it("scales and pans the dot grid with the canvas world", () => {
     render(
       <PreviewCanvas
@@ -276,12 +311,12 @@ describe("preview canvas", () => {
 
     const grid = screen.getByTestId("canvas-grid");
     expect(grid.style.backgroundSize).toBe("20px 20px");
-    expect(grid.style.backgroundImage).toContain("1px");
+    expect(Number(grid.dataset.dotRadius)).toBeCloseTo(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
 
     expect(grid.style.backgroundSize).toBe("22px 22px");
-    expect(grid.style.backgroundImage).toContain("1.1px");
+    expect(Number(grid.dataset.dotRadius)).toBeCloseTo(2.2);
     expect(grid.style.backgroundPosition).not.toBe("16px 56px");
   });
 

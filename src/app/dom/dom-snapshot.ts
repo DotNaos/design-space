@@ -30,12 +30,30 @@ function observeElement(
   const nodeId = semanticNodeId(element, instanceId) ?? `dom.${path.join(".")}`;
   const selectionId = htmlSelectionId(instanceId, nodeId);
   if (element.dataset.designSpaceHtmlId !== selectionId) element.dataset.designSpaceHtmlId = selectionId;
-  return [{ kind: "html", id: nodeId, tagName: element.tagName.toLocaleLowerCase(), ...(children.length ? { children } : {}) }];
+  const slotId = semanticSlotId(element, instanceId);
+  return [{
+    kind: "html",
+    id: nodeId,
+    tagName: element.tagName.toLocaleLowerCase(),
+    ...(slotId ? { slotId } : {}),
+    ...(children.length ? { children } : {}),
+  }];
 }
 
 function semanticNodeId(element: HTMLElement, instanceId: string): string | undefined {
   const selectionId = element.dataset.designSpaceHtmlId;
   const prefix = `html:${encodeURIComponent(instanceId)}:`;
+  if (!selectionId?.startsWith(prefix)) return undefined;
+  try {
+    return decodeURIComponent(selectionId.slice(prefix.length));
+  } catch {
+    return undefined;
+  }
+}
+
+function semanticSlotId(element: HTMLElement, instanceId: string): string | undefined {
+  const selectionId = element.dataset.designSpaceSlotId;
+  const prefix = `slot:${encodeURIComponent(instanceId)}:`;
   if (!selectionId?.startsWith(prefix)) return undefined;
   try {
     return decodeURIComponent(selectionId.slice(prefix.length));

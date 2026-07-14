@@ -37,7 +37,7 @@ export function ComponentCatalogBrowser(props: ComponentCatalogBrowserProps) {
     >
       <header className="border-b border-white/10 px-3 py-2.5">
         <div className="flex min-h-6 items-center gap-2">
-          <Boxes aria-hidden="true" className="text-indigo-400" size={14} />
+          <Boxes aria-hidden="true" className="text-sky-400" size={14} />
           <h2 className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-300">Component catalog</h2>
           <span className="text-[9px] tabular-nums text-zinc-600">
             {normalizedQuery ? `${visibleCount} of ${props.entries.length}` : `${props.entries.length} total`}
@@ -105,13 +105,13 @@ function CatalogEntryButton(props: {
   return (
     <Button
       aria-pressed={props.selected}
-      className={`min-h-16 w-full justify-start rounded-none px-4 py-2 text-left ${props.selected ? "bg-indigo-500/10" : ""}`}
+      className={`min-h-16 w-full justify-start rounded-none px-4 py-2 text-left ${props.selected ? "bg-sky-500/10" : ""}`}
       fullWidth
       size="sm"
       variant="ghost"
       onPress={() => props.onSelect(props.entry.component.id)}
     >
-      <Component aria-hidden="true" className={props.entry.targetAdapter ? "text-indigo-400" : "text-violet-300"} size={14} />
+      <Component aria-hidden="true" className={props.entry.targetAdapter ? "text-sky-400" : "text-cyan-300"} size={14} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium text-zinc-300">{props.entry.component.label}</span>
         <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[9px] leading-4 text-zinc-600">

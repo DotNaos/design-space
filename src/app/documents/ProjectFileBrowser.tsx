@@ -113,7 +113,7 @@ function FileTreeLevel(props: {
         role="treeitem"
       >
         <Button
-          className={`min-h-11 w-full justify-start rounded-none px-2 text-xs lg:min-h-9 ${isSelected ? "bg-indigo-500/10 text-indigo-200" : "text-zinc-400"}`}
+          className={`min-h-11 w-full justify-start rounded-none px-2 text-xs lg:min-h-9 ${isSelected ? "bg-sky-500/10 text-sky-200" : "text-zinc-400"}`}
           fullWidth
           size="sm"
           variant="ghost"

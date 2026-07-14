@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import { z } from "zod";
 
 import { componentControlSchema, componentDescriptorSchema, opaqueIdSchema } from "../shared/contracts";
@@ -13,6 +11,7 @@ import {
   type TrustedManagedDocumentStore,
 } from "./managed-document-registration";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
+import { readRegisteredFile } from "./registered-file-reader";
 
 export interface EditValidationContext {
   fileId: string;
@@ -38,6 +37,8 @@ export interface TailwindCompilerContext {
 
 export interface TrustedTailwindCompiler {
   sourceFileIds: readonly string[];
+  /** Registered Tailwind CSS entrypoint used only by the fixed official language server. */
+  intelligenceFileId?: string;
   compile: (classList: string, context: TailwindCompilerContext) => string | Promise<string>;
 }
 
@@ -152,6 +153,7 @@ const trustedConfigShape = z
     ),
     tailwindCompiler: z.object({
       sourceFileIds: z.array(opaqueIdSchema).max(50),
+      intelligenceFileId: opaqueIdSchema.optional(),
       compile: z.function(),
     }).strict().optional(),
     documentRegistration: z.object({
@@ -203,7 +205,9 @@ export async function registerTrustedTarget(config: TrustedTargetConfig): Promis
     if (!file) {
       throw new DesignSpaceError("INVALID_REGISTRATION", `Edit target ${id} references an unknown file`);
     }
-    const source = await readFile(file.path, "utf8");
+    const source = await readRegisteredFile(root, file.path, {
+      unavailableMessage: `Edit target ${id} source is unavailable`,
+    });
     if (source.split(editTarget.marker).length !== 2) {
       throw new DesignSpaceError(
         "INVALID_REGISTRATION",
@@ -218,7 +222,8 @@ export async function registerTrustedTarget(config: TrustedTargetConfig): Promis
     const sourceFileIds = [...config.tailwindCompiler.sourceFileIds];
     if (
       new Set(sourceFileIds).size !== sourceFileIds.length ||
-      sourceFileIds.some((fileId) => !files.has(fileId))
+      sourceFileIds.some((fileId) => !files.has(fileId)) ||
+      (config.tailwindCompiler.intelligenceFileId !== undefined && !files.has(config.tailwindCompiler.intelligenceFileId))
     ) {
       throw new DesignSpaceError(
         "INVALID_REGISTRATION",
@@ -227,6 +232,7 @@ export async function registerTrustedTarget(config: TrustedTargetConfig): Promis
     }
     tailwindCompiler = {
       sourceFileIds: Object.freeze(sourceFileIds),
+      intelligenceFileId: config.tailwindCompiler.intelligenceFileId,
       compile: config.tailwindCompiler.compile,
     };
   }

@@ -6,5 +6,6 @@ export * from "./project-loader";
 export * from "./local-operation-service";
 export * from "./managed-document-registration";
 export * from "./tailwind-preview";
+export * from "./tailwind-intelligence-service";
 export * from "./target-registration";
 export * from "./virtual-target-plugin";

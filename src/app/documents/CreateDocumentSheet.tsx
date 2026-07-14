@@ -36,7 +36,7 @@ export function CreateDocumentSheet(props: {
         <Modal.Dialog aria-label={`Create ${kindLabel}`} className="max-h-[82dvh] w-full rounded-b-none border border-white/10 bg-[#17181b] text-zinc-200 lg:rounded-xl">
           <Modal.Header className="border-b border-white/10 px-4 py-3">
             <div className="flex w-full items-center gap-3">
-              <span className="grid size-9 place-items-center rounded-lg bg-indigo-500/10 text-indigo-300"><FilePlus2 size={17} /></span>
+              <span className="grid size-9 place-items-center rounded-lg bg-sky-500/10 text-sky-300"><FilePlus2 size={17} /></span>
               <div className="min-w-0 flex-1">
                 <p className="text-[9px] uppercase tracking-[0.16em] text-zinc-500">Target-owned recipe</p>
                 <Modal.Heading className="mt-0.5 text-base font-semibold">Create {kindLabel}</Modal.Heading>
@@ -59,11 +59,11 @@ export function CreateDocumentSheet(props: {
                     <button
                       key={recipe.id}
                       aria-pressed={selected}
-                      className={`flex min-h-16 w-full items-start gap-3 px-2 py-3 text-left ${selected ? "bg-indigo-500/10" : "hover:bg-white/[0.03]"}`}
+                      className={`flex min-h-16 w-full items-start gap-3 px-2 py-3 text-left ${selected ? "bg-sky-500/10" : "hover:bg-white/[0.03]"}`}
                       type="button"
                       onClick={() => setRecipeId(recipe.id)}
                     >
-                      <span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-indigo-500 text-white" : "bg-white/5 text-zinc-500"}`}>
+                      <span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-sky-500 text-white" : "bg-white/5 text-zinc-500"}`}>
                         {recipe.kind === "screen" ? <Smartphone size={15} /> : <Boxes size={15} />}
                       </span>
                       <span className="min-w-0 flex-1">

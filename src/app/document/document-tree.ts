@@ -10,11 +10,12 @@ export function buildDesignDocumentTree(
   target: TargetModule,
   document: DesignDocument,
   library: readonly DesignDocument[],
-  revealInternalHtml: boolean,
+  revealInternalHtml: boolean | ReadonlySet<string>,
   observedDom: PreviewDomSnapshot = {},
 ): readonly ComponentTreeRow[] {
   const rows: ComponentTreeRow[] = [];
   if (document.kind === "component" && document.component) {
+    const implementationDisclosureId = `implementation:${encodeURIComponent(document.id)}`;
     rows.push({
       kind: "component",
       depth: 0,
@@ -35,14 +36,16 @@ export function buildDesignDocumentTree(
         rows.push({ kind: "text", depth: 1, label: `${slot.label} slot · outlet missing`, id: `missing-outlet-${slot.id}` });
       }
     }
+    const implementationRevealed = isInternalHtmlRevealed(revealInternalHtml, implementationDisclosureId);
     rows.push({
       kind: "internals-summary",
+      disclosureId: implementationDisclosureId,
       depth: 1,
       label: "Implementation",
       nodeCount: countDesignNodes(document.root),
-      collapsed: !revealInternalHtml,
+      collapsed: !implementationRevealed,
     });
-    if (revealInternalHtml) appendNode(rows, target, document.root, library, 2, true, observedDom);
+    if (implementationRevealed) appendNode(rows, target, document.root, library, 2, revealInternalHtml, observedDom);
     return rows;
   }
   appendNode(rows, target, document.root, library, 0, revealInternalHtml, observedDom);
@@ -69,33 +72,32 @@ function appendNode(
   node: DesignComponentNode,
   library: readonly DesignDocument[],
   depth: number,
-  revealInternalHtml: boolean,
+  revealInternalHtml: boolean | ReadonlySet<string>,
   observedDom: PreviewDomSnapshot,
 ): void {
   const adapter = resolveDocumentAdapter(target, library, node.adapterId);
   if (!adapter) return;
+  const internals = observedDom[node.instanceId] ?? adapter.component.internalHtml ?? [];
+  const internalsRevealed = isInternalHtmlRevealed(revealInternalHtml, node.instanceId);
   rows.push({
     kind: "component",
     depth,
     label: adapter.component.label,
     selection: { kind: "component", id: node.instanceId },
+    internalHtml: internals.length > 0
+      ? { nodeCount: countInternalNodes(internals), collapsed: !internalsRevealed }
+      : undefined,
   });
-  const internals = observedDom[node.instanceId] ?? adapter.component.internalHtml ?? [];
-  if (internals.length) {
-    rows.push({
-      kind: "internals-summary",
-      depth: depth + 1,
-      label: "Internal HTML",
-      nodeCount: countInternalNodes(internals),
-      collapsed: !revealInternalHtml,
-    });
-    if (revealInternalHtml) appendInternalRows(rows, internals, depth + 2, node.instanceId);
-  }
-  for (const slot of adapter.component.slots) {
+  const placedSlots = new Set<string>();
+  const appendSlot = (slotId: string, slotDepth: number) => {
+    if (placedSlots.has(slotId)) return;
+    const slot = adapter.component.slots.find((candidate) => candidate.id === slotId);
+    if (!slot) return;
+    placedSlots.add(slotId);
     const children = node.slots[slot.id] ?? [];
     rows.push({
       kind: "slot",
-      depth: depth + 1,
+      depth: slotDepth,
       label: slot.label,
       occupied: children.length > 0,
       childCount: children.length,
@@ -107,18 +109,25 @@ function appendNode(
       },
     });
     for (const child of children) {
-      if (child.kind === "component") appendNode(rows, target, child.node, library, depth + 2, revealInternalHtml, observedDom);
+      if (child.kind === "component") appendNode(rows, target, child.node, library, slotDepth + 1, revealInternalHtml, observedDom);
       else if (child.kind === "slot-outlet") {
         const definition = documentSlotLabel(library, child.slotId);
         rows.push({
           kind: "slot-outlet",
-          depth: depth + 2,
+          depth: slotDepth + 1,
           label: `${definition ?? child.slotId} slot outlet`,
           selection: { kind: "slot-outlet", id: `outlet:${child.id}`, outletId: child.id, slotId: child.slotId },
         });
-      } else rows.push({ kind: "text", depth: depth + 2, label: child.value, id: child.id });
+      } else rows.push({ kind: "text", depth: slotDepth + 1, label: child.value, id: child.id });
     }
-  }
+  };
+
+  if (internalsRevealed) appendInternalRows(rows, internals, depth + 1, node.instanceId, appendSlot);
+  for (const slot of adapter.component.slots) appendSlot(slot.id, depth + 1);
+}
+
+function isInternalHtmlRevealed(revealInternalHtml: boolean | ReadonlySet<string>, instanceId: string): boolean {
+  return typeof revealInternalHtml === "boolean" ? revealInternalHtml : revealInternalHtml.has(instanceId);
 }
 
 function documentSlotLabel(library: readonly DesignDocument[], slotId: string): string | undefined {
@@ -138,19 +147,30 @@ function appendInternalRows(
   nodes: readonly InternalHtmlNode[] | undefined,
   depth: number,
   componentInstanceId: string,
+  appendSlot: (slotId: string, depth: number) => void,
 ): void {
   for (const node of nodes ?? []) {
+    const selectionId = htmlSelectionId(componentInstanceId, node.id);
+    const selfClosing = voidHtmlTags.has(node.tagName);
     rows.push({
       kind: "html",
       depth,
       label: node.tagName,
+      selfClosing,
       selection: {
         kind: "html",
-        id: htmlSelectionId(componentInstanceId, node.id),
+        id: selectionId,
         componentInstanceId,
         nodeId: node.id,
       },
     });
-    appendInternalRows(rows, node.children, depth + 1, componentInstanceId);
+    if (selfClosing) continue;
+    appendInternalRows(rows, node.children, depth + 1, componentInstanceId, appendSlot);
+    if (node.slotId) appendSlot(node.slotId, depth + 1);
+    rows.push({ kind: "html-close", depth, label: node.tagName, id: selectionId });
   }
 }
+
+const voidHtmlTags = new Set([
+  "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr",
+]);

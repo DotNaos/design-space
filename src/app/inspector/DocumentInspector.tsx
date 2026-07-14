@@ -5,6 +5,8 @@ import type { ComponentControl } from "../../shared/contracts";
 import type { DesignValue } from "../../shared/design-document";
 import type { SlotState } from "../types";
 import { PropertyControlField } from "../components/PropertyControlField";
+import { TailwindClassField } from "./TailwindClassField";
+import { TailwindMappedControls } from "./TailwindMappedControls";
 
 export function DocumentInspector(props: {
   className?: string;
@@ -28,7 +30,11 @@ export function DocumentInspector(props: {
   onApply: () => void;
   onCancel: () => void;
 }) {
-  const sections = groupControls(props.controls);
+  const tailwindControl = props.controls.find((control) => control.kind === "tailwind");
+  const sections = groupControls(props.controls.filter((control) => control.kind !== "tailwind"));
+  const tailwindValue = tailwindControl && typeof props.values[tailwindControl.prop] === "string"
+    ? String(props.values[tailwindControl.prop])
+    : "";
   return (
     <aside className={`${props.className ?? "flex w-80"} min-w-0 shrink-0 flex-col overflow-y-auto border-l border-white/10 bg-[#141518]`}>
       <header className="flex items-center gap-3 border-b border-white/10 px-4 py-3"><div className="min-w-0 flex-1"><p className="text-[9px] uppercase tracking-[0.16em] text-zinc-600">Inspector · Body</p><h2 className="mt-1 truncate text-sm font-semibold text-zinc-100">{props.componentLabel}</h2><p className="mt-0.5 truncate text-[9px] text-zinc-600">{props.sourceLabel ?? "Target-owned adapter"}</p></div>{props.onEditDefinition && <Button size="sm" variant="secondary" onPress={props.onEditDefinition}>Definition</Button>}</header>
@@ -38,9 +44,15 @@ export function DocumentInspector(props: {
         <Action label="Duplicate" disabled={!props.canDuplicate} icon={<Copy size={14} />} onPress={props.onDuplicate} />
         <Action danger label="Delete" disabled={!props.canDelete} icon={<Trash2 size={14} />} onPress={props.onDelete} />
       </div>
+      {tailwindControl ? (
+        <InspectorSection title="Layout & style">
+          <TailwindMappedControls value={tailwindValue} onChange={(value) => props.onControlChange(tailwindControl.prop, value)} />
+          <TailwindClassField compileError={props.compileError} label={tailwindControl.label} value={tailwindValue} onChange={(value) => props.onControlChange(tailwindControl.prop, value)} />
+        </InspectorSection>
+      ) : null}
       {Object.entries(sections).map(([section, controls]) => controls.length ? (
         <InspectorSection key={section} title={sectionLabel(section)}>
-          {controls.map((control) => <PropertyControlField key={control.id} control={control} value={props.values[control.prop]} onChange={(value) => props.onControlChange(control.prop, value)} />)}
+          {controls.map((control) => <PropertyControlField key={control.id} control={control} error={control.kind === "tailwind" ? props.compileError : undefined} value={props.values[control.prop]} onChange={(value) => props.onControlChange(control.prop, value)} />)}
         </InspectorSection>
       ) : null)}
       <InspectorSection title="Slots">

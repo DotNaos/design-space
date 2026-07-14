@@ -3,13 +3,25 @@ import { Check, Minus, Plus } from "lucide-react";
 
 import type { ComponentControl } from "../../shared/contracts";
 import type { DesignValue } from "../../shared/design-document";
+import { TailwindClassField } from "../inspector/TailwindClassField";
 
 export function PropertyControlField(props: {
   control: ComponentControl;
   value: DesignValue | undefined;
+  error?: string;
   onChange: (value: DesignValue | undefined) => void;
 }) {
   const { control } = props;
+  if (control.kind === "tailwind") {
+    return (
+      <TailwindClassField
+        compileError={props.error}
+        label={control.label}
+        value={typeof props.value === "string" ? props.value : ""}
+        onChange={props.onChange}
+      />
+    );
+  }
   if (control.kind === "boolean") {
     return (
       <Switch isSelected={props.value === true} onChange={props.onChange}>

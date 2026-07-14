@@ -26,6 +26,7 @@
   "dependencies": {
     "@heroui/react": "^3.0.5",
     "@heroui/styles": "^3.0.5",
+    "@tailwindcss/language-server": "0.14.29",
     "lucide-react": "^0.468.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

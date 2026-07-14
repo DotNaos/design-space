@@ -4,12 +4,13 @@ import type {
   ProjectFileSnapshot,
   SavedEdit,
   SourceSnapshot,
+  TailwindIntelligence,
   TailwindPreview,
 } from "../shared/contracts";
 import type { DocumentOperation, DocumentOperationResult } from "../shared/document-transactions";
 
 type LocalOperation = BrowserOperation | DocumentOperation;
-type OperationResult = SourceSnapshot | ProjectFileSnapshot | PreparedEdit | SavedEdit | TailwindPreview | DocumentOperationResult;
+type OperationResult = SourceSnapshot | ProjectFileSnapshot | PreparedEdit | SavedEdit | TailwindPreview | TailwindIntelligence | DocumentOperationResult;
 
 export class LocalOperationError extends Error {
   constructor(

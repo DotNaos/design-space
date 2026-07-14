@@ -94,6 +94,32 @@ export function insertDesignChild(
   });
 }
 
+export function clearDesignSlot(
+  document: DesignDocument,
+  parentInstanceId: string,
+  slotId: string,
+): DesignDocument {
+  const parent = findDesignNode(document.root, parentInstanceId);
+  if (!parent) throw new Error(`Component instance ${parentInstanceId} was not found.`);
+  const current = parent.slots[slotId];
+  if (!current) throw new Error(`Component ${parentInstanceId} does not declare slot ${slotId}.`);
+  if (current.length === 0) return document;
+  return updateDocumentRoot(document, parentInstanceId, (node) => {
+    return { ...node, slots: { ...node.slots, [slotId]: [] } };
+  });
+}
+
+export function removeDesignSlotOutlet(document: DesignDocument, outletId: string): DesignDocument {
+  let removed = false;
+  const root = updateDesignChildren(document.root, (child) => {
+    if (child.kind !== "slot-outlet" || child.id !== outletId) return [child];
+    removed = true;
+    return [];
+  });
+  if (!removed) throw new Error(`Slot outlet ${outletId} was not found.`);
+  return { ...document, root };
+}
+
 export function removeDesignComponent(document: DesignDocument, instanceId: string): DesignDocument {
   if (document.root.instanceId === instanceId) throw new Error("The root component cannot be removed.");
   const root = updateParentChildren(document.root, instanceId, (children, index) => children.filter((_, item) => item !== index));
@@ -331,6 +357,30 @@ function removeSlotOutlets(root: DesignComponentNode, slotId: string): DesignCom
       }),
     ])),
   };
+}
+
+function updateDesignChildren(
+  root: DesignComponentNode,
+  update: (child: DesignChild) => readonly DesignChild[],
+): DesignComponentNode {
+  let changed = false;
+  const slots = Object.fromEntries(Object.entries(root.slots).map(([slotId, children]) => [
+    slotId,
+    children.flatMap<DesignChild>((child) => {
+      if (child.kind !== "component") {
+        const next = update(child);
+        if (next.length !== 1 || next[0] !== child) changed = true;
+        return [...next];
+      }
+      const node = updateDesignChildren(child.node, update);
+      const nested = node === child.node ? child : { ...child, node };
+      if (nested !== child) changed = true;
+      const next = update(nested);
+      if (next.length !== 1 || next[0] !== nested) changed = true;
+      return [...next];
+    }),
+  ]));
+  return changed ? { ...root, slots } : root;
 }
 
 function defaultId(): string {

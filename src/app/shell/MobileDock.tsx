@@ -1,29 +1,34 @@
-import { Boxes, Files, Layers3, LayoutGrid, Library, SlidersHorizontal } from "lucide-react";
+import { FolderKanban, Layers3, SlidersHorizontal } from "lucide-react";
+
+import { useMobileViewport } from "../components/use-mobile-viewport";
 
 export type MobilePane = "documents" | "files" | "tree" | "canvas" | "catalog" | "inspect";
+export type MobileDestination = "project" | "tree" | "canvas" | "inspect";
 
 const actions = [
-  { pane: "documents" as const, label: "Docs", icon: LayoutGrid },
-  { pane: "files" as const, label: "Files", icon: Files },
-  { pane: "tree" as const, label: "Tree", icon: Layers3 },
-  { pane: "canvas" as const, label: "Canvas", icon: Boxes },
-  { pane: "catalog" as const, label: "Catalog", icon: Library },
-  { pane: "inspect" as const, label: "Inspect", icon: SlidersHorizontal },
+  { destination: "project" as const, pane: "documents" as const, label: "Project", icon: FolderKanban },
+  { destination: "tree" as const, pane: "tree" as const, label: "Tree", icon: Layers3 },
+  { destination: "inspect" as const, pane: "inspect" as const, label: "Inspect", icon: SlidersHorizontal },
 ];
 
 export function MobileDock(props: { active: MobilePane; onChange: (pane: MobilePane) => void }) {
+  const mobile = useMobileViewport();
+  const activeDestination = mobileDestinationForPane(props.active);
+  if (!mobile) return null;
   return (
-    <nav aria-label="Mobile workspace" className="grid h-[calc(3.75rem+env(safe-area-inset-bottom))] shrink-0 grid-cols-6 border-t border-white/10 bg-[#101113] pb-[env(safe-area-inset-bottom)] lg:hidden">
-      {actions.map(({ pane, label, icon: Icon }) => {
-        const active = props.active === pane;
+    <nav aria-label="Mobile workspace tools" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-white/10 bg-[#17181b]/95 p-1 shadow-2xl backdrop-blur-sm lg:hidden">
+      {actions.map(({ destination, pane, label, icon: Icon }) => {
+        const active = activeDestination === destination;
         return (
-          <button key={pane} aria-current={active ? "page" : undefined} className={`relative flex min-w-0 flex-col items-center justify-center gap-1 text-[9px] ${active ? "text-indigo-300" : "text-zinc-500"}`} type="button" onClick={() => props.onChange(pane)}>
-            {active && <span className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-indigo-400" />}
-            <Icon size={17} strokeWidth={active ? 2.2 : 1.8} />
-            <span className="max-w-full truncate px-0.5">{label}</span>
+          <button key={destination} aria-label={active ? `Close ${label}` : `Open ${label}`} aria-pressed={active} className={`grid size-11 place-items-center rounded-xl transition-colors ${active ? "bg-sky-400/15 text-sky-300" : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100"}`} type="button" onClick={() => props.onChange(active ? "canvas" : pane)}>
+            <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
           </button>
         );
       })}
     </nav>
   );
+}
+
+export function mobileDestinationForPane(pane: MobilePane): MobileDestination {
+  return pane === "documents" || pane === "files" || pane === "catalog" ? "project" : pane;
 }

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { chmod, lstat, open, readFile, realpath, rename, rm, stat } from "node:fs/promises";
+import { chmod, lstat, open, realpath, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { transformWithEsbuild } from "vite";
 
@@ -11,14 +11,17 @@ import {
   type ProjectFileSnapshot,
   type SavedEdit,
   type SourceSnapshot,
+  type TailwindIntelligence,
   type TailwindPreview,
 } from "../shared/contracts";
 import { createUnifiedDiff } from "./diff";
 import { ChallengeStore } from "./challenge-store";
 import { DesignSpaceError } from "./errors";
 import { assertStillRegistered } from "./path-security";
+import { readRegisteredFile } from "./registered-file-reader";
 import { locateMarkedString, sourceVersion } from "./source-editor";
 import { TargetTailwindService } from "./target-tailwind-service";
+import { TailwindIntelligenceService } from "./tailwind-intelligence-service";
 import type {
   RegisteredEditTarget,
   RegisteredFile,
@@ -79,7 +82,7 @@ async function atomicWrite(root: string, path: string, expectedVersion: string, 
     ) {
       throw new DesignSpaceError("ACCESS_DENIED", "The registered file changed during the atomic save");
     }
-    const currentSource = await readFile(path, "utf8");
+    const currentSource = await readRegisteredFile(root, path);
     if (sourceVersion(currentSource) !== expectedVersion) {
       throw new DesignSpaceError("STALE_SOURCE", "The registered source changed during the atomic save");
     }
@@ -98,6 +101,7 @@ export class EditService {
   readonly #now: () => number;
   readonly #createId: () => string;
   readonly #tailwind: TargetTailwindService;
+  readonly #tailwindIntelligence: TailwindIntelligenceService;
   #saveQueue: Promise<void> = Promise.resolve();
 
   constructor(target: RegisteredTarget, options: EditServiceOptions = {}) {
@@ -107,9 +111,10 @@ export class EditService {
     this.#createId = options.createId ?? randomUUID;
     this.#challenges = new ChallengeStore({ now: this.#now });
     this.#tailwind = new TargetTailwindService(target);
+    this.#tailwindIntelligence = new TailwindIntelligenceService(target);
   }
 
-  async execute(input: unknown): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | SavedEdit | TailwindPreview> {
+  async execute(input: unknown): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | SavedEdit | TailwindPreview | TailwindIntelligence> {
     const parsed = browserOperationSchema.safeParse(input);
     if (!parsed.success) {
       throw new DesignSpaceError("INVALID_REQUEST", "The browser operation is invalid");
@@ -117,8 +122,10 @@ export class EditService {
     return this.#executeParsed(parsed.data);
   }
 
-  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | SavedEdit | TailwindPreview> {
+  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | SavedEdit | TailwindPreview | TailwindIntelligence> {
     switch (operation.type) {
+      case "analyze-tailwind":
+        return this.#tailwindIntelligence.analyze(operation.value, operation.cursor);
       case "compile-tailwind":
         return (await this.#tailwind.compile(operation.value)).preview;
       case "read-project-file":
@@ -132,27 +139,23 @@ export class EditService {
     }
   }
 
+  dispose(): void {
+    this.#tailwindIntelligence.dispose();
+  }
+
   async readProjectFile(fileId: string): Promise<ProjectFileSnapshot> {
     const file = this.#target.files.get(fileId);
     if (!file) throw new DesignSpaceError("NOT_FOUND", "The project file is not registered");
-    await assertStillRegistered(this.#target.root, file.path);
-    const handle = await open(file.path, constants.O_RDONLY | constants.O_NOFOLLOW);
-    try {
-      const metadata = await handle.stat();
-      if (!metadata.isFile() || metadata.size > maximumBrowsableFileBytes) {
-        throw new DesignSpaceError("ACCESS_DENIED", "The registered file is not available for source browsing");
-      }
-      const source = await handle.readFile("utf8");
-      return { fileId, label: file.displayName, source, version: sourceVersion(source) };
-    } finally {
-      await handle.close();
-    }
+    const source = await readRegisteredFile(this.#target.root, file.path, {
+      maximumBytes: maximumBrowsableFileBytes,
+      unavailableMessage: "The registered file is not available for source browsing",
+    });
+    return { fileId, label: file.displayName, source, version: sourceVersion(source) };
   }
 
   async read(editTargetId: string): Promise<SourceSnapshot> {
     const { editTarget, file } = this.#resolve(editTargetId);
-    await assertStillRegistered(this.#target.root, file.path);
-    const source = await readFile(file.path, "utf8");
+    const source = await readRegisteredFile(this.#target.root, file.path);
     return {
       editTargetId: editTarget.id,
       value: locateMarkedString(source, editTarget.marker).value,
@@ -162,8 +165,7 @@ export class EditService {
 
   async prepare(editTargetId: string, unsafeValue: string, baseVersion: string): Promise<PreparedEdit> {
     const { editTarget, file } = this.#resolve(editTargetId);
-    await assertStillRegistered(this.#target.root, file.path);
-    const source = await readFile(file.path, "utf8");
+    const source = await readRegisteredFile(this.#target.root, file.path);
     const currentVersion = sourceVersion(source);
     if (currentVersion !== baseVersion) {
       throw new DesignSpaceError("STALE_SOURCE", "The source changed after the editor loaded it");
@@ -236,8 +238,7 @@ export class EditService {
     if (challenge.expiresAt <= this.#now()) {
       throw new DesignSpaceError("CHALLENGE_EXPIRED", "The prepared edit expired before it was saved");
     }
-    await assertStillRegistered(this.#target.root, challenge.file.path);
-    const currentSource = await readFile(challenge.file.path, "utf8");
+    const currentSource = await readRegisteredFile(this.#target.root, challenge.file.path);
     if (sourceVersion(currentSource) !== challenge.baseVersion) {
       throw new DesignSpaceError("STALE_SOURCE", "The source changed before the edit could be saved");
     }

@@ -113,6 +113,7 @@ export function designSpaceApiPlugin(service: OperationExecutor): Plugin {
     name: "design-space-local-api",
     apply: "serve",
     configureServer(server) {
+      server.httpServer?.once("close", () => service.dispose?.());
       server.middlewares.use(async (request, response, next) => {
         response.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
         response.setHeader("Referrer-Policy", "no-referrer");

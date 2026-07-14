@@ -20,7 +20,7 @@ describe("live preview DOM indexing", () => {
       tagName: "article",
       children: [
         { id: "dom.0.0", tagName: "div", children: [{ id: "dom.0.0.0", tagName: "button" }] },
-        { id: "dom.0.1", tagName: "header" },
+        { id: "dom.0.1", tagName: "header", slotId: "header" },
       ],
     }]);
     expect(snapshot["copy.one"]).toMatchObject([{

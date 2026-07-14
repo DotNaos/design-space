@@ -13,7 +13,7 @@ export function ScreenWorkshop(props: {
   return (
     <aside className={`${props.className ?? "flex w-80"} h-full min-h-0 min-w-0 shrink-0 flex-col overflow-y-auto overscroll-contain border-l border-white/10 bg-[#141518]`}>
       <header className="sticky top-0 z-10 border-b border-white/10 bg-[#141518]/95 px-4 py-3 backdrop-blur">
-        <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-indigo-400">Screen settings</p>
+        <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-sky-400">Screen settings</p>
         <h2 className="mt-1 truncate text-sm font-semibold text-zinc-100">{props.document.label}</h2>
         <p className="mt-1 text-[10px] text-zinc-600">Source-backed app document</p>
       </header>

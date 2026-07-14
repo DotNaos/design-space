@@ -10,6 +10,7 @@ import { ProjectFileBrowser } from "./ProjectFileBrowser";
 export function ProjectFilesWorkspace(props: {
   className?: string;
   files: readonly TargetFileEntry[];
+  requestedFileId?: string;
   onSelect?: (fileId: string) => void;
   loadFile?: (fileId: string) => Promise<ProjectFileSnapshot>;
 }) {
@@ -53,6 +54,10 @@ export function ProjectFilesWorkspace(props: {
       .catch(() => undefined);
   };
 
+  useEffect(() => {
+    if (props.requestedFileId && props.requestedFileId !== selectedFileId) openFile(props.requestedFileId);
+  }, [props.requestedFileId]);
+
   const closeFile = () => {
     requestId.current += 1;
     setSelectedFileId(undefined);
@@ -72,7 +77,7 @@ export function ProjectFilesWorkspace(props: {
         <Button aria-label="Back to project files" isIconOnly size="sm" variant="ghost" onPress={closeFile}>
           <ArrowLeft aria-hidden="true" size={14} />
         </Button>
-        <FileCode2 aria-hidden="true" className="shrink-0 text-indigo-300" size={14} />
+        <FileCode2 aria-hidden="true" className="shrink-0 text-sky-300" size={14} />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-xs font-medium text-zinc-300">{snapshot?.label ?? selectedFile?.label ?? "Project source"}</h2>
           <p className="mt-0.5 flex items-center gap-1 text-[9px] text-zinc-600"><LockKeyhole aria-hidden="true" size={10} /> Read only · allowlisted source</p>

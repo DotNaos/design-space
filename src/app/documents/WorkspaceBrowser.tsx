@@ -17,6 +17,7 @@ export interface WorkspaceBrowserProps {
   catalogEntries: readonly DocumentAdapterView[];
   activeDocumentId?: string;
   selectedComponentId?: string;
+  requestedFileId?: string;
   canCreate: boolean;
   onViewChange: (view: WorkspaceBrowserView) => void;
   onModeChange: (mode: ProductMode) => void;
@@ -24,6 +25,7 @@ export interface WorkspaceBrowserProps {
   onFileSelect?: (fileId: string) => void;
   onCatalogSelect: (componentId: string) => void;
   onCreate: () => void;
+  showViewNavigation?: boolean;
 }
 
 const views = [
@@ -38,21 +40,23 @@ export function WorkspaceBrowser(props: WorkspaceBrowserProps) {
       aria-label="Project browser"
       className={`${props.className ?? "flex w-64"} min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}
     >
-      <nav aria-label="Project browser views" className="grid h-12 shrink-0 grid-cols-3 border-b border-white/10 p-1">
-        {views.map(({ id, label, shortLabel, icon: Icon }) => (
-          <button
-            key={id}
-            aria-current={props.view === id ? "page" : undefined}
-            aria-label={label}
-            className={`flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-[10px] transition-colors ${props.view === id ? "bg-white/10 text-zinc-100" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}
-            type="button"
-            onClick={() => props.onViewChange(id)}
-          >
-            <Icon aria-hidden="true" size={13} />
-            <span className="truncate">{shortLabel}</span>
-          </button>
-        ))}
-      </nav>
+      {props.showViewNavigation !== false && (
+        <nav aria-label="Project browser views" className="grid h-12 shrink-0 grid-cols-3 border-b border-white/10 p-1">
+          {views.map(({ id, label, shortLabel, icon: Icon }) => (
+            <button
+              key={id}
+              aria-current={props.view === id ? "page" : undefined}
+              aria-label={label}
+              className={`flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-[10px] transition-colors ${props.view === id ? "bg-white/10 text-zinc-100" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}
+              type="button"
+              onClick={() => props.onViewChange(id)}
+            >
+              <Icon aria-hidden="true" size={13} />
+              <span className="truncate">{shortLabel}</span>
+            </button>
+          ))}
+        </nav>
+      )}
 
       <div className="min-h-0 flex-1">
         {props.view === "documents" && (
@@ -71,6 +75,7 @@ export function WorkspaceBrowser(props: WorkspaceBrowserProps) {
           <ProjectFilesWorkspace
             className="flex h-full w-full border-r-0!"
             files={props.files}
+            requestedFileId={props.requestedFileId}
             onSelect={props.onFileSelect}
           />
         )}

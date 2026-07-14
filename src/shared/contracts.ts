@@ -29,12 +29,14 @@ export type SlotDefinition = z.infer<typeof slotDefinitionSchema>;
 export interface InternalHtmlNode {
   id: string;
   tagName: string;
+  slotId?: string;
   children?: readonly InternalHtmlNode[];
 }
 
 const internalHtmlNodeSchema: z.ZodType<InternalHtmlNode> = z.lazy(() => z.object({
   id: opaqueIdSchema,
   tagName: z.string().regex(/^[a-z][a-z0-9-]*$/),
+  slotId: opaqueIdSchema.optional(),
   children: z.array(internalHtmlNodeSchema).max(200).optional(),
 }).strict());
 
@@ -65,7 +67,7 @@ export const componentDescriptorSchema = z
       ids.add(slot.id);
     }
     const htmlIds = new Set<string>();
-    validateInternalHtmlIds(component.internalHtml ?? [], ["internalHtml"], htmlIds, context);
+    validateInternalHtmlIds(component.internalHtml ?? [], ["internalHtml"], htmlIds, ids, context);
   });
 
 export type ComponentDescriptor = z.infer<typeof componentDescriptorSchema>;
@@ -74,6 +76,7 @@ function validateInternalHtmlIds(
   nodes: readonly InternalHtmlNode[],
   path: Array<string | number>,
   ids: Set<string>,
+  slotIds: ReadonlySet<string>,
   context: z.RefinementCtx,
 ): void {
   for (const [index, node] of nodes.entries()) {
@@ -85,7 +88,14 @@ function validateInternalHtmlIds(
       });
     }
     ids.add(node.id);
-    validateInternalHtmlIds(node.children ?? [], [...path, index, "children"], ids, context);
+    if (node.slotId && !slotIds.has(node.slotId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Internal HTML references undeclared slot: ${node.slotId}`,
+        path: [...path, index, "slotId"],
+      });
+    }
+    validateInternalHtmlIds(node.children ?? [], [...path, index, "children"], ids, slotIds, context);
   }
 }
 
@@ -145,6 +155,7 @@ export type ComponentControl = z.infer<typeof componentControlSchema>;
 
 export const browserOperationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("compile-tailwind"), value: z.string().max(10_000) }).strict(),
+  z.object({ type: z.literal("analyze-tailwind"), value: z.string().max(10_000), cursor: z.number().int().min(0).max(10_000) }).strict(),
   z.object({ type: z.literal("read-project-file"), fileId: opaqueIdSchema }).strict(),
   z.object({ type: z.literal("read-source"), editTargetId: opaqueIdSchema }).strict(),
   z
@@ -156,7 +167,11 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("save-edit"), challengeId: z.string().uuid() }).strict(),
-]);
+]).superRefine((operation, context) => {
+  if (operation.type === "analyze-tailwind" && operation.cursor > operation.value.length) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["cursor"], message: "Tailwind cursor exceeds the class field" });
+  }
+});
 
 export type BrowserOperation = z.infer<typeof browserOperationSchema>;
 
@@ -176,6 +191,31 @@ export interface ProjectFileSnapshot {
 export interface TailwindPreview {
   value: string;
   css: string;
+}
+
+export interface TailwindCompletion {
+  label: string;
+  insertText: string;
+  replaceStart: number;
+  replaceEnd: number;
+  detail?: string;
+  documentation?: string;
+}
+
+export interface TailwindDiagnostic {
+  code?: string;
+  message: string;
+  severity: "error" | "warning" | "information";
+  start: number;
+  end: number;
+}
+
+export interface TailwindIntelligence {
+  value: string;
+  cursor: number;
+  engineVersion: string;
+  completions: readonly TailwindCompletion[];
+  diagnostics: readonly TailwindDiagnostic[];
 }
 
 export interface PreparedEdit {

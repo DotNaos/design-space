@@ -13,6 +13,7 @@ it("keeps the complete component workshop scrollable on a phone and creates an e
     <ComponentWorkshop
       className="flex w-full"
       document={component}
+      documents={[component]}
       recipe={{
         id: "stack-component",
         label: "Stack component",
@@ -61,6 +62,7 @@ it("removes cleared maximum and accepted-component constraints from the saved sl
       <ComponentWorkshop
         className="flex w-full"
         document={document}
+        documents={[document]}
         catalogComponents={[{ id: "catalog.heading", label: "Heading", controls: [] }]}
         onChange={(nextDocument) => {
           setDocument(nextDocument);
@@ -81,6 +83,45 @@ it("removes cleared maximum and accepted-component constraints from the saved sl
   changed = onChange.mock.lastCall?.[0] as DesignDocument;
   expect(changed.component?.slots[0]).not.toHaveProperty("max");
   expect(changed.component?.slots[0]).not.toHaveProperty("accepts");
+});
+
+it("keeps a public slot when another document depends on its component", async () => {
+  const user = userEvent.setup();
+  const onChange = vi.fn();
+  const document: DesignDocument = {
+    ...component,
+    component: {
+      ...component.component!,
+      slots: [{ id: "body", label: "Body", acceptsText: true }],
+    },
+  };
+  const dependentScreen: DesignDocument = {
+    schemaVersion: 2,
+    id: "screen.dashboard",
+    label: "Dashboard",
+    kind: "screen",
+    root: {
+      instanceId: "dashboard.panel",
+      adapterId: "panel",
+      slots: { body: [] },
+    },
+  };
+  render(
+    <ComponentWorkshop
+      className="flex w-full"
+      document={document}
+      documents={[document, dependentScreen]}
+      catalogComponents={[]}
+      onChange={onChange}
+      onEditImplementation={vi.fn()}
+    />,
+  );
+
+  const remove = screen.getByRole("button", { name: "Remove Body slot" });
+  expect(remove).toBeDisabled();
+  expect(screen.getByText(/Cannot remove the Body slot because “Dashboard” uses Panel/)).toBeInTheDocument();
+  await user.click(remove);
+  expect(onChange).not.toHaveBeenCalled();
 });
 
 const component: DesignDocument = {

@@ -12,6 +12,7 @@ export const registration = {
   files: {
     "card.source": "src/Card.tsx",
     "tailwind.theme": "src/theme.css",
+    "tailwind.intelligence": "src/tailwind.css",
     "dashboard.document": "src/dashboard.design.json",
     "panel.document": "src/panel.design.json",
   },
@@ -24,6 +25,7 @@ export const registration = {
   },
   tailwindCompiler: {
     sourceFileIds: ["tailwind.theme"],
+    intelligenceFileId: "tailwind.intelligence",
     compile: compileDemoTailwind,
   },
   documentRegistration: {

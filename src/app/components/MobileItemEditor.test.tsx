@@ -21,10 +21,7 @@ describe("mobile item editor", () => {
           { id: "content", label: "Content", kind: "text", prop: "children" },
         ]}
         controlValues={{ className: "text-sm", children: "Planning" }}
-        preview={<p data-design-space-instance-id="copy">Planning</p>}
         previewCss=""
-        rootInstanceId="root"
-        selectedInstanceId="copy"
         slots={[{ id: "body", selectionId: "slot:copy:body", label: "Body", count: 0 }]}
         compileError="Unknown Tailwind class"
         compilePending={false}
@@ -34,7 +31,6 @@ describe("mobile item editor", () => {
         canDuplicate
         canDelete
         onControlChange={onControlChange}
-        onSelectComponent={vi.fn()}
         onSelectSlot={onSelectSlot}
         onMove={vi.fn()}
         onDuplicate={vi.fn()}
@@ -50,7 +46,7 @@ describe("mobile item editor", () => {
     expect(screen.getByRole("button", { name: "Move up" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Duplicate" })).toBeEnabled();
     fireEvent.change(screen.getByRole("textbox", { name: "Content" }), { target: { value: "Updated" } });
-    fireEvent.change(screen.getByRole("textbox", { name: "Tailwind classes" }), { target: { value: "text-lg" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Tailwind classes" }), { target: { value: "text-lg" } });
     expect(onControlChange).toHaveBeenCalledWith("children", "Updated");
     expect(onControlChange).toHaveBeenCalledWith("className", "text-lg");
     fireEvent.click(screen.getByRole("button", { name: "Body slot, empty" }));
@@ -69,10 +65,7 @@ describe("mobile item editor", () => {
           { id: "copy", label: "Label", kind: "text", prop: "label" },
         ]}
         controlValues={{ classes: "text-sm", label: "Target label" }}
-        preview={<span data-design-space-instance-id="label">Target label</span>}
         previewCss=""
-        rootInstanceId="root"
-        selectedInstanceId="label"
         slots={[]}
         compilePending={false}
         sourceBacked={false}
@@ -81,7 +74,6 @@ describe("mobile item editor", () => {
         canDuplicate={false}
         canDelete
         onControlChange={onControlChange}
-        onSelectComponent={vi.fn()}
         onMove={vi.fn()}
         onDuplicate={vi.fn()}
         onDelete={vi.fn()}
@@ -90,7 +82,7 @@ describe("mobile item editor", () => {
       />,
     );
     fireEvent.change(screen.getByRole("textbox", { name: "Label" }), { target: { value: "Renamed" } });
-    fireEvent.change(screen.getByRole("textbox", { name: "Classes" }), { target: { value: "text-lg" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Classes" }), { target: { value: "text-lg" } });
     expect(onControlChange).toHaveBeenCalledWith("label", "Renamed");
     expect(onControlChange).toHaveBeenCalledWith("classes", "text-lg");
   });

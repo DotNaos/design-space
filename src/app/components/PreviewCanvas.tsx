@@ -1,8 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minus, MousePointer2, Plus, RotateCcw } from "lucide-react";
 
 import type { StrictUiViolation } from "../../shared/strict-ui";
-import { fitCanvas, pinchCanvas, zoomCanvasAt, type CanvasCamera, type Point } from "../canvas-transform";
+import { fitCanvas, zoomCanvasAt, type CanvasCamera, type Point } from "../canvas-transform";
 import { indexPreviewDom, type PreviewDomSnapshot } from "../dom/dom-snapshot";
 import { StrictUiIndicator, strictUiOutlineTone } from "../strict-ui/StrictUiIndicator";
 import {
@@ -11,7 +10,28 @@ import {
   type StrictUiCanvasTarget,
 } from "../strict-ui/strict-ui-markers";
 import type { Selection, SlotState } from "../types";
+import {
+  canvasGridPresentation,
+  layoutEmptySlotOverlays,
+  measureCanvasSelector,
+  placeCanvasOverlayLabels,
+  sameSelection,
+  selectorForSelection,
+  selectorForStrictUiTarget,
+  strictUiBadgeObstacle,
+  type ViewRect,
+} from "./canvas-overlay-geometry";
+import {
+  actionForStrictUiTarget,
+  componentToEdit,
+  selectionForCanvasTarget,
+  type CanvasContextMenuRequest,
+} from "./canvas-target-selection";
+import { CanvasViewportControls } from "./CanvasViewportControls";
 import { useCanvasTrackpadGestures } from "./use-canvas-trackpad-gestures";
+import { useCanvasTouchGestures } from "./use-canvas-touch-gestures";
+
+export type { CanvasContextMenuRequest } from "./canvas-target-selection";
 
 type PreviewCanvasProps = {
   className?: string;
@@ -19,34 +39,22 @@ type PreviewCanvasProps = {
   rootInstanceId: string;
   selectedComponentInstanceId: string;
   selectionLabel: string;
-  slots: SlotState[];
+  slots: readonly SlotState[];
   selection: Selection;
+  hoveredSelection?: Selection;
   cameraKey?: string;
   strictUiViolations?: readonly StrictUiViolation[];
   compact?: boolean;
   onSelect: (selection: Selection) => void;
   onEditComponent?: (instanceId: string) => void;
+  onContextMenuRequest?: (request: CanvasContextMenuRequest) => void;
   onDomSnapshot?: (snapshot: PreviewDomSnapshot) => void;
 };
-
-type ViewRect = { left: number; top: number; width: number; height: number };
 type MeasuredStrictUiTarget = { target: StrictUiCanvasTarget; rect: ViewRect };
-type GestureStart = {
-  camera: CanvasCamera;
-  points: readonly Point[];
-  moved: boolean;
-};
-
 const worldWidth = 620;
-const worldGridStep = 20;
-const worldGridDotRadius = 1;
-const emptySlotMinimumHeight = 32;
-
 export function PreviewCanvas(props: PreviewCanvasProps) {
   const viewportRef = useRef<HTMLElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
-  const pointers = useRef(new Map<number, Point>());
-  const gesture = useRef<GestureStart | undefined>(undefined);
   const suppressClick = useRef(false);
   const cameraRef = useRef<CanvasCamera>({ x: 16, y: 56, scale: 1 });
   const lastCameraResetKey = useRef<string | undefined>(undefined);
@@ -55,9 +63,13 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const frame = useRef<number | undefined>(undefined);
   const [camera, setCameraState] = useState(cameraRef.current);
   const [selectionRect, setSelectionRect] = useState<ViewRect>();
+  const [hoveredRect, setHoveredRect] = useState<ViewRect>();
   const [emptyRects, setEmptyRects] = useState<Readonly<Record<string, ViewRect>>>({});
   const [strictUiRects, setStrictUiRects] = useState<readonly MeasuredStrictUiTarget[]>([]);
+  const [gridAnchor, setGridAnchor] = useState<Point>();
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showGestureHint, setShowGestureHint] = useState(true);
+  const [interactionMode, setInteractionMode] = useState<"select" | "interact">("select");
   const strictUiTargets = useMemo(
     () => buildStrictUiCanvasTargets(props.strictUiViolations ?? [], props.rootInstanceId),
     [props.rootInstanceId, props.strictUiViolations],
@@ -74,10 +86,22 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   }, []);
 
   useCanvasTrackpadGestures({
+    enabled: interactionMode === "select",
     viewportRef,
     cameraRef,
     setCamera,
     onInteraction: beginCameraInteraction,
+  });
+  const touchGestures = useCanvasTouchGestures({
+    viewportRef,
+    cameraRef,
+    suppressClick,
+    interactionMode,
+    slots: props.slots,
+    selectedComponentInstanceId: props.selectedComponentInstanceId,
+    setCamera,
+    onInteraction: beginCameraInteraction,
+    onContextMenuRequest: props.onContextMenuRequest,
   });
 
   const measure = useCallback(() => {
@@ -93,29 +117,32 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         props.onDomSnapshot(snapshot);
       }
     }
-    const selectedSelector = props.selection.kind === "component"
-      ? `[data-design-space-instance-id="${escapeAttribute(props.selection.id)}"]`
-      : props.selection.kind === "slot"
-        ? `[data-design-space-slot-id="${escapeAttribute(props.selection.id)}"]`
-        : props.selection.kind === "html"
-          ? `[data-design-space-html-id="${escapeAttribute(props.selection.id)}"]`
-        : props.selection.kind === "slot-outlet"
-          ? `[data-design-space-outlet-id="${escapeAttribute(props.selection.outletId)}"]`
-          : undefined;
-    setSelectionRect(selectedSelector ? measureSelector(world, selectedSelector, viewportRect) : undefined);
+    setViewportSize((current) => current.width === viewportRect.width && current.height === viewportRect.height
+      ? current
+      : { width: viewportRect.width, height: viewportRect.height });
+    const rootRect = measureCanvasSelector(world, selectorForSelection({ kind: "component", id: props.rootInstanceId }), viewportRect);
+    if (rootRect) {
+      setGridAnchor((current) => current?.x === rootRect.left && current.y === rootRect.top
+        ? current
+        : { x: rootRect.left, y: rootRect.top });
+    } else setGridAnchor((current) => current === undefined ? current : undefined);
+    setSelectionRect(measureCanvasSelector(world, selectorForSelection(props.selection), viewportRect));
+    setHoveredRect(props.hoveredSelection && !sameSelection(props.hoveredSelection, props.selection)
+      ? measureCanvasSelector(world, selectorForSelection(props.hoveredSelection), viewportRect)
+      : undefined);
     setEmptyRects(Object.fromEntries(props.slots.filter((slot) => slot.count === 0).flatMap((slot) => {
-      const rect = measureSelector(
+      const rect = measureCanvasSelector(
         world,
-        `[data-design-space-slot-id="${escapeAttribute(slot.selectionId)}"]`,
+        selectorForSelection({ kind: "slot", id: slot.selectionId, componentInstanceId: props.selectedComponentInstanceId, slotId: slot.id }),
         viewportRect,
       );
       return rect ? [[slot.selectionId, rect]] : [];
     })));
     setStrictUiRects(strictUiTargets.flatMap((target) => {
-      const rect = measureSelector(world, selectorForStrictUiTarget(target), viewportRect);
+      const rect = measureCanvasSelector(world, selectorForStrictUiTarget(target), viewportRect);
       return rect ? [{ target, rect }] : [];
     }));
-  }, [props.onDomSnapshot, props.rootInstanceId, props.selection, props.slots, strictUiTargets]);
+  }, [props.hoveredSelection, props.onDomSnapshot, props.rootInstanceId, props.selectedComponentInstanceId, props.selection, props.slots, strictUiTargets]);
 
   const scheduleMeasure = useCallback(() => {
     if (frame.current !== undefined) cancelAnimationFrame(frame.current);
@@ -166,15 +193,16 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     const resetKey = `${props.cameraKey}:${props.compact ? "compact" : "full"}`;
     if (lastCameraResetKey.current === resetKey) return;
     lastCameraResetKey.current = resetKey;
-    pointers.current.clear();
-    gesture.current = undefined;
+    touchGestures.resetTouchGestures();
     suppressClick.current = false;
     autoFit.current = true;
+    setGridAnchor(undefined);
     setShowGestureHint(true);
+    setInteractionMode("select");
     setCamera({ x: 16, y: props.compact ? 44 : 56, scale: 1 });
     fit();
     scheduleMeasure();
-  }, [fit, props.cameraKey, props.compact, scheduleMeasure, setCamera]);
+  }, [fit, props.cameraKey, props.compact, scheduleMeasure, setCamera, touchGestures.resetTouchGestures]);
 
   const reset = () => {
     const viewport = viewportRef.current;
@@ -195,56 +223,42 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     }));
   };
 
-  const rebaseGesture = () => {
-    gesture.current = {
-      camera: cameraRef.current,
-      points: [...pointers.current.values()],
-      moved: false,
-    };
-  };
-
-  const onPointerDown = (event: React.PointerEvent<HTMLElement>) => {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    autoFit.current = false;
-    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    rebaseGesture();
-    setShowGestureHint(false);
-  };
-
-  const onPointerMove = (event: React.PointerEvent<HTMLElement>) => {
-    if (!pointers.current.has(event.pointerId) || !gesture.current) return;
-    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    const current = [...pointers.current.values()];
-    const start = gesture.current;
-    if (current.length >= 2 && start.points.length >= 2) {
-      const startCentroid = midpoint(start.points[0], start.points[1]);
-      const currentCentroid = midpoint(current[0], current[1]);
-      const next = pinchCanvas(
-        start.camera,
-        startCentroid,
-        currentCentroid,
-        distance(start.points[0], start.points[1]),
-        distance(current[0], current[1]),
-      );
-      gesture.current.moved ||= distance(startCentroid, currentCentroid) > 3 || Math.abs(next.scale - start.camera.scale) > 0.01;
-      setCamera(next);
-      return;
-    }
-    if (current.length === 1 && start.points.length === 1) {
-      const dx = current[0].x - start.points[0].x;
-      const dy = current[0].y - start.points[0].y;
-      gesture.current.moved ||= Math.hypot(dx, dy) > 5;
-      if (gesture.current.moved) setCamera({ ...start.camera, x: start.camera.x + dx, y: start.camera.y + dy });
-    }
-  };
-
-  const finishPointer = (event: React.PointerEvent<HTMLElement>) => {
-    if (gesture.current?.moved) suppressClick.current = true;
-    pointers.current.delete(event.pointerId);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    rebaseGesture();
-  };
+  const grid = useMemo(
+    () => canvasGridPresentation(camera.scale, gridAnchor ?? { x: camera.x, y: camera.y }),
+    [camera.scale, camera.x, camera.y, gridAnchor],
+  );
+  const emptySlotOverlayRects = useMemo(() => layoutEmptySlotOverlays(
+    props.slots.filter((slot) => slot.count === 0).flatMap((slot) => {
+      const rect = emptyRects[slot.selectionId];
+      return rect ? [{ id: slot.selectionId, rect }] : [];
+    }),
+    camera.scale,
+  ), [camera.scale, emptyRects, props.slots]);
+  const overlayLabels = useMemo(() => placeCanvasOverlayLabels([
+    ...(selectionRect ? [{
+      id: "selection-label",
+      text: props.selectionLabel,
+      anchor: selectionRect,
+      placement: "selection" as const,
+    }] : []),
+    ...props.slots.filter((slot) => slot.count === 0 && props.selection.id !== slot.selectionId).flatMap((slot) => {
+      const rect = emptySlotOverlayRects[slot.selectionId];
+      return rect ? [{
+        id: `slot-label:${slot.selectionId}`,
+        text: `${slot.label} · empty`,
+        anchor: rect,
+        placement: "slot" as const,
+      }] : [];
+    }),
+  ], strictUiRects.map(({ rect }) => strictUiBadgeObstacle(rect)), viewportSize), [
+    emptySlotOverlayRects,
+    props.selection.id,
+    props.selectionLabel,
+    props.slots,
+    selectionRect,
+    strictUiRects,
+    viewportSize,
+  ]);
 
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
     if (suppressClick.current) {
@@ -253,65 +267,55 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       event.stopPropagation();
       return;
     }
-    const target = event.target instanceof Element ? event.target : undefined;
-    const slotElement = target?.closest<HTMLElement>("[data-design-space-slot-id]");
-    const slotId = slotElement?.dataset.designSpaceSlotId;
-    const slot = props.slots.find((item) => item.selectionId === slotId);
-    if (slot && slot.count === 0) {
-      props.onSelect({ kind: "slot", id: slot.selectionId, componentInstanceId: props.selectedComponentInstanceId, slotId: slot.id });
-      return;
+    const selection = selectionForCanvasTarget(
+      event.target instanceof Element ? event.target : undefined,
+      props.slots,
+      props.selectedComponentInstanceId,
+    );
+    if (selection) {
+      event.preventDefault();
+      event.stopPropagation();
+      props.onSelect(selection);
     }
-    const htmlId = target?.closest<HTMLElement>("[data-design-space-html-id]")?.dataset.designSpaceHtmlId;
-    if (htmlId) {
-      const parts = htmlId.split(":");
-      if (parts.length === 3) {
-        props.onSelect({
-          kind: "html",
-          id: htmlId,
-          componentInstanceId: decodeURIComponent(parts[1]),
-          nodeId: decodeURIComponent(parts[2]),
-        });
-        return;
-      }
-    }
-    const instanceId = target?.closest<HTMLElement>("[data-design-space-instance-id]")?.dataset.designSpaceInstanceId;
+  };
+
+  const onDoubleClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (!props.onEditComponent) return;
+    const selection = selectionForCanvasTarget(
+      event.target instanceof Element ? event.target : undefined,
+      props.slots,
+      props.selectedComponentInstanceId,
+    );
+    const instanceId = selection ? componentToEdit(selection) : undefined;
     if (!instanceId) return;
-    props.onSelect({ kind: "component", id: instanceId });
-    props.onEditComponent?.(instanceId);
+    event.preventDefault();
+    event.stopPropagation();
+    props.onEditComponent(instanceId);
+  };
+
+  const onContextMenu = (event: React.MouseEvent<HTMLElement>) => {
+    if (!props.onContextMenuRequest) return;
+    const selection = selectionForCanvasTarget(
+      event.target instanceof Element ? event.target : undefined,
+      props.slots,
+      props.selectedComponentInstanceId,
+    );
+    const viewport = viewportRef.current;
+    if (!selection || !viewport) return;
+    const rect = viewport.getBoundingClientRect();
+    event.preventDefault();
+    event.stopPropagation();
+    props.onContextMenuRequest({
+      selection,
+      clientPosition: { x: event.clientX, y: event.clientY },
+      viewportPosition: { x: event.clientX - rect.left, y: event.clientY - rect.top },
+    });
   };
 
   const selectStrictUiTarget = (target: StrictUiCanvasTarget) => {
-    const violation = target.marker.violations.find((candidate) => candidate.location.kind !== "document")
-      ?? target.marker.violations[0];
-    const location = violation?.location;
-    if (!location || location.kind === "document") {
-      props.onSelect({ kind: "component", id: props.rootInstanceId });
-      return;
-    }
-    if (location.kind === "instance" || location.kind === "control") {
-      props.onSelect({ kind: "component", id: location.instanceId });
-      props.onEditComponent?.(location.instanceId);
-      return;
-    }
-    if (location.kind === "slot") {
-      props.onSelect({
-        kind: "slot",
-        id: target.id,
-        componentInstanceId: location.instanceId,
-        slotId: location.slotId,
-      });
-      return;
-    }
-    if (location.outletId) {
-      props.onSelect({
-        kind: "slot-outlet",
-        id: `outlet:${location.outletId}`,
-        outletId: location.outletId,
-        slotId: location.slotId,
-      });
-      return;
-    }
-    props.onSelect({ kind: "component", id: props.rootInstanceId });
+    const action = actionForStrictUiTarget(target, props.rootInstanceId);
+    props.onSelect(action.selection);
+    if (action.editInstanceId) props.onEditComponent?.(action.editInstanceId);
   };
 
   return (
@@ -319,46 +323,51 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       ref={viewportRef}
       aria-label="Preview canvas"
       className={`${props.className ?? "flex"} relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[#0d0e10]`}
-      style={{ touchAction: "none", overscrollBehavior: "none" }}
-      onClick={onClick}
-      onPointerCancel={finishPointer}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={finishPointer}
+      style={{
+        touchAction: interactionMode === "select" ? "none" : "pan-x pan-y",
+        overscrollBehavior: interactionMode === "select" ? "none" : "contain",
+      }}
+      onClickCapture={interactionMode === "select" ? onClick : undefined}
+      onContextMenuCapture={interactionMode === "select" ? onContextMenu : undefined}
+      onDoubleClickCapture={interactionMode === "select" ? onDoubleClick : undefined}
+      onPointerCancel={touchGestures.finishPointer}
+      onPointerDown={touchGestures.onPointerDown}
+      onPointerMove={touchGestures.onPointerMove}
+      onPointerUp={touchGestures.finishPointer}
     >
       <div
-        className="pointer-events-none absolute inset-0 opacity-40"
+        className="pointer-events-none absolute inset-0"
+        data-dot-radius={grid.dotRadius}
         data-testid="canvas-grid"
+        data-world-step={grid.worldStep}
         style={{
-          backgroundImage: `radial-gradient(circle, #3f3f46 ${worldGridDotRadius * camera.scale}px, transparent ${worldGridDotRadius * camera.scale}px)`,
-          backgroundPosition: `${camera.x}px ${camera.y}px`,
-          backgroundSize: `${worldGridStep * camera.scale}px ${worldGridStep * camera.scale}px`,
+          backgroundImage: `radial-gradient(circle, #52525b ${grid.dotRadius}px, transparent ${grid.dotRadius}px)`,
+          backgroundPosition: `${grid.anchorX}px ${grid.anchorY}px`,
+          backgroundSize: `${grid.screenStep}px ${grid.screenStep}px`,
+          opacity: grid.opacity,
         }}
       />
 
-      {!props.compact && (
-        <div className="absolute left-3 top-3 z-20 grid size-11 place-items-center rounded-lg border border-indigo-300/30 bg-indigo-500 text-white shadow-xl lg:size-8">
-          <MousePointer2 size={15} />
-        </div>
-      )}
-      <div
-        className="absolute right-3 top-3 z-20 flex h-11 items-center rounded-lg border border-white/10 bg-[#17181b]/95 px-1 shadow-xl lg:h-8"
-        onPointerDown={(event) => event.stopPropagation()}
-        onPointerMove={(event) => event.stopPropagation()}
-        onPointerUp={(event) => event.stopPropagation()}
-      >
-        <button aria-label="Zoom out" className="grid size-9 place-items-center text-zinc-400 lg:size-7" type="button" onClick={(event) => { event.stopPropagation(); zoomBy(-0.1); }}><Minus size={14} /></button>
-        <span className="min-w-10 text-center text-[10px] tabular-nums text-zinc-300">{Math.round(camera.scale * 100)}%</span>
-        <button aria-label="Zoom in" className="grid size-9 place-items-center text-zinc-400 lg:size-7" type="button" onClick={(event) => { event.stopPropagation(); zoomBy(0.1); }}><Plus size={14} /></button>
-        <button aria-label="Fit canvas" className="grid h-9 min-w-11 place-items-center border-l border-white/10 px-2 text-[10px] text-zinc-300 lg:h-7" type="button" onClick={(event) => { event.stopPropagation(); suppressClick.current = false; autoFit.current = true; fit(); }}><span className="flex items-center gap-1"><Maximize2 size={12} /> Fit</span></button>
-        <button aria-label="Reset zoom to 100%" className="grid size-9 place-items-center border-l border-white/10 text-zinc-400 lg:size-7" type="button" onClick={(event) => { event.stopPropagation(); reset(); }}><RotateCcw size={13} /></button>
-      </div>
+      <CanvasViewportControls
+        compact={props.compact}
+        interactionMode={interactionMode}
+        scale={camera.scale}
+        onFit={() => {
+          suppressClick.current = false;
+          autoFit.current = true;
+          fit();
+        }}
+        onReset={reset}
+        onZoomIn={() => zoomBy(0.1)}
+        onZoomOut={() => zoomBy(-0.1)}
+        onToggleInteractionMode={() => setInteractionMode((current) => current === "select" ? "interact" : "select")}
+      />
 
       <div
         ref={worldRef}
         data-testid="canvas-world"
-        className="absolute left-0 top-0 w-[620px] will-change-transform"
-        style={{ transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.scale})`, transformOrigin: "0 0" }}
+        className="absolute left-0 top-0 w-[620px]"
+        style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`, transformOrigin: "0 0" }}
       >
         {props.preview}
       </div>
@@ -376,7 +385,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
           >
             <button
               aria-label={describeStrictUiMarker(target.marker)}
-              className="pointer-events-auto absolute -right-2 -top-2 grid size-10 place-items-center rounded-full outline-none ring-offset-2 ring-offset-[#0d0e10] focus-visible:ring-2 focus-visible:ring-indigo-300 lg:size-7"
+              className="pointer-events-auto absolute -right-2 -top-2 grid size-10 place-items-center rounded-full outline-none ring-offset-2 ring-offset-[#0d0e10] focus-visible:ring-2 focus-visible:ring-sky-300 lg:size-7"
               data-strict-ui-action={target.marker.key}
               type="button"
               onClick={(event) => {
@@ -394,79 +403,55 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         {selectionRect && (
           <div
             data-testid="selection-outline"
-            className="absolute border-2 border-indigo-400 shadow-[0_0_0_1px_rgba(13,14,16,0.7)]"
+            className="absolute border-2 border-sky-400 shadow-[0_0_0_1px_rgba(13,14,16,0.7)]"
             style={{ left: selectionRect.left, top: selectionRect.top, width: selectionRect.width, height: selectionRect.height }}
-          >
-            <span className="absolute -top-6 left-0 max-w-40 truncate rounded bg-indigo-500 px-1.5 py-1 text-[10px] font-medium text-white shadow-lg">{props.selectionLabel}</span>
-          </div>
+          />
+        )}
+        {hoveredRect && (
+          <div
+            aria-hidden="true"
+            data-testid="hover-outline"
+            className="absolute border border-dashed border-sky-300/80 bg-sky-300/[0.025]"
+            style={{ left: hoveredRect.left, top: hoveredRect.top, width: hoveredRect.width, height: Math.max(1, hoveredRect.height) }}
+          />
         )}
         {!props.compact && props.slots.filter((slot) => slot.count === 0).map((slot) => {
-          const rect = emptyRects[slot.selectionId];
+          const rect = emptySlotOverlayRects[slot.selectionId];
           if (!rect || props.selection.id === slot.selectionId) return null;
           return (
             <button
               key={slot.selectionId}
               aria-label={`Add to empty ${slot.label} slot`}
               className="pointer-events-auto absolute border border-dashed border-emerald-400/60 bg-emerald-400/[0.04] text-left"
-              style={{ left: rect.left, top: rect.top, width: rect.width, height: Math.max(emptySlotMinimumHeight * camera.scale, rect.height) }}
+              data-design-space-slot-id={slot.selectionId}
+              style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
               type="button"
-              onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation();
                 props.onSelect({ kind: "slot", id: slot.selectionId, componentInstanceId: props.selectedComponentInstanceId, slotId: slot.id });
               }}
-            >
-              <span className="absolute right-1 top-1 rounded bg-emerald-500 px-1.5 py-0.5 text-[9px] font-medium text-emerald-950">{slot.label} · empty</span>
-            </button>
+            />
           );
         })}
+        {overlayLabels.map((label) => (
+          <span
+            key={label.id}
+            aria-hidden="true"
+            className={`absolute truncate rounded px-1.5 py-1 text-[10px] font-medium shadow-lg ${label.placement === "selection" ? "bg-sky-500 text-white" : "bg-emerald-500 text-emerald-950"}`}
+            data-testid="canvas-overlay-label"
+            style={{ left: label.left, top: label.top, width: label.width, height: label.height }}
+          >
+            {label.text}
+          </span>
+        ))}
       </div>
 
       {showGestureHint && !props.compact && (
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-white/10 bg-[#17181b]/90 px-3 py-2 text-[10px] text-zinc-400 shadow-xl">Pinch to zoom · drag to pan</div>
+        <div data-design-space-gesture-hint className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-white/10 bg-[#17181b]/90 px-3 py-2 text-[10px] text-zinc-400 shadow-xl">
+          <span className="lg:hidden">Drag to pan · pinch to zoom</span>
+          <span className="hidden lg:inline">Trackpad scroll to pan · pinch to zoom</span>
+        </div>
       )}
     </main>
   );
-}
-
-function measureSelector(world: HTMLElement, selector: string, viewport: DOMRect): ViewRect | undefined {
-  const rects = [...world.querySelectorAll<HTMLElement>(selector)]
-    .filter((element) => element.isConnected)
-    .flatMap((element) => measurableRects(element))
-    .filter((rect) => rect.width > 0 || rect.height > 0);
-  if (!rects.length) return undefined;
-  const left = Math.min(...rects.map((rect) => rect.left));
-  const top = Math.min(...rects.map((rect) => rect.top));
-  const right = Math.max(...rects.map((rect) => rect.right));
-  const bottom = Math.max(...rects.map((rect) => rect.bottom));
-  return { left: left - viewport.left, top: top - viewport.top, width: right - left, height: bottom - top };
-}
-
-function measurableRects(element: HTMLElement): DOMRect[] {
-  const own = element.getBoundingClientRect();
-  if (own.width > 0 || own.height > 0) return [own];
-  return [...element.querySelectorAll<HTMLElement>("*")]
-    .map((child) => child.getBoundingClientRect())
-    .filter((rect) => rect.width > 0 || rect.height > 0);
-}
-
-function selectorForStrictUiTarget(target: StrictUiCanvasTarget): string {
-  const attribute = target.kind === "instance"
-    ? "data-design-space-instance-id"
-    : target.kind === "outlet"
-      ? "data-design-space-outlet-id"
-      : "data-design-space-slot-id";
-  return `[${attribute}="${escapeAttribute(target.id)}"]`;
-}
-
-function escapeAttribute(value: string): string {
-  return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
-}
-
-function midpoint(first: Point, second: Point): Point {
-  return { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 };
-}
-
-function distance(first: Point, second: Point): number {
-  return Math.hypot(second.x - first.x, second.y - first.y);
 }

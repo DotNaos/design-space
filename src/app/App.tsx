@@ -44,16 +44,16 @@ export function App() {
 }
 
 function LegacyWorkspace() {
-  const [showInternals, setShowInternals] = useState(false);
+  const [revealedInternals, setRevealedInternals] = useState<ReadonlySet<string>>(() => new Set());
   const [fixture, setFixture] = useState<ComponentFixture>(target.defaultFixture);
   const [fixtureUndoStack, setFixtureUndoStack] = useState<FixtureUndo[]>([]);
   const targetResult = useMemo<TargetResult>(() => {
     try {
-      return { view: createTargetViewModel(target, showInternals, fixture) } as const;
+      return { view: createTargetViewModel(target, revealedInternals, fixture) } as const;
     } catch (error) {
       return { error: error instanceof Error ? error.message : "The target adapter is invalid." } as const;
     }
-  }, [fixture, showInternals]);
+  }, [fixture, revealedInternals]);
   const initialClassName = getInitialClassName();
   const [editor, dispatch] = useReducer(editorReducer, createEditorState(initialClassName, initialVersion));
   const [connected, setConnected] = useState(false);
@@ -205,6 +205,19 @@ function LegacyWorkspace() {
   if (!targetResult.view) return <BlockedTarget message={targetResult.error ?? "The target adapter is invalid."} />;
 
   const { view } = targetResult;
+  const internalTreeIds = view.rows.flatMap((row) => (
+    row.kind === "component" && row.internalHtml ? [row.selection.id] : []
+  ));
+  const showInternals = internalTreeIds.length > 0 && internalTreeIds.every((id) => revealedInternals.has(id));
+  const toggleInternals = (componentInstanceId?: string) => setRevealedInternals((current) => {
+    if (componentInstanceId) {
+      const next = new Set(current);
+      if (next.has(componentInstanceId)) next.delete(componentInstanceId);
+      else next.add(componentInstanceId);
+      return next;
+    }
+    return showInternals ? new Set() : new Set(internalTreeIds);
+  });
   const selectedComponentInstanceId = selection.kind === "slot"
     ? selection.componentInstanceId
     : selection.kind === "component" ? selection.id : view.root.instanceId;
@@ -236,7 +249,7 @@ function LegacyWorkspace() {
   };
   const editable = connected && Boolean(editTargetId) && selectedInstance.instanceId === view.root.instanceId;
   const tailwindReady = previewValue === editor.draftValue;
-  const preview = renderTargetFixture(target, fixture, { className: editor.draftValue });
+  const preview = itemEditorController.model?.preview ?? renderTargetFixture(target, fixture, { className: editor.draftValue });
   const selectionLabel = selection.kind === "slot"
     ? slots.find((slot) => slot.id === selection.slotId)?.label ?? "Slot"
     : selectedAdapter.component.label;
@@ -309,7 +322,7 @@ function LegacyWorkspace() {
 
   return (
     <div className="flex h-dvh w-full min-w-0 flex-col overflow-hidden bg-[#0d0e10] text-zinc-200">
-      <style data-design-space-tailwind-preview>{`${previewCss}\n${Object.values(compositionCss).join("\n")}`}</style>
+      <style data-design-space-tailwind-preview>{itemEditorController.model?.previewCss ?? `${previewCss}\n${Object.values(compositionCss).join("\n")}`}</style>
       <TopBar
         targetLabel={target.project.label}
         connected={connected}
@@ -338,6 +351,7 @@ function LegacyWorkspace() {
           setFixture(target.defaultFixture);
           setFixtureUndoStack([]);
           setCompositionCss({});
+          setRevealedInternals(new Set());
           setSelection(initialSelection(safeInitialView()));
           setRuntimeMessage(undefined);
           setShowDiff(false);
@@ -352,14 +366,14 @@ function LegacyWorkspace() {
 
         {mobileMode !== "preview" && (
           <div className="flex min-h-0 min-w-0 flex-1 lg:hidden">
-            {mobileMode === "tree" && <ComponentTree className="flex w-full border-r-0" pageLabel={target.defaultFixture.label ?? target.project.label} rows={view.rows} selectedId={selection.id} showInternals={showInternals} onSelect={selectTarget} onToggleInternals={() => setShowInternals((value) => !value)} />}
+            {mobileMode === "tree" && <ComponentTree className="flex w-full border-r-0" pageLabel={target.defaultFixture.label ?? target.project.label} rows={view.rows} selectedId={selection.id} showInternals={showInternals} onSelect={selectTarget} onToggleInternals={toggleInternals} />}
             {mobileMode === "files" && <FileBrowser className="flex w-full border-r-0" files={target.files} selectedId={selectedFileId} onSelect={setSelectedFileId} />}
             {mobileMode === "catalog" && <CatalogPanel className="flex w-full border-r-0" entries={catalogEntries} selectedId={selectedCatalogId} onSelect={browseCatalogComponent} />}
             {mobileMode === "inspector" && <Inspector className="flex w-full border-l-0" {...inspectorProps} />}
           </div>
         )}
 
-        {workspaceMode === "tree" && <ComponentTree className="hidden w-64 lg:flex" pageLabel={target.defaultFixture.label ?? target.project.label} rows={view.rows} selectedId={selection.id} showInternals={showInternals} onSelect={selectTarget} onToggleInternals={() => setShowInternals((value) => !value)} />}
+        {workspaceMode === "tree" && <ComponentTree className="hidden w-64 lg:flex" pageLabel={target.defaultFixture.label ?? target.project.label} rows={view.rows} selectedId={selection.id} showInternals={showInternals} onSelect={selectTarget} onToggleInternals={toggleInternals} />}
         {workspaceMode === "files" && <FileBrowser className="hidden w-64 lg:flex" files={target.files} selectedId={selectedFileId} onSelect={setSelectedFileId} />}
         {(workspaceMode === "catalog" || workspaceMode === "search") && <CatalogPanel className="hidden w-64 lg:flex" entries={catalogEntries} selectedId={selectedCatalogId} onSelect={browseCatalogComponent} />}
         {workspaceMode === "inspector" && <Inspector className="hidden w-72 lg:flex xl:hidden" {...inspectorProps} />}
@@ -406,10 +420,7 @@ function LegacyWorkspace() {
           sourceLabel={target.files.find((file) => file.id === itemEditorController.model?.adapter.component.sourceFileId)?.label}
           controls={itemEditorController.model.adapter.controls ?? []}
           controlValues={itemEditorController.model.controlValues}
-          preview={itemEditorController.model.preview}
           previewCss={itemEditorController.model.previewCss}
-          rootInstanceId={itemEditorController.model.view.root.instanceId}
-          selectedInstanceId={itemEditorController.model.instance.instanceId}
           slots={itemEditorController.model.slots}
           compileError={itemEditorController.model.compileError}
           compilePending={itemEditorController.model.compilePending}
@@ -419,7 +430,6 @@ function LegacyWorkspace() {
           canDuplicate={itemEditorController.model.canDuplicate}
           canDelete={itemEditorController.model.canDelete}
           onControlChange={itemEditorController.updateControl}
-          onSelectComponent={itemEditorController.selectComponent}
           onSelectSlot={(slot) => {
             const instanceId = itemEditorController.model?.instance.instanceId;
             if (!instanceId) return;

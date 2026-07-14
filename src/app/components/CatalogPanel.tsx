@@ -44,8 +44,8 @@ export function CatalogPanel(props: { className?: string; entries: readonly Cata
               <ChevronDown size={12} className={collapsed.has(group) ? "-rotate-90" : ""} /> {group} <span className="ml-auto">{entries.length}</span>
             </button>
             {!collapsed.has(group) && entries.map((entry) => (
-              <button key={entry.id} aria-selected={props.selectedId === entry.id} className={`flex min-h-11 w-full items-center gap-2 px-5 text-left hover:bg-white/[0.03] lg:min-h-10 ${props.selectedId === entry.id ? "bg-indigo-500/10" : ""}`} type="button" onClick={() => props.onSelect(entry.id)}>
-                <Component size={13} className="text-indigo-400" />
+              <button key={entry.id} aria-selected={props.selectedId === entry.id} className={`flex min-h-11 w-full items-center gap-2 px-5 text-left hover:bg-white/[0.03] lg:min-h-10 ${props.selectedId === entry.id ? "bg-sky-500/10" : ""}`} type="button" onClick={() => props.onSelect(entry.id)}>
+                <Component size={13} className="text-sky-400" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs text-zinc-300">{entry.label}</span>
                   <span className="block truncate text-[9px] text-zinc-600">{entry.slotCount ? `${entry.slotCount} declared slots` : "No children"}</span>

@@ -26,3 +26,19 @@ it("routes only typed legacy and document operations to their isolated services"
   expect(editExecute).toHaveBeenCalledTimes(1);
   expect(documentExecute).toHaveBeenCalledTimes(3);
 });
+
+it("disposes the edit service once and rejects operations after shutdown", async () => {
+  const editDispose = vi.fn();
+  const service = new LocalOperationService(
+    { execute: vi.fn(), dispose: editDispose } as unknown as EditService,
+    { execute: vi.fn() } as unknown as DocumentService,
+  );
+
+  service.dispose();
+  service.dispose();
+
+  expect(editDispose).toHaveBeenCalledTimes(1);
+  await expect(service.execute({ type: "list-documents" })).rejects.toMatchObject({
+    code: "VALIDATION_ERROR",
+  });
+});

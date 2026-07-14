@@ -27,7 +27,7 @@ export function ComponentPropertyBindings(props: {
   return (
     <div className="space-y-3 border-t border-white/10 pt-4">
       <div className="flex items-start gap-2">
-        <Link2 aria-hidden="true" className="mt-0.5 shrink-0 text-indigo-400" size={13} />
+        <Link2 aria-hidden="true" className="mt-0.5 shrink-0 text-sky-400" size={13} />
         <div>
           <h4 className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-400">Implementation bindings</h4>
           <p className="mt-1 text-[10px] leading-4 text-zinc-600">Each public property controls exactly one compatible property in the component body.</p>
@@ -66,7 +66,7 @@ function PropertyBinding(props: {
       </span>
       <select
         aria-label={`Binding for ${props.property.label}`}
-        className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-zinc-200 outline-none focus:border-indigo-400"
+        className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-zinc-200 outline-none focus:border-sky-400"
         value={unavailable ? "__unavailable__" : currentIndex < 0 ? "" : String(currentIndex)}
         onChange={(event) => {
           const target = event.target.value === "" ? undefined : props.targets[Number(event.target.value)];
