@@ -18,8 +18,10 @@
     "dev:raw": "bun ./scripts/dev.ts --raw",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "bun run test:unit && bun run test:tailwind",
+    "test:unit": "vitest run --project server --project ui",
+    "test:tailwind": "vitest run --project tailwind-integration",
+    "test:watch": "vitest --project server --project ui",
     "verify": "bun run typecheck && bun run test && bun run build && bun run verify:local-only",
     "verify:local-only": "bun ./scripts/verify-local-only.ts"
   },

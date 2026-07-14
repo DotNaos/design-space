@@ -1,5 +1,7 @@
 import { defineConfig } from "vitest/config";
 
+const tailwindIntegrationTest = "src/server/tailwind-intelligence-official.integration.test.ts";
+
 export default defineConfig({
   test: {
     // Keep the real Tailwind language server responsive while the UI and
@@ -13,6 +15,7 @@ export default defineConfig({
           name: "server",
           environment: "node",
           include: ["src/server/**/*.test.ts"],
+          exclude: [tailwindIntegrationTest],
         },
       },
       {
@@ -22,6 +25,16 @@ export default defineConfig({
           environment: "jsdom",
           include: ["src/**/*.test.{ts,tsx}", "examples/**/*.test.{ts,tsx}"],
           exclude: ["src/server/**/*.test.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "tailwind-integration",
+          environment: "node",
+          include: [tailwindIntegrationTest],
+          fileParallelism: false,
+          maxWorkers: 1,
         },
       },
     ],
