@@ -29,6 +29,7 @@ function enforcedPortless(): Plugin {
 }
 
 export default defineConfig(async () => {
+  const serverPort = process.env.PORT ? Number(process.env.PORT) : 4173;
   const registeredTarget = await loadRegisteredProject(
     resolveServerProjectRoot(resolve(root, "examples/demo-target")),
   );
@@ -38,6 +39,7 @@ export default defineConfig(async () => {
   );
 
   return {
+    cacheDir: resolve(root, "node_modules/.vite-design-space", `port-${serverPort}`),
     resolve: { dedupe: ["react", "react-dom"] },
     plugins: [
       enforcedPortless(),
@@ -48,7 +50,7 @@ export default defineConfig(async () => {
     ],
     server: {
       host: "127.0.0.1",
-      port: process.env.PORT ? Number(process.env.PORT) : 4173,
+      port: serverPort,
       strictPort: true,
       fs: {
         strict: true,
