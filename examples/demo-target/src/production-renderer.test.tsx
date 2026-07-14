@@ -77,6 +77,22 @@ describe("target-owned production renderer", () => {
     expect(container.querySelector("article")?.className).not.toContain("rounded-3xl");
   });
 
+  it("preserves an explicitly null class as unstyled", () => {
+    const screenDocument: ProductionScreenDocument = {
+      id: "screen.null-class",
+      root: {
+        instanceId: "null.button",
+        adapterId: "button",
+        props: { className: null },
+        slots: {},
+      },
+    };
+
+    render(<>{renderProductionDocument(screenDocument, [])}</>);
+
+    expect(screen.getByRole("button", { name: "Continue" })).not.toHaveClass("rounded-lg", "bg-indigo-500");
+  });
+
   it("uses target adapter classes when a saved node omits className", () => {
     const screenDocument: ProductionScreenDocument = {
       id: "screen.defaults",

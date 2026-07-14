@@ -74,6 +74,26 @@ describe("editor lifecycle", () => {
     const edited = editorReducer(createEditorState("old", "v1"), { type: "edit", value: "new" });
     expect(editorReducer(edited, { type: "save-started", preparedEditId: "missing" })).toBe(edited);
   });
+
+  it("keeps a prepared diff retryable after saving fails", () => {
+    const edited = editorReducer(createEditorState("old", "v1"), { type: "edit", value: "new" });
+    const prepared = editorReducer(edited, {
+      type: "prepare-succeeded",
+      preparedEditId: "prepared-retry",
+      sourceVersion: "v1",
+      draftValue: "new",
+      exactDiff: "- old\n+ new",
+    });
+    const saving = editorReducer(prepared, { type: "save-started", preparedEditId: "prepared-retry" });
+    const failed = editorReducer(saving, { type: "save-failed", preparedEditId: "prepared-retry" });
+
+    expect(failed).toMatchObject({
+      phase: "diff-ready",
+      draftValue: "new",
+      preparedEdit: { id: "prepared-retry", exactDiff: "- old\n+ new" },
+    });
+    expect(editorReducer(failed, { type: "save-started", preparedEditId: "prepared-retry" }).phase).toBe("saving");
+  });
 });
 
 describe("source conflicts", () => {

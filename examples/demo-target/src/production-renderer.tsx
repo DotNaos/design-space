@@ -149,7 +149,7 @@ function renderTarget(
   slots: Readonly<Record<string, readonly ReactNode[]>>,
   key: string,
 ): ReactNode {
-  const className = stringValue(props.className, productionClassDefaults[node.adapterId] ?? "");
+  const className = classValue(props.className, productionClassDefaults[node.adapterId] ?? "");
   if (node.adapterId === "card") {
     return <Card key={key} className={className} header={slots.header} body={slots.body} footer={slots.footer} />;
   }
@@ -164,4 +164,9 @@ function renderTarget(
 
 function stringValue(value: ProductionValue | undefined, fallback: string): string {
   return typeof value === "string" ? value : fallback;
+}
+
+function classValue(value: ProductionValue | undefined, fallback: string): string {
+  if (value === undefined) return fallback;
+  return typeof value === "string" ? value : "";
 }

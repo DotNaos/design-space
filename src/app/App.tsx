@@ -170,6 +170,7 @@ function LegacyWorkspace() {
       setRuntimeMessage(undefined);
       window.setTimeout(() => dispatch({ type: "preview-ready" }), 900);
     } catch (error) {
+      dispatch({ type: "save-failed", preparedEditId });
       if (error instanceof LocalOperationError && error.code === "STALE_SOURCE") await readSource();
       setRuntimeMessage(messageFor(error));
     }

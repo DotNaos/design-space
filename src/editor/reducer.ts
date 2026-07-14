@@ -125,6 +125,9 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case "save-started":
       if (state.preparedEdit?.id !== action.preparedEditId) return state;
       return { ...state, phase: "saving" };
+    case "save-failed":
+      if (state.phase !== "saving" || state.preparedEdit?.id !== action.preparedEditId) return state;
+      return { ...state, phase: "diff-ready" };
     case "save-succeeded":
       if (state.preparedEdit?.id !== action.preparedEditId) return state;
       return {
