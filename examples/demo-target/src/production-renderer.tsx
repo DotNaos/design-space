@@ -26,6 +26,13 @@ export type ProductionComponentDocument = {
 };
 export type ProductionScreenDocument = { id: string; root: ProductionNode };
 
+interface ProductionTemplateContext {
+  component: ProductionComponentDocument;
+  publicValues: Readonly<Record<string, ProductionValue>>;
+  externalSlots: Readonly<Record<string, readonly ProductionChild[]>>;
+  externalContext?: ProductionTemplateContext;
+}
+
 const dashboard = dashboardSource as ProductionScreenDocument;
 const panel = panelSource as ProductionComponentDocument;
 const productionClassDefaults: Readonly<Record<string, string>> = {
@@ -59,7 +66,9 @@ function renderNode(
   components: ReadonlyMap<string, ProductionComponentDocument>,
   key: string = node.instanceId,
   authoredPath: readonly string[] = [],
+  templateContext?: ProductionTemplateContext,
 ): ReactNode {
+  const boundProps = resolveBoundProps(node, templateContext);
   const component = components.get(node.adapterId);
   if (component) {
     if (authoredPath.includes(node.adapterId)) {
@@ -70,65 +79,50 @@ function renderNode(
         property.defaultValue === undefined ? [] : [[property.prop, property.defaultValue]]
       ))),
       ...node.props,
+      ...boundProps,
+    };
+    const nextTemplateContext: ProductionTemplateContext = {
+      component,
+      publicValues: values,
+      externalSlots: node.slots,
+      externalContext: templateContext,
     };
     return (
       <div key={key} data-production-component={component.id} data-production-instance={node.instanceId}>
-        {renderTemplate(
+        {renderNode(
           component.root,
-          component,
-          values,
-          node.slots,
           components,
+          component.root.instanceId,
           [...authoredPath, node.adapterId],
+          nextTemplateContext,
         )}
       </div>
     );
   }
-  return renderTarget(node, node.props ?? {}, renderSlots(node.slots, components, authoredPath), key);
-}
-
-function renderTemplate(
-  node: ProductionNode,
-  component: ProductionComponentDocument,
-  publicValues: Readonly<Record<string, ProductionValue>>,
-  externalSlots: Readonly<Record<string, readonly ProductionChild[]>>,
-  components: ReadonlyMap<string, ProductionComponentDocument>,
-  authoredPath: readonly string[],
-): ReactNode {
-  const properties = new Map(component.component.properties.map((property) => [property.id, property]));
-  const bound = Object.fromEntries(Object.entries(node.propertyBindings ?? {}).flatMap(([targetProp, propertyId]) => {
-    const property = properties.get(propertyId);
-    const value = property ? publicValues[property.prop] : undefined;
-    return value === undefined ? [] : [[targetProp, value]];
-  }));
-  const props = { ...node.props, ...bound };
-  if (components.has(node.adapterId)) {
-    return renderNode({ ...node, props }, components, node.instanceId, authoredPath);
-  }
-  const slots = Object.fromEntries(Object.entries(node.slots).map(([slotId, children]) => [
-    slotId,
-    children.flatMap((child) => child.kind === "slot-outlet"
-      ? (externalSlots[child.slotId] ?? []).map((external, index) => renderChild(
-          external,
-          `${child.id}-${index}`,
-          components,
-          authoredPath,
-        ))
-      : [child.kind === "component"
-          ? renderTemplate(child.node, component, publicValues, externalSlots, components, authoredPath)
-          : renderChild(child, child.id, components, authoredPath)]),
-  ]));
-  return renderTarget(node, props, slots, node.instanceId);
+  const props = { ...node.props, ...boundProps };
+  return renderTarget(
+    node,
+    props,
+    renderSlots(node.slots, components, authoredPath, templateContext),
+    key,
+  );
 }
 
 function renderSlots(
   slots: Readonly<Record<string, readonly ProductionChild[]>>,
   components: ReadonlyMap<string, ProductionComponentDocument>,
   authoredPath: readonly string[],
+  templateContext?: ProductionTemplateContext,
 ): Readonly<Record<string, readonly ReactNode[]>> {
   return Object.fromEntries(Object.entries(slots).map(([slotId, children]) => [
     slotId,
-    children.map((child, index) => renderChild(child, `${slotId}-${index}`, components, authoredPath)),
+    children.flatMap((child, index) => renderChild(
+      child,
+      `${slotId}-${index}`,
+      components,
+      authoredPath,
+      templateContext,
+    )),
   ]));
 }
 
@@ -137,10 +131,34 @@ function renderChild(
   key: string,
   components: ReadonlyMap<string, ProductionComponentDocument>,
   authoredPath: readonly string[],
-): ReactNode {
-  if (child.kind === "text") return <span key={key}>{child.value}</span>;
-  if (child.kind === "slot-outlet") return null;
-  return renderNode(child.node, components, key, authoredPath);
+  templateContext?: ProductionTemplateContext,
+): ReactNode[] {
+  if (child.kind === "text") return [<span key={key}>{child.value}</span>];
+  if (child.kind === "slot-outlet") {
+    if (!templateContext) return [];
+    return (templateContext.externalSlots[child.slotId] ?? []).flatMap((external, index) => renderChild(
+      external,
+      `${key}-${index}`,
+      components,
+      authoredPath,
+      templateContext.externalContext,
+    ));
+  }
+  return [renderNode(child.node, components, key, authoredPath, templateContext)];
+}
+
+function resolveBoundProps(
+  node: ProductionNode,
+  context: ProductionTemplateContext | undefined,
+): Readonly<Record<string, ProductionValue>> {
+  if (!context) return {};
+  const properties = new Map(context.component.component.properties.map((property) => [property.id, property]));
+  return Object.fromEntries(Object.entries(node.propertyBindings ?? {}).flatMap(([targetProp, propertyId]) => {
+    const property = properties.get(propertyId);
+    if (!property) return [];
+    const value = context.publicValues[property.prop];
+    return value === undefined ? [] : [[targetProp, value]];
+  }));
 }
 
 function renderTarget(

@@ -28,4 +28,17 @@ describe("demo target adapter evidence", () => {
       expect(container.querySelector(`[data-design-space-html-id="html:review-card:${id}"]`)).toBeInTheDocument();
     }
   });
+
+  it("keeps an explicitly null Card class unstyled like the production renderer", () => {
+    const fixture: ComponentFixture = {
+      instanceId: "unstyled-card",
+      adapterId: "card",
+      props: { className: null },
+      slots: { header: [], body: [], footer: [] },
+    };
+
+    const { container } = render(<>{renderTargetFixture(target, fixture)}</>);
+
+    expect(container.querySelector("article")).not.toHaveClass("rounded-3xl", "bg-zinc-950");
+  });
 });

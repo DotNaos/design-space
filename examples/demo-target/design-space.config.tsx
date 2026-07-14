@@ -26,7 +26,7 @@ const adapters: ComponentAdapter[] = [
     defaultProps: { className: cardSourceClassName },
     render: (props, context) => (
       <Card
-        className={typeof props.className === "string" ? props.className : cardSourceClassName}
+        className={stringProp(props, "className", "")}
         header={context.slotChildren.header}
         body={context.slotChildren.body}
         footer={context.slotChildren.footer}

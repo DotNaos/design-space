@@ -61,6 +61,51 @@ describe("target-owned production renderer", () => {
     expect(screen.getByRole("heading", { name: "Nested authored component" })).toBeVisible();
   });
 
+  it("forwards a screen slot through nested authored components", () => {
+    const inner: ProductionComponentDocument = {
+      id: "component.inner",
+      component: {
+        id: "inner",
+        properties: [],
+      },
+      root: {
+        instanceId: "inner.stack",
+        adapterId: "stack",
+        slots: {
+          content: [{ kind: "slot-outlet", id: "inner.content.outlet", slotId: "content" }],
+        },
+      },
+    };
+    const outer: ProductionComponentDocument = {
+      id: "component.outer",
+      component: {
+        id: "outer",
+        properties: [],
+      },
+      root: {
+        instanceId: "outer.inner",
+        adapterId: "inner",
+        slots: {
+          content: [{ kind: "slot-outlet", id: "outer.content.outlet", slotId: "content" }],
+        },
+      },
+    };
+    const screenDocument: ProductionScreenDocument = {
+      id: "screen.forwarded-slot",
+      root: {
+        instanceId: "screen.outer",
+        adapterId: "outer",
+        slots: {
+          content: [{ kind: "text", id: "screen.forwarded-text", value: "Forwarded through both layers" }],
+        },
+      },
+    };
+
+    render(<>{renderProductionDocument(screenDocument, [outer, inner])}</>);
+
+    expect(screen.getByText("Forwarded through both layers")).toBeVisible();
+  });
+
   it("preserves explicit empty classes instead of restoring adapter defaults", () => {
     const screenDocument: ProductionScreenDocument = {
       id: "screen.unstyled-card",
@@ -81,16 +126,16 @@ describe("target-owned production renderer", () => {
     const screenDocument: ProductionScreenDocument = {
       id: "screen.null-class",
       root: {
-        instanceId: "null.button",
-        adapterId: "button",
+        instanceId: "null.card",
+        adapterId: "card",
         props: { className: null },
-        slots: {},
+        slots: { header: [], body: [], footer: [] },
       },
     };
 
-    render(<>{renderProductionDocument(screenDocument, [])}</>);
+    const { container } = render(<>{renderProductionDocument(screenDocument, [])}</>);
 
-    expect(screen.getByRole("button", { name: "Continue" })).not.toHaveClass("rounded-lg", "bg-indigo-500");
+    expect(container.querySelector("article")).not.toHaveClass("rounded-3xl", "bg-zinc-950");
   });
 
   it("uses target adapter classes when a saved node omits className", () => {
