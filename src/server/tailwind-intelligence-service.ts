@@ -36,8 +36,10 @@ const languageServerVersion = (() => {
 
 const maximumClassFieldLength = 10_000;
 const defaultRequestTimeoutMs = 10_000;
-// The first request also starts the official server and indexes the trusted target.
+// Keep cold requests bounded while the official server indexes the trusted target.
 const defaultColdStartTimeoutMs = 30_000;
+const projectInitializedNotification = "@/tailwindCSS/projectInitialized";
+const projectResetNotification = "@/tailwindCSS/projectReset";
 // The official server intentionally debounces document diagnostics by 500 ms.
 // Keep a small margin so one field analysis can return the matching result.
 const defaultDiagnosticWaitMs = 650;
@@ -185,7 +187,9 @@ export class TailwindIntelligenceService {
   #documentVersion = 0;
   #openDocumentUri?: string;
   #idleTimer?: ReturnType<typeof setTimeout>;
-  #connectionWarmed = false;
+  #projectReady = false;
+  #projectReadinessConnection?: LanguageServerConnection;
+  #stopProjectReadiness?: () => void;
   #disposed = false;
 
   constructor(target: RegisteredTarget, options: TailwindIntelligenceServiceOptions = {}) {
@@ -274,8 +278,7 @@ export class TailwindIntelligenceService {
           textDocument: { uri },
           position: { line: 0, character: tailwindWrapperPrefix.length + cursor },
           context: { triggerKind: 1 },
-        }, this.#connectionWarmed ? this.#requestTimeoutMs : this.#coldStartTimeoutMs);
-        this.#connectionWarmed = true;
+        }, this.#projectReady ? this.#requestTimeoutMs : this.#coldStartTimeoutMs);
         this.#throwIfDisposed();
         if (!hasDiagnosticCandidates(diagnosticPayload)) {
           // The official server deliberately debounces document validation.
@@ -314,6 +317,7 @@ export class TailwindIntelligenceService {
         this.#initializingConnection = connection;
         try {
           this.#throwIfDisposed();
+          this.#watchProjectReadiness(connection);
           const rootUri = pathToFileURL(this.#target.root).href;
           await connection.client.request("initialize", {
             processId: process.pid,
@@ -349,6 +353,7 @@ export class TailwindIntelligenceService {
           return connection;
         } catch (error) {
           if (this.#initializingConnection === connection) this.#initializingConnection = undefined;
+          this.#clearProjectReadiness(connection);
           this.#disposeConnection(connection);
           throw error;
         }
@@ -372,7 +377,7 @@ export class TailwindIntelligenceService {
     this.#connectionPromise = undefined;
     this.#initializingConnection = undefined;
     this.#openDocumentUri = undefined;
-    this.#connectionWarmed = false;
+    this.#clearProjectReadiness();
     if (initializingConnection) this.#disposeConnection(initializingConnection);
     if (connection) {
       void connection.then((resolvedConnection) => {
@@ -387,5 +392,28 @@ export class TailwindIntelligenceService {
     if (this.#disposedConnections.has(connection)) return;
     this.#disposedConnections.add(connection);
     connection.dispose();
+  }
+
+  #watchProjectReadiness(connection: LanguageServerConnection): void {
+    this.#clearProjectReadiness();
+    this.#projectReadinessConnection = connection;
+    const stopInitialized = connection.client.onNotification(projectInitializedNotification, () => {
+      if (this.#projectReadinessConnection === connection) this.#projectReady = true;
+    });
+    const stopReset = connection.client.onNotification(projectResetNotification, () => {
+      if (this.#projectReadinessConnection === connection) this.#projectReady = false;
+    });
+    this.#stopProjectReadiness = () => {
+      stopInitialized();
+      stopReset();
+    };
+  }
+
+  #clearProjectReadiness(connection?: LanguageServerConnection): void {
+    if (connection && this.#projectReadinessConnection !== connection) return;
+    this.#stopProjectReadiness?.();
+    this.#stopProjectReadiness = undefined;
+    this.#projectReadinessConnection = undefined;
+    this.#projectReady = false;
   }
 }

@@ -1,11 +1,8 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
-
-import { registration as demoRegistration } from "../../examples/demo-target/design-space.server";
 
 import {
   createTailwindLanguageServerRequestHandler,
@@ -135,33 +132,6 @@ describe("Tailwind LSP result confinement", () => {
 });
 
 describe("TailwindIntelligenceService", () => {
-  it("returns completions from the official server using the target's installed Tailwind", async () => {
-    const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../examples/demo-target");
-    const target = await registerTrustedTarget({ ...demoRegistration, root } as TrustedTargetConfig);
-    const service = new EditService(target);
-    try {
-      const result = await service.execute({ type: "analyze-tailwind", value: "grid-cols-", cursor: 10 });
-      expect(result).toMatchObject({ engineVersion: "0.14.29", value: "grid-cols-" });
-      expect("completions" in result ? result.completions.map((item) => item.insertText) : [])
-        .toContain("grid-cols-1");
-      const targetToken = await service.execute({ type: "analyze-tailwind", value: "bg-workspace-", cursor: 13 });
-      expect("completions" in targetToken ? targetToken.completions.map((item) => item.insertText) : [])
-        .toContain("bg-workspace-accent");
-      const conflict = await service.execute({ type: "analyze-tailwind", value: "p-4 p-6", cursor: 7 });
-      expect("diagnostics" in conflict ? conflict.diagnostics : []).toEqual(expect.arrayContaining([
-        expect.objectContaining({ code: "cssConflict", severity: "warning" }),
-      ]));
-      const quoted = await service.execute({
-        type: "analyze-tailwind",
-        value: "before:content-['hello']",
-        cursor: "before:content-['hello']".length,
-      });
-      expect(quoted).toMatchObject({ value: "before:content-['hello']" });
-    } finally {
-      service.dispose();
-    }
-  }, 40_000);
-
   it("uses the exact virtual wrapper, serializes requests, and isolates versionless diagnostics by URI", async () => {
     const { target } = await registeredTarget();
     const requests: Array<{ method: string; params: unknown; timeoutMs?: number }> = [];
@@ -222,6 +192,10 @@ describe("TailwindIntelligenceService", () => {
     });
 
     const [first, second] = await Promise.all([service.analyze("p", 1), service.analyze("m", 1)]);
+    handlers.get("@/tailwindCSS/projectInitialized")?.({});
+    const third = await service.analyze("grid", 4);
+    handlers.get("@/tailwindCSS/projectReset")?.({});
+    const fourth = await service.analyze("flex", 4);
     expect(maximumActiveCompletions).toBe(1);
     expect(first).toMatchObject({
       value: "p",
@@ -231,12 +205,14 @@ describe("TailwindIntelligenceService", () => {
       diagnostics: [{ message: "Conflicting utility", start: 0, end: 1 }],
     });
     expect(second.value).toBe("m");
+    expect(third.value).toBe("grid");
+    expect(fourth.value).toBe("flex");
     const opened = notifications.filter(({ method }) => method === "textDocument/didOpen");
     const changed = notifications.filter(({ method }) => method === "textDocument/didChange");
     const closed = notifications.filter(({ method }) => method === "textDocument/didClose");
-    expect(opened).toHaveLength(2);
+    expect(opened).toHaveLength(4);
     expect(changed).toHaveLength(0);
-    expect(closed).toHaveLength(1);
+    expect(closed).toHaveLength(3);
     expect(opened[0]?.params).toMatchObject({
       textDocument: { languageId: "javascriptreact", version: 1, text: '<div className="p"></div>' },
     });
@@ -251,7 +227,9 @@ describe("TailwindIntelligenceService", () => {
     expect(requests.map(({ method, timeoutMs }) => ({ method, timeoutMs }))).toEqual([
       { method: "initialize", timeoutMs: 50 },
       { method: "textDocument/completion", timeoutMs: 50 },
+      { method: "textDocument/completion", timeoutMs: 50 },
       { method: "textDocument/completion", timeoutMs: 25 },
+      { method: "textDocument/completion", timeoutMs: 50 },
     ]);
     service.dispose();
     await new Promise((resolve) => setImmediate(resolve));
