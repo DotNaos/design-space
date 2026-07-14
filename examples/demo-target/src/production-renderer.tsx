@@ -28,6 +28,15 @@ export type ProductionScreenDocument = { id: string; root: ProductionNode };
 
 const dashboard = dashboardSource as ProductionScreenDocument;
 const panel = panelSource as ProductionComponentDocument;
+const productionClassDefaults: Readonly<Record<string, string>> = {
+  card: cardSourceClassName,
+  stack: "flex flex-col items-start gap-3",
+  heading: "text-2xl font-semibold tracking-tight",
+  text: "max-w-md text-sm leading-6 text-zinc-400",
+  badge: "rounded-full bg-emerald-400/10 px-2 py-1 text-xs text-emerald-300",
+  button: "rounded-lg bg-indigo-500 px-3 py-2 text-xs font-medium text-white",
+  input: "rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm",
+};
 
 export function ProductionApp() {
   return (
@@ -140,14 +149,14 @@ function renderTarget(
   slots: Readonly<Record<string, readonly ReactNode[]>>,
   key: string,
 ): ReactNode {
-  const className = stringValue(props.className, "");
+  const className = stringValue(props.className, productionClassDefaults[node.adapterId] ?? "");
   if (node.adapterId === "card") {
-    return <Card key={key} className={className || cardSourceClassName} header={slots.header} body={slots.body} footer={slots.footer} />;
+    return <Card key={key} className={className} header={slots.header} body={slots.body} footer={slots.footer} />;
   }
-  if (node.adapterId === "stack") return <div key={key} className={className || "flex flex-col items-start gap-3"}>{slots.content}</div>;
-  if (node.adapterId === "heading") return <h2 key={key} className={className || "text-2xl font-semibold tracking-tight"}>{stringValue(props.children, "Quarterly planning")}</h2>;
-  if (node.adapterId === "text") return <p key={key} className={className || "max-w-md text-sm leading-6 text-zinc-400"}>{stringValue(props.children, "Align the product and engineering teams around a review-ready direction.")}</p>;
-  if (node.adapterId === "badge") return <span key={key} className={className || "rounded-full bg-emerald-400/10 px-2 py-1 text-xs text-emerald-300"}>{stringValue(props.children, "Ready")}</span>;
+  if (node.adapterId === "stack") return <div key={key} className={className}>{slots.content}</div>;
+  if (node.adapterId === "heading") return <h2 key={key} className={className}>{stringValue(props.children, "Quarterly planning")}</h2>;
+  if (node.adapterId === "text") return <p key={key} className={className}>{stringValue(props.children, "Align the product and engineering teams around a review-ready direction.")}</p>;
+  if (node.adapterId === "badge") return <span key={key} className={className}>{stringValue(props.children, "Ready")}</span>;
   if (node.adapterId === "button") return <button key={key} className={className} type="button">{stringValue(props.children, "Continue")}</button>;
   if (node.adapterId === "input") return <input key={key} className={className} placeholder="Project name" />;
   throw new Error(`Production adapter ${node.adapterId} is unavailable`);

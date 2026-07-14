@@ -60,4 +60,41 @@ describe("target-owned production renderer", () => {
 
     expect(screen.getByRole("heading", { name: "Nested authored component" })).toBeVisible();
   });
+
+  it("preserves explicit empty classes instead of restoring adapter defaults", () => {
+    const screenDocument: ProductionScreenDocument = {
+      id: "screen.unstyled-card",
+      root: {
+        instanceId: "unstyled.card",
+        adapterId: "card",
+        props: { className: "" },
+        slots: { header: [], body: [], footer: [] },
+      },
+    };
+
+    const { container } = render(<>{renderProductionDocument(screenDocument, [])}</>);
+
+    expect(container.querySelector("article")?.className).not.toContain("rounded-3xl");
+  });
+
+  it("uses target adapter classes when a saved node omits className", () => {
+    const screenDocument: ProductionScreenDocument = {
+      id: "screen.defaults",
+      root: {
+        instanceId: "defaults.stack",
+        adapterId: "stack",
+        slots: {
+          content: [
+            { kind: "component", node: { instanceId: "defaults.button", adapterId: "button", slots: {} } },
+            { kind: "component", node: { instanceId: "defaults.input", adapterId: "input", slots: {} } },
+          ],
+        },
+      },
+    };
+
+    render(<>{renderProductionDocument(screenDocument, [])}</>);
+
+    expect(screen.getByRole("button", { name: "Continue" })).toHaveClass("rounded-lg", "bg-indigo-500");
+    expect(screen.getByPlaceholderText("Project name")).toHaveClass("rounded-lg", "border", "bg-black/20");
+  });
 });
