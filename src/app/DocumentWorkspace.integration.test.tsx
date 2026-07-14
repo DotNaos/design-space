@@ -83,6 +83,18 @@ it("builds an empty authored slot on mobile, edits the item, saves, and reloads 
   expect(await screen.findByText("Written from mobile")).toBeInTheDocument();
 }, 15_000);
 
+it("opens a default component document in Library mode after loading", async () => {
+  installServer(() => screenDocument, () => undefined, () => undefined);
+  const componentTarget: TargetModule = { ...target, defaultDocumentId: panelDocument.id };
+
+  render(<DocumentWorkspace target={componentTarget} />);
+
+  expect(await screen.findByText("Components")).toBeVisible();
+  const projectBrowser = screen.getByRole("region", { name: "Project browser" });
+  expect(within(projectBrowser).getByRole("button", { name: "Panel" })).toHaveAttribute("aria-current", "page");
+  expect(screen.queryByText("Screens")).not.toBeInTheDocument();
+});
+
 function installServer(
   currentScreen: () => DesignDocument,
   onPrepare: (document: DesignDocument) => void,

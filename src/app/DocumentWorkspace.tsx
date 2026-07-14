@@ -119,12 +119,13 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     onSelect: setSelection,
   });
   useEffect(() => {
+    setMode(document.kind === "component" ? "library" : "app");
     setSelection({ kind: "component", id: document.root.instanceId });
     setSelectedCatalogId(document.component?.id);
     setDefinitionEditor(true);
     setObservedDom({});
     itemEditor.close();
-  }, [document.id, document.root.instanceId, sourceSnapshotKey]);
+  }, [document.id, document.kind, document.root.instanceId, sourceSnapshotKey]);
   useEffect(() => {
     if (!pendingEditId || !findDesignNode(document.root, pendingEditId)) return;
     itemEditor.open(pendingEditId);

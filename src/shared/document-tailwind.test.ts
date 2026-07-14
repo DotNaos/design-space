@@ -141,3 +141,40 @@ it("passes an outer authored binding through a nested authored component templat
 
   expect(collectDocumentTailwind(target, [outer, inner], screen.root)).toBe("bg-cyan-500 p-4");
 });
+
+it("keeps implementation and adapter Tailwind when an optional binding is unset", () => {
+  const panel = (className?: string): DesignDocument => ({
+    schemaVersion: 2,
+    id: "component.optional-panel",
+    label: "Optional panel",
+    kind: "component",
+    component: {
+      id: "optional-panel",
+      label: "Optional panel",
+      group: "Custom",
+      properties: [{ id: "surface", label: "Surface", prop: "surface", kind: "tailwind" }],
+      slots: [],
+    },
+    root: {
+      instanceId: "optional-panel.root",
+      adapterId: "stack",
+      ...(className ? { props: { className } } : {}),
+      propertyBindings: { className: "surface" },
+      slots: { content: [] },
+    },
+  });
+  const screen: DesignDocument = {
+    schemaVersion: 2,
+    id: "screen.optional-panel",
+    label: "Optional panel",
+    kind: "screen",
+    root: { instanceId: "optional-panel.instance", adapterId: "optional-panel", slots: {} },
+  };
+  const targetWithDefault: TargetModule = {
+    ...target,
+    adapters: target.adapters.map((adapter) => ({ ...adapter, defaultProps: { className: "p-4" } })),
+  };
+
+  expect(collectDocumentTailwind(targetWithDefault, [panel("rounded-xl")], screen.root)).toBe("rounded-xl");
+  expect(collectDocumentTailwind(targetWithDefault, [panel()], screen.root)).toBe("p-4");
+});

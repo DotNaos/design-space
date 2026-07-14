@@ -99,6 +99,8 @@ function resolveBindings(
   const properties = new Map(template.definition.component.properties.map((property) => [property.id, property]));
   return Object.fromEntries(Object.entries(node.propertyBindings ?? {}).flatMap(([targetProp, propertyId]) => {
     const property = properties.get(propertyId);
-    return property ? [[targetProp, template.publicValues[property.prop]]] : [];
+    if (!property) return [];
+    const value = template.publicValues[property.prop];
+    return value === undefined ? [] : [[targetProp, value]];
   }));
 }
