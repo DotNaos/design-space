@@ -11,6 +11,7 @@ import {
   type StrictUiCanvasTarget,
 } from "../strict-ui/strict-ui-markers";
 import type { Selection, SlotState } from "../types";
+import { useCanvasTrackpadGestures } from "./use-canvas-trackpad-gestures";
 
 type PreviewCanvasProps = {
   className?: string;
@@ -37,6 +38,9 @@ type GestureStart = {
 };
 
 const worldWidth = 620;
+const worldGridStep = 20;
+const worldGridDotRadius = 1;
+const emptySlotMinimumHeight = 32;
 
 export function PreviewCanvas(props: PreviewCanvasProps) {
   const viewportRef = useRef<HTMLElement>(null);
@@ -63,6 +67,18 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     cameraRef.current = next;
     setCameraState(next);
   }, []);
+
+  const beginCameraInteraction = useCallback(() => {
+    autoFit.current = false;
+    setShowGestureHint(false);
+  }, []);
+
+  useCanvasTrackpadGestures({
+    viewportRef,
+    cameraRef,
+    setCamera,
+    onInteraction: beginCameraInteraction,
+  });
 
   const measure = useCallback(() => {
     const viewport = viewportRef.current;
@@ -303,24 +319,22 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       ref={viewportRef}
       aria-label="Preview canvas"
       className={`${props.className ?? "flex"} relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[#0d0e10]`}
-      style={{ touchAction: "none" }}
+      style={{ touchAction: "none", overscrollBehavior: "none" }}
       onClick={onClick}
       onPointerCancel={finishPointer}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={finishPointer}
-      onWheel={(event) => {
-        event.preventDefault();
-        setShowGestureHint(false);
-        const rect = viewportRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-        autoFit.current = false;
-        if (event.ctrlKey || event.metaKey) setCamera(zoomCanvasAt(cameraRef.current, cameraRef.current.scale * Math.exp(-event.deltaY * 0.01), anchor));
-        else setCamera({ ...cameraRef.current, x: cameraRef.current.x - event.deltaX, y: cameraRef.current.y - event.deltaY });
-      }}
     >
-      <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: "radial-gradient(circle, #3f3f46 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-40"
+        data-testid="canvas-grid"
+        style={{
+          backgroundImage: `radial-gradient(circle, #3f3f46 ${worldGridDotRadius * camera.scale}px, transparent ${worldGridDotRadius * camera.scale}px)`,
+          backgroundPosition: `${camera.x}px ${camera.y}px`,
+          backgroundSize: `${worldGridStep * camera.scale}px ${worldGridStep * camera.scale}px`,
+        }}
+      />
 
       {!props.compact && (
         <div className="absolute left-3 top-3 z-20 grid size-11 place-items-center rounded-lg border border-indigo-300/30 bg-indigo-500 text-white shadow-xl lg:size-8">
@@ -394,7 +408,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
               key={slot.selectionId}
               aria-label={`Add to empty ${slot.label} slot`}
               className="pointer-events-auto absolute border border-dashed border-emerald-400/60 bg-emerald-400/[0.04] text-left"
-              style={{ left: rect.left, top: rect.top, width: rect.width, height: Math.max(32, rect.height) }}
+              style={{ left: rect.left, top: rect.top, width: rect.width, height: Math.max(emptySlotMinimumHeight * camera.scale, rect.height) }}
               type="button"
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {

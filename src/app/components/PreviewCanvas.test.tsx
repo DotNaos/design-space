@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PreviewCanvas } from "./PreviewCanvas";
@@ -260,6 +260,122 @@ describe("preview canvas", () => {
     expect(screen.getByTestId("canvas-world").style.transform).not.toBe(beforePan);
   });
 
+  it("scales and pans the dot grid with the canvas world", () => {
+    render(
+      <PreviewCanvas
+        compact
+        preview={<div data-design-space-instance-id="one">One</div>}
+        rootInstanceId="one"
+        selectedComponentInstanceId="one"
+        selection={{ kind: "component", id: "one" }}
+        selectionLabel="One"
+        slots={[]}
+        onSelect={() => undefined}
+      />,
+    );
+
+    const grid = screen.getByTestId("canvas-grid");
+    expect(grid.style.backgroundSize).toBe("20px 20px");
+    expect(grid.style.backgroundImage).toContain("1px");
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+
+    expect(grid.style.backgroundSize).toBe("22px 22px");
+    expect(grid.style.backgroundImage).toContain("1.1px");
+    expect(grid.style.backgroundPosition).not.toBe("16px 56px");
+  });
+
+  it("scales an empty slot's minimum height with the canvas instead of the viewport", async () => {
+    render(
+      <PreviewCanvas
+        preview={(
+          <div data-design-space-instance-id="root">
+            <div data-design-space-slot-id="slot:root:footer" />
+          </div>
+        )}
+        rootInstanceId="root"
+        selectedComponentInstanceId="root"
+        selection={{ kind: "component", id: "root" }}
+        selectionLabel="Root"
+        slots={[{ id: "footer", selectionId: "slot:root:footer", label: "Footer", count: 0 }]}
+        onSelect={() => undefined}
+      />,
+    );
+    const canvas = screen.getByRole("main", { name: "Preview canvas" });
+    const slot = canvas.querySelector<HTMLElement>('[data-design-space-slot-id="slot:root:footer"]')!;
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(rect(10, 20, 390, 300));
+    vi.spyOn(slot, "getBoundingClientRect").mockReturnValue(rect(42, 68, 180, 0));
+
+    fireEvent(window, new Event("resize"));
+    const placeholder = await screen.findByRole("button", { name: "Add to empty Footer slot" });
+    expect(placeholder).toHaveStyle({ height: "32px" });
+
+    for (let step = 0; step < 5; step += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
+    }
+
+    expect(canvasScale()).toBeCloseTo(0.5);
+    expect(Number.parseFloat(placeholder.style.height)).toBeCloseTo(16);
+  });
+
+  it("cancels browser wheel zoom and applies it to the canvas", () => {
+    render(
+      <PreviewCanvas
+        compact
+        preview={<div data-design-space-instance-id="one">One</div>}
+        rootInstanceId="one"
+        selectedComponentInstanceId="one"
+        selection={{ kind: "component", id: "one" }}
+        selectionLabel="One"
+        slots={[]}
+        onSelect={() => undefined}
+      />,
+    );
+    const canvas = screen.getByRole("main", { name: "Preview canvas" });
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(rect(0, 0, 400, 300));
+    const wheel = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 200,
+      clientY: 150,
+      ctrlKey: true,
+      deltaY: -10,
+    });
+
+    act(() => canvas.dispatchEvent(wheel));
+
+    expect(wheel.defaultPrevented).toBe(true);
+    expect(canvasScale()).toBeCloseTo(Math.exp(0.1));
+  });
+
+  it("cancels Safari trackpad gestures and applies their scale to the canvas", () => {
+    render(
+      <PreviewCanvas
+        compact
+        preview={<div data-design-space-instance-id="one">One</div>}
+        rootInstanceId="one"
+        selectedComponentInstanceId="one"
+        selection={{ kind: "component", id: "one" }}
+        selectionLabel="One"
+        slots={[]}
+        onSelect={() => undefined}
+      />,
+    );
+    const canvas = screen.getByRole("main", { name: "Preview canvas" });
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(rect(0, 0, 400, 300));
+    const start = gestureEvent("gesturestart", 1, 200, 150);
+    const change = gestureEvent("gesturechange", 2, 200, 150);
+
+    act(() => {
+      canvas.dispatchEvent(start);
+      canvas.dispatchEvent(change);
+    });
+
+    expect(start.defaultPrevented).toBe(true);
+    expect(change.defaultPrevented).toBe(true);
+    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(2)");
+  });
+
   it("measures descendants of a display-contents adapter anchor", async () => {
     render(
       <PreviewCanvas
@@ -333,4 +449,20 @@ function dispatchPointer(target: Element, type: string, pointerId: number, clien
     pointerType: { value: "touch" },
   });
   fireEvent(target, event);
+}
+
+function gestureEvent(type: string, scale: number, clientX: number, clientY: number): Event {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperties(event, {
+    scale: { value: scale },
+    clientX: { value: clientX },
+    clientY: { value: clientY },
+  });
+  return event;
+}
+
+function canvasScale(): number {
+  const match = screen.getByTestId("canvas-world").style.transform.match(/scale\(([^)]+)\)/);
+  if (!match) throw new Error("Canvas transform does not contain a scale");
+  return Number(match[1]);
 }
