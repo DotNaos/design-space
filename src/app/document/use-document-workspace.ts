@@ -26,6 +26,7 @@ import {
   type DocumentSessionAction,
   type DocumentSessionState,
 } from "./document-session";
+import { createRefreshScheduler } from "./refresh-scheduler";
 
 export interface DocumentWorkspaceController {
   activeDocumentId?: string;
@@ -56,7 +57,7 @@ export function useDocumentWorkspace(target: TargetModule): DocumentWorkspaceCon
   const [activeDocumentId, setActiveDocumentId] = useState(target.defaultDocumentId ?? initialEntries[0]?.id);
   const [sessions, setSessions] = useState<Readonly<Record<string, DocumentSessionState>>>({});
   const sessionsRef = useRef<Readonly<Record<string, DocumentSessionState>>>({});
-  const refreshQueue = useRef<Promise<void>>(Promise.resolve());
+  const workspaceGeneration = useRef(0);
   const checkSequence = useRef(0);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -110,12 +111,15 @@ export function useDocumentWorkspace(target: TargetModule): DocumentWorkspaceCon
   }, [target.project.id]);
 
   const runRefresh = useCallback(async () => {
+    const generation = workspaceGeneration.current;
     try {
       const nextCatalog = await runLocalOperation<DocumentCatalog>({ type: "list-documents" });
+      if (generation !== workspaceGeneration.current) return;
       const snapshots = await Promise.all(nextCatalog.documents.map((entry) => runLocalOperation<DocumentSnapshot>({
         type: "read-document",
         documentId: entry.id,
       })));
+      if (generation !== workspaceGeneration.current) return;
       setCatalog(nextCatalog);
       const nextSessions = Object.fromEntries(snapshots.map((snapshot) => [
         snapshot.documentId,
@@ -129,29 +133,35 @@ export function useDocumentWorkspace(target: TargetModule): DocumentWorkspaceCon
       setConnected(true);
       setMessage(nextCatalog.documents.length ? undefined : "No documents yet · create one from a registered recipe.");
     } catch (error) {
+      if (generation !== workspaceGeneration.current) return;
       setConnected(false);
       setMessage(errorMessage(error));
     } finally {
-      setLoading(false);
+      if (generation === workspaceGeneration.current) setLoading(false);
     }
   }, [loadSnapshot, target.defaultDocumentId]);
 
-  const refresh = useCallback((): Promise<void> => {
-    const next = refreshQueue.current.then(runRefresh, runRefresh);
-    refreshQueue.current = next;
-    return next;
-  }, [runRefresh]);
+  const runRefreshRef = useRef(runRefresh);
+  runRefreshRef.current = runRefresh;
+  const refreshScheduler = useMemo(
+    () => createRefreshScheduler(() => runRefreshRef.current()),
+    [target.project.id],
+  );
+  const refresh = useCallback(() => refreshScheduler.request(), [refreshScheduler]);
 
   useEffect(() => {
+    refreshScheduler.activate();
     void refresh();
     const onFocus = () => void refresh();
     const timer = window.setInterval(() => void refresh(), 2_000);
     window.addEventListener("focus", onFocus);
     return () => {
+      workspaceGeneration.current += 1;
+      refreshScheduler.dispose();
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
     };
-  }, [refresh]);
+  }, [refresh, refreshScheduler]);
 
   const prepare = useCallback(async () => {
     if (!activeDocumentId || !active || !connected || active.phase === "stale" || !isDocumentDirty(active)) return undefined;

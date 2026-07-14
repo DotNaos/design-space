@@ -49,7 +49,7 @@ describe("useDocumentWorkspace managed creation", () => {
     expect(runLocalOperationMock).toHaveBeenCalledWith({ type: "read-document", documentId: "component.managed" });
   });
 
-  it("serializes overlapping refreshes so an older snapshot cannot replace a newer one", async () => {
+  it("coalesces overlapping refreshes so an older snapshot cannot replace a newer one", async () => {
     const catalog = documentCatalog([homeDocument]);
     const delayed = deferred<DocumentSnapshot>();
     const newer = { ...homeDocument, label: "Newer source" };
@@ -69,15 +69,16 @@ describe("useDocumentWorkspace managed creation", () => {
     const { result } = renderHook(() => useDocumentWorkspace(target));
     await waitFor(() => expect(result.current.connected).toBe(true));
     let first!: Promise<void>;
-    let second!: Promise<void>;
+    let queued!: Promise<void>[];
     act(() => {
       first = result.current.refresh();
-      second = result.current.refresh();
+      queued = Array.from({ length: 40 }, () => result.current.refresh());
     });
     await waitFor(() => expect(readCalls).toBe(2));
     expect(readCalls).toBe(2);
+    expect(new Set(queued).size).toBe(1);
     delayed.resolve(snapshot(homeDocument, "1"));
-    await act(async () => Promise.all([first, second]));
+    await act(async () => Promise.all([first, ...queued]));
 
     expect(readCalls).toBe(3);
     expect(result.current.session?.draft.label).toBe("Newer source");
@@ -115,6 +116,68 @@ describe("useDocumentWorkspace managed creation", () => {
     expect(result.current.connected).toBe(true);
     expect(result.current.message).toBeUndefined();
     expect(result.current.session?.draft.label).toBe("Recovered");
+  });
+
+  it("drops a queued refresh when the workspace unmounts", async () => {
+    const catalog = documentCatalog([homeDocument]);
+    const delayed = deferred<DocumentSnapshot>();
+    let readCalls = 0;
+    runLocalOperationMock.mockImplementation(async (operation) => {
+      const request = operation as DocumentOperation;
+      if (request.type === "list-documents") return catalog as never;
+      if (request.type === "read-document") {
+        readCalls += 1;
+        return (readCalls === 1 ? snapshot(homeDocument, "1") : delayed.promise) as never;
+      }
+      throw new Error(`Unexpected operation ${request.type}`);
+    });
+
+    const { result, unmount } = renderHook(() => useDocumentWorkspace(target));
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    let active!: Promise<void>;
+    let queued!: Promise<void>;
+    act(() => {
+      active = result.current.refresh();
+      queued = result.current.refresh();
+    });
+    await waitFor(() => expect(readCalls).toBe(2));
+
+    unmount();
+    delayed.resolve(snapshot(homeDocument, "2"));
+    await Promise.all([active, queued]);
+    await Promise.resolve();
+
+    expect(readCalls).toBe(2);
+  });
+
+  it("does not fan out document reads after a delayed catalog resolves post-unmount", async () => {
+    const catalog = documentCatalog([homeDocument]);
+    const delayedCatalog = deferred<DocumentCatalog>();
+    let listCalls = 0;
+    let readCalls = 0;
+    runLocalOperationMock.mockImplementation(async (operation) => {
+      const request = operation as DocumentOperation;
+      if (request.type === "list-documents") {
+        listCalls += 1;
+        return (listCalls === 1 ? catalog : delayedCatalog.promise) as never;
+      }
+      if (request.type === "read-document") {
+        readCalls += 1;
+        return snapshot(homeDocument, "1") as never;
+      }
+      throw new Error(`Unexpected operation ${request.type}`);
+    });
+
+    const { result, unmount } = renderHook(() => useDocumentWorkspace(target));
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    const refresh = result.current.refresh();
+    await waitFor(() => expect(listCalls).toBe(2));
+
+    unmount();
+    delayedCatalog.resolve(catalog);
+    await refresh;
+
+    expect(readCalls).toBe(1);
   });
 
   it("discards a delayed prepare result after the document changes again", async () => {
