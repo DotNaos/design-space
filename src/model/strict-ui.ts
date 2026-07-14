@@ -1,5 +1,11 @@
 import type { ComponentControl, ComponentDescriptor } from "../shared/contracts";
-import type { ComponentPropertyDraft, DesignComponentNode, DesignDocument, DesignSlotOutletNode } from "../shared/design-document";
+import type {
+  ComponentPropertyDraft,
+  ComponentSlotDraft,
+  DesignComponentNode,
+  DesignDocument,
+  DesignSlotOutletNode,
+} from "../shared/design-document";
 import type { StrictUiLocation, StrictUiViolation } from "../shared/strict-ui";
 import type { ComponentAdapter, TargetModule } from "../shared/target-module";
 
@@ -20,7 +26,8 @@ export function validateStrictUi(
   const violations: StrictUiViolation[] = [];
   const nodeIds = new Set<string>();
   const outlets: DesignSlotOutletNode[] = [];
-  visitNode(target, library, document.root, nodeIds, outlets, violations);
+  const publicSlots = new Map(document.component?.slots.map((slot) => [slot.id, slot]) ?? []);
+  visitNode(target, library, document.root, nodeIds, outlets, publicSlots, violations);
   validateOutlets(document, outlets, violations);
   validatePropertyBindings(target, document, library, violations);
   if (hasAuthoredComponentCycle(document, library)) {
@@ -118,6 +125,7 @@ function visitNode(
   node: DesignComponentNode,
   nodeIds: Set<string>,
   outlets: DesignSlotOutletNode[],
+  publicSlots: ReadonlyMap<string, ComponentSlotDraft>,
   violations: StrictUiViolation[],
 ): void {
   if (nodeIds.has(node.instanceId)) {
@@ -150,7 +158,7 @@ function visitNode(
       violations.push(issue("slot.missing", `${slot.label} must be represented, even when empty.`, slotLocation(node.instanceId, slot.id)));
       continue;
     }
-    validateSlot(target, library, node, slot, children, nodeIds, outlets, violations);
+    validateSlot(target, library, node, slot, children, nodeIds, outlets, publicSlots, violations);
   }
 }
 
@@ -215,13 +223,15 @@ function validateSlot(
   children: DesignComponentNode["slots"][string],
   nodeIds: Set<string>,
   outlets: DesignSlotOutletNode[],
+  publicSlots: ReadonlyMap<string, ComponentSlotDraft>,
   violations: StrictUiViolation[],
 ): void {
   const location = slotLocation(node.instanceId, slot.id);
-  if (children.length < (slot.min ?? 0)) {
+  const cardinality = projectedCardinality(children, publicSlots);
+  if (cardinality && cardinality.minimum < (slot.min ?? 0)) {
     violations.push(issue("slot.minimum", `${slot.label} requires at least ${slot.min} item${slot.min === 1 ? "" : "s"}.`, location));
   }
-  if (slot.max !== undefined && children.length > slot.max) {
+  if (slot.max !== undefined && cardinality && (cardinality.maximum === undefined || cardinality.maximum > slot.max)) {
     violations.push(issue("slot.maximum", `${slot.label} allows at most ${slot.max} item${slot.max === 1 ? "" : "s"}.`, location));
   }
 
@@ -234,12 +244,65 @@ function validateSlot(
     if (child.kind === "slot-outlet") {
       registerChildId(child.id, { kind: "slot-outlet", slotId: child.slotId, outletId: child.id }, nodeIds, violations);
       outlets.push(child);
+      const publicSlot = publicSlots.get(child.slotId);
+      if (publicSlot) validateOutletContract(slot, publicSlot, child, violations);
       continue;
     }
     if (slot.accepts && !slot.accepts.includes(child.node.adapterId)) {
       violations.push(issue("slot.child", `${slot.label} does not accept ${child.node.adapterId}.`, location));
     }
-    visitNode(target, library, child.node, nodeIds, outlets, violations);
+    visitNode(target, library, child.node, nodeIds, outlets, publicSlots, violations);
+  }
+}
+
+function projectedCardinality(
+  children: DesignComponentNode["slots"][string],
+  publicSlots: ReadonlyMap<string, ComponentSlotDraft>,
+): { minimum: number; maximum: number | undefined } | undefined {
+  let minimum = 0;
+  let maximum: number | undefined = 0;
+  for (const child of children) {
+    if (child.kind !== "slot-outlet") {
+      minimum += 1;
+      if (maximum !== undefined) maximum += 1;
+      continue;
+    }
+    const publicSlot = publicSlots.get(child.slotId);
+    if (!publicSlot) return undefined;
+    minimum += publicSlot.min ?? 0;
+    if (maximum !== undefined) {
+      maximum = publicSlot.max === undefined ? undefined : maximum + publicSlot.max;
+    }
+  }
+  return { minimum, maximum };
+}
+
+function validateOutletContract(
+  containingSlot: StrictSlot,
+  publicSlot: ComponentSlotDraft,
+  outlet: DesignSlotOutletNode,
+  violations: StrictUiViolation[],
+): void {
+  const location: StrictUiLocation = { kind: "slot-outlet", slotId: outlet.slotId, outletId: outlet.id };
+  if (containingSlot.accepts !== undefined) {
+    const unsupported = publicSlot.accepts === undefined
+      ? undefined
+      : publicSlot.accepts.filter((adapterId) => !containingSlot.accepts?.includes(adapterId));
+    if (unsupported === undefined || unsupported.length > 0) {
+      const detail = unsupported === undefined
+        ? "unrestricted components"
+        : unsupported.length === 1
+          ? unsupported[0]
+          : `${unsupported[0]} and ${unsupported.length - 1} more component types`;
+      violations.push(issue(
+        "outlet.child",
+        `${publicSlot.label} allows ${detail}, which ${containingSlot.label} does not accept.`,
+        location,
+      ));
+    }
+  }
+  if (containingSlot.acceptsText === false && publicSlot.acceptsText !== false) {
+    violations.push(issue("outlet.text", `${publicSlot.label} allows text, which ${containingSlot.label} does not accept.`, location));
   }
 }
 

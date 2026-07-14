@@ -173,6 +173,183 @@ describe("core Strict UI validation", () => {
         location: { kind: "slot-outlet", slotId: "body" },
       }),
     ]));
+
+  });
+
+  it("requires a public slot outlet to fit its containing slot contract", () => {
+    const authored: DesignDocument = {
+      schemaVersion: 2,
+      id: "component.unsafe-panel",
+      label: "Unsafe panel",
+      kind: "component",
+      component: {
+        id: "unsafe-panel",
+        label: "Unsafe panel",
+        group: "Surfaces",
+        properties: [],
+        slots: [{ id: "body", label: "Public body", min: 0, max: 3, accepts: ["text", "button"] }],
+      },
+      root: {
+        instanceId: "unsafe-panel.root",
+        adapterId: "card",
+        props: { title: "Panel" },
+        slots: { body: [{ kind: "slot-outlet", id: "unsafe-panel.outlet", slotId: "body" }] },
+      },
+    };
+
+    expect(validateStrictUi(target, authored)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "slot.minimum" }),
+      expect.objectContaining({ ruleId: "slot.maximum" }),
+      expect.objectContaining({
+        ruleId: "outlet.child",
+        location: { kind: "slot-outlet", slotId: "body", outletId: "unsafe-panel.outlet" },
+      }),
+    ]));
+
+    const manyUnsupported: DesignDocument = {
+      ...authored,
+      component: {
+        ...authored.component!,
+        slots: [{
+          ...authored.component!.slots[0],
+          accepts: Array.from({ length: 100 }, (_, index) => `unsupported-${index}-${"x".repeat(64)}`),
+        }],
+      },
+    };
+    const boundedMessage = validateStrictUi(target, manyUnsupported)
+      .find((violation) => violation.ruleId === "outlet.child")?.message;
+    expect(boundedMessage).toBeDefined();
+    expect(boundedMessage!.length).toBeLessThanOrEqual(500);
+  });
+
+  it("accepts a public slot whose projected children fit the containing slot", () => {
+    const targetWithPairSlot: TargetModule = {
+      ...target,
+      adapters: target.adapters.map((adapter) => adapter.component.id === "card"
+        ? {
+            ...adapter,
+            component: {
+              ...adapter.component,
+              slots: adapter.component.slots.map((slot) => ({ ...slot, min: 2, max: 2 })),
+            },
+          }
+        : adapter),
+    };
+    const authored: DesignDocument = {
+      schemaVersion: 2,
+      id: "component.safe-panel",
+      label: "Safe panel",
+      kind: "component",
+      component: {
+        id: "safe-panel",
+        label: "Safe panel",
+        group: "Surfaces",
+        properties: [],
+        slots: [{ id: "body", label: "Public body", min: 2, max: 2, accepts: ["text"] }],
+      },
+      root: {
+        instanceId: "safe-panel.root",
+        adapterId: "card",
+        props: { title: "Panel" },
+        slots: { body: [{ kind: "slot-outlet", id: "safe-panel.outlet", slotId: "body" }] },
+      },
+    };
+
+    expect(validateStrictUi(targetWithPairSlot, authored)).toEqual([]);
+  });
+
+  it("aggregates fixed children and multiple outlet ranges", () => {
+    const targetWithPairSlot: TargetModule = {
+      ...target,
+      adapters: target.adapters.map((adapter) => adapter.component.id === "card"
+        ? {
+            ...adapter,
+            component: {
+              ...adapter.component,
+              slots: adapter.component.slots.map((slot) => ({ ...slot, min: 2, max: 2 })),
+            },
+          }
+        : adapter),
+    };
+    const authored: DesignDocument = {
+      schemaVersion: 2,
+      id: "component.aggregate-panel",
+      label: "Aggregate panel",
+      kind: "component",
+      component: {
+        id: "aggregate-panel",
+        label: "Aggregate panel",
+        group: "Surfaces",
+        properties: [],
+        slots: [
+          { id: "primary", label: "Primary", min: 1, max: 1, accepts: ["text"] },
+          { id: "secondary", label: "Secondary", min: 0, max: 1, accepts: [], acceptsText: true },
+        ],
+      },
+      root: {
+        instanceId: "aggregate-panel.root",
+        adapterId: "card",
+        props: { title: "Panel" },
+        slots: {
+          body: [
+            { kind: "component", node: { instanceId: "aggregate-panel.fixed", adapterId: "text", slots: {} } },
+            { kind: "slot-outlet", id: "aggregate-panel.primary", slotId: "primary" },
+            { kind: "slot-outlet", id: "aggregate-panel.secondary", slotId: "secondary" },
+          ],
+        },
+      },
+    };
+
+    expect(validateStrictUi(targetWithPairSlot, authored)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "slot.maximum" }),
+    ]));
+  });
+
+  it("blocks public text projection into a slot that forbids text", () => {
+    const targetWithoutText: TargetModule = {
+      ...target,
+      adapters: target.adapters.map((adapter) => adapter.component.id === "card"
+        ? {
+            ...adapter,
+            component: {
+              ...adapter.component,
+              slots: adapter.component.slots.map((slot) => ({ ...slot, acceptsText: false })),
+            },
+          }
+        : adapter),
+    };
+    const authored: DesignDocument = {
+      schemaVersion: 2,
+      id: "component.text-panel",
+      label: "Text panel",
+      kind: "component",
+      component: {
+        id: "text-panel",
+        label: "Text panel",
+        group: "Surfaces",
+        properties: [],
+        slots: [{ id: "body", label: "Public body", min: 1, max: 1, accepts: ["text"] }],
+      },
+      root: {
+        instanceId: "text-panel.root",
+        adapterId: "card",
+        props: { title: "Panel" },
+        slots: { body: [{ kind: "slot-outlet", id: "text-panel.outlet", slotId: "body" }] },
+      },
+    };
+
+    expect(validateStrictUi(targetWithoutText, authored)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "outlet.text" }),
+    ]));
+
+    const textSafe: DesignDocument = {
+      ...authored,
+      component: {
+        ...authored.component!,
+        slots: authored.component!.slots.map((slot) => ({ ...slot, acceptsText: false })),
+      },
+    };
+    expect(validateStrictUi(targetWithoutText, textSafe)).toEqual([]);
   });
 
   it("validates authored components inserted into screens through their public contracts", () => {
