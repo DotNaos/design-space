@@ -23,7 +23,7 @@ Status legend: `[ ]` queued, `[-]` active, `[x]` verified, `[!]` blocked on a de
 
 - [x] **UX-001 — Baseline UX audit.** Capture the current laptop and 390×844 flows, including panel layout, direct selection, slot selection, picker, diff, Tailwind editing, zoom extremes, and footer/status presentation. Record concrete problems rather than generic polish notes.
 - [x] **UX-002 — Coordinate repository ownership.** Confirm no active Design Space or Component Lab task owns the same files. Keep the inactive DotNaos/ui worktree and shared `/Users/oli/projects/ui` checkout read-only.
-- [-] **UX-003 — Produce and select A/B/C directions.** Create three compact mockup directions grounded in the current product. Each direction must show the laptop workspace and the mobile preview-plus-drawer pattern. Generated controls are directional, not literal requirements. Wait for the user's selection before broad UI implementation.
+- [x] **UX-003 — Produce and select A/B/C directions.** Create three compact mockup directions grounded in the current product. Each direction must show the laptop workspace and the mobile preview-plus-drawer pattern. Generated controls are directional, not literal requirements. Wait for the user's selection before broad UI implementation.
 - [x] **UX-004 — Component Lab reference audit.** Inspect its canvas, gesture, grid, selection, and overlay behavior read-only. Record the exact reusable ideas and the parts intentionally replaced.
 - [ ] **UX-005 — Interaction state model.** Define Select, Hover, Insert, Interact, Context Menu, Panel Editing, Draft, Diff, Stale, and Blocked states so that canvas clicks and keyboard commands cannot trigger ambiguous behavior.
 
@@ -70,7 +70,7 @@ Status legend: `[ ]` queued, `[-]` active, `[x]` verified, `[!]` blocked on a de
 ## 5. Tailwind code editor and language intelligence
 
 - [ ] **UX-050 — Official Tailwind intelligence spike.** Prove how the official Tailwind language service can run locally against the server-registered target configuration/theme without browser-supplied executable paths, commands, or module paths.
-- [ ] **UX-051 — Proper Tailwind editor.** Add a focused code-editor surface with keyboard navigation, selection, multi-line editing where useful, completion UI, Tab completion, and mobile-safe text entry.
+- [ ] **UX-051 — Single-field Tailwind editor.** Add exactly one focused Tailwind class field, not a component source-code view. It may render committed classes as chips outside the typing surface, but editing remains one compact VS-Code-like input with keyboard navigation, completion UI, Tab acceptance, and mobile-safe text entry.
 - [ ] **UX-052 — Target-aware completion.** Complete utilities, variants, arbitrary values, target theme tokens, and registered custom classes from the actual opened project rather than a hardcoded Design Space list.
 - [ ] **UX-053 — Official diagnostics/lint.** Surface unknown utilities, conflicting classes, malformed arbitrary values, and language-service diagnostics with positions and explanations comparable to VS Code.
 - [ ] **UX-054 — Preview and recovery integration.** Debounce language-service and Tailwind compilation work, keep the last valid preview during errors, prevent invalid Apply/Save, and recover without closing the editor.
@@ -136,7 +136,15 @@ Read-only Component Lab findings from `/Users/oli/projects/ui`:
 - Reuse the editor configuration seam from `apps/component-lab/src/source/sourceEditorConfig.ts`, but replace its read-only/minimal language setup with target-aware official Tailwind intelligence.
 - Intentionally do not copy Component Lab's grab-first pointer layer, viewport-relative overlay labels, crowded DevTools presentation, or its fixed-radius dot SVG. Design Space needs trackpad-first navigation, collision-aware overlays, explicit composition commands, and world-consistent grid rendering.
 
+## Chosen product direction
+
+- The user delegated the final visual choice after reviewing the A/B/C sheet. Use **Canvas First** as the structural base and incorporate the useful **Workbench** actions where they improve editing.
+- The canvas remains the dominant surface. The left side is one contextual, resizable workspace; the right side is one stable, contextual tool surface.
+- Tailwind editing is not a full source-code panel. It is one compact class field with the official IntelliSense experience: completion, Tab acceptance, diagnostics, project-aware configuration, and automatic adoption of supported official language-service updates.
+- The exact automatic-update mechanism must preserve the local-only trust model: Design Space may update its own pinned/approved tooling, but it must not execute a browser-supplied package, path, command, or arbitrary VS Code extension installation.
+
 ## Progress log
 
 - **2026-07-14:** Captured the full request as stable work items. Coordination found no overlapping active Design Space or Component Lab task.
 - **2026-07-14:** Completed the current laptop/mobile baseline audit and read-only Component Lab reference audit. The exact reuse and intentional replacement boundaries are recorded above. Broad UI implementation remains gated on the user's `UX-003` choice.
+- **2026-07-14:** The user delegated the visual choice. Locked Canvas First plus restrained Workbench actions, and narrowed Tailwind to one IntelliSense-enabled class field rather than a source-code screen. The design gate is complete.
