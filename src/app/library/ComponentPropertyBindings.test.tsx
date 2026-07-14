@@ -9,6 +9,7 @@ afterEach(cleanup);
 
 describe("ComponentPropertyBindings", () => {
   it("offers only compatible implementation controls and stores or clears a stable property binding", async () => {
+    const user = userEvent.setup();
     const onChange = vi.fn();
     const document: DesignDocument = {
       schemaVersion: 2,
@@ -40,10 +41,12 @@ describe("ComponentPropertyBindings", () => {
       />,
     );
 
-    const select = screen.getByRole("combobox", { name: "Binding for Title" });
-    expect(select).toHaveTextContent("Heading · Content");
-    expect(select).not.toHaveTextContent("Heading · Surface");
-    await userEvent.selectOptions(select, "0");
+    const trigger = screen.getByRole("button", { name: /Binding for Title/ });
+    expect(trigger).toHaveTextContent("Not bound");
+    await user.click(trigger);
+    expect(screen.getByRole("option", { name: "Heading · Content" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Heading · Surface" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "Heading · Content" }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
       root: expect.objectContaining({ propertyBindings: { children: "title" } }),
     }));
@@ -64,13 +67,15 @@ describe("ComponentPropertyBindings", () => {
         onChange={onChange}
       />,
     );
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Binding for Title" }), "");
+    await user.click(screen.getByRole("button", { name: /Binding for Title/ }));
+    await user.click(screen.getByRole("option", { name: "Not bound" }));
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
       root: expect.not.objectContaining({ propertyBindings: expect.anything() }),
     }));
   });
 
   it("shows and clears a binding whose target is no longer compatible", async () => {
+    const user = userEvent.setup();
     const onChange = vi.fn();
     const document: DesignDocument = {
       schemaVersion: 2,
@@ -107,10 +112,11 @@ describe("ComponentPropertyBindings", () => {
       />,
     );
 
-    const select = screen.getByRole("combobox", { name: "Binding for Title" });
-    expect(select).toHaveValue("__unavailable__");
-    expect(select).toHaveTextContent("Unavailable binding");
-    await userEvent.selectOptions(select, "");
+    const trigger = screen.getByRole("button", { name: /Binding for Title/ });
+    expect(trigger).toHaveTextContent("Unavailable binding");
+    await user.click(trigger);
+    expect(screen.getByRole("option", { name: "Unavailable binding" })).toHaveAttribute("aria-disabled", "true");
+    await user.click(screen.getByRole("option", { name: "Not bound" }));
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
       root: expect.not.objectContaining({ propertyBindings: expect.anything() }),
     }));

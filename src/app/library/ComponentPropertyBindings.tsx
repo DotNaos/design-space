@@ -2,6 +2,7 @@ import { Link2 } from "lucide-react";
 
 import type { ComponentControl } from "../../shared/contracts";
 import type { ComponentPropertyDraft, DesignComponentNode, DesignDocument } from "../../shared/design-document";
+import { EditorSelectField } from "../components/EditorSelectField";
 import { bindComponentProperty } from "../document/document-commands";
 import type { AcceptedComponentOption } from "./ComponentSlotEditor";
 
@@ -59,30 +60,36 @@ function PropertyBinding(props: {
     : -1;
   const unavailable = Boolean(current && currentIndex < 0);
   return (
-    <label className="block text-[10px] text-zinc-500">
-      <span className="flex items-center justify-between gap-2">
-        <span className="truncate">{props.property.label}</span>
-        <code className="truncate font-mono text-[9px] text-zinc-700">{props.property.prop}</code>
-      </span>
-      <select
-        aria-label={`Binding for ${props.property.label}`}
-        className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-zinc-200 outline-none focus:border-sky-400"
+    <div>
+      <EditorSelectField
+        ariaLabel={`Binding for ${props.property.label}`}
+        label={(
+          <span className="flex items-center justify-between gap-2">
+            <span className="truncate">{props.property.label}</span>
+            <code className="truncate font-mono text-[9px] text-zinc-700">{props.property.prop}</code>
+          </span>
+        )}
+        options={[
+          { id: "unbound", value: "", label: "Not bound" },
+          ...(unavailable ? [{ id: "unavailable", value: "__unavailable__", label: "Unavailable binding", disabled: true }] : []),
+          ...props.targets.map((target, index) => ({
+            id: `target-${index}`,
+            value: String(index),
+            label: target.label,
+          })),
+        ]}
         value={unavailable ? "__unavailable__" : currentIndex < 0 ? "" : String(currentIndex)}
-        onChange={(event) => {
-          const target = event.target.value === "" ? undefined : props.targets[Number(event.target.value)];
+        onChange={(value) => {
+          const target = value === "" ? undefined : props.targets[Number(value)];
           props.onChange(bindComponentProperty(
             props.document,
             props.property.id,
             target ? { instanceId: target.instanceId, prop: target.prop } : undefined,
           ));
         }}
-      >
-        <option value="">Not bound</option>
-        {unavailable && <option disabled value="__unavailable__">Unavailable binding</option>}
-        {props.targets.map((target, index) => <option key={`${target.instanceId}:${target.prop}`} value={index}>{target.label}</option>)}
-      </select>
+      />
       {!props.targets.length && <span className="mt-1 block leading-4 text-amber-300/80">No compatible implementation property is available yet.</span>}
-    </label>
+    </div>
   );
 }
 

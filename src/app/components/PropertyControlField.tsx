@@ -1,9 +1,10 @@
-import { Input, Label, ListBox, Select, Switch, TextField } from "@heroui/react";
-import { Check, Minus, Plus } from "lucide-react";
+import { Input, Label, Switch, TextField } from "@heroui/react";
+import { Minus, Plus } from "lucide-react";
 
 import type { ComponentControl } from "../../shared/contracts";
 import type { DesignValue } from "../../shared/design-document";
 import { TailwindClassField } from "../inspector/TailwindClassField";
+import { EditorSelectField } from "./EditorSelectField";
 
 export function PropertyControlField(props: {
   control: ComponentControl;
@@ -63,21 +64,16 @@ export function PropertyControlField(props: {
   if (control.kind === "select") {
     const selected = control.options.find((option) => option.value === props.value);
     return (
-      <Select fullWidth aria-label={control.label} selectedKey={selected?.id ?? null} onSelectionChange={(key) => {
-        const option = control.options.find((candidate) => candidate.id === key);
-        if (option) props.onChange(option.value);
-      }}>
-        <Label className="text-[10px] text-zinc-500">{control.label}</Label>
-        <Select.Trigger className="mt-1 flex min-h-11 w-full items-center rounded-lg border border-white/10 bg-black/20 px-3 text-base text-zinc-200 lg:text-sm">
-          <Select.Value className="min-w-0 flex-1 text-left" />
-          <Select.Indicator className="size-4 text-zinc-500" />
-        </Select.Trigger>
-        <Select.Popover className="min-w-48 rounded-xl border border-white/10 bg-[#18191c] p-1 shadow-2xl">
-          <ListBox items={control.options}>
-            {(option) => <ListBox.Item id={option.id} textValue={option.label} className="flex min-h-10 items-center rounded-lg px-3 text-sm text-zinc-300 data-[focused]:bg-white/10"><span className="flex-1">{option.label}</span>{selected?.id === option.id && <Check size={14} />}</ListBox.Item>}
-          </ListBox>
-        </Select.Popover>
-      </Select>
+      <EditorSelectField
+        ariaLabel={control.label}
+        label={control.label}
+        options={control.options.map((option) => ({ id: option.id, label: option.label, value: option.id }))}
+        value={selected?.id ?? ""}
+        onChange={(id) => {
+          const option = control.options.find((candidate) => candidate.id === id);
+          if (option) props.onChange(option.value);
+        }}
+      />
     );
   }
   const value = typeof props.value === "string" ? props.value : "";

@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { replaceTailwindUtilityGroup, TailwindMappedControls } from "./TailwindMappedControls";
@@ -10,11 +11,15 @@ it("replaces only the selected Tailwind utility group", () => {
     .toBe("flex p-4 text-sm flex-col");
 });
 
-it("emits Tailwind classes from visual inspector controls", () => {
+it("emits Tailwind classes from visual inspector controls", async () => {
+  const user = userEvent.setup();
   const onChange = vi.fn();
   render(<TailwindMappedControls value="flex p-4 px-8 sm:p-6 rounded-lg" onChange={onChange} />);
 
-  fireEvent.change(screen.getByRole("combobox", { name: "Padding Tailwind utility" }), { target: { value: "p-6" } });
+  const trigger = screen.getByRole("button", { name: /Padding Tailwind utility/ });
+  expect(trigger).toHaveTextContent("p-4");
+  await user.click(trigger);
+  await user.click(screen.getByRole("option", { name: "p-6" }));
 
   expect(onChange).toHaveBeenCalledWith("flex rounded-lg p-6");
 });

@@ -1,5 +1,7 @@
 import { Input, Label, Switch, TextArea, TextField } from "@heroui/react";
 
+import { EditorSelectField } from "../components/EditorSelectField";
+
 const inputClassName = "mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-base text-zinc-200 outline-none placeholder:text-zinc-700 lg:text-sm";
 
 export function StableIdField(props: { id: string }) {
@@ -115,16 +117,12 @@ export function ContractSelect(props: {
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="block text-[10px] text-zinc-500">
-      {props.label}
-      <select
-        aria-label={props.label}
-        className={`${inputClassName} appearance-none`}
-        value={props.value}
-        onChange={(event) => props.onChange(event.currentTarget.value)}
-      >
-        {props.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
+    <EditorSelectField
+      ariaLabel={props.label}
+      label={props.label}
+      options={props.options.map((option, index) => ({ id: `option-${index}`, ...option }))}
+      value={props.value}
+      onChange={props.onChange}
+    />
   );
 }

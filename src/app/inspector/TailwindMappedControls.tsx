@@ -1,3 +1,5 @@
+import { EditorSelectField } from "../components/EditorSelectField";
+
 type UtilityOption = { label: string; value: string };
 type UtilityGroup = {
   id: string;
@@ -26,18 +28,19 @@ export function TailwindMappedControls(props: { value: string; onChange: (value:
           const allowed = group.options.map((option) => option.value);
           const selected = tokens.find((token) => allowed.includes(token)) ?? "";
           return (
-            <label key={group.id} className="block min-w-0">
-              <span className="mb-1 block text-[9px] text-zinc-600">{group.label}</span>
-              <select
-                aria-label={`${group.label} Tailwind utility`}
-                className="min-h-10 w-full rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none focus:border-sky-400"
+            <div key={group.id} className="min-w-0">
+              <EditorSelectField
+                ariaLabel={`${group.label} Tailwind utility`}
+                density="compact"
+                label={group.label}
+                options={[
+                  { id: `${group.id}-auto`, value: "", label: "Auto" },
+                  ...group.options.map((option) => ({ id: `${group.id}-${option.value}`, ...option })),
+                ]}
                 value={selected}
-                onChange={(event) => props.onChange(replaceTailwindUtilityGroup(props.value, allowed, event.currentTarget.value, group.matches))}
-              >
-                <option value="">Auto</option>
-                {group.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </label>
+                onChange={(value) => props.onChange(replaceTailwindUtilityGroup(props.value, allowed, value, group.matches))}
+              />
+            </div>
           );
         })}
       </div>

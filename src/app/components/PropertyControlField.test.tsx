@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PropertyControlField } from "./PropertyControlField";
@@ -6,6 +7,32 @@ import { PropertyControlField } from "./PropertyControlField";
 afterEach(cleanup);
 
 describe("PropertyControlField", () => {
+  it("maps a HeroUI option selection back to its typed control value", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <PropertyControlField
+        control={{
+          id: "tone",
+          kind: "select",
+          label: "Tone",
+          prop: "tone",
+          options: [
+            { id: "quiet", label: "Quiet", value: "quiet" },
+            { id: "loud", label: "Loud", value: 2 },
+          ],
+        }}
+        value="quiet"
+        onChange={onChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Tone/ }));
+    await user.click(screen.getByRole("option", { name: "Loud" }));
+
+    expect(onChange).toHaveBeenCalledWith(2);
+  });
+
   it("keeps optional numeric values visibly unset and lets users clear them again", () => {
     const onChange = vi.fn();
     const { rerender } = render(

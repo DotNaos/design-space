@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -8,7 +9,8 @@ import { changePropertyKind, ComponentPropertyEditor } from "./ComponentProperty
 afterEach(cleanup);
 
 describe("component property editor", () => {
-  it("edits shared and text-specific contract fields with mobile-safe inputs", () => {
+  it("edits shared and text-specific contract fields with mobile-safe inputs", async () => {
+    const user = userEvent.setup();
     const onChange = vi.fn();
     function Harness() {
       const [property, setProperty] = useState<ComponentPropertyDraft>({
@@ -35,7 +37,8 @@ describe("component property editor", () => {
     expect(label).toHaveClass("text-base");
     fireEvent.change(label, { target: { value: "Body copy" } });
     fireEvent.change(screen.getByRole("textbox", { name: "React prop" }), { target: { value: "content" } });
-    fireEvent.change(screen.getByRole("combobox", { name: "Inspector section" }), { target: { value: "content" } });
+    await user.click(screen.getByRole("button", { name: /Inspector section/ }));
+    await user.click(screen.getByRole("option", { name: "Content" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Description" }), { target: { value: "Visible text" } });
     fireEvent.click(screen.getByRole("switch", { name: "Required" }));
     fireEvent.click(screen.getByRole("switch", { name: "Has default value" }));
