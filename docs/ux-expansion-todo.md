@@ -88,8 +88,8 @@ Status legend: `[ ]` queued, `[-]` active, `[x]` verified, `[!]` blocked on a de
 - [-] **UX-062 — Mobile dogfood.** Verify 390×844 and a larger phone: preview/drawer, slot selection, catalog search, property/Tailwind editing, context actions, pinch/pan, diff, save, and keyboard/safe-area behavior.
 - [-] **UX-063 — Accessibility pass.** Verify splitter semantics, keyboard selection, Shift+F10, focus restoration, screen-reader labels, contrast, touch targets, reduced motion, and no hover-only required action.
 - [ ] **UX-064 — Performance pass.** Measure canvas gesture responsiveness, overlay re-measure frequency, tree hover latency, editor completion latency, and large-catalog behavior. Fix avoidable layout thrash and stale async work.
-- [-] **UX-065 — Full repository gates.** Run typecheck, all tests, production build, local-only artifact proof, dependency audit, and exact-head CI.
-- [-] **UX-066 — Delivery.** Keep the focused PR linked to issue #1, document exact Component Lab reuse, resolve review/CI findings requested by the user, and do not deploy or merge without explicit approval.
+- [x] **UX-065 — Full repository gates.** Run typecheck, all tests, production build, local-only artifact proof, dependency audit, and exact-head CI.
+- [x] **UX-066 — Delivery.** Keep the focused PR linked to issue #1, document exact Component Lab reuse, resolve review/CI findings requested by the user, and do not deploy or merge without explicit approval.
 
 ## Request coverage map
 
@@ -174,3 +174,4 @@ Read-only Component Lab findings from `/Users/oli/projects/ui`:
 - **2026-07-14:** Browser-verified the replacement mobile HUD at 430×932 and the laptop layout at 1440×900. Project/Tree/Inspect open as canvas-preserving drawers, selected preview content is refit above the drawer/editor, and the HUD is absent on laptop.
 - **2026-07-14:** Browser-verified direct canvas editing on mobile and laptop. One click opens the matching item editor, visual controls emit exact Tailwind utilities, the single IntelliSense field reflects those classes immediately, and cancel discards the dogfood edit.
 - **2026-07-14:** Resolved the independent final review findings: visual controls now remove conflicting axis/variant Tailwind utilities, touch pan/pinch can start over large empty-slot overlays, 1024px panel resizing always reserves a 320px canvas, and edit-target registration uses the bounded no-follow reader. Browser proof confirmed the minimum canvas width; `bun run verify` passes 87 files / 394 tests plus build and local-only isolation.
+- **2026-07-14:** Completed the delivery gates on PR #3. The official Tailwind server follows real project readiness and runs in an isolated integration phase; `bun run verify` passes 88 files / 394 tests, `bun audit` reports no vulnerabilities, local-only isolation passes, and exact-head GitHub CI is green. No deploy or merge was performed.
