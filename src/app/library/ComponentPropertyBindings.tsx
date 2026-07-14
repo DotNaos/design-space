@@ -57,6 +57,7 @@ function PropertyBinding(props: {
   const currentIndex = current
     ? props.targets.findIndex((target) => target.instanceId === current.instanceId && target.prop === current.prop)
     : -1;
+  const unavailable = Boolean(current && currentIndex < 0);
   return (
     <label className="block text-[10px] text-zinc-500">
       <span className="flex items-center justify-between gap-2">
@@ -66,9 +67,9 @@ function PropertyBinding(props: {
       <select
         aria-label={`Binding for ${props.property.label}`}
         className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-zinc-200 outline-none focus:border-indigo-400"
-        value={currentIndex < 0 ? "" : String(currentIndex)}
+        value={unavailable ? "__unavailable__" : currentIndex < 0 ? "" : String(currentIndex)}
         onChange={(event) => {
-          const target = props.targets[Number(event.target.value)];
+          const target = event.target.value === "" ? undefined : props.targets[Number(event.target.value)];
           props.onChange(bindComponentProperty(
             props.document,
             props.property.id,
@@ -77,6 +78,7 @@ function PropertyBinding(props: {
         }}
       >
         <option value="">Not bound</option>
+        {unavailable && <option disabled value="__unavailable__">Unavailable binding</option>}
         {props.targets.map((target, index) => <option key={`${target.instanceId}:${target.prop}`} value={index}>{target.label}</option>)}
       </select>
       {!props.targets.length && <span className="mt-1 block leading-4 text-amber-300/80">No compatible implementation property is available yet.</span>}
