@@ -36,6 +36,8 @@ const languageServerVersion = (() => {
 
 const maximumClassFieldLength = 10_000;
 const defaultRequestTimeoutMs = 10_000;
+// The first request also starts the official server and indexes the trusted target.
+const defaultColdStartTimeoutMs = 30_000;
 // The official server intentionally debounces document diagnostics by 500 ms.
 // Keep a small margin so one field analysis can return the matching result.
 const defaultDiagnosticWaitMs = 650;
@@ -62,6 +64,7 @@ interface ConnectionContext {
 export interface TailwindIntelligenceServiceOptions {
   createConnection?: (context: ConnectionContext) => LanguageServerConnection | Promise<LanguageServerConnection>;
   requestTimeoutMs?: number;
+  coldStartTimeoutMs?: number;
   diagnosticWaitMs?: number;
   idleTimeoutMs?: number;
 }
@@ -172,6 +175,7 @@ export class TailwindIntelligenceService {
   readonly #target: RegisteredTarget;
   readonly #createConnection: NonNullable<TailwindIntelligenceServiceOptions["createConnection"]>;
   readonly #requestTimeoutMs: number;
+  readonly #coldStartTimeoutMs: number;
   readonly #diagnosticWaitMs: number;
   readonly #idleTimeoutMs: number;
   readonly #analyses: TailwindAnalysisQueue;
@@ -181,12 +185,14 @@ export class TailwindIntelligenceService {
   #documentVersion = 0;
   #openDocumentUri?: string;
   #idleTimer?: ReturnType<typeof setTimeout>;
+  #connectionWarmed = false;
   #disposed = false;
 
   constructor(target: RegisteredTarget, options: TailwindIntelligenceServiceOptions = {}) {
     this.#target = target;
     this.#createConnection = options.createConnection ?? createOfficialConnection;
     this.#requestTimeoutMs = options.requestTimeoutMs ?? defaultRequestTimeoutMs;
+    this.#coldStartTimeoutMs = options.coldStartTimeoutMs ?? defaultColdStartTimeoutMs;
     this.#diagnosticWaitMs = options.diagnosticWaitMs ?? defaultDiagnosticWaitMs;
     this.#idleTimeoutMs = options.idleTimeoutMs ?? defaultIdleTimeoutMs;
     this.#analyses = new TailwindAnalysisQueue((value, cursor) => this.#analyzeNow(value, cursor));
@@ -268,7 +274,8 @@ export class TailwindIntelligenceService {
           textDocument: { uri },
           position: { line: 0, character: tailwindWrapperPrefix.length + cursor },
           context: { triggerKind: 1 },
-        }, this.#requestTimeoutMs);
+        }, this.#connectionWarmed ? this.#requestTimeoutMs : this.#coldStartTimeoutMs);
+        this.#connectionWarmed = true;
         this.#throwIfDisposed();
         if (!hasDiagnosticCandidates(diagnosticPayload)) {
           // The official server deliberately debounces document validation.
@@ -335,7 +342,7 @@ export class TailwindIntelligenceService {
             },
             initializationOptions: {},
             trace: "off",
-          }, this.#requestTimeoutMs);
+          }, this.#coldStartTimeoutMs);
           this.#throwIfDisposed();
           connection.client.notify("initialized", {});
           if (this.#initializingConnection === connection) this.#initializingConnection = undefined;
@@ -365,6 +372,7 @@ export class TailwindIntelligenceService {
     this.#connectionPromise = undefined;
     this.#initializingConnection = undefined;
     this.#openDocumentUri = undefined;
+    this.#connectionWarmed = false;
     if (initializingConnection) this.#disposeConnection(initializingConnection);
     if (connection) {
       void connection.then((resolvedConnection) => {

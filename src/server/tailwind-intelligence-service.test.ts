@@ -160,19 +160,19 @@ describe("TailwindIntelligenceService", () => {
     } finally {
       service.dispose();
     }
-  }, 20_000);
+  }, 40_000);
 
   it("uses the exact virtual wrapper, serializes requests, and isolates versionless diagnostics by URI", async () => {
     const { target } = await registeredTarget();
-    const requests: Array<{ method: string; params: unknown }> = [];
+    const requests: Array<{ method: string; params: unknown; timeoutMs?: number }> = [];
     const notifications: Array<{ method: string; params: unknown }> = [];
     const handlers = new Map<string, (params: unknown) => void>();
     let activeCompletions = 0;
     let maximumActiveCompletions = 0;
     let disposed = false;
     const client = {
-      async request<T>(method: string, params?: unknown): Promise<T> {
-        requests.push({ method, params });
+      async request<T>(method: string, params?: unknown, timeoutMs?: number): Promise<T> {
+        requests.push({ method, params, timeoutMs });
         if (method === "initialize") return { capabilities: {} } as T;
         activeCompletions += 1;
         maximumActiveCompletions = Math.max(maximumActiveCompletions, activeCompletions);
@@ -216,6 +216,8 @@ describe("TailwindIntelligenceService", () => {
     };
     const service = new TailwindIntelligenceService(target, {
       createConnection: () => ({ client, dispose: () => { disposed = true; } }),
+      requestTimeoutMs: 25,
+      coldStartTimeoutMs: 50,
       idleTimeoutMs: 60_000,
     });
 
@@ -246,6 +248,11 @@ describe("TailwindIntelligenceService", () => {
     expect(firstUri).not.toBe(secondUri);
     expect(closed[0]?.params).toMatchObject({ textDocument: { uri: firstUri } });
     expect(requests.filter(({ method }) => method === "initialize")).toHaveLength(1);
+    expect(requests.map(({ method, timeoutMs }) => ({ method, timeoutMs }))).toEqual([
+      { method: "initialize", timeoutMs: 50 },
+      { method: "textDocument/completion", timeoutMs: 50 },
+      { method: "textDocument/completion", timeoutMs: 25 },
+    ]);
     service.dispose();
     await new Promise((resolve) => setImmediate(resolve));
     expect(disposed).toBe(true);
