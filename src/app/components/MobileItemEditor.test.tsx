@@ -12,6 +12,7 @@ describe("mobile item editor", () => {
   it("exposes staged item actions and blocks Apply on compile errors", () => {
     const onCancel = vi.fn();
     const onControlChange = vi.fn();
+    const onSelectSlot = vi.fn();
     render(
       <MobileItemEditor
         componentLabel="Text"
@@ -24,7 +25,7 @@ describe("mobile item editor", () => {
         previewCss=""
         rootInstanceId="root"
         selectedInstanceId="copy"
-        slots={[]}
+        slots={[{ id: "body", selectionId: "slot:copy:body", label: "Body", count: 0 }]}
         compileError="Unknown Tailwind class"
         compilePending={false}
         sourceBacked={false}
@@ -34,6 +35,7 @@ describe("mobile item editor", () => {
         canDelete
         onControlChange={onControlChange}
         onSelectComponent={vi.fn()}
+        onSelectSlot={onSelectSlot}
         onMove={vi.fn()}
         onDuplicate={vi.fn()}
         onDelete={vi.fn()}
@@ -42,6 +44,8 @@ describe("mobile item editor", () => {
       />,
     );
 
+    const dialog = screen.getByRole("dialog", { name: "Edit Text" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Move up" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Duplicate" })).toBeEnabled();
@@ -49,7 +53,9 @@ describe("mobile item editor", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Tailwind classes" }), { target: { value: "text-lg" } });
     expect(onControlChange).toHaveBeenCalledWith("children", "Updated");
     expect(onControlChange).toHaveBeenCalledWith("className", "text-lg");
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Body slot, empty" }));
+    expect(onSelectSlot).toHaveBeenCalledWith(expect.objectContaining({ id: "body", count: 0 }));
+    fireEvent.keyDown(dialog, { key: "Escape" });
     expect(onCancel).toHaveBeenCalledOnce();
   });
 

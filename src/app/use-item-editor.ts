@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { projectPreviewSlots, type SelectionTarget } from "../model";
 import type { TailwindPreview } from "../shared/contracts";
+import type { DesignValue } from "../shared/design-document";
 import type { ComponentFixture, TargetModule } from "../shared/target-module";
 import { runLocalOperation } from "./api";
 import {
@@ -53,12 +54,12 @@ export function useItemEditor(options: UseItemEditorOptions) {
     const adapter = options.target.adapters.find((candidate) => candidate.component.id === instance.componentId);
     if (!adapter) return undefined;
     const props = resolveFixtureProps(options.target, fixture);
-    const controlValues = Object.fromEntries((adapter.controls ?? []).map((control) => [
-      control.prop,
-      instance.instanceId === view.root.instanceId && control.prop === "className"
+    const controlValues = Object.fromEntries((adapter.controls ?? []).map((control) => {
+      const value = instance.instanceId === view.root.instanceId && control.prop === "className"
         ? session.rootClassValue
-        : typeof props[control.prop] === "string" ? props[control.prop] : "",
-    ])) as Readonly<Record<string, string>>;
+        : toDesignValue(props[control.prop]);
+      return [control.prop, value ?? defaultControlValue(control.kind)];
+    })) as Readonly<Record<string, DesignValue>>;
     const tailwindInput = collectTailwindValues(options.target, session.draftFixture, session.rootClassValue);
     const location = findFixtureLocation(session.draftFixture, instance.instanceId);
     const parent = location ? findComponentInstance(view.root, location.parentInstanceId) : undefined;
@@ -134,13 +135,13 @@ export function useItemEditor(options: UseItemEditorOptions) {
     setCompileError(undefined);
   };
 
-  const updateControl = (prop: string, value: string) => {
+  const updateControl = (prop: string, value: DesignValue) => {
     setSession((current) => {
       if (!current) return current;
       const fixture = findComponentFixture(current.draftFixture, current.selectedInstanceId);
       const adapter = options.target.adapters.find((candidate) => candidate.component.id === fixture?.adapterId);
       if (!fixture || !adapter?.controls?.some((control) => control.prop === prop)) return current;
-      if (prop === "className" && current.selectedInstanceId === current.draftFixture.instanceId && options.target.defaultEditTargetId) {
+      if (prop === "className" && typeof value === "string" && current.selectedInstanceId === current.draftFixture.instanceId && options.target.defaultEditTargetId) {
         return { ...current, rootClassValue: value };
       }
       return {
@@ -213,6 +214,18 @@ export function useItemEditor(options: UseItemEditorOptions) {
     remove,
     apply,
   };
+}
+
+function defaultControlValue(kind: string): DesignValue {
+  if (kind === "boolean") return false;
+  if (kind === "number") return 0;
+  return "";
+}
+
+function toDesignValue(value: unknown): DesignValue | undefined {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return undefined;
 }
 
 export function collectTailwindValues(target: TargetModule, fixture: ComponentFixture, rootClassValue: string): string {

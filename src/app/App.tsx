@@ -29,14 +29,18 @@ import {
 } from "./target-model";
 import type { SlotState } from "./types";
 import { useItemEditor } from "./use-item-editor";
+import { DocumentWorkspace } from "./DocumentWorkspace";
 
 const initialVersion = "0".repeat(64);
-let draftInstanceSequence = 0;
 type TargetResult = { view: TargetViewModel; error?: never } | { view?: never; error: string };
 type SlotSelection = Extract<SelectionTarget, { kind: "slot" }>;
 type FixtureUndo = { fixture: ComponentFixture; compositionCss: Readonly<Record<string, string>>; undoRootEdit: boolean };
 
 export function App() {
+  return target.defaultDocumentId ? <DocumentWorkspace target={target} /> : <LegacyWorkspace />;
+}
+
+function LegacyWorkspace() {
   const [showInternals, setShowInternals] = useState(false);
   const [fixture, setFixture] = useState<ComponentFixture>(target.defaultFixture);
   const [fixtureUndoStack, setFixtureUndoStack] = useState<FixtureUndo[]>([]);
@@ -368,7 +372,14 @@ export function App() {
           else setMobileMode(mode);
         }}
       />
-      {showDiff && editor.preparedEdit && <DiffSheet diff={editor.preparedEdit.exactDiff} onClose={() => setShowDiff(false)} />}
+      {showDiff && editor.preparedEdit && (
+        <DiffSheet
+          diff={editor.preparedEdit.exactDiff}
+          saving={editor.phase === "saving"}
+          onClose={() => setShowDiff(false)}
+          onSave={() => void save().then(() => setShowDiff(false))}
+        />
+      )}
       <SlotCatalogDialog open={Boolean(slotPicker)} slotLabel={pickerSlot?.label ?? "slot"} entries={pickerEntries} onClose={() => setSlotPicker(undefined)} onSelect={selectPickerComponent} />
       {itemEditorController.model && (
         <MobileItemEditor
@@ -388,8 +399,17 @@ export function App() {
           canMoveDown={Boolean(itemEditorController.model.location && itemEditorController.model.location.index < itemEditorController.model.location.siblingCount - 1)}
           canDuplicate={itemEditorController.model.canDuplicate}
           canDelete={itemEditorController.model.canDelete}
-          onControlChange={itemEditorController.updateControl}
+          onControlChange={(prop, value) => {
+            if (value !== undefined) itemEditorController.updateControl(prop, value);
+          }}
           onSelectComponent={itemEditorController.selectComponent}
+          onSelectSlot={(slot) => {
+            const instanceId = itemEditorController.model?.instance.instanceId;
+            if (!instanceId) return;
+            itemEditorController.close();
+            selectTarget({ kind: "slot", id: slot.selectionId, componentInstanceId: instanceId, slotId: slot.id });
+            setMobileMode(slot.count ? "tree" : "preview");
+          }}
           onMove={itemEditorController.move}
           onDuplicate={itemEditorController.duplicate}
           onDelete={itemEditorController.remove}
@@ -438,7 +458,7 @@ function messageFor(error: unknown) {
 }
 
 function nextDraftId() {
-  return `draft-${++draftInstanceSequence}`;
+  return `draft-${globalThis.crypto.randomUUID()}`;
 }
 
 function isMobileWorkspace() {

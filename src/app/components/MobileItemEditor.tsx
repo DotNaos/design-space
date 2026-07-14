@@ -1,16 +1,19 @@
 import { Button, Input, Label, TextField } from "@heroui/react";
-import { ArrowLeft, ChevronDown, ChevronUp, Copy, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, CircleDot, Copy, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 import type { ComponentControl } from "../../shared/contracts";
+import type { DesignValue } from "../../shared/design-document";
 import type { Selection } from "../types";
 import type { SlotState } from "../types";
 import { PreviewCanvas } from "./PreviewCanvas";
+import { PropertyControlField } from "./PropertyControlField";
 
 type MobileItemEditorProps = {
   componentLabel: string;
   sourceLabel?: string;
   controls: readonly ComponentControl[];
-  controlValues: Readonly<Record<string, string>>;
+  controlValues: Readonly<Record<string, DesignValue | undefined>>;
   preview: React.ReactNode;
   previewCss: string;
   rootInstanceId: string;
@@ -23,8 +26,10 @@ type MobileItemEditorProps = {
   canMoveDown: boolean;
   canDuplicate: boolean;
   canDelete: boolean;
-  onControlChange: (prop: string, value: string) => void;
+  onControlChange: (prop: string, value: DesignValue | undefined) => void;
   onSelectComponent: (instanceId: string) => void;
+  onSelectSlot?: (slot: SlotState) => void;
+  onEditDefinition?: () => void;
   onMove: (offset: -1 | 1) => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -42,13 +47,42 @@ const classGroups = [
 ] as const;
 
 export function MobileItemEditor(props: MobileItemEditorProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const tailwindControls = props.controls.filter((control) => control.kind === "tailwind");
   const tailwindControl = tailwindControls[0];
-  const textControls = props.controls.filter((control) => control.kind === "text");
-  const tailwindValue = tailwindControl ? props.controlValues[tailwindControl.prop] ?? "" : "";
+  const nonTailwindControls = props.controls.filter((control) => control.kind !== "tailwind");
+  const rawTailwindValue = tailwindControl ? props.controlValues[tailwindControl.prop] : "";
+  const tailwindValue = typeof rawTailwindValue === "string" ? rawTailwindValue : "";
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || !isMobileEditorViewport()) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+    return () => {
+      if (dialog.open && typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, []);
 
   return (
-    <section aria-label={`Edit ${props.componentLabel}`} className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#0d0e10] text-zinc-200 lg:hidden">
+    <dialog
+      ref={dialogRef}
+      aria-label={`Edit ${props.componentLabel}`}
+      aria-modal="true"
+      className="fixed inset-0 z-50 m-0 hidden h-dvh max-h-none w-full max-w-none flex-col overflow-hidden border-0 bg-[#0d0e10] p-0 text-zinc-200 backdrop:bg-[#0d0e10] open:flex lg:!hidden"
+      onCancel={(event) => {
+        event.preventDefault();
+        props.onCancel();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        props.onCancel();
+      }}
+    >
       <style data-design-space-item-preview>{props.previewCss}</style>
       <header className="flex h-12 shrink-0 items-center border-b border-white/10 bg-[#101113] px-2">
         <Button aria-label="Back to canvas" isIconOnly size="sm" variant="ghost" onPress={props.onCancel}>
@@ -58,9 +92,7 @@ export function MobileItemEditor(props: MobileItemEditorProps) {
           <h2 className="truncate text-sm font-semibold text-zinc-100">{props.componentLabel}</h2>
           <p className="truncate text-[9px] text-zinc-600">{props.sourceLabel ?? "Target-owned adapter"}</p>
         </div>
-        <span className={`w-9 text-center text-[9px] ${props.sourceBacked ? "text-emerald-400" : "text-zinc-600"}`}>
-          {props.sourceBacked ? "Source" : "Draft"}
-        </span>
+        {props.onEditDefinition ? <Button size="sm" variant="ghost" onPress={props.onEditDefinition}>Definition</Button> : <span className={`w-9 text-center text-[9px] ${props.sourceBacked ? "text-emerald-400" : "text-zinc-600"}`}>{props.sourceBacked ? "Source" : "Draft"}</span>}
       </header>
 
       <div className="h-[min(15rem,34dvh)] min-h-36 shrink-0 border-b border-white/10">
@@ -87,7 +119,7 @@ export function MobileItemEditor(props: MobileItemEditorProps) {
         <Action danger label="Delete" disabled={!props.canDelete} icon={<Trash2 size={16} />} onPress={props.onDelete} />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div className="min-h-0 flex-1 scroll-pb-[calc(7rem+env(safe-area-inset-bottom))] overflow-y-auto overscroll-contain">
         {tailwindControl && (
           <>
             <PropertySection title="Layout">
@@ -106,23 +138,49 @@ export function MobileItemEditor(props: MobileItemEditorProps) {
           </>
         )}
 
-        {textControls.length > 0 && (
+        {nonTailwindControls.length > 0 && (
           <PropertySection title="Content">
-            {textControls.map((control) => (
-              <TextField key={control.id} fullWidth value={props.controlValues[control.prop] ?? ""} onChange={(value) => props.onControlChange(control.prop, value)}>
-                <Label className="text-[10px] text-zinc-500">{control.label}</Label>
-                <Input className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-zinc-200" aria-label={control.label} />
-              </TextField>
+            {nonTailwindControls.map((control) => (
+              <PropertyControlField
+                key={control.id}
+                control={control}
+                value={props.controlValues[control.prop]}
+                onChange={(value) => props.onControlChange(control.prop, value)}
+              />
             ))}
+          </PropertySection>
+        )}
+
+        {props.slots.length > 0 && (
+          <PropertySection title="Slots">
+            <div className="overflow-hidden rounded-xl border border-white/10">
+              {props.slots.map((slot) => (
+                <button
+                  key={slot.id}
+                  aria-label={`${slot.label} slot, ${slot.count ? `${slot.count} used` : "empty"}`}
+                  className="flex min-h-12 w-full items-center gap-3 border-t border-white/10 px-3 text-left first:border-t-0 disabled:cursor-default"
+                  disabled={!props.onSelectSlot}
+                  type="button"
+                  onClick={() => props.onSelectSlot?.(slot)}
+                >
+                  <CircleDot size={14} className={slot.count ? "text-emerald-400" : "text-zinc-600"} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-zinc-200">{slot.label}</span>
+                    <span className="block text-[10px] text-zinc-600">{slot.count ? slot.childLabel ?? `${slot.count} ${slot.count === 1 ? "item" : "items"}` : "Empty slot"}</span>
+                  </span>
+                  {!slot.count && <Plus size={15} className="text-indigo-300" />}
+                </button>
+              ))}
+            </div>
           </PropertySection>
         )}
 
         {tailwindControls.length > 0 && (
           <PropertySection title="Tailwind classes">
             {tailwindControls.map((control) => (
-              <TextField key={control.id} fullWidth value={props.controlValues[control.prop] ?? ""} onChange={(value) => props.onControlChange(control.prop, value)}>
+              <TextField key={control.id} fullWidth value={typeof props.controlValues[control.prop] === "string" ? props.controlValues[control.prop] as string : ""} onChange={(value) => props.onControlChange(control.prop, value)}>
                 <Label className="text-[10px] text-zinc-500">{control.label}</Label>
-                <Input className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 font-mono text-[11px] text-zinc-200" aria-label={control.prop} />
+                <Input className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 font-mono text-base text-zinc-200 lg:text-[11px]" aria-label={control.prop} />
               </TextField>
             ))}
             <p className={`mt-2 text-[10px] leading-4 ${props.compileError ? "text-rose-300" : "text-zinc-600"}`}>
@@ -140,7 +198,7 @@ export function MobileItemEditor(props: MobileItemEditorProps) {
           {props.compilePending ? "Checking…" : "Apply"}
         </Button>
       </footer>
-    </section>
+    </dialog>
   );
 }
 
@@ -202,4 +260,8 @@ export function replaceClassGroup(current: string, group: readonly string[], nex
 function classLabel(value: string): string {
   if (!value) return "Default";
   return value.replace(/^(?:rounded-|bg-|shadow-|text-|max-w-|w-|p-)/, "") || value;
+}
+
+function isMobileEditorViewport(): boolean {
+  return typeof window.matchMedia !== "function" || window.matchMedia("(max-width: 1023px)").matches;
 }

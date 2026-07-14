@@ -5,7 +5,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { EditService } from "./edit-service";
-import { registerTrustedTarget, validateTargetModule, type TrustedTargetConfig } from "./target-registration";
+import {
+  registerTrustedTarget,
+  validateTargetModule,
+  type TrustedTargetConfig,
+} from "./target-registration";
 
 const marker = "/* design-space:card.surface */";
 
@@ -65,6 +69,59 @@ describe("trusted target registration", () => {
       }),
     ).rejects.toMatchObject({ code: "INVALID_REGISTRATION" });
   });
+
+  it("allows document writes only to unique files inside their registered source set", async () => {
+    const root = await mkdtemp(join(tmpdir(), "design-space-doc-registration-"));
+    await writeFile(join(root, "target.tsx"), "export const target = {};\n");
+    await writeFile(join(root, "document.json"), "{}\n");
+    const base = {
+      project: { id: "demo", label: "Demo" },
+      root,
+      targetModule: "target.tsx",
+      files: { document: "document.json" },
+      editTargets: {},
+    } satisfies Omit<TrustedTargetConfig, "documentRegistration">;
+    const document = {
+      sourceFileIds: ["document"],
+      writeFileIds: ["unknown"],
+      load: () => ({}),
+      materialize: () => ({}),
+    };
+    await expect(registerTrustedTarget({
+      ...base,
+      documentRegistration: { version: "v1", tailwindClassList: () => "", documents: { screen: document } },
+    })).rejects.toMatchObject({ code: "INVALID_REGISTRATION" });
+    await expect(registerTrustedTarget({
+      ...base,
+      documentRegistration: {
+        version: "v1",
+        tailwindClassList: () => "",
+        documents: { screen: { ...document, sourceFileIds: ["document", "document"], writeFileIds: ["document"] } },
+      },
+    })).rejects.toMatchObject({ code: "INVALID_REGISTRATION" });
+  });
+
+  it("requires an explicit document Tailwind collector at server registration", async () => {
+    const root = await mkdtemp(join(tmpdir(), "design-space-doc-tailwind-registration-"));
+    try {
+      await writeFile(join(root, "target.tsx"), "export const target = {};\n");
+      await writeFile(join(root, "document.json"), "{}\n");
+      await expect(registerTrustedTarget({
+        project: { id: "demo", label: "Demo" },
+        root,
+        targetModule: "target.tsx",
+        files: { document: "document.json" },
+        editTargets: {},
+        documentRegistration: {
+          version: "v1",
+          documents: {},
+        },
+      } as unknown as TrustedTargetConfig)).rejects.toMatchObject({ code: "INVALID_REGISTRATION" });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
 });
 
 describe("adapter contracts", () => {
@@ -154,6 +211,70 @@ describe("adapter contracts", () => {
       }],
     })).toThrowError(expect.objectContaining({ code: "INVALID_ADAPTER" }));
   });
+
+  it("accepts nested internal HTML and rejects duplicate DOM identifiers", () => {
+    expect(() => validateTargetModule({
+      ...valid,
+      adapters: [{
+        ...valid.adapters[0],
+        component: {
+          ...valid.adapters[0].component,
+          internalHtml: [{
+            id: "card.surface",
+            tagName: "article",
+            children: [{ id: "card.header", tagName: "header" }],
+          }],
+        },
+      }],
+    })).not.toThrow();
+    expect(() => validateTargetModule({
+      ...valid,
+      adapters: [{
+        ...valid.adapters[0],
+        component: {
+          ...valid.adapters[0].component,
+          internalHtml: [{
+            id: "card.surface",
+            tagName: "article",
+            children: [{ id: "card.surface", tagName: "header" }],
+          }],
+        },
+      }],
+    })).toThrowError(expect.objectContaining({ code: "INVALID_ADAPTER" }));
+  });
+
+  it("validates target-owned document catalogs and component recipes", () => {
+    const withDocuments = {
+      ...valid,
+      adapters: [{
+        ...valid.adapters[0],
+        component: {
+          ...valid.adapters[0].component,
+          slots: [{ id: "body", label: "Body" }],
+        },
+      }],
+      defaultDocumentId: "screen.home",
+      documents: [{ id: "screen.home", label: "Home", kind: "screen" as const }],
+      componentRecipes: [{
+        id: "card-recipe",
+        label: "Card recipe",
+        rootAdapterId: "card",
+        rootSlotId: "body",
+      }],
+    };
+    expect(() => validateTargetModule(withDocuments)).not.toThrow();
+    expect(() => validateTargetModule({ ...withDocuments, defaultDocumentId: "screen.missing" })).toThrowError(
+      expect.objectContaining({ code: "INVALID_ADAPTER" }),
+    );
+    expect(() => validateTargetModule({
+      ...withDocuments,
+      documents: [...withDocuments.documents, ...withDocuments.documents],
+    })).toThrowError(expect.objectContaining({ code: "INVALID_ADAPTER" }));
+    expect(() => validateTargetModule({
+      ...withDocuments,
+      componentRecipes: [{ ...withDocuments.componentRecipes[0], rootSlotId: "missing" }],
+    })).toThrowError(expect.objectContaining({ code: "INVALID_ADAPTER" }));
+  });
 });
 
 describe("local edit service", () => {
@@ -161,7 +282,16 @@ describe("local edit service", () => {
     const { service } = await fixture();
     const attempts = [
       { type: "read-source", editTargetId: "edit.card.surface", path: "/etc/passwd" },
+      { type: "read-project-file", fileId: "file.card", path: "/etc/passwd" },
       { type: "prepare-edit", editTargetId: "edit.card.surface", baseVersion: "x", value: "p-2", command: "rm" },
+      {
+        type: "compile-tailwind",
+        value: "p-2",
+        compiler: "arbitrary",
+        tailwindCompiler: "arbitrary",
+        configPath: "/tmp/tailwind.ts",
+        sourceFileIds: ["file.card"],
+      },
       { type: "run-command", command: "echo unsafe" },
     ];
     for (const attempt of attempts) {
@@ -169,6 +299,18 @@ describe("local edit service", () => {
     }
     await expect(service.execute({ type: "read-source", editTargetId: "edit.unknown" })).rejects.toMatchObject({
       code: "NOT_FOUND",
+    });
+    await expect(service.execute({ type: "read-project-file", fileId: "file.unknown" })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+
+  it("reads only a server-registered project file through its opaque ID", async () => {
+    const { service } = await fixture();
+    await expect(service.execute({ type: "read-project-file", fileId: "file.card" })).resolves.toMatchObject({
+      fileId: "file.card",
+      label: "component.tsx",
+      source: `const cardClass = ${marker} "rounded-xl p-4";\n`,
     });
   });
 
@@ -235,6 +377,7 @@ describe("local edit service", () => {
     await rm(componentPath);
     await symlink(outsideFile, componentPath);
     await expect(service.read("edit.card.surface")).rejects.toMatchObject({ code: "ACCESS_DENIED" });
+    await expect(service.readProjectFile("file.card")).rejects.toMatchObject({ code: "ACCESS_DENIED" });
   });
 
   it("allows recovery after a target compile failure", async () => {

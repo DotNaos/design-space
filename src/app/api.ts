@@ -1,6 +1,15 @@
-import type { BrowserOperation, PreparedEdit, SavedEdit, SourceSnapshot, TailwindPreview } from "../shared/contracts";
+import type {
+  BrowserOperation,
+  PreparedEdit,
+  ProjectFileSnapshot,
+  SavedEdit,
+  SourceSnapshot,
+  TailwindPreview,
+} from "../shared/contracts";
+import type { DocumentOperation, DocumentOperationResult } from "../shared/document-transactions";
 
-type OperationResult = SourceSnapshot | PreparedEdit | SavedEdit | TailwindPreview;
+type LocalOperation = BrowserOperation | DocumentOperation;
+type OperationResult = SourceSnapshot | ProjectFileSnapshot | PreparedEdit | SavedEdit | TailwindPreview | DocumentOperationResult;
 
 export class LocalOperationError extends Error {
   constructor(
@@ -13,7 +22,7 @@ export class LocalOperationError extends Error {
   }
 }
 
-export async function runLocalOperation<T extends OperationResult>(operation: BrowserOperation): Promise<T> {
+export async function runLocalOperation<T extends OperationResult>(operation: LocalOperation): Promise<T> {
   const response = await fetch("/__design-space/api", {
     method: "POST",
     headers: { "content-type": "application/json" },

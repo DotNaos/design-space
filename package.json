@@ -10,6 +10,7 @@
   "exports": {
     "./server": "./src/server/index.ts",
     "./contracts": "./src/shared/contracts.ts",
+    "./documents": "./src/shared/documents.ts",
     "./target": "./src/shared/target-module.ts"
   },
   "scripts": {
@@ -38,12 +39,12 @@
     "@types/bun": "^1.2.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^5",
     "jsdom": "^25.0.1",
     "portless": "^0.6.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.7.2",
-    "vite": "^6.0.6",
-    "vitest": "^2.1.8"
+    "vite": "^7",
+    "vitest": "^4"
   }
 }

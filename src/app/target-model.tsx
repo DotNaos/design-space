@@ -1,13 +1,17 @@
-import { cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import { cloneElement, Fragment, isValidElement, type ReactElement, type ReactNode } from "react";
 
 import {
   buildComponentTree,
   createAdapterCatalog,
+  htmlSelectionId,
   projectPreviewSlots,
   slotSelectionId,
   type AdapterCatalog,
+  type ComponentAdapterDefinition,
   type ComponentInstance,
   type ComponentTreeRow,
+  type ContractValidationMode,
+  type HtmlTreeNode,
   type SelectionTarget,
   type SlotProjection,
 } from "../model";
@@ -18,6 +22,8 @@ import type {
   PreviewSlotAttributes,
   TargetModule,
 } from "../shared/target-module";
+import type { InternalHtmlNode } from "../shared/contracts";
+import type { DesignDocument } from "../shared/design-document";
 
 export interface TargetViewModel {
   catalog: AdapterCatalog;
@@ -26,16 +32,20 @@ export interface TargetViewModel {
   slots: readonly SlotProjection[];
 }
 
+export interface TargetViewModelOptions {
+  readonly contractValidation?: ContractValidationMode;
+}
+
 export function createTargetViewModel(
   target: TargetModule,
   revealInternalHtml: boolean,
   fixture: ComponentFixture = target.defaultFixture,
+  componentDocuments: readonly DesignDocument[] = [],
+  options: TargetViewModelOptions = {},
 ): TargetViewModel {
   if (!target.adapters.length) throw new Error("The target has no component adapters.");
-  if (fixture.adapterId !== target.defaultAdapterId) {
-    throw new Error("The target fixture does not match its default adapter.");
-  }
-  const catalog = createAdapterCatalog(target.adapters.map((adapter) => ({
+  const definitions: ComponentAdapterDefinition[] = [
+    ...target.adapters.map((adapter) => ({
     id: adapter.component.id,
     label: adapter.component.label,
     slots: adapter.component.slots.map((slot) => ({
@@ -46,12 +56,26 @@ export function createTargetViewModel(
       maximum: slot.max,
     })),
     defaultProps: target.adapters.find((item) => item.component.id === adapter.component.id)?.defaultProps ?? {},
-    internalHtml: adapter.component.internalHtml?.map((node) => ({
-      kind: "html" as const,
-      id: node.id,
-      tagName: node.tagName,
+    internalHtml: adapter.component.internalHtml?.map(toModelHtmlTree),
     })),
-  })));
+    ...componentDocuments.flatMap((document) => document.kind === "component" && document.component ? [{
+      id: document.component.id,
+      label: document.component.label,
+      slots: document.component.slots.map((slot) => ({
+        id: slot.id,
+        label: slot.label,
+        accepts: slot.accepts,
+        minimum: slot.min,
+        maximum: slot.max,
+      })),
+      defaultProps: Object.fromEntries(document.component.properties.flatMap((property) => property.defaultValue === undefined
+        ? []
+        : [[property.prop, property.defaultValue]])),
+    }] : []),
+  ];
+  const catalog = options.contractValidation === "tolerant"
+    ? createTolerantCatalog(definitions)
+    : createAdapterCatalog(definitions);
   const root = fixtureToInstance(fixture);
   const revealedInstances = revealInternalHtml ? collectInstanceIds(root) : undefined;
   return {
@@ -59,9 +83,16 @@ export function createTargetViewModel(
     root,
     rows: buildComponentTree(catalog, root, {
       revealInternalHtml: revealedInstances,
+      contractValidation: options.contractValidation,
     }),
-    slots: projectPreviewSlots(catalog, root),
+    slots: projectPreviewSlots(catalog, root, {
+      contractValidation: options.contractValidation,
+    }),
   };
+}
+
+function createTolerantCatalog(definitions: readonly ComponentAdapterDefinition[]): AdapterCatalog {
+  return { adapters: new Map(definitions.map((definition) => [definition.id, definition])) };
 }
 
 export function findComponentInstance(root: ComponentInstance, instanceId: string): ComponentInstance | undefined {
@@ -222,14 +253,33 @@ export function renderTargetFixture(
       { "data-design-space-slot-id": slotSelectionId(fixture.instanceId, slot.id) } satisfies PreviewSlotAttributes,
     ]),
   );
+  const htmlAttributes = Object.fromEntries(
+    flattenInternalHtml(adapter.component.internalHtml ?? []).map((node) => [
+      node.id,
+      { "data-design-space-html-id": htmlSelectionId(fixture.instanceId, node.id) },
+    ]),
+  );
   const rendered = adapter.render(
     { ...adapter.defaultProps, ...fixture.props, ...rootProps },
-    { slotChildren, previewAttributes, slotAttributes },
+    { slotChildren, previewAttributes, slotAttributes, htmlAttributes },
   );
   return withKey(
     instrumentPreviewNode(rendered, previewAttributes),
     fixture.instanceId,
   );
+}
+
+function toModelHtmlTree(node: InternalHtmlNode): HtmlTreeNode {
+  return {
+    kind: "html" as const,
+    id: node.id,
+    tagName: node.tagName,
+    children: node.children?.map(toModelHtmlTree),
+  };
+}
+
+function flattenInternalHtml(nodes: readonly InternalHtmlNode[]): readonly InternalHtmlNode[] {
+  return nodes.flatMap((node) => [node, ...flattenInternalHtml(node.children ?? [])]);
 }
 
 function fixtureToInstance(fixture: ComponentFixture): ComponentInstance {
@@ -364,12 +414,14 @@ function collectInstanceIds(root: ComponentInstance): Set<string> {
 
 function renderFixtureChild(target: TargetModule, child: FixtureChild, parentSlotSelectionId: string): ReactNode {
   return child.kind === "text"
-    ? <span data-design-space-parent-slot-id={parentSlotSelectionId} style={{ display: "contents" }}>{child.value}</span>
+    ? <span key={child.id} data-design-space-parent-slot-id={parentSlotSelectionId} style={{ display: "contents" }}>{child.value}</span>
     : renderTargetFixture(target, child.node, undefined, { parentSlotSelectionId });
 }
 
 function instrumentPreviewNode(node: ReactNode, attributes: PreviewElementAttributes): ReactNode {
-  if (!isValidElement(node)) return node;
+  if (!isValidElement(node) || node.type === Fragment) {
+    return <span {...attributes} style={{ display: "contents" }}>{node}</span>;
+  }
   return cloneElement(node as ReactElement<Record<string, unknown>>, attributes);
 }
 

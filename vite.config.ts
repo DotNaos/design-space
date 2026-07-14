@@ -4,7 +4,15 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin } from "vite";
 
-import { designSpaceApiPlugin, designSpaceTargetPlugin, EditService, loadRegisteredProject, resolveServerProjectRoot } from "./src/server";
+import {
+  designSpaceApiPlugin,
+  designSpaceTargetPlugin,
+  DocumentService,
+  EditService,
+  loadRegisteredProject,
+  LocalOperationService,
+  resolveServerProjectRoot,
+} from "./src/server";
 
 const root = import.meta.dirname;
 
@@ -24,9 +32,13 @@ export default defineConfig(async () => {
   const registeredTarget = await loadRegisteredProject(
     resolveServerProjectRoot(resolve(root, "examples/demo-target")),
   );
-  const api = new EditService(registeredTarget);
+  const api = new LocalOperationService(
+    new EditService(registeredTarget),
+    new DocumentService(registeredTarget),
+  );
 
   return {
+    resolve: { dedupe: ["react", "react-dom"] },
     plugins: [
       enforcedPortless(),
       designSpaceTargetPlugin(registeredTarget),
@@ -38,6 +50,25 @@ export default defineConfig(async () => {
       host: "127.0.0.1",
       port: process.env.PORT ? Number(process.env.PORT) : 4173,
       strictPort: true,
+      fs: {
+        strict: true,
+        allow: [root, registeredTarget.targetModulePath],
+        deny: [
+          ".env",
+          ".env.*",
+          "*.{crt,pem,key,p12,pfx,cer,der}",
+          ".npmrc",
+          ".yarnrc.yml",
+          "**/.git/**",
+          "**/.github/**",
+          "**/design-space.server.*",
+          "**/src/server/**",
+          "**/vite.config.*",
+          "**/package.json",
+          "**/bun.lock*",
+          "**/tsconfig*.json",
+        ],
+      },
     },
     build: { sourcemap: true },
   };

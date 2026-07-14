@@ -3,8 +3,15 @@ import { readFile } from "node:fs/promises";
 import { z } from "zod";
 
 import { componentControlSchema, componentDescriptorSchema, opaqueIdSchema } from "../shared/contracts";
+import type { DesignDocument } from "../shared/design-document";
+import type { StrictUiViolation } from "../shared/strict-ui";
 import type { TargetModule } from "../shared/target-module";
 import { DesignSpaceError } from "./errors";
+import {
+  registerManagedDocumentStore,
+  type RegisteredManagedDocumentStore,
+  type TrustedManagedDocumentStore,
+} from "./managed-document-registration";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 
 export interface EditValidationContext {
@@ -21,12 +28,73 @@ export interface TrustedEditTarget {
   compile?: (nextSource: string, context: EditValidationContext) => void | Promise<void>;
 }
 
+export interface TailwindCompilerContext {
+  projectId: string;
+  /** Frozen source snapshot loaded from fixed server-registered file IDs. */
+  sources: Readonly<Record<string, string>>;
+  /** Frozen content hashes for the same source snapshot. */
+  sourceVersions: Readonly<Record<string, string>>;
+}
+
+export interface TrustedTailwindCompiler {
+  sourceFileIds: readonly string[];
+  compile: (classList: string, context: TailwindCompilerContext) => string | Promise<string>;
+}
+
+export interface DocumentTargetContext {
+  projectId: string;
+  documentId: string;
+  registrationVersion: string;
+  sources: Readonly<Record<string, string>>;
+  /** Server-loaded snapshot; document operations never accept this from the browser. */
+  libraryDocuments: readonly DesignDocument[];
+}
+
+export interface ManagedDocumentRecipeContext {
+  projectId: string;
+  documentId: string;
+  recipeId: string;
+  registrationVersion: string;
+}
+
+export interface TrustedDocumentTarget {
+  sourceFileIds: readonly string[];
+  writeFileIds: readonly string[];
+  load: (sources: Readonly<Record<string, string>>, context: DocumentTargetContext) => unknown | Promise<unknown>;
+  materialize: (
+    document: DesignDocument,
+    context: DocumentTargetContext,
+  ) => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>;
+  strictUi?: (
+    document: DesignDocument,
+    context: DocumentTargetContext,
+  ) => readonly StrictUiViolation[] | Promise<readonly StrictUiViolation[]>;
+  compile?: (
+    nextSources: Readonly<Record<string, string>>,
+    context: DocumentTargetContext,
+  ) => void | Promise<void>;
+}
+
+export interface TrustedDocumentRegistration {
+  version: string;
+  /** Trusted server callback that derives the complete Tailwind class graph for a document. */
+  tailwindClassList: (
+    document: DesignDocument,
+    context: DocumentTargetContext,
+  ) => string | Promise<string>;
+  documents: Readonly<Record<string, TrustedDocumentTarget>>;
+  managed?: TrustedManagedDocumentStore;
+}
+
 export interface TrustedTargetConfig {
   project: { id: string; label: string };
   root: string;
   targetModule: string;
   files: Readonly<Record<string, string>>;
   editTargets: Readonly<Record<string, TrustedEditTarget>>;
+  /** Trusted server callback; never selected or configured by a browser operation. */
+  tailwindCompiler?: TrustedTailwindCompiler;
+  documentRegistration?: TrustedDocumentRegistration;
 }
 
 export interface RegisteredFile {
@@ -39,12 +107,28 @@ export interface RegisteredEditTarget extends TrustedEditTarget {
   id: string;
 }
 
+export interface RegisteredDocumentTarget extends TrustedDocumentTarget {
+  id: string;
+  origin: "registered" | "managed";
+  sourceFileIds: readonly string[];
+  writeFileIds: readonly string[];
+}
+
+export interface RegisteredDocumentRegistration {
+  version: string;
+  tailwindClassList: TrustedDocumentRegistration["tailwindClassList"];
+  documents: Map<string, RegisteredDocumentTarget>;
+  managed?: RegisteredManagedDocumentStore;
+}
+
 export interface RegisteredTarget {
   project: { id: string; label: string };
   root: string;
   targetModulePath: string;
-  files: ReadonlyMap<string, RegisteredFile>;
+  files: Map<string, RegisteredFile>;
   editTargets: ReadonlyMap<string, RegisteredEditTarget>;
+  tailwindCompiler?: TrustedTailwindCompiler;
+  documentRegistration?: RegisteredDocumentRegistration;
   registrationPath?: string;
 }
 
@@ -66,6 +150,33 @@ const trustedConfigShape = z
         })
         .strict(),
     ),
+    tailwindCompiler: z.object({
+      sourceFileIds: z.array(opaqueIdSchema).max(50),
+      compile: z.function(),
+    }).strict().optional(),
+    documentRegistration: z.object({
+      version: z.string().trim().min(1).max(120),
+      tailwindClassList: z.function(),
+      documents: z.record(opaqueIdSchema, z.object({
+        sourceFileIds: z.array(opaqueIdSchema).min(1).max(200),
+        writeFileIds: z.array(opaqueIdSchema).min(1).max(200),
+        load: z.function(),
+        materialize: z.function(),
+        strictUi: z.function().optional(),
+        compile: z.function().optional(),
+      }).strict()),
+      managed: z.object({
+        directory: z.string().min(1),
+        recipes: z.record(opaqueIdSchema, z.object({
+          label: z.string().trim().min(1).max(120),
+          description: z.string().trim().max(500).optional(),
+          kind: z.enum(["screen", "component"]),
+          create: z.function(),
+        }).strict()),
+        strictUi: z.function().optional(),
+        compile: z.function().optional(),
+      }).strict().optional(),
+    }).strict().optional(),
   })
   .strict();
 
@@ -102,12 +213,74 @@ export async function registerTrustedTarget(config: TrustedTargetConfig): Promis
     editTargets.set(id, { id, ...editTarget });
   }
 
+  let tailwindCompiler: TrustedTailwindCompiler | undefined;
+  if (config.tailwindCompiler) {
+    const sourceFileIds = [...config.tailwindCompiler.sourceFileIds];
+    if (
+      new Set(sourceFileIds).size !== sourceFileIds.length ||
+      sourceFileIds.some((fileId) => !files.has(fileId))
+    ) {
+      throw new DesignSpaceError(
+        "INVALID_REGISTRATION",
+        "The Tailwind compiler must use unique registered source files",
+      );
+    }
+    tailwindCompiler = {
+      sourceFileIds: Object.freeze(sourceFileIds),
+      compile: config.tailwindCompiler.compile,
+    };
+  }
+
+  let documentRegistration: RegisteredDocumentRegistration | undefined;
+  if (config.documentRegistration) {
+    const documents = new Map<string, RegisteredDocumentTarget>();
+    for (const [id, document] of Object.entries(config.documentRegistration.documents)) {
+      const sourceFileIds = [...document.sourceFileIds];
+      const writeFileIds = [...document.writeFileIds];
+      if (
+        new Set(sourceFileIds).size !== sourceFileIds.length ||
+        new Set(writeFileIds).size !== writeFileIds.length ||
+        writeFileIds.some((fileId) => !sourceFileIds.includes(fileId))
+      ) {
+        throw new DesignSpaceError(
+          "INVALID_REGISTRATION",
+          `Document ${id} must use unique registered write files from its source set`,
+        );
+      }
+      for (const fileId of sourceFileIds) {
+        if (!files.has(fileId)) {
+          throw new DesignSpaceError("INVALID_REGISTRATION", `Document ${id} references an unknown file`);
+        }
+      }
+      documents.set(id, { id, origin: "registered", ...document, sourceFileIds, writeFileIds });
+    }
+    const managed = config.documentRegistration.managed
+      ? await registerManagedDocumentStore({
+          root,
+          config: config.documentRegistration.managed,
+          files,
+          documents,
+        })
+      : undefined;
+    if (documents.size > 500) {
+      throw new DesignSpaceError("INVALID_REGISTRATION", "The document catalog exceeds 500 documents");
+    }
+    documentRegistration = {
+      version: config.documentRegistration.version,
+      tailwindClassList: config.documentRegistration.tailwindClassList,
+      documents,
+      managed,
+    };
+  }
+
   return {
     project: config.project,
     root,
     targetModulePath,
     files,
     editTargets,
+    tailwindCompiler,
+    documentRegistration,
   };
 }
 
@@ -151,6 +324,41 @@ export function validateTargetModule(value: unknown): asserts value is TargetMod
   }
   if (target.defaultEditTargetId !== undefined && !opaqueIdSchema.safeParse(target.defaultEditTargetId).success) {
     throw new DesignSpaceError("INVALID_ADAPTER", "The default edit target ID is invalid");
+  }
+  const documents = z.array(z.object({
+    id: opaqueIdSchema,
+    label: z.string().trim().min(1).max(120),
+    kind: z.enum(["screen", "component"]),
+    group: z.string().trim().min(1).max(80).optional(),
+  }).strict()).max(500).safeParse(target.documents ?? []);
+  if (!documents.success || new Set(documents.data.map((document) => document.id)).size !== documents.data.length) {
+    throw new DesignSpaceError("INVALID_ADAPTER", "The target document catalog is invalid or duplicated");
+  }
+  if (
+    target.defaultDocumentId !== undefined &&
+    (!opaqueIdSchema.safeParse(target.defaultDocumentId).success ||
+      !documents.data.some((document) => document.id === target.defaultDocumentId))
+  ) {
+    throw new DesignSpaceError("INVALID_ADAPTER", "The default document does not exist in the document catalog");
+  }
+  const recipes = z.array(z.object({
+    id: opaqueIdSchema,
+    label: z.string().trim().min(1).max(120),
+    description: z.string().trim().max(500).optional(),
+    rootAdapterId: opaqueIdSchema,
+    rootSlotId: opaqueIdSchema,
+  }).strict()).max(100).safeParse(target.componentRecipes ?? []);
+  if (!recipes.success || new Set(recipes.data.map((recipe) => recipe.id)).size !== recipes.data.length) {
+    throw new DesignSpaceError("INVALID_ADAPTER", "The component recipe catalog is invalid or duplicated");
+  }
+  for (const recipe of recipes.data) {
+    const adapter = target.adapters.find((candidate) => candidate.component.id === recipe.rootAdapterId);
+    if (
+      !adapter ||
+      !adapter.component.slots.some((slot: { id: string }) => slot.id === recipe.rootSlotId)
+    ) {
+      throw new DesignSpaceError("INVALID_ADAPTER", "A component recipe references an unavailable adapter slot");
+    }
   }
   const fileEntries = z.array(z.object({
     id: opaqueIdSchema,

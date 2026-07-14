@@ -1,0 +1,47 @@
+{
+  "component": {
+    "description": "A reusable surface authored entirely in Design Space.",
+    "group": "Surfaces",
+    "id": "panel",
+    "label": "Panel",
+    "properties": [
+      {
+        "defaultValue": "rounded-2xl border border-white/10 bg-zinc-950 p-5",
+        "id": "surface",
+        "kind": "tailwind",
+        "label": "Surface",
+        "prop": "className",
+        "section": "style"
+      }
+    ],
+    "recipeId": "stack-component",
+    "slots": [
+      {
+        "acceptsText": true,
+        "id": "content",
+        "label": "Content",
+        "min": 0
+      }
+    ]
+  },
+  "id": "component.panel",
+  "kind": "component",
+  "label": "Panel",
+  "root": {
+    "adapterId": "stack",
+    "instanceId": "panel-template",
+    "propertyBindings": {
+      "className": "surface"
+    },
+    "slots": {
+      "content": [
+        {
+          "id": "panel-content-outlet",
+          "kind": "slot-outlet",
+          "slotId": "content"
+        }
+      ]
+    }
+  },
+  "schemaVersion": 2
+}

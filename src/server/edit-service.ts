@@ -8,16 +8,22 @@ import {
   browserOperationSchema,
   type BrowserOperation,
   type PreparedEdit,
+  type ProjectFileSnapshot,
   type SavedEdit,
   type SourceSnapshot,
   type TailwindPreview,
 } from "../shared/contracts";
 import { createUnifiedDiff } from "./diff";
+import { ChallengeStore } from "./challenge-store";
 import { DesignSpaceError } from "./errors";
 import { assertStillRegistered } from "./path-security";
 import { locateMarkedString, sourceVersion } from "./source-editor";
-import { compileTailwindPreview } from "./tailwind-preview";
-import type { RegisteredEditTarget, RegisteredFile, RegisteredTarget } from "./target-registration";
+import { TargetTailwindService } from "./target-tailwind-service";
+import type {
+  RegisteredEditTarget,
+  RegisteredFile,
+  RegisteredTarget,
+} from "./target-registration";
 
 interface StoredChallenge {
   id: string;
@@ -28,8 +34,11 @@ interface StoredChallenge {
   nextVersion: string;
   nextSource: string;
   value: string;
+  tailwindSourceVersions: Readonly<Record<string, string>>;
   expiresAt: number;
 }
+
+const maximumBrowsableFileBytes = 512 * 1024;
 
 export interface EditServiceOptions {
   challengeTtlMs?: number;
@@ -37,7 +46,7 @@ export interface EditServiceOptions {
   createId?: () => string;
 }
 
-async function atomicWrite(root: string, path: string, source: string): Promise<void> {
+async function atomicWrite(root: string, path: string, expectedVersion: string, source: string): Promise<void> {
   await assertStillRegistered(root, path);
   const parentPath = await realpath(dirname(path));
   const parentIdentity = await stat(parentPath);
@@ -70,6 +79,10 @@ async function atomicWrite(root: string, path: string, source: string): Promise<
     ) {
       throw new DesignSpaceError("ACCESS_DENIED", "The registered file changed during the atomic save");
     }
+    const currentSource = await readFile(path, "utf8");
+    if (sourceVersion(currentSource) !== expectedVersion) {
+      throw new DesignSpaceError("STALE_SOURCE", "The registered source changed during the atomic save");
+    }
     await rename(temporaryPath, path);
     await assertStillRegistered(root, path);
   } finally {
@@ -80,10 +93,11 @@ async function atomicWrite(root: string, path: string, source: string): Promise<
 
 export class EditService {
   readonly #target: RegisteredTarget;
-  readonly #challenges = new Map<string, StoredChallenge>();
+  readonly #challenges: ChallengeStore<StoredChallenge>;
   readonly #challengeTtlMs: number;
   readonly #now: () => number;
   readonly #createId: () => string;
+  readonly #tailwind: TargetTailwindService;
   #saveQueue: Promise<void> = Promise.resolve();
 
   constructor(target: RegisteredTarget, options: EditServiceOptions = {}) {
@@ -91,9 +105,11 @@ export class EditService {
     this.#challengeTtlMs = options.challengeTtlMs ?? 60_000;
     this.#now = options.now ?? Date.now;
     this.#createId = options.createId ?? randomUUID;
+    this.#challenges = new ChallengeStore({ now: this.#now });
+    this.#tailwind = new TargetTailwindService(target);
   }
 
-  async execute(input: unknown): Promise<SourceSnapshot | PreparedEdit | SavedEdit | TailwindPreview> {
+  async execute(input: unknown): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | SavedEdit | TailwindPreview> {
     const parsed = browserOperationSchema.safeParse(input);
     if (!parsed.success) {
       throw new DesignSpaceError("INVALID_REQUEST", "The browser operation is invalid");
@@ -101,16 +117,35 @@ export class EditService {
     return this.#executeParsed(parsed.data);
   }
 
-  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | PreparedEdit | SavedEdit | TailwindPreview> {
+  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | SavedEdit | TailwindPreview> {
     switch (operation.type) {
       case "compile-tailwind":
-        return compileTailwindPreview(operation.value);
+        return (await this.#tailwind.compile(operation.value)).preview;
+      case "read-project-file":
+        return this.readProjectFile(operation.fileId);
       case "read-source":
         return this.read(operation.editTargetId);
       case "prepare-edit":
         return this.prepare(operation.editTargetId, operation.value, operation.baseVersion);
       case "save-edit":
         return this.save(operation.challengeId);
+    }
+  }
+
+  async readProjectFile(fileId: string): Promise<ProjectFileSnapshot> {
+    const file = this.#target.files.get(fileId);
+    if (!file) throw new DesignSpaceError("NOT_FOUND", "The project file is not registered");
+    await assertStillRegistered(this.#target.root, file.path);
+    const handle = await open(file.path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      const metadata = await handle.stat();
+      if (!metadata.isFile() || metadata.size > maximumBrowsableFileBytes) {
+        throw new DesignSpaceError("ACCESS_DENIED", "The registered file is not available for source browsing");
+      }
+      const source = await handle.readFile("utf8");
+      return { fileId, label: file.displayName, source, version: sourceVersion(source) };
+    } finally {
+      await handle.close();
     }
   }
 
@@ -134,7 +169,8 @@ export class EditService {
       throw new DesignSpaceError("STALE_SOURCE", "The source changed after the editor loaded it");
     }
 
-    const { value } = await compileTailwindPreview(unsafeValue);
+    const tailwind = await this.#tailwind.compile(unsafeValue);
+    const { value } = tailwind.preview;
     const located = locateMarkedString(source, editTarget.marker);
     const nextSource = located.nextSource(value);
     const context = { fileId: file.id, editTargetId: editTarget.id, source };
@@ -156,6 +192,7 @@ export class EditService {
         throw new DesignSpaceError("COMPILE_ERROR", "The edited target did not compile");
       }
     }
+    await this.#tailwind.assertUnchanged(tailwind.sourceVersions);
 
     const id = this.#createId();
     const expiresAt = this.#now() + this.#challengeTtlMs;
@@ -169,6 +206,7 @@ export class EditService {
       nextVersion,
       nextSource,
       value,
+      tailwindSourceVersions: tailwind.sourceVersions,
       expiresAt,
     });
     return {
@@ -191,8 +229,7 @@ export class EditService {
   }
 
   async #saveNow(challengeId: string): Promise<SavedEdit> {
-    const challenge = this.#challenges.get(challengeId);
-    this.#challenges.delete(challengeId);
+    const challenge = this.#challenges.take(challengeId);
     if (!challenge) {
       throw new DesignSpaceError("NOT_FOUND", "The prepared edit does not exist");
     }
@@ -204,7 +241,8 @@ export class EditService {
     if (sourceVersion(currentSource) !== challenge.baseVersion) {
       throw new DesignSpaceError("STALE_SOURCE", "The source changed before the edit could be saved");
     }
-    await atomicWrite(this.#target.root, challenge.file.path, challenge.nextSource);
+    await this.#tailwind.assertUnchanged(challenge.tailwindSourceVersions);
+    await atomicWrite(this.#target.root, challenge.file.path, challenge.baseVersion, challenge.nextSource);
     await assertStillRegistered(this.#target.root, challenge.file.path);
     return {
       editTargetId: challenge.editTargetId,
@@ -225,4 +263,5 @@ export class EditService {
     }
     return { editTarget, file };
   }
+
 }

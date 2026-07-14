@@ -1,12 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { isIP } from "node:net";
 
 import type { Plugin } from "vite";
 
 import { DesignSpaceError } from "./errors";
-import type { EditService } from "./edit-service";
+import type { OperationExecutor } from "./local-operation-service";
 
 export const DESIGN_SPACE_API_PATH = "/__design-space/api";
-const maximumBodyBytes = 16_384;
+const VITE_OPEN_IN_EDITOR_PATH = "/__open-in-editor";
+const maximumBodyBytes = 2_097_152;
 
 function respond(response: ServerResponse, status: number, payload: unknown): void {
   response.statusCode = status;
@@ -15,14 +17,50 @@ function respond(response: ServerResponse, status: number, payload: unknown): vo
   response.end(JSON.stringify(payload));
 }
 
+function normalizedHostname(authority: string): string | undefined {
+  try {
+    const parsed = new URL(`http://${authority}`);
+    if (parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash) return undefined;
+    return parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  } catch {
+    return undefined;
+  }
+}
+
+function isTrustedLocalHostname(hostname: string): boolean {
+  if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".ts.net")) return true;
+  const addressFamily = isIP(hostname);
+  if (addressFamily === 4) {
+    const [first, second] = hostname.split(".").map(Number);
+    return first === 127 || (first === 100 && second >= 64 && second <= 127);
+  }
+  if (addressFamily === 6) {
+    return hostname === "::1" || hostname.startsWith("fd7a:115c:a1e0:");
+  }
+  return false;
+}
+
 function requestIsSameOrigin(request: IncomingMessage): boolean {
   const origin = request.headers.origin;
   const host = request.headers.host;
-  if (!origin || !host) return true;
+  if (!host || !isTrustedLocalHostname(normalizedHostname(host) ?? "")) return false;
+  if (!origin) return true;
   try {
-    return new URL(origin).host === host;
+    const parsedOrigin = new URL(origin);
+    return (
+      (parsedOrigin.protocol === "http:" || parsedOrigin.protocol === "https:") &&
+      parsedOrigin.host.toLowerCase() === host.toLowerCase()
+    );
   } catch {
     return false;
+  }
+}
+
+function requestPathname(request: IncomingMessage): string | undefined {
+  try {
+    return new URL(request.url ?? "/", "http://design-space.local").pathname;
+  } catch {
+    return undefined;
   }
 }
 
@@ -57,23 +95,44 @@ function errorStatus(error: DesignSpaceError): number {
     case "ACCESS_DENIED":
       return 403;
     case "COMPILE_ERROR":
+    case "INVALID_DOCUMENT":
     case "VALIDATION_ERROR":
     case "INVALID_TAILWIND":
       return 422;
     case "CHALLENGE_EXPIRED":
       return 410;
+    case "TRANSACTION_FAILED":
+      return 409;
     default:
       return 400;
   }
 }
 
-export function designSpaceApiPlugin(service: EditService): Plugin {
+export function designSpaceApiPlugin(service: OperationExecutor): Plugin {
   return {
     name: "design-space-local-api",
     apply: "serve",
     configureServer(server) {
       server.middlewares.use(async (request, response, next) => {
-        const pathname = new URL(request.url ?? "/", "http://design-space.local").pathname;
+        response.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+        response.setHeader("Referrer-Policy", "no-referrer");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setHeader("X-Frame-Options", "DENY");
+        const pathname = requestPathname(request);
+        if (pathname === undefined) {
+          respond(response, 400, {
+            ok: false,
+            error: { code: "INVALID_REQUEST", message: "The request target is invalid" },
+          });
+          return;
+        }
+        if (pathname.startsWith(VITE_OPEN_IN_EDITOR_PATH)) {
+          respond(response, 403, {
+            ok: false,
+            error: { code: "ACCESS_DENIED", message: "Browser-selected editor paths are disabled" },
+          });
+          return;
+        }
         if (pathname !== DESIGN_SPACE_API_PATH) {
           next();
           return;

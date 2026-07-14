@@ -1,4 +1,4 @@
-import type { ComponentAdapter, TargetModule } from "../../src/shared/target-module";
+import type { ComponentAdapter, ComponentFixture, TargetModule } from "../../src/shared/target-module";
 import { Card, cardSourceClassName } from "./src/Card";
 
 const adapters: ComponentAdapter[] = [
@@ -10,9 +10,11 @@ const adapters: ComponentAdapter[] = [
       description: "A composed surface with three explicit child slots.",
       sourceFileId: "card.source",
       internalHtml: [
-        { id: "card.article", tagName: "article" },
-        { id: "card.header", tagName: "header" },
-        { id: "card.body", tagName: "div" },
+        { id: "card.article", tagName: "article", children: [
+          { id: "card.header", tagName: "header" },
+          { id: "card.body", tagName: "div" },
+          { id: "card.footer", tagName: "footer" },
+        ] },
       ],
       slots: [
         { id: "header", label: "Header", min: 0, max: 1 },
@@ -30,6 +32,7 @@ const adapters: ComponentAdapter[] = [
         footer={context.slotChildren.footer}
         previewAttributes={context.previewAttributes}
         slotAttributes={context.slotAttributes}
+        htmlAttributes={context.htmlAttributes}
       />
     ),
   },
@@ -76,34 +79,39 @@ const adapters: ComponentAdapter[] = [
   },
 ];
 
+const targetOnlyFallbackFixture: ComponentFixture = {
+  instanceId: "fallback-card",
+  adapterId: "card",
+  props: { className: cardSourceClassName },
+  slots: {
+    header: [{ kind: "component", node: { instanceId: "fallback-heading", adapterId: "heading", slots: {} } }],
+    body: [{ kind: "component", node: { instanceId: "fallback-copy", adapterId: "text", slots: {} } }],
+    footer: [],
+  },
+};
+
 export const target: TargetModule = {
   project: { id: "demo-target", label: "Design Space demo target" },
   adapters,
   defaultAdapterId: "card",
+  defaultDocumentId: "screen.dashboard",
+  defaultDocumentLabel: "Dashboard",
+  documents: [
+    { id: "screen.dashboard", label: "Dashboard", kind: "screen" },
+    { id: "component.panel", label: "Panel", kind: "component", group: "Surfaces" },
+  ],
+  componentRecipes: [
+    {
+      id: "stack-component",
+      label: "Stack component",
+      description: "Start with a target-owned Stack and place explicit slot outlets inside it.",
+      rootAdapterId: "stack",
+      rootSlotId: "content",
+    },
+  ],
   defaultProps: { className: cardSourceClassName },
   defaultEditTargetId: "card.surface",
-  defaultFixture: {
-    instanceId: "review-card",
-    adapterId: "card",
-    label: "Dashboard",
-    slots: {
-      header: [{ kind: "component", node: { instanceId: "review-heading", adapterId: "heading", slots: {} } }],
-      body: [{
-        kind: "component",
-        node: {
-          instanceId: "review-stack",
-          adapterId: "stack",
-          slots: {
-            content: [
-              { kind: "component", node: { instanceId: "review-copy", adapterId: "text", slots: {} } },
-              { kind: "component", node: { instanceId: "review-badge", adapterId: "badge", slots: {} } },
-            ],
-          },
-        },
-      }],
-      footer: [],
-    },
-  },
+  defaultFixture: targetOnlyFallbackFixture,
   files: [
     { id: "root", label: "demo-target", kind: "directory" },
     { id: "target.config", label: "design-space.config.tsx", kind: "file", parentId: "root" },
@@ -111,6 +119,9 @@ export const target: TargetModule = {
     { id: "target.production", label: "vite.production.config.ts", kind: "file", parentId: "root" },
     { id: "src", label: "src", kind: "directory", parentId: "root" },
     { id: "card.source", label: "Card.tsx", kind: "file", parentId: "src" },
+    { id: "tailwind.theme", label: "theme.css", kind: "file", parentId: "src" },
+    { id: "dashboard.document", label: "dashboard.design.json", kind: "file", parentId: "src" },
+    { id: "panel.document", label: "panel.design.json", kind: "file", parentId: "src" },
     { id: "production.source", label: "production.tsx", kind: "file", parentId: "src" },
   ],
 };

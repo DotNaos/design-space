@@ -1,7 +1,15 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Maximize2, Minus, MousePointer2, Plus, RotateCcw } from "lucide-react";
 
+import type { StrictUiViolation } from "../../shared/strict-ui";
 import { fitCanvas, pinchCanvas, zoomCanvasAt, type CanvasCamera, type Point } from "../canvas-transform";
+import { indexPreviewDom, type PreviewDomSnapshot } from "../dom/dom-snapshot";
+import { StrictUiIndicator, strictUiOutlineTone } from "../strict-ui/StrictUiIndicator";
+import {
+  buildStrictUiCanvasTargets,
+  describeStrictUiMarker,
+  type StrictUiCanvasTarget,
+} from "../strict-ui/strict-ui-markers";
 import type { Selection, SlotState } from "../types";
 
 type PreviewCanvasProps = {
@@ -12,12 +20,16 @@ type PreviewCanvasProps = {
   selectionLabel: string;
   slots: SlotState[];
   selection: Selection;
+  cameraKey?: string;
+  strictUiViolations?: readonly StrictUiViolation[];
   compact?: boolean;
   onSelect: (selection: Selection) => void;
   onEditComponent?: (instanceId: string) => void;
+  onDomSnapshot?: (snapshot: PreviewDomSnapshot) => void;
 };
 
 type ViewRect = { left: number; top: number; width: number; height: number };
+type MeasuredStrictUiTarget = { target: StrictUiCanvasTarget; rect: ViewRect };
 type GestureStart = {
   camera: CanvasCamera;
   points: readonly Point[];
@@ -33,12 +45,19 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const gesture = useRef<GestureStart | undefined>(undefined);
   const suppressClick = useRef(false);
   const cameraRef = useRef<CanvasCamera>({ x: 16, y: 56, scale: 1 });
+  const lastCameraResetKey = useRef<string | undefined>(undefined);
+  const lastDomSnapshot = useRef("");
   const autoFit = useRef(true);
   const frame = useRef<number | undefined>(undefined);
   const [camera, setCameraState] = useState(cameraRef.current);
   const [selectionRect, setSelectionRect] = useState<ViewRect>();
   const [emptyRects, setEmptyRects] = useState<Readonly<Record<string, ViewRect>>>({});
+  const [strictUiRects, setStrictUiRects] = useState<readonly MeasuredStrictUiTarget[]>([]);
   const [showGestureHint, setShowGestureHint] = useState(true);
+  const strictUiTargets = useMemo(
+    () => buildStrictUiCanvasTargets(props.strictUiViolations ?? [], props.rootInstanceId),
+    [props.rootInstanceId, props.strictUiViolations],
+  );
 
   const setCamera = useCallback((next: CanvasCamera) => {
     cameraRef.current = next;
@@ -50,11 +69,23 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     const world = worldRef.current;
     if (!viewport || !world) return;
     const viewportRect = viewport.getBoundingClientRect();
+    if (props.onDomSnapshot) {
+      const snapshot = indexPreviewDom(world);
+      const serialized = JSON.stringify(snapshot);
+      if (serialized !== lastDomSnapshot.current) {
+        lastDomSnapshot.current = serialized;
+        props.onDomSnapshot(snapshot);
+      }
+    }
     const selectedSelector = props.selection.kind === "component"
       ? `[data-design-space-instance-id="${escapeAttribute(props.selection.id)}"]`
       : props.selection.kind === "slot"
         ? `[data-design-space-slot-id="${escapeAttribute(props.selection.id)}"]`
-        : undefined;
+        : props.selection.kind === "html"
+          ? `[data-design-space-html-id="${escapeAttribute(props.selection.id)}"]`
+        : props.selection.kind === "slot-outlet"
+          ? `[data-design-space-outlet-id="${escapeAttribute(props.selection.outletId)}"]`
+          : undefined;
     setSelectionRect(selectedSelector ? measureSelector(world, selectedSelector, viewportRect) : undefined);
     setEmptyRects(Object.fromEntries(props.slots.filter((slot) => slot.count === 0).flatMap((slot) => {
       const rect = measureSelector(
@@ -64,7 +95,11 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       );
       return rect ? [[slot.selectionId, rect]] : [];
     })));
-  }, [props.selection, props.slots]);
+    setStrictUiRects(strictUiTargets.flatMap((target) => {
+      const rect = measureSelector(world, selectorForStrictUiTarget(target), viewportRect);
+      return rect ? [{ target, rect }] : [];
+    }));
+  }, [props.onDomSnapshot, props.rootInstanceId, props.selection, props.slots, strictUiTargets]);
 
   const scheduleMeasure = useCallback(() => {
     if (frame.current !== undefined) cancelAnimationFrame(frame.current);
@@ -109,6 +144,21 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   }, [fit, scheduleMeasure]);
 
   useLayoutEffect(scheduleMeasure, [camera, props.preview, scheduleMeasure]);
+
+  useLayoutEffect(() => {
+    if (props.cameraKey === undefined) return;
+    const resetKey = `${props.cameraKey}:${props.compact ? "compact" : "full"}`;
+    if (lastCameraResetKey.current === resetKey) return;
+    lastCameraResetKey.current = resetKey;
+    pointers.current.clear();
+    gesture.current = undefined;
+    suppressClick.current = false;
+    autoFit.current = true;
+    setShowGestureHint(true);
+    setCamera({ x: 16, y: props.compact ? 44 : 56, scale: 1 });
+    fit();
+    scheduleMeasure();
+  }, [fit, props.cameraKey, props.compact, scheduleMeasure, setCamera]);
 
   const reset = () => {
     const viewport = viewportRef.current;
@@ -195,10 +245,57 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       props.onSelect({ kind: "slot", id: slot.selectionId, componentInstanceId: props.selectedComponentInstanceId, slotId: slot.id });
       return;
     }
+    const htmlId = target?.closest<HTMLElement>("[data-design-space-html-id]")?.dataset.designSpaceHtmlId;
+    if (htmlId) {
+      const parts = htmlId.split(":");
+      if (parts.length === 3) {
+        props.onSelect({
+          kind: "html",
+          id: htmlId,
+          componentInstanceId: decodeURIComponent(parts[1]),
+          nodeId: decodeURIComponent(parts[2]),
+        });
+        return;
+      }
+    }
     const instanceId = target?.closest<HTMLElement>("[data-design-space-instance-id]")?.dataset.designSpaceInstanceId;
     if (!instanceId) return;
     props.onSelect({ kind: "component", id: instanceId });
     props.onEditComponent?.(instanceId);
+  };
+
+  const selectStrictUiTarget = (target: StrictUiCanvasTarget) => {
+    const violation = target.marker.violations.find((candidate) => candidate.location.kind !== "document")
+      ?? target.marker.violations[0];
+    const location = violation?.location;
+    if (!location || location.kind === "document") {
+      props.onSelect({ kind: "component", id: props.rootInstanceId });
+      return;
+    }
+    if (location.kind === "instance" || location.kind === "control") {
+      props.onSelect({ kind: "component", id: location.instanceId });
+      props.onEditComponent?.(location.instanceId);
+      return;
+    }
+    if (location.kind === "slot") {
+      props.onSelect({
+        kind: "slot",
+        id: target.id,
+        componentInstanceId: location.instanceId,
+        slotId: location.slotId,
+      });
+      return;
+    }
+    if (location.outletId) {
+      props.onSelect({
+        kind: "slot-outlet",
+        id: `outlet:${location.outletId}`,
+        outletId: location.outletId,
+        slotId: location.slotId,
+      });
+      return;
+    }
+    props.onSelect({ kind: "component", id: props.rootInstanceId });
   };
 
   return (
@@ -245,6 +342,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 
       <div
         ref={worldRef}
+        data-testid="canvas-world"
         className="absolute left-0 top-0 w-[620px] will-change-transform"
         style={{ transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.scale})`, transformOrigin: "0 0" }}
       >
@@ -252,6 +350,33 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       </div>
 
       <div className="pointer-events-none absolute inset-0 z-10">
+        {strictUiRects.map(({ target, rect }) => (
+          <div
+            key={target.marker.key}
+            className={`absolute border border-dashed ${strictUiOutlineTone(target.marker.severity)}`}
+            data-strict-ui-count={target.marker.violations.length}
+            data-strict-ui-severity={target.marker.severity}
+            data-strict-ui-target={`${target.kind}:${target.id}`}
+            data-testid="strict-ui-canvas-marker"
+            style={{ left: rect.left, top: rect.top, width: rect.width, height: Math.max(2, rect.height) }}
+          >
+            <button
+              aria-label={describeStrictUiMarker(target.marker)}
+              className="pointer-events-auto absolute -right-2 -top-2 grid size-10 place-items-center rounded-full outline-none ring-offset-2 ring-offset-[#0d0e10] focus-visible:ring-2 focus-visible:ring-indigo-300 lg:size-7"
+              data-strict-ui-action={target.marker.key}
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                selectStrictUiTarget(target);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onPointerMove={(event) => event.stopPropagation()}
+              onPointerUp={(event) => event.stopPropagation()}
+            >
+              <StrictUiIndicator decorative marker={target.marker} />
+            </button>
+          </div>
+        ))}
         {selectionRect && (
           <div
             data-testid="selection-outline"
@@ -293,7 +418,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 function measureSelector(world: HTMLElement, selector: string, viewport: DOMRect): ViewRect | undefined {
   const rects = [...world.querySelectorAll<HTMLElement>(selector)]
     .filter((element) => element.isConnected)
-    .map((element) => element.getBoundingClientRect())
+    .flatMap((element) => measurableRects(element))
     .filter((rect) => rect.width > 0 || rect.height > 0);
   if (!rects.length) return undefined;
   const left = Math.min(...rects.map((rect) => rect.left));
@@ -301,6 +426,23 @@ function measureSelector(world: HTMLElement, selector: string, viewport: DOMRect
   const right = Math.max(...rects.map((rect) => rect.right));
   const bottom = Math.max(...rects.map((rect) => rect.bottom));
   return { left: left - viewport.left, top: top - viewport.top, width: right - left, height: bottom - top };
+}
+
+function measurableRects(element: HTMLElement): DOMRect[] {
+  const own = element.getBoundingClientRect();
+  if (own.width > 0 || own.height > 0) return [own];
+  return [...element.querySelectorAll<HTMLElement>("*")]
+    .map((child) => child.getBoundingClientRect())
+    .filter((rect) => rect.width > 0 || rect.height > 0);
+}
+
+function selectorForStrictUiTarget(target: StrictUiCanvasTarget): string {
+  const attribute = target.kind === "instance"
+    ? "data-design-space-instance-id"
+    : target.kind === "outlet"
+      ? "data-design-space-outlet-id"
+      : "data-design-space-slot-id";
+  return `[${attribute}="${escapeAttribute(target.id)}"]`;
 }
 
 function escapeAttribute(value: string): string {

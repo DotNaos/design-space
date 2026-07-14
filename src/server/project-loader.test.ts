@@ -14,12 +14,25 @@ describe("target project discovery", () => {
     roots.push(root);
     await writeFile(join(root, "target.tsx"), "export const target = {};\n");
     await writeFile(join(root, "Card.tsx"), 'const className = "p-4";\n');
+    await writeFile(join(root, "home.design.json"), '{"schemaVersion":2}\n');
     await writeFile(join(root, TARGET_REGISTRATION_FILE), `
       export const registration = {
         project: { id: "external-app", label: "External app" },
         targetModule: "target.tsx",
-        files: { "card.source": "Card.tsx" },
+        files: { "card.source": "Card.tsx", "home.document": "home.design.json" },
         editTargets: { "card.surface": { fileId: "card.source", marker: "className = " } },
+        documentRegistration: {
+          version: "external.v1",
+          tailwindClassList: () => "",
+          documents: {
+            "screen.home": {
+              sourceFileIds: ["home.document"],
+              writeFileIds: ["home.document"],
+              load: (sources) => JSON.parse(sources["home.document"]),
+              materialize: (document) => ({ "home.document": JSON.stringify(document) }),
+            },
+          },
+        },
       };
     `);
 
@@ -27,6 +40,8 @@ describe("target project discovery", () => {
     expect(target.root).toBe(await realpath(root));
     expect(target.project).toEqual({ id: "external-app", label: "External app" });
     expect(target.files.get("card.source")?.displayName).toBe("Card.tsx");
+    expect(target.documentRegistration?.version).toBe("external.v1");
+    expect(target.documentRegistration?.documents.get("screen.home")?.writeFileIds).toEqual(["home.document"]);
   });
 
   it("does not accept a project without the fixed registration file", async () => {

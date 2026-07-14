@@ -35,14 +35,31 @@ export type ComponentTreeRow =
       readonly childCount: number;
       readonly selection: Extract<SelectionTarget, { kind: "slot" }>;
     }
+  | {
+      readonly kind: "slot-outlet";
+      readonly depth: number;
+      readonly label: string;
+      readonly selection: Extract<SelectionTarget, { kind: "slot-outlet" }>;
+    }
   | { readonly kind: "text"; readonly depth: number; readonly label: string; readonly id: string };
 
 export interface ComponentTreeOptions {
   readonly revealInternalHtml?: ReadonlySet<string>;
+  readonly contractValidation?: ContractValidationMode;
 }
+
+export interface SlotProjectionOptions {
+  readonly contractValidation?: ContractValidationMode;
+}
+
+export type ContractValidationMode = "strict" | "tolerant";
 
 export function slotSelectionId(componentInstanceId: string, slotId: string): string {
   return `slot:${encodeURIComponent(componentInstanceId)}:${encodeURIComponent(slotId)}`;
+}
+
+export function htmlSelectionId(componentInstanceId: string, nodeId: string): string {
+  return `html:${encodeURIComponent(componentInstanceId)}:${encodeURIComponent(nodeId)}`;
 }
 
 export function createSlotSelection(componentInstanceId: string, slotId: string) {
@@ -58,15 +75,25 @@ function countHtmlNodes(nodes: readonly HtmlTreeNode[]): number {
   return nodes.reduce((count, node) => count + 1 + countHtmlNodes(node.children ?? []), 0);
 }
 
-function appendHtmlRows(rows: ComponentTreeRow[], nodes: readonly HtmlTreeNode[], depth: number) {
+function appendHtmlRows(
+  rows: ComponentTreeRow[],
+  nodes: readonly HtmlTreeNode[],
+  depth: number,
+  componentInstanceId: string,
+) {
   for (const node of nodes) {
     rows.push({
       kind: "html",
       depth,
       label: node.tagName,
-      selection: { kind: "html", id: node.id },
+      selection: {
+        kind: "html",
+        id: htmlSelectionId(componentInstanceId, node.id),
+        componentInstanceId,
+        nodeId: node.id,
+      },
     });
-    appendHtmlRows(rows, node.children ?? [], depth + 1);
+    appendHtmlRows(rows, node.children ?? [], depth + 1, componentInstanceId);
   }
 }
 
@@ -97,7 +124,7 @@ function appendInstanceRows(
       nodeCount: countHtmlNodes(internals),
       collapsed: !revealed,
     });
-    if (revealed) appendHtmlRows(rows, internals, depth + 2);
+    if (revealed) appendHtmlRows(rows, internals, depth + 2, instance.instanceId);
   }
 
   const contentBySlot = new Map(instance.slots.map((content) => [content.slotId, content.children]));
@@ -127,7 +154,7 @@ export function buildComponentTree(
   root: ComponentInstance,
   options: ComponentTreeOptions = {},
 ): readonly ComponentTreeRow[] {
-  validateComponentInstance(catalog, root);
+  if (options.contractValidation !== "tolerant") validateComponentInstance(catalog, root);
   const rows: ComponentTreeRow[] = [];
   appendInstanceRows(rows, catalog, root, 0, options);
   return rows;
@@ -136,8 +163,9 @@ export function buildComponentTree(
 export function projectPreviewSlots(
   catalog: AdapterCatalog,
   instance: ComponentInstance,
+  options: SlotProjectionOptions = {},
 ): readonly SlotProjection[] {
-  validateComponentInstance(catalog, instance);
+  if (options.contractValidation !== "tolerant") validateComponentInstance(catalog, instance);
   const adapter = catalog.adapters.get(instance.componentId);
   if (!adapter) return [];
   const contentBySlot = new Map(instance.slots.map((content) => [content.slotId, content.children]));

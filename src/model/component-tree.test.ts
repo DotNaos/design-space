@@ -109,6 +109,33 @@ describe("component tree", () => {
       revealInternalHtml: new Set(["instance-card"]),
     });
     expect(expanded.filter((row) => row.kind === "html").map((row) => row.label)).toEqual(["div", "section"]);
+    expect(expanded.filter((row) => row.kind === "html").map((row) => row.selection)).toMatchObject([
+      { id: "html:instance-card:card.outer", componentInstanceId: "instance-card", nodeId: "card.outer" },
+      { id: "html:instance-card:card.surface", componentInstanceId: "instance-card", nodeId: "card.surface" },
+    ]);
     expect(expanded.find((row) => row.kind === "internals-summary")).toMatchObject({ collapsed: false });
+  });
+
+  it("can project declared slots while an authored instance still uses a removed slot", () => {
+    const staleInstance: ComponentInstance = {
+      ...card(),
+      slots: [{ slotId: "removed", children: [{ kind: "text", id: "copy", value: "Draft" }] }],
+    };
+
+    expect(() => buildComponentTree(catalog, staleInstance)).toThrow("does not declare slot removed");
+    expect(() => projectPreviewSlots(catalog, staleInstance)).toThrow("does not declare slot removed");
+
+    const options = { contractValidation: "tolerant" as const };
+    expect(buildComponentTree(catalog, staleInstance, options).filter((row) => row.kind === "slot"))
+      .toMatchObject([
+        { label: "Header", occupied: false, childCount: 0 },
+        { label: "Body", occupied: false, childCount: 0 },
+        { label: "Footer", occupied: false, childCount: 0 },
+      ]);
+    expect(projectPreviewSlots(catalog, staleInstance, options)).toMatchObject([
+      { label: "Header", occupied: false, childCount: 0 },
+      { label: "Body", occupied: false, childCount: 0 },
+      { label: "Footer", occupied: false, childCount: 0 },
+    ]);
   });
 });

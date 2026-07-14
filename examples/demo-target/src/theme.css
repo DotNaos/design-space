@@ -1,0 +1,5 @@
+.surface {
+  border-radius: 1.5rem;
+  background-color: color-mix(in oklab, var(--color-zinc-950) 94%, transparent);
+  padding: 1.5rem;
+}
