@@ -30,6 +30,7 @@ import {
 import type { SlotState } from "./types";
 import { useItemEditor } from "./use-item-editor";
 import { DocumentWorkspace } from "./DocumentWorkspace";
+import { usesDocumentWorkspace } from "./workspace-selection";
 
 const initialVersion = "0".repeat(64);
 type TargetResult = { view: TargetViewModel; error?: never } | { view?: never; error: string };
@@ -37,7 +38,7 @@ type SlotSelection = Extract<SelectionTarget, { kind: "slot" }>;
 type FixtureUndo = { fixture: ComponentFixture; compositionCss: Readonly<Record<string, string>>; undoRootEdit: boolean };
 
 export function App() {
-  return target.defaultDocumentId ? <DocumentWorkspace target={target} /> : <LegacyWorkspace />;
+  return usesDocumentWorkspace(target) ? <DocumentWorkspace target={target} /> : <LegacyWorkspace />;
 }
 
 function LegacyWorkspace() {
