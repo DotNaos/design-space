@@ -97,9 +97,10 @@ it("opens a default component document in Library mode after loading", async () 
 
   await userEvent.click(await screen.findByRole("button", { name: "Open Project" }));
   expect(await screen.findByText("Components")).toBeVisible();
-  const projectBrowser = screen.getByRole("region", { name: "Project browser" });
-  expect(within(projectBrowser).getByRole("button", { name: "Panel" })).toHaveAttribute("aria-current", "page");
-  expect(screen.queryByText("Screens")).not.toBeInTheDocument();
+  const components = screen.getByRole("region", { name: "Components" });
+  expect(within(components).getByRole("button", { name: "Panel" })).toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("heading", { name: "Layers" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Documents" })).not.toBeInTheDocument();
 });
 
 it("blocks an unsourced fallback after the initial read fails and recovers on focus", async () => {

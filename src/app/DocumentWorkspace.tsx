@@ -369,6 +369,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
       />
       <DocumentWorkspacePanels
         projectId={target.project.id}
+        projectLabel={target.project.label}
         documentId={document.id}
         documentLabel={document.label}
         documentKind={document.kind}

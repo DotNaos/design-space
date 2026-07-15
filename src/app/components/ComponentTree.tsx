@@ -13,6 +13,7 @@ import {
 
 type ComponentTreeProps = {
   className?: string;
+  embedded?: boolean;
   pageLabel: string;
   rows: readonly ComponentTreeRow[];
   selectedId: string;
@@ -35,6 +36,7 @@ export function ComponentTree(props: ComponentTreeProps) {
   const treeRef = useRef<HTMLDivElement>(null);
   const [collapsedBranches, setCollapsedBranches] = useState<ReadonlySet<string>>(() => new Set());
   const markers = buildStrictUiSelectionMarkers(props.strictUiViolations ?? []);
+  const levelOffset = props.embedded ? 1 : 2;
   const selectedPath = useMemo(() => treeSelectionPath(props.rows, props.selectedId), [props.rows, props.selectedId]);
   const visibleRows = useMemo(() => visibleTreeRows(props.rows, collapsedBranches), [collapsedBranches, props.rows]);
 
@@ -61,10 +63,10 @@ export function ComponentTree(props: ComponentTreeProps) {
     props.onCollapseAll?.();
   };
   return (
-    <aside className={`${props.className ?? "flex w-64"} min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
+    <aside className={`${props.className ?? "flex w-64"} min-w-0 shrink-0 flex-col ${props.embedded ? "" : "border-r border-white/10 bg-[#141518]"}`}>
       <div className="flex h-11 items-center gap-2 border-b border-white/10 px-3">
-        <h2 className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-300">Component tree</h2>
-        <span className="max-w-20 truncate text-[10px] text-zinc-600">{props.pageLabel}</span>
+        <h2 className="min-w-0 flex-1 truncate text-xs font-semibold text-zinc-200">{props.embedded ? "Layers" : "Component tree"}</h2>
+        {!props.embedded && <span className="max-w-20 truncate text-[10px] text-zinc-600">{props.pageLabel}</span>}
         <Tooltip delay={350}>
           <button
             aria-label="Collapse all tree branches"
@@ -104,17 +106,20 @@ export function ComponentTree(props: ComponentTreeProps) {
         }}
         onKeyDown={navigateTree}
       >
-        <div aria-expanded="true" aria-level={1} className="flex h-11 items-center gap-2 px-3 text-zinc-400 lg:h-8" role="treeitem">
-          <ChevronDown size={13} className="text-zinc-600" />
-          <FileBox size={14} />
-          <span className="truncate">{props.pageLabel}</span>
-        </div>
+        {!props.embedded && (
+          <div aria-expanded="true" aria-level={1} className="flex h-11 items-center gap-2 px-3 text-zinc-400 lg:h-8" role="treeitem">
+            <ChevronDown size={13} className="text-zinc-600" />
+            <FileBox size={14} />
+            <span className="truncate">{props.pageLabel}</span>
+          </div>
+        )}
         {visibleRows.map((row, index) => (
           <TreeRow
             key={`${row.kind}-${"selection" in row ? row.selection.id : index}`}
             row={row}
             selectedId={props.selectedId}
             marker={strictUiMarkerForTreeRow(row, markers)}
+            levelOffset={levelOffset}
             onHover={props.onHover}
             onHoverInternals={props.onHoverInternals}
             onContextMenuRequest={props.onContextMenuRequest}
@@ -147,6 +152,7 @@ function TreeRow(props: {
   row: ComponentTreeRow;
   selectedId: string;
   marker?: StrictUiMarker;
+  levelOffset: number;
   onHover?: (selection: SelectionTarget | undefined) => void;
   onHoverInternals?: (componentInstanceId: string | undefined) => void;
   onContextMenuRequest?: (selection: SelectionTarget, position: { x: number; y: number }) => void;
@@ -158,7 +164,7 @@ function TreeRow(props: {
     return (
       <button
         aria-expanded={!row.collapsed}
-        aria-level={row.depth + 2}
+        aria-level={row.depth + props.levelOffset}
         className="flex h-11 w-full items-center gap-2 pr-2 text-left text-zinc-500 hover:bg-white/[0.03] lg:h-8"
         data-tree-disclosure="true"
         role="treeitem"
@@ -200,7 +206,7 @@ function TreeRow(props: {
   const marker = props.marker;
   return (
     <button
-      aria-level={row.depth + 2}
+      aria-level={row.depth + props.levelOffset}
       aria-selected={selected}
       className={`flex min-h-11 w-full items-center gap-2 border-l-2 pr-3 text-left lg:min-h-8 ${selected ? "border-sky-400 bg-sky-500/10 text-zinc-100" : "border-transparent text-zinc-400 hover:bg-white/[0.03]"}`}
       data-design-space-selection-id={selection.id}
@@ -244,6 +250,7 @@ function ComponentRow(props: {
   row: Extract<ComponentTreeRow, { kind: "component" }>;
   selectedId: string;
   marker?: StrictUiMarker;
+  levelOffset: number;
   onHover?: (selection: SelectionTarget | undefined) => void;
   onHoverInternals?: (componentInstanceId: string | undefined) => void;
   onContextMenuRequest?: (selection: SelectionTarget, position: { x: number; y: number }) => void;
@@ -266,7 +273,7 @@ function ComponentRow(props: {
     >
       <button
         aria-expanded={internals ? !internals.collapsed : undefined}
-        aria-level={row.depth + 2}
+        aria-level={row.depth + props.levelOffset}
         aria-selected={selected}
         className="flex min-h-11 min-w-0 flex-1 items-center gap-2 pr-2 text-left lg:min-h-8"
         data-design-space-selection-id={selection.id}

@@ -226,6 +226,24 @@ describe("ComponentTree Strict UI markers", () => {
     expect(screen.getByRole("treeitem", { name: "Card" })).toHaveAttribute("aria-selected", "true");
     expect(onCollapseAll).toHaveBeenCalledOnce();
   });
+
+  it("embeds layers without repeating the active page as a tree row", () => {
+    render(
+      <ComponentTree
+        embedded
+        pageLabel="Dashboard"
+        rows={rows}
+        selectedId="card.one"
+        showInternals={false}
+        onSelect={vi.fn()}
+        onToggleInternals={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Layers" })).toBeVisible();
+    expect(screen.queryByRole("treeitem", { name: "Dashboard" })).not.toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: "Card" })).toHaveAttribute("aria-level", "1");
+  });
 });
 
 const rows: readonly ComponentTreeRow[] = [

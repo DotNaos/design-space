@@ -23,6 +23,7 @@ type SlotSelection = Extract<SelectionTarget, { kind: "slot" }>;
 
 export function DocumentWorkspacePanels(props: {
   projectId: string;
+  projectLabel: string;
   documentId: string;
   documentLabel: string;
   documentKind: "screen" | "component";
@@ -114,6 +115,7 @@ export function DocumentWorkspacePanels(props: {
   const componentTree = props.modeDocumentAvailable ? (
     <ComponentTree
       className="flex h-full w-full border-r-0"
+      embedded
       pageLabel={props.documentLabel}
       rows={props.rows}
       selectedId={props.selection.id}
@@ -184,9 +186,19 @@ export function DocumentWorkspacePanels(props: {
     />
   ) : props.rightOverride ?? slotInspector ?? props.desktopEditor;
   const left = (
-    <WorkspaceSidebar active={props.sidebarView} onChange={props.onSidebarViewChange}>
-      {props.sidebarView === "tree" ? componentTree : projectBrowser(false)}
-    </WorkspaceSidebar>
+    <WorkspaceSidebar
+      active={props.sidebarView}
+      activeDocumentId={props.modeDocumentAvailable ? props.activeDocumentId : undefined}
+      auxiliary={props.sidebarView === "files" || props.sidebarView === "catalog" ? projectBrowser(false) : undefined}
+      canCreate={props.canCreate}
+      entries={props.entries}
+      layers={componentTree}
+      mode={props.mode}
+      projectLabel={props.projectLabel}
+      onChange={props.onSidebarViewChange}
+      onCreate={props.onCreate}
+      onDocumentSelect={props.onDocumentSelect}
+    />
   );
   return (
     <DocumentWorkspaceSurface
@@ -197,8 +209,8 @@ export function DocumentWorkspacePanels(props: {
       left={left}
       canvas={canvas}
       right={right}
-      mobileProject={projectBrowser(true)}
-      mobileTree={componentTree}
+      mobileProject={left}
+      mobileTree={left}
       mobileInspect={slotInspector ?? props.mobileDefinition}
       onMobileDrawerClose={props.onMobileDrawerClose}
     />
