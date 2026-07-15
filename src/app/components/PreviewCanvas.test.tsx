@@ -353,6 +353,36 @@ describe("preview canvas", () => {
     expect(grid.dataset.gridMode).toBe("lines");
   });
 
+  it("configures a persistent overlay layout grid from the HUD menu", async () => {
+    render(
+      <PreviewCanvas
+        compact
+        preview={<div data-design-space-instance-id="one">One</div>}
+        rootInstanceId="one"
+        selectedComponentInstanceId="one"
+        selection={{ kind: "component", id: "one" }}
+        selectionLabel="One"
+        slots={[]}
+        onSelect={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Layout grid settings" }));
+    const enabled = await screen.findByRole("switch", { name: "Show layout grid" });
+    fireEvent.click(enabled);
+
+    const fade = document.querySelector<HTMLElement>('[data-layout-grid-layer="fade"]')!;
+    expect(fade.dataset.layoutGridStep).toBe("8");
+
+    fireEvent.click(screen.getByRole("radio", { name: "4 px" }));
+    expect(fade.dataset.layoutGridStep).toBe("4");
+
+    const color = screen.getByRole("textbox", { name: "Custom layout grid color" });
+    fireEvent.change(color, { target: { value: "#34D399" } });
+    fireEvent.blur(color);
+    await waitFor(() => expect(fade.style.backgroundImage).toContain("52, 211, 153"));
+  });
+
   it("scales an empty slot's minimum height with the canvas instead of the viewport", async () => {
     render(
       <PreviewCanvas

@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { StrictUiViolation } from "../../shared/strict-ui";
-import { fitCanvas, zoomCanvasAt, type CanvasCamera, type Point } from "../canvas-transform";
+import { fitCanvas, zoomCanvasAt, type CanvasCamera } from "../canvas-transform";
 import { indexPreviewDom, type PreviewDomSnapshot } from "../dom/dom-snapshot";
 import { StrictUiIndicator, strictUiOutlineTone } from "../strict-ui/StrictUiIndicator";
 import {
@@ -29,7 +29,9 @@ import {
   selectionForCanvasTarget,
   type CanvasContextMenuRequest,
 } from "./canvas-target-selection";
-import { CanvasViewportControls, type CanvasGridMode } from "./CanvasViewportControls";
+import { CanvasGridLayer } from "./CanvasGridLayer";
+import { CanvasViewportControls } from "./CanvasViewportControls";
+import { defaultCanvasLayoutGrid, type CanvasGridMode } from "./canvas-grid-types";
 import { useCanvasTrackpadGestures } from "./use-canvas-trackpad-gestures";
 import { useCanvasTouchGestures } from "./use-canvas-touch-gestures";
 
@@ -72,8 +74,9 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const [internalHtmlRect, setInternalHtmlRect] = useState<ViewRect>();
   const [emptyRects, setEmptyRects] = useState<Readonly<Record<string, ViewRect>>>({});
   const [strictUiRects, setStrictUiRects] = useState<readonly MeasuredStrictUiTarget[]>([]);
-  const [gridAnchor, setGridAnchor] = useState<Point>();
+  const [gridRootRect, setGridRootRect] = useState<ViewRect>();
   const [gridMode, setGridMode] = useState<CanvasGridMode>("dots");
+  const [layoutGrid, setLayoutGrid] = useState(defaultCanvasLayoutGrid);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showGestureHint, setShowGestureHint] = useState(true);
   const [interactionMode, setInteractionMode] = useState<"select" | "interact">("select");
@@ -129,10 +132,13 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       : { width: viewportRect.width, height: viewportRect.height });
     const rootRect = measureCanvasSelector(world, selectorForSelection({ kind: "component", id: props.rootInstanceId }), viewportRect);
     if (rootRect) {
-      setGridAnchor((current) => current?.x === rootRect.left && current.y === rootRect.top
+      setGridRootRect((current) => current?.left === rootRect.left
+        && current.top === rootRect.top
+        && current.width === rootRect.width
+        && current.height === rootRect.height
         ? current
-        : { x: rootRect.left, y: rootRect.top });
-    } else setGridAnchor((current) => current === undefined ? current : undefined);
+        : rootRect);
+    } else setGridRootRect((current) => current === undefined ? current : undefined);
     setSelectionRect(measureCanvasSelector(world, selectorForSelection(props.selection), viewportRect));
     const hoveredSelection = pointerHoveredSelection ?? props.hoveredSelection;
     setHoveredRect(hoveredSelection && !sameSelection(hoveredSelection, props.selection)
@@ -208,7 +214,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     touchGestures.resetTouchGestures();
     suppressClick.current = false;
     autoFit.current = true;
-    setGridAnchor(undefined);
+    setGridRootRect(undefined);
     setShowGestureHint(true);
     setInteractionMode("select");
     setCamera({ x: 16, y: props.compact ? 44 : 56, scale: 1 });
@@ -236,18 +242,11 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   };
 
   const grid = useMemo(
-    () => canvasGridPresentation(camera.scale, gridAnchor ?? { x: camera.x, y: camera.y }),
-    [camera.scale, camera.x, camera.y, gridAnchor],
+    () => canvasGridPresentation(camera.scale, gridRootRect
+      ? { x: gridRootRect.left, y: gridRootRect.top }
+      : { x: camera.x, y: camera.y }),
+    [camera.scale, camera.x, camera.y, gridRootRect],
   );
-  const gridBackground = gridMode === "dots"
-    ? {
-      image: `radial-gradient(circle, #52525b ${grid.dotRadius}px, transparent ${grid.dotRadius}px)`,
-      position: `${grid.backgroundPositionX}px ${grid.backgroundPositionY}px`,
-    }
-    : {
-      image: "linear-gradient(to right, #52525b 1px, transparent 1px), linear-gradient(to bottom, #52525b 1px, transparent 1px)",
-      position: `${grid.anchorX}px ${grid.anchorY}px`,
-    };
   const emptySlotOverlayRects = useMemo(() => layoutEmptySlotOverlays(
     props.slots.filter((slot) => slot.count === 0).flatMap((slot) => {
       const rect = emptyRects[slot.selectionId];
@@ -383,24 +382,19 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       onPointerUp={touchGestures.finishPointer}
       tabIndex={interactionMode === "select" ? 0 : -1}
     >
-      <div
-        className="pointer-events-none absolute inset-0"
-        data-dot-radius={grid.dotRadius}
-        data-grid-mode={gridMode}
-        data-testid="canvas-grid"
-        data-world-step={grid.worldStep}
-        style={{
-          backgroundImage: gridBackground.image,
-          backgroundPosition: gridBackground.position,
-          backgroundSize: `${grid.screenStep}px ${grid.screenStep}px`,
-          opacity: grid.opacity,
-        }}
+      <CanvasGridLayer
+        grid={grid}
+        layoutGrid={layoutGrid}
+        mode={gridMode}
+        rootRect={gridRootRect}
+        scale={camera.scale}
       />
 
       <CanvasViewportControls
         compact={props.compact}
         gridMode={gridMode}
         interactionMode={interactionMode}
+        layoutGrid={layoutGrid}
         scale={camera.scale}
         onFit={() => {
           suppressClick.current = false;
@@ -409,6 +403,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         }}
         onReset={reset}
         onGridModeChange={setGridMode}
+        onLayoutGridChange={setLayoutGrid}
         onZoomIn={() => zoomBy(0.1)}
         onZoomOut={() => zoomBy(-0.1)}
         onToggleInteractionMode={() => setInteractionMode((current) => current === "select" ? "interact" : "select")}
