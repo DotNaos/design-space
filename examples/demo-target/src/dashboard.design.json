@@ -1,0 +1,78 @@
+{
+  "id": "screen.dashboard",
+  "kind": "screen",
+  "label": "Dashboard",
+  "root": {
+    "adapterId": "card",
+    "instanceId": "review-card",
+    "label": "Dashboard",
+    "props": {
+      "className": "rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl"
+    },
+    "slots": {
+      "body": [
+        {
+          "kind": "component",
+          "node": {
+            "adapterId": "stack",
+            "instanceId": "review-stack",
+            "slots": {
+              "content": [
+                {
+                  "kind": "component",
+                  "node": {
+                    "adapterId": "text",
+                    "instanceId": "review-copy",
+                    "slots": {}
+                  }
+                },
+                {
+                  "kind": "component",
+                  "node": {
+                    "adapterId": "badge",
+                    "instanceId": "review-badge",
+                    "slots": {}
+                  }
+                },
+                {
+                  "kind": "component",
+                  "node": {
+                    "adapterId": "panel",
+                    "instanceId": "review-panel",
+                    "slots": {
+                      "content": [
+                        {
+                          "kind": "component",
+                          "node": {
+                            "adapterId": "text",
+                            "instanceId": "review-panel-copy",
+                            "props": {
+                              "children": "This panel is composed from the authored component document."
+                            },
+                            "slots": {}
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "footer": [],
+      "header": [
+        {
+          "kind": "component",
+          "node": {
+            "adapterId": "heading",
+            "instanceId": "review-heading",
+            "slots": {}
+          }
+        }
+      ]
+    }
+  },
+  "schemaVersion": 2
+}

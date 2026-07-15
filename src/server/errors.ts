@@ -4,11 +4,13 @@ export type DesignSpaceErrorCode =
   | "ACCESS_DENIED"
   | "NOT_FOUND"
   | "INVALID_ADAPTER"
+  | "INVALID_DOCUMENT"
   | "INVALID_TAILWIND"
   | "VALIDATION_ERROR"
   | "COMPILE_ERROR"
   | "STALE_SOURCE"
-  | "CHALLENGE_EXPIRED";
+  | "CHALLENGE_EXPIRED"
+  | "TRANSACTION_FAILED";
 
 export class DesignSpaceError extends Error {
   readonly code: DesignSpaceErrorCode;

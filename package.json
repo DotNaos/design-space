@@ -10,6 +10,7 @@
   "exports": {
     "./server": "./src/server/index.ts",
     "./contracts": "./src/shared/contracts.ts",
+    "./documents": "./src/shared/documents.ts",
     "./target": "./src/shared/target-module.ts"
   },
   "scripts": {
@@ -17,14 +18,17 @@
     "dev:raw": "bun ./scripts/dev.ts --raw",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "bun run test:unit && bun run test:tailwind",
+    "test:unit": "vitest run --project server --project ui",
+    "test:tailwind": "vitest run --project tailwind-integration",
+    "test:watch": "vitest --project server --project ui",
     "verify": "bun run typecheck && bun run test && bun run build && bun run verify:local-only",
     "verify:local-only": "bun ./scripts/verify-local-only.ts"
   },
   "dependencies": {
     "@heroui/react": "^3.0.5",
     "@heroui/styles": "^3.0.5",
+    "@tailwindcss/language-server": "0.14.29",
     "lucide-react": "^0.468.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -38,12 +42,12 @@
     "@types/bun": "^1.2.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^5",
     "jsdom": "^25.0.1",
     "portless": "^0.6.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.7.2",
-    "vite": "^6.0.6",
-    "vitest": "^2.1.8"
+    "vite": "^7",
+    "vitest": "^4"
   }
 }

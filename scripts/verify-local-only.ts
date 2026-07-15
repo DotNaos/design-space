@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 
 const root = resolve(import.meta.dir, "..");
 const forbiddenHostingFiles = ["vercel.json", ".vercel", "netlify.toml"];
+const forbiddenRuntimePattern = /design-space-target|\/__design-space\/api|tailwindcss-language-server|@tailwindcss\/language-server|analyze-tailwind/i;
 
 for (const name of forbiddenHostingFiles) {
   if (existsSync(resolve(root, name))) {
@@ -25,13 +26,34 @@ if (build.status !== 0) {
 }
 
 const files = readdirSync(output, { recursive: true, withFileTypes: true });
+let productionText = "";
 for (const file of files) {
   if (!file.isFile()) continue;
   const text = readFileSync(resolve(file.parentPath, file.name), "utf8");
-  if (/design[- ]space|design-space-target|\/api\/design-space/i.test(text)) {
+  productionText += text;
+  if (forbiddenRuntimePattern.test(text)) {
     throw new Error(`Design Space leaked into target production artifact: ${file.name}`);
   }
 }
 
+for (const expected of ["screen.dashboard", "component.panel", "review-panel"]) {
+  if (!productionText.includes(expected)) {
+    throw new Error(`Target production build did not consume the saved composition: ${expected}`);
+  }
+}
+
 rmSync(output, { force: true, recursive: true });
-console.log("Local-only boundary verified: target production output contains no Design Space runtime.");
+
+const browserOutput = resolve(root, "dist");
+if (!existsSync(browserOutput)) {
+  throw new Error("Local-only boundary failed: build the Design Space browser bundle before verification.");
+}
+for (const file of readdirSync(browserOutput, { recursive: true, withFileTypes: true })) {
+  if (!file.isFile()) continue;
+  const text = readFileSync(resolve(file.parentPath, file.name), "utf8");
+  if (/tailwindcss-language-server|@tailwindcss\/language-server/i.test(text)) {
+    throw new Error(`Server-only Tailwind tooling leaked into the browser bundle: ${file.name}`);
+  }
+}
+
+console.log("Local-only boundary verified: target production and browser artifacts exclude the Design Space server runtime and Tailwind language-server executable.");

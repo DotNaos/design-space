@@ -2,6 +2,7 @@ import { DesignSpaceError } from "./errors";
 
 const forbiddenCharacters = /[\0-\x1f\x7f'"`{};<>\\]/;
 const allowedToken = /^[a-zA-Z0-9_!@#$%&*+,.\-/:=\[\]()|~?]+$/;
+const maximumClassTokens = 256;
 
 function balanced(token: string, open: string, close: string): boolean {
   let depth = 0;
@@ -19,7 +20,12 @@ export function validateTailwindClassList(value: string): string {
   }
   if (normalized === "") return normalized;
 
-  for (const token of normalized.split(" ")) {
+  const tokens = normalized.split(" ");
+  if (tokens.length > maximumClassTokens) {
+    throw new DesignSpaceError("INVALID_TAILWIND", "The class list contains too many utilities");
+  }
+  const seen = new Set<string>();
+  for (const token of tokens) {
     if (
       token.length > 300 ||
       !allowedToken.test(token) ||
@@ -28,6 +34,10 @@ export function validateTailwindClassList(value: string): string {
     ) {
       throw new DesignSpaceError("INVALID_TAILWIND", `Invalid Tailwind class token: ${token}`);
     }
+    if (seen.has(token)) {
+      throw new DesignSpaceError("INVALID_TAILWIND", `Duplicate Tailwind class: ${token}`);
+    }
+    seen.add(token);
   }
   return normalized;
 }

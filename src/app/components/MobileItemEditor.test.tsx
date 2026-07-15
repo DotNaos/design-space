@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MobileItemEditor, replaceClassGroup } from "./MobileItemEditor";
+
+afterEach(cleanup);
 
 describe("mobile item editor", () => {
   it("keeps class replacement scoped to one property group", () => {
@@ -12,6 +14,7 @@ describe("mobile item editor", () => {
   it("exposes staged item actions and blocks Apply on compile errors", () => {
     const onCancel = vi.fn();
     const onControlChange = vi.fn();
+    const onSelectSlot = vi.fn();
     render(
       <MobileItemEditor
         componentLabel="Text"
@@ -20,11 +23,8 @@ describe("mobile item editor", () => {
           { id: "content", label: "Content", kind: "text", prop: "children" },
         ]}
         controlValues={{ className: "text-sm", children: "Planning" }}
-        preview={<p data-design-space-instance-id="copy">Planning</p>}
         previewCss=""
-        rootInstanceId="root"
-        selectedInstanceId="copy"
-        slots={[]}
+        slots={[{ id: "body", selectionId: "slot:copy:body", label: "Body", count: 0 }]}
         compileError="Unknown Tailwind class"
         compilePending={false}
         sourceBacked={false}
@@ -33,7 +33,7 @@ describe("mobile item editor", () => {
         canDuplicate
         canDelete
         onControlChange={onControlChange}
-        onSelectComponent={vi.fn()}
+        onSelectSlot={onSelectSlot}
         onMove={vi.fn()}
         onDuplicate={vi.fn()}
         onDelete={vi.fn()}
@@ -42,14 +42,24 @@ describe("mobile item editor", () => {
       />,
     );
 
+    const dialog = screen.getByRole("dialog", { name: "Edit Text" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAttribute("data-slot", "drawer-dialog");
+    expect(dialog.querySelector('[data-slot="drawer-handle"]')).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Move up" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Duplicate" })).toBeEnabled();
+    expect(screen.getByRole("tab", { name: "Design" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Properties" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Content" }), { target: { value: "Updated" } });
-    fireEvent.change(screen.getByRole("textbox", { name: "Tailwind classes" }), { target: { value: "text-lg" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Classes" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Tailwind classes" }), { target: { value: "text-lg" } });
     expect(onControlChange).toHaveBeenCalledWith("children", "Updated");
     expect(onControlChange).toHaveBeenCalledWith("className", "text-lg");
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Slots" }));
+    fireEvent.click(screen.getByRole("button", { name: "Body slot, empty" }));
+    expect(onSelectSlot).toHaveBeenCalledWith(expect.objectContaining({ id: "body", count: 0 }));
+    fireEvent.keyDown(dialog, { key: "Escape" });
     expect(onCancel).toHaveBeenCalledOnce();
   });
 
@@ -63,10 +73,7 @@ describe("mobile item editor", () => {
           { id: "copy", label: "Label", kind: "text", prop: "label" },
         ]}
         controlValues={{ classes: "text-sm", label: "Target label" }}
-        preview={<span data-design-space-instance-id="label">Target label</span>}
         previewCss=""
-        rootInstanceId="root"
-        selectedInstanceId="label"
         slots={[]}
         compilePending={false}
         sourceBacked={false}
@@ -75,7 +82,6 @@ describe("mobile item editor", () => {
         canDuplicate={false}
         canDelete
         onControlChange={onControlChange}
-        onSelectComponent={vi.fn()}
         onMove={vi.fn()}
         onDuplicate={vi.fn()}
         onDelete={vi.fn()}
@@ -83,9 +89,46 @@ describe("mobile item editor", () => {
         onApply={vi.fn()}
       />,
     );
+    fireEvent.click(screen.getByRole("tab", { name: "Properties" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Label" }), { target: { value: "Renamed" } });
-    fireEvent.change(screen.getByRole("textbox", { name: "Classes" }), { target: { value: "text-lg" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Classes" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Classes" }), { target: { value: "text-lg" } });
     expect(onControlChange).toHaveBeenCalledWith("label", "Renamed");
     expect(onControlChange).toHaveBeenCalledWith("classes", "text-lg");
+  });
+
+  it("lets Escape close an open property menu before closing the editor", () => {
+    const onCancel = vi.fn();
+    render(
+      <MobileItemEditor
+        componentLabel="Stack"
+        controls={[{ id: "style", label: "Classes", kind: "tailwind", prop: "classes" }]}
+        controlValues={{ classes: "flex gap-3" }}
+        previewCss=""
+        slots={[]}
+        compilePending={false}
+        sourceBacked={false}
+        canMoveUp={false}
+        canMoveDown={false}
+        canDuplicate={false}
+        canDelete
+        onControlChange={vi.fn()}
+        onMove={vi.fn()}
+        onDuplicate={vi.fn()}
+        onDelete={vi.fn()}
+        onCancel={onCancel}
+        onApply={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Size" }));
+    fireEvent.click(screen.getByRole("button", { name: /Width Tailwind utility/ }));
+    const listbox = screen.getByRole("listbox", { name: "Width Tailwind utility" });
+    expect(listbox).toBeVisible();
+    fireEvent.keyDown(listbox, { key: "Escape", code: "Escape" });
+
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Edit Stack" })).toBeVisible();
+    expect(screen.queryByRole("listbox", { name: "Width Tailwind utility" })).not.toBeInTheDocument();
   });
 });

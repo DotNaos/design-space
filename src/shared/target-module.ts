@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 
 import type { ComponentControl, ComponentDescriptor } from "./contracts";
 
@@ -11,10 +11,16 @@ export type PreviewSlotAttributes = Readonly<{
   "data-design-space-slot-id": string;
 }>;
 
+export type PreviewHtmlAttributes = Readonly<{
+  "data-design-space-html-id": string;
+  className?: string;
+}>;
+
 export interface AdapterRenderContext {
   slotChildren: Readonly<Record<string, readonly ReactNode[]>>;
   previewAttributes: PreviewElementAttributes;
   slotAttributes: Readonly<Record<string, PreviewSlotAttributes>>;
+  htmlAttributes: Readonly<Record<string, PreviewHtmlAttributes>>;
 }
 
 export interface ComponentAdapter<Props extends object = Record<string, unknown>> {
@@ -45,6 +51,27 @@ export interface TargetFileEntry {
   parentId?: string;
 }
 
+export interface TargetDocumentEntry {
+  id: string;
+  label: string;
+  kind: "screen" | "component";
+  group?: string;
+}
+
+export interface ComponentCreationRecipe {
+  id: string;
+  label: string;
+  description?: string;
+  rootAdapterId: string;
+  rootSlotId: string;
+}
+
+export interface TargetPreviewRootProps {
+  children: ReactNode;
+}
+
+export type TargetPreviewRoot = ComponentType<TargetPreviewRootProps>;
+
 export interface TargetModule {
   project: {
     id: string;
@@ -52,6 +79,11 @@ export interface TargetModule {
   };
   adapters: readonly ComponentAdapter[];
   defaultAdapterId: string;
+  defaultDocumentId?: string;
+  defaultDocumentLabel?: string;
+  documents?: readonly TargetDocumentEntry[];
+  componentRecipes?: readonly ComponentCreationRecipe[];
+  previewRoot?: TargetPreviewRoot;
   defaultProps?: Readonly<Record<string, unknown>>;
   defaultEditTargetId?: string;
   defaultFixture: ComponentFixture;

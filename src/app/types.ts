@@ -6,6 +6,11 @@ export type SlotState = {
   label: string;
   count: number;
   childLabel?: string;
+  min?: number;
+  max?: number;
+  accepts?: readonly string[];
+  acceptedLabels?: readonly string[];
+  acceptsText?: boolean;
 };
 
 export type Selection = SelectionTarget;

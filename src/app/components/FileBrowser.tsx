@@ -1,3 +1,4 @@
+import { Button } from "@heroui/react";
 import { ChevronDown, FileCode2, FolderOpen } from "lucide-react";
 
 import type { TargetFileEntry } from "../../shared/target-module";
@@ -34,16 +35,16 @@ function renderChildren(
 ): React.ReactNode {
   return files.filter((file) => file.parentId === parentId).map((file) => (
     <div key={file.id}>
-      <button
+      <Button
         aria-selected={selectedId === file.id}
-        className={`flex h-11 w-full items-center gap-2 pr-2 text-left lg:h-8 ${selectedId === file.id ? "bg-indigo-500/10 text-indigo-200" : "hover:bg-white/[0.03]"}`}
+        className={`flex h-11 w-full items-center justify-start gap-2 rounded-none pr-2 text-left lg:h-8 ${selectedId === file.id ? "bg-sky-500/10 text-sky-200" : "hover:bg-white/[0.03]"}`}
         style={{ paddingLeft: 10 + depth * 16 }}
-        type="button"
-        onClick={() => onSelect(file.id)}
+        variant="ghost"
+        onPress={() => onSelect(file.id)}
       >
         {file.kind === "directory" ? <><ChevronDown size={13} /><FolderOpen size={14} /></> : <><span className="w-[13px]" /><FileCode2 size={13} /></>}
         <span className="truncate">{file.label}</span>
-      </button>
+      </Button>
       {file.kind === "directory" && renderChildren(files, file.id, depth + 1, selectedId, onSelect)}
     </div>
   ));

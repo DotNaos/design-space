@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import target from "virtual:design-space-target";
 
 import { createEditorState, editorReducer, isDirty } from "../editor";
@@ -29,24 +29,31 @@ import {
 } from "./target-model";
 import type { SlotState } from "./types";
 import { useItemEditor } from "./use-item-editor";
+import { DocumentWorkspace } from "./DocumentWorkspace";
+import { createPortableDraftId } from "./document/design-id";
+import { isLegacyPrepareCompileFailure } from "./legacy-prepare-error";
+import { usesDocumentWorkspace } from "./workspace-selection";
 
 const initialVersion = "0".repeat(64);
-let draftInstanceSequence = 0;
 type TargetResult = { view: TargetViewModel; error?: never } | { view?: never; error: string };
 type SlotSelection = Extract<SelectionTarget, { kind: "slot" }>;
 type FixtureUndo = { fixture: ComponentFixture; compositionCss: Readonly<Record<string, string>>; undoRootEdit: boolean };
 
 export function App() {
-  const [showInternals, setShowInternals] = useState(false);
+  return usesDocumentWorkspace(target) ? <DocumentWorkspace target={target} /> : <LegacyWorkspace />;
+}
+
+function LegacyWorkspace() {
+  const [revealedInternals, setRevealedInternals] = useState<ReadonlySet<string>>(() => new Set());
   const [fixture, setFixture] = useState<ComponentFixture>(target.defaultFixture);
   const [fixtureUndoStack, setFixtureUndoStack] = useState<FixtureUndo[]>([]);
   const targetResult = useMemo<TargetResult>(() => {
     try {
-      return { view: createTargetViewModel(target, showInternals, fixture) } as const;
+      return { view: createTargetViewModel(target, revealedInternals, fixture) } as const;
     } catch (error) {
       return { error: error instanceof Error ? error.message : "The target adapter is invalid." } as const;
     }
-  }, [fixture, showInternals]);
+  }, [fixture, revealedInternals]);
   const initialClassName = getInitialClassName();
   const [editor, dispatch] = useReducer(editorReducer, createEditorState(initialClassName, initialVersion));
   const [connected, setConnected] = useState(false);
@@ -61,6 +68,7 @@ export function App() {
   const [previewCss, setPreviewCss] = useState("");
   const [previewValue, setPreviewValue] = useState<string>();
   const [compositionCss, setCompositionCss] = useState<Readonly<Record<string, string>>>({});
+  const sourceReadSequence = useRef(0);
   const editTargetId = target.defaultEditTargetId;
   const commitFixture = useCallback((next: ComponentFixture, metadata?: { undoRootEdit?: boolean }) => {
     if (next === fixture) return;
@@ -77,12 +85,15 @@ export function App() {
       setConnected(true);
       return;
     }
+    const readId = ++sourceReadSequence.current;
     try {
       const snapshot = await runLocalOperation<SourceSnapshot>({ type: "read-source", editTargetId });
+      if (readId !== sourceReadSequence.current) return;
       dispatch({ type: "source-changed", value: snapshot.value, sourceVersion: snapshot.version });
       setConnected(true);
       setRuntimeMessage(undefined);
     } catch (error) {
+      if (readId !== sourceReadSequence.current) return;
       setConnected(false);
       setRuntimeMessage(messageFor(error));
     }
@@ -146,7 +157,8 @@ export function App() {
       return prepared;
     } catch (error) {
       if (error instanceof LocalOperationError && error.code === "STALE_SOURCE") await readSource();
-      else dispatch({ type: "compile-failed", message: messageFor(error) });
+      else if (isLegacyPrepareCompileFailure(error)) dispatch({ type: "compile-failed", message: messageFor(error) });
+      else dispatch({ type: "prepare-failed" });
       setRuntimeMessage(messageFor(error));
       return undefined;
     }
@@ -162,9 +174,16 @@ export function App() {
       dispatch({ type: "save-succeeded", preparedEditId, savedValue: result.value, sourceVersion: result.version });
       setShowDiff(false);
       setRuntimeMessage(undefined);
+      await readSource();
       window.setTimeout(() => dispatch({ type: "preview-ready" }), 900);
     } catch (error) {
-      if (error instanceof LocalOperationError && error.code === "STALE_SOURCE") await readSource();
+      const staleSource = error instanceof LocalOperationError && error.code === "STALE_SOURCE";
+      dispatch({
+        type: "save-failed",
+        preparedEditId,
+        reason: staleSource ? "stale-source" : "transient",
+      });
+      if (staleSource) await readSource();
       setRuntimeMessage(messageFor(error));
     }
   }, [editor.phase, editor.preparedEdit, readSource]);
@@ -176,7 +195,7 @@ export function App() {
     connected,
     basePreviewCss: previewCss,
     compositionCss,
-    createId: nextDraftId,
+    createId: createPortableDraftId,
     onCommitFixture: commitFixture,
     onApplyRootClass: (value) => dispatch({ type: "edit", value }),
     onApplyCompositionCss: (instanceId, css) => setCompositionCss((current) => ({ ...current, [instanceId]: css })),
@@ -186,6 +205,19 @@ export function App() {
   if (!targetResult.view) return <BlockedTarget message={targetResult.error ?? "The target adapter is invalid."} />;
 
   const { view } = targetResult;
+  const internalTreeIds = view.rows.flatMap((row) => (
+    row.kind === "component" && row.internalHtml ? [row.selection.id] : []
+  ));
+  const showInternals = internalTreeIds.length > 0 && internalTreeIds.every((id) => revealedInternals.has(id));
+  const toggleInternals = (componentInstanceId?: string) => setRevealedInternals((current) => {
+    if (componentInstanceId) {
+      const next = new Set(current);
+      if (next.has(componentInstanceId)) next.delete(componentInstanceId);
+      else next.add(componentInstanceId);
+      return next;
+    }
+    return showInternals ? new Set() : new Set(internalTreeIds);
+  });
   const selectedComponentInstanceId = selection.kind === "slot"
     ? selection.componentInstanceId
     : selection.kind === "component" ? selection.id : view.root.instanceId;
@@ -217,7 +249,7 @@ export function App() {
   };
   const editable = connected && Boolean(editTargetId) && selectedInstance.instanceId === view.root.instanceId;
   const tailwindReady = previewValue === editor.draftValue;
-  const preview = renderTargetFixture(target, fixture, { className: editor.draftValue });
+  const preview = itemEditorController.model?.preview ?? renderTargetFixture(target, fixture, { className: editor.draftValue });
   const selectionLabel = selection.kind === "slot"
     ? slots.find((slot) => slot.id === selection.slotId)?.label ?? "Slot"
     : selectedAdapter.component.label;
@@ -262,7 +294,7 @@ export function App() {
       return false;
     }
     const child: ComponentFixture = {
-      instanceId: nextDraftId(),
+      instanceId: createPortableDraftId(),
       adapterId,
       props: childAdapter.defaultProps,
       slots: Object.fromEntries(childAdapter.component.slots.map((slot) => [slot.id, []])),
@@ -290,7 +322,7 @@ export function App() {
 
   return (
     <div className="flex h-dvh w-full min-w-0 flex-col overflow-hidden bg-[#0d0e10] text-zinc-200">
-      <style data-design-space-tailwind-preview>{`${previewCss}\n${Object.values(compositionCss).join("\n")}`}</style>
+      <style data-design-space-tailwind-preview>{itemEditorController.model?.previewCss ?? `${previewCss}\n${Object.values(compositionCss).join("\n")}`}</style>
       <TopBar
         targetLabel={target.project.label}
         connected={connected}
@@ -311,10 +343,15 @@ export function App() {
           } else dispatch({ type: "undo" });
         }}
         onReset={() => {
+          if (editor.phase === "stale" && !editor.staleSource) {
+            void readSource();
+            return;
+          }
           dispatch({ type: "reset" });
           setFixture(target.defaultFixture);
           setFixtureUndoStack([]);
           setCompositionCss({});
+          setRevealedInternals(new Set());
           setSelection(initialSelection(safeInitialView()));
           setRuntimeMessage(undefined);
           setShowDiff(false);
@@ -329,14 +366,14 @@ export function App() {
 
         {mobileMode !== "preview" && (
           <div className="flex min-h-0 min-w-0 flex-1 lg:hidden">
-            {mobileMode === "tree" && <ComponentTree className="flex w-full border-r-0" pageLabel={target.defaultFixture.label ?? target.project.label} rows={view.rows} selectedId={selection.id} showInternals={showInternals} onSelect={selectTarget} onToggleInternals={() => setShowInternals((value) => !value)} />}
+            {mobileMode === "tree" && <ComponentTree className="flex w-full border-r-0" pageLabel={target.defaultFixture.label ?? target.project.label} rows={view.rows} selectedId={selection.id} showInternals={showInternals} onSelect={selectTarget} onToggleInternals={toggleInternals} />}
             {mobileMode === "files" && <FileBrowser className="flex w-full border-r-0" files={target.files} selectedId={selectedFileId} onSelect={setSelectedFileId} />}
             {mobileMode === "catalog" && <CatalogPanel className="flex w-full border-r-0" entries={catalogEntries} selectedId={selectedCatalogId} onSelect={browseCatalogComponent} />}
             {mobileMode === "inspector" && <Inspector className="flex w-full border-l-0" {...inspectorProps} />}
           </div>
         )}
 
-        {workspaceMode === "tree" && <ComponentTree className="hidden w-64 lg:flex" pageLabel={target.defaultFixture.label ?? target.project.label} rows={view.rows} selectedId={selection.id} showInternals={showInternals} onSelect={selectTarget} onToggleInternals={() => setShowInternals((value) => !value)} />}
+        {workspaceMode === "tree" && <ComponentTree className="hidden w-64 lg:flex" pageLabel={target.defaultFixture.label ?? target.project.label} rows={view.rows} selectedId={selection.id} showInternals={showInternals} onSelect={selectTarget} onToggleInternals={toggleInternals} />}
         {workspaceMode === "files" && <FileBrowser className="hidden w-64 lg:flex" files={target.files} selectedId={selectedFileId} onSelect={setSelectedFileId} />}
         {(workspaceMode === "catalog" || workspaceMode === "search") && <CatalogPanel className="hidden w-64 lg:flex" entries={catalogEntries} selectedId={selectedCatalogId} onSelect={browseCatalogComponent} />}
         {workspaceMode === "inspector" && <Inspector className="hidden w-72 lg:flex xl:hidden" {...inspectorProps} />}
@@ -368,7 +405,14 @@ export function App() {
           else setMobileMode(mode);
         }}
       />
-      {showDiff && editor.preparedEdit && <DiffSheet diff={editor.preparedEdit.exactDiff} onClose={() => setShowDiff(false)} />}
+      {showDiff && editor.preparedEdit && (
+        <DiffSheet
+          diff={editor.preparedEdit.exactDiff}
+          saving={editor.phase === "saving"}
+          onClose={() => setShowDiff(false)}
+          onSave={() => void save()}
+        />
+      )}
       <SlotCatalogDialog open={Boolean(slotPicker)} slotLabel={pickerSlot?.label ?? "slot"} entries={pickerEntries} onClose={() => setSlotPicker(undefined)} onSelect={selectPickerComponent} />
       {itemEditorController.model && (
         <MobileItemEditor
@@ -376,10 +420,7 @@ export function App() {
           sourceLabel={target.files.find((file) => file.id === itemEditorController.model?.adapter.component.sourceFileId)?.label}
           controls={itemEditorController.model.adapter.controls ?? []}
           controlValues={itemEditorController.model.controlValues}
-          preview={itemEditorController.model.preview}
           previewCss={itemEditorController.model.previewCss}
-          rootInstanceId={itemEditorController.model.view.root.instanceId}
-          selectedInstanceId={itemEditorController.model.instance.instanceId}
           slots={itemEditorController.model.slots}
           compileError={itemEditorController.model.compileError}
           compilePending={itemEditorController.model.compilePending}
@@ -389,7 +430,13 @@ export function App() {
           canDuplicate={itemEditorController.model.canDuplicate}
           canDelete={itemEditorController.model.canDelete}
           onControlChange={itemEditorController.updateControl}
-          onSelectComponent={itemEditorController.selectComponent}
+          onSelectSlot={(slot) => {
+            const instanceId = itemEditorController.model?.instance.instanceId;
+            if (!instanceId) return;
+            itemEditorController.close();
+            selectTarget({ kind: "slot", id: slot.selectionId, componentInstanceId: instanceId, slotId: slot.id });
+            setMobileMode(slot.count ? "tree" : "preview");
+          }}
           onMove={itemEditorController.move}
           onDuplicate={itemEditorController.duplicate}
           onDelete={itemEditorController.remove}
@@ -435,10 +482,6 @@ function statusLabel(phase: string, dirty: boolean, connected: boolean, composit
 
 function messageFor(error: unknown) {
   return error instanceof Error ? error.message : "The local operation failed.";
-}
-
-function nextDraftId() {
-  return `draft-${++draftInstanceSequence}`;
 }
 
 function isMobileWorkspace() {

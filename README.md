@@ -21,7 +21,7 @@ Raw Vite startup is blocked. `DESIGN_SPACE_ALLOW_DIRECT=1` is a noisy debugging 
 
 Install Design Space as a development dependency and add a script such as `"design-space": "design-space"`. Running that script from the target repository discovers exactly one fixed server file: `design-space.server.ts`. The CLI accepts no root, path, command, or module arguments.
 
-The server file exports a trusted `registration` with the project label, `design-space.config.tsx` target module, opaque file IDs, and opaque edit-target IDs. See `examples/demo-target/design-space.server.ts`. The React config owns the full adapter catalog, display-only file tree, and default component fixture; see `examples/demo-target/design-space.config.tsx`.
+The server file exports a trusted `registration` with the project label, `design-space.config.tsx` target module, opaque file IDs, and opaque edit-target IDs. See `examples/demo-target/design-space.server.ts`. Those server file IDs are the authoritative source browser and automatically include newly created managed documents. The React config owns the full adapter catalog and default component fixture; see `examples/demo-target/design-space.config.tsx`.
 
 This split is intentional: the local developer chooses the target by the directory where the CLI starts, while the browser can only use the fixed opaque operations made available by that registration.
 
@@ -33,9 +33,12 @@ This split is intentional: the local developer chooses the target by the directo
 - Used and empty slot states in both the tree and preview. Selecting either surface selects the same stable slot ID.
 - Selecting an empty slot in the tree or preview opens a searchable component picker filtered to adapters accepted by that slot; insertion returns directly to the live preview.
 - Internal HTML collapsed inside components by default, with an explicit reveal control.
-- Live Tailwind drafts compiled on demand against the full Tailwind theme, including valid classes that do not yet appear in source. Unknown utilities and external CSS resources are rejected before Diff or Save.
+- Live DOM observation supplies the complete internal HTML hierarchy and measured selection outlines, while preserving component and public-slot boundaries.
+- App and Library modes can create trusted target-owned screens and components, rename screens, define component slots and typed properties, bind public properties to implementation controls, and edit the implementation body from the same phone UI.
+- Live Tailwind drafts compiled through the target's trusted, fixed theme registration, including valid project utilities that do not yet appear in component source. Targets without a custom compiler use the bundled Tailwind fallback. Unknown utilities and external CSS resources are rejected before Diff or Save.
+- Strict UI findings are tied to exact source evidence, shown in the tree and canvas, and block unsafe saves; component contract changes are also checked against every registered dependent document.
 - Undo, reset, stale-source protection, one-time saves, atomic writes, and compile-error recovery.
-- A dedicated phone layout with one full-width workspace at a time, labeled bottom navigation, touch-sized tree/catalog rows, a fitted preview, a mobile diff sheet, and full-screen Tree, Files, Catalog, and Inspector surfaces.
+- A dedicated phone layout with one full-width workspace at a time, labeled bottom navigation, touch-sized tree/catalog rows, pinch-to-zoom and drag-to-pan canvas controls, a mobile diff sheet, and full-screen Tree, Files, Catalog, and Inspector surfaces.
 
 ## Target-owned adapters
 
@@ -47,17 +50,20 @@ The included target in `examples/demo-target/design-space.config.tsx` is the ref
 
 The target also supplies a default fixture. That fixture—not Design Space—defines the actual component instances, nested slot content, occupied states, preview composition, and page label. The visible tree is built through the same validated slot model used by the tests.
 
-The fixed target-side `design-space.server.ts` selects the target module, files, edit markers, and optional target validation/compile hooks. It is a normal TypeScript module and may import target-owned server helpers. Set `compiler: "tsx"` on an edit target to require the complete edited source to pass a TSX compile before Design Space issues a save challenge. The process working directory supplies the canonical root. This registration is trusted server configuration. The browser cannot supply any of those paths or executable inputs.
+Targets that need application context can provide an optional `previewRoot` React component. Design Space wraps the complete direct preview once, so target-owned themes, HeroUI providers, routers, and other context remain available without introducing an iframe or a browser-selected module path.
+
+The fixed target-side `design-space.server.ts` selects the target module, files, edit markers, document recipes, and target validation/compile hooks. Every document registration supplies `tailwindClassList`, which derives the complete utility graph from trusted adapter metadata and authored components; a project with no utilities returns an empty string explicitly. Set `compiler: "tsx"` on an edit target to require the complete edited source to pass a TSX compile before Design Space issues a save challenge. A target-owned Tailwind compiler receives only server-loaded contents and hashes for its fixed registered source IDs. The process working directory supplies the canonical root. This registration is trusted server configuration. The browser cannot supply any of those paths or executable inputs.
 
 The catalog UI enumerates every adapter exported by the selected target, so adding an adapter automatically expands the catalog without Design Space knowing the target library.
 
 ## Trust boundary
 
-The browser has one same-origin JSON endpoint and four fixed operations:
+The browser has one same-origin JSON endpoint and a closed set of schema-validated operations:
 
+- list and read registered UI documents by opaque ID;
+- read allowlisted project files by opaque ID;
 - compile a Tailwind draft without accepting CSS resources or commands;
-- read a registered edit target by opaque ID;
-- prepare a validated edit against a source hash;
+- prepare registered source edits or document creates/updates against current hashes;
 - save an unexpired one-time challenge.
 
 It cannot send repository roots, file paths, commands, shell text, executable paths, module paths, or extra fields. On the server, canonical roots and allowlisted files are rechecked against traversal and symlink escapes before reads and writes. Saves recheck the source hash, preserve all text outside the marked string, and replace the file atomically.
@@ -66,7 +72,7 @@ Review approval remains outside Design Space. The signed Project CLI is the appr
 
 ## Local-only proof
 
-`bun run verify:local-only` builds the representative target production entry separately, scans its output for Design Space runtime markers, and fails if hosting configuration appears in this repository. Design Space is a development tool only; do not add it to a target production entry.
+`bun run verify:local-only` builds the representative target production entry separately, verifies that it consumes the saved screen and authored-component documents, rejects Design Space application/server modules from the bundle graph, scans for runtime endpoint markers, and fails if hosting configuration appears in this repository. Design Space is a development tool only; do not add it to a target production entry.
 
 ## Verification
 
@@ -74,7 +80,7 @@ Review approval remains outside Design Space. The signed Project CLI is the appr
 bun run verify
 ```
 
-This runs strict type checking, the editor/model/server/application integration tests, the Design Space build, and the real target component's production-boundary proof. Tests cover target-project discovery, root confinement, arbitrary-input rejection, adapter and slot rules, full-theme Tailwind compilation, exact diffs, save/undo/reset, slow-preparation races, stale and concurrent changes, compile failures, expiring challenges, and atomic writes.
+This runs strict type checking, the editor/model/server/application integration tests, the Design Space build, and the real target component's production-boundary proof. Tests cover target-project discovery, root confinement, arbitrary-input rejection, adapter and slot rules, target-theme Tailwind compilation, exact diffs, save/undo/reset, slow-preparation races, stale and concurrent changes, dependent component contracts, compile failures, expiring challenges, and atomic writes.
 
 ## Reused product contracts
 

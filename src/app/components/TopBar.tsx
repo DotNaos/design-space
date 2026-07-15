@@ -19,7 +19,7 @@ export function TopBar(props: TopBarProps) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-white/10 bg-[#101113] px-2 lg:h-14 lg:gap-3 lg:px-3">
       <div className="flex min-w-0 items-center gap-2 lg:gap-3">
-        <div className="grid size-8 place-items-center rounded-lg bg-indigo-500 text-white">
+        <div className="grid size-8 place-items-center rounded-lg bg-sky-500 text-white">
           <Code2 size={17} strokeWidth={2.2} />
         </div>
         <span className="text-sm font-semibold tracking-tight text-zinc-100">Design Space</span>
@@ -47,7 +47,7 @@ export function TopBar(props: TopBarProps) {
         <Button aria-label="Show exact diff" className="min-h-11 min-w-11 px-0 lg:min-h-8 lg:min-w-fit lg:px-3" size="sm" variant="ghost" isDisabled={!props.canDiff} onPress={props.onDiff}>
           <FileDiff size={14} /> <span className="hidden lg:inline">Diff</span>
         </Button>
-        <Button aria-label={props.saveLabel} className="min-h-11 min-w-11 bg-indigo-500 px-0 text-white hover:bg-indigo-400 lg:min-h-8 lg:min-w-fit lg:px-3" size="sm" isDisabled={!props.canSave} onPress={props.onSave}>
+        <Button aria-label={props.saveLabel} className="min-h-11 min-w-11 bg-sky-500 px-0 text-white hover:bg-sky-400 lg:min-h-8 lg:min-w-fit lg:px-3" size="sm" isDisabled={!props.canSave} onPress={props.onSave}>
           <Save size={14} /> <span className="hidden lg:inline">{props.saveLabel}</span>
         </Button>
       </div>

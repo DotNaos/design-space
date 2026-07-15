@@ -4,7 +4,16 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin } from "vite";
 
-import { designSpaceApiPlugin, designSpaceTargetPlugin, EditService, loadRegisteredProject, resolveServerProjectRoot } from "./src/server";
+import {
+  designSpaceApiPlugin,
+  designSpaceTargetPlugin,
+  DocumentService,
+  EditService,
+  loadRegisteredProject,
+  LocalOperationService,
+  resolveServerProjectRoot,
+} from "./src/server";
+import { createViteFileSystemPolicy } from "./src/server/vite-file-system-policy";
 
 const root = import.meta.dirname;
 
@@ -21,12 +30,18 @@ function enforcedPortless(): Plugin {
 }
 
 export default defineConfig(async () => {
+  const serverPort = process.env.PORT ? Number(process.env.PORT) : 4173;
   const registeredTarget = await loadRegisteredProject(
     resolveServerProjectRoot(resolve(root, "examples/demo-target")),
   );
-  const api = new EditService(registeredTarget);
+  const api = new LocalOperationService(
+    new EditService(registeredTarget),
+    new DocumentService(registeredTarget),
+  );
 
   return {
+    cacheDir: resolve(root, "node_modules/.vite-design-space", `port-${serverPort}`),
+    resolve: { dedupe: ["react", "react-dom"] },
     plugins: [
       enforcedPortless(),
       designSpaceTargetPlugin(registeredTarget),
@@ -36,8 +51,9 @@ export default defineConfig(async () => {
     ],
     server: {
       host: "127.0.0.1",
-      port: process.env.PORT ? Number(process.env.PORT) : 4173,
+      port: serverPort,
       strictPort: true,
+      fs: createViteFileSystemPolicy(root, registeredTarget.targetModulePath),
     },
     build: { sourcemap: true },
   };

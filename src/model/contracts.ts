@@ -14,6 +14,8 @@ export interface HtmlTreeNode {
   readonly kind: "html";
   readonly id: string;
   readonly tagName: string;
+  readonly className?: string;
+  readonly slotId?: SlotId;
   readonly children?: readonly HtmlTreeNode[];
 }
 
@@ -62,7 +64,18 @@ export type SelectionTarget =
       readonly componentInstanceId: ComponentInstanceId;
       readonly slotId: SlotId;
     }
-  | { readonly kind: "html"; readonly id: string };
+  | {
+      readonly kind: "html";
+      readonly id: string;
+      readonly componentInstanceId: ComponentInstanceId;
+      readonly nodeId: string;
+    }
+  | {
+      readonly kind: "slot-outlet";
+      readonly id: string;
+      readonly outletId: string;
+      readonly slotId: SlotId;
+    };
 
 export interface SlotProjection {
   readonly selection: Extract<SelectionTarget, { kind: "slot" }>;

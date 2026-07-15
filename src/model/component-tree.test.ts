@@ -14,11 +14,16 @@ const catalog = createAdapterCatalog([
     ],
     internalHtml: [
       { kind: "html", id: "card.outer", tagName: "div", children: [
-        { kind: "html", id: "card.surface", tagName: "section" },
+        { kind: "html", id: "card.surface", tagName: "section", slotId: "body" },
       ] },
     ],
   },
-  { id: "heading", label: "Heading", slots: [] },
+  {
+    id: "heading",
+    label: "Heading",
+    slots: [],
+    internalHtml: [{ kind: "html", id: "heading.text", tagName: "h2" }],
+  },
 ]);
 
 function card(): ComponentInstance {
@@ -97,18 +102,56 @@ describe("component tree", () => {
     expect(treeSlots.map((row) => row.selection.id)).toEqual(previewSlots.map((slot) => slot.selection.id));
   });
 
-  it("collapses internal HTML by default and can reveal the complete internal tree", () => {
+  it("keeps internal HTML metadata on its component row and reveals one component at a time", () => {
     const collapsed = buildComponentTree(catalog, card());
     expect(collapsed.filter((row) => row.kind === "html")).toHaveLength(0);
-    expect(collapsed.find((row) => row.kind === "internals-summary")).toMatchObject({
-      nodeCount: 2,
-      collapsed: true,
-    });
+    expect(collapsed.filter((row) => row.kind === "internals-summary")).toHaveLength(0);
+    expect(collapsed.filter((row) => row.kind === "component")).toMatchObject([
+      { selection: { id: "instance-card" }, internalHtml: { nodeCount: 2, collapsed: true } },
+      { selection: { id: "instance-heading" }, internalHtml: { nodeCount: 1, collapsed: true } },
+    ]);
 
     const expanded = buildComponentTree(catalog, card(), {
       revealInternalHtml: new Set(["instance-card"]),
     });
     expect(expanded.filter((row) => row.kind === "html").map((row) => row.label)).toEqual(["div", "section"]);
-    expect(expanded.find((row) => row.kind === "internals-summary")).toMatchObject({ collapsed: false });
+    expect(expanded.filter((row) => row.kind === "html-close").map((row) => row.label)).toEqual(["section", "div"]);
+    expect(expanded.filter((row) => row.kind === "html").map((row) => row.selection)).toMatchObject([
+      { id: "html:instance-card:card.outer", componentInstanceId: "instance-card", nodeId: "card.outer" },
+      { id: "html:instance-card:card.surface", componentInstanceId: "instance-card", nodeId: "card.surface" },
+    ]);
+    const nestedBody = expanded.find((row) => row.kind === "slot" && row.selection.slotId === "body");
+    const bodyOpen = expanded.findIndex((row) => row.kind === "html" && row.label === "section");
+    const bodyClose = expanded.findIndex((row) => row.kind === "html-close" && row.label === "section");
+    expect(nestedBody).toMatchObject({ depth: 3 });
+    expect(expanded.indexOf(nestedBody!)).toBeGreaterThan(bodyOpen);
+    expect(expanded.indexOf(nestedBody!)).toBeLessThan(bodyClose);
+    expect(expanded.filter((row) => row.kind === "component")).toMatchObject([
+      { selection: { id: "instance-card" }, internalHtml: { nodeCount: 2, collapsed: false } },
+      { selection: { id: "instance-heading" }, internalHtml: { nodeCount: 1, collapsed: true } },
+    ]);
+  });
+
+  it("can project declared slots while an authored instance still uses a removed slot", () => {
+    const staleInstance: ComponentInstance = {
+      ...card(),
+      slots: [{ slotId: "removed", children: [{ kind: "text", id: "copy", value: "Draft" }] }],
+    };
+
+    expect(() => buildComponentTree(catalog, staleInstance)).toThrow("does not declare slot removed");
+    expect(() => projectPreviewSlots(catalog, staleInstance)).toThrow("does not declare slot removed");
+
+    const options = { contractValidation: "tolerant" as const };
+    expect(buildComponentTree(catalog, staleInstance, options).filter((row) => row.kind === "slot"))
+      .toMatchObject([
+        { label: "Header", occupied: false, childCount: 0 },
+        { label: "Body", occupied: false, childCount: 0 },
+        { label: "Footer", occupied: false, childCount: 0 },
+      ]);
+    expect(projectPreviewSlots(catalog, staleInstance, options)).toMatchObject([
+      { label: "Header", occupied: false, childCount: 0 },
+      { label: "Body", occupied: false, childCount: 0 },
+      { label: "Footer", occupied: false, childCount: 0 },
+    ]);
   });
 });

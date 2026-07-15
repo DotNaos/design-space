@@ -34,3 +34,14 @@ export function createUnifiedDiff(before: string, after: string, label: string):
   }
   return `${output.join("\n")}\n`;
 }
+
+export function createNewFileDiff(source: string, label: string): string {
+  const sourceLines = lines(source);
+  return [
+    "--- /dev/null",
+    `+++ b/${label}`,
+    `@@ -0,0 +1,${sourceLines.length} @@`,
+    ...sourceLines.map((line) => `+${line}`),
+    "",
+  ].join("\n");
+}

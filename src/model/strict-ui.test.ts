@@ -1,0 +1,480 @@
+import { describe, expect, it } from "vitest";
+
+import type { DesignDocument } from "../shared/design-document";
+import type { TargetModule } from "../shared/target-module";
+import { validateStrictUi } from "./strict-ui";
+
+const target: TargetModule = {
+  project: { id: "demo", label: "Demo" },
+  defaultAdapterId: "card",
+  defaultFixture: { instanceId: "card.one", adapterId: "card", slots: { body: [] } },
+  files: [],
+  adapters: [
+    {
+      component: {
+        id: "card",
+        label: "Card",
+        group: "Surfaces",
+        slots: [{ id: "body", label: "Body", min: 1, max: 1, accepts: ["text"], acceptsText: false }],
+      },
+      controls: [{ id: "title", label: "Title", kind: "text", prop: "title", required: true }],
+      render: () => null,
+    },
+    {
+      component: { id: "text", label: "Text", group: "Content", slots: [] },
+      controls: [{ id: "content", label: "Content", kind: "text", prop: "children" }],
+      render: () => null,
+    },
+    { component: { id: "button", label: "Button", group: "Actions", slots: [] }, render: () => null },
+  ],
+};
+
+function document(root: DesignDocument["root"]): DesignDocument {
+  return { schemaVersion: 2, id: "screen.dashboard", label: "Dashboard", kind: "screen", root };
+}
+
+describe("core Strict UI validation", () => {
+  it("blocks slots without an explicit child allow-list and text policy", () => {
+    const legacyTarget: TargetModule = {
+      ...target,
+      adapters: target.adapters.map((adapter) => adapter.component.id === "card"
+        ? { ...adapter, component: { ...adapter.component, slots: [{ id: "body", label: "Body" }] } }
+        : adapter),
+    };
+    const rules = validateStrictUi(legacyTarget, document({ instanceId: "card.one", adapterId: "card", props: { title: "Ready" }, slots: { body: [] } }))
+      .map((violation) => violation.ruleId);
+    expect(rules).toEqual(expect.arrayContaining(["slot.contract.components", "slot.contract.text"]));
+  });
+
+  it("blocks duplicate and unavailable accepted component IDs", () => {
+    const invalidTarget: TargetModule = {
+      ...target,
+      adapters: target.adapters.map((adapter) => adapter.component.id === "card"
+        ? { ...adapter, component: { ...adapter.component, slots: [{ id: "body", label: "Body", accepts: ["text", "text", "missing"], acceptsText: false }] } }
+        : adapter),
+    };
+    const rules = validateStrictUi(invalidTarget, document({ instanceId: "card.one", adapterId: "card", props: { title: "Ready" }, slots: { body: [] } }))
+      .map((violation) => violation.ruleId);
+    expect(rules).toEqual(expect.arrayContaining(["slot.contract.duplicate", "slot.contract.unknown"]));
+  });
+
+  it("allows an ordered list of multiple accepted component children", () => {
+    const listTarget: TargetModule = {
+      ...target,
+      defaultAdapterId: "stack",
+      adapters: [
+        ...target.adapters,
+        {
+          component: {
+            id: "stack",
+            label: "Stack",
+            group: "Layout",
+            slots: [{ id: "content", label: "Content", accepts: ["text"], acceptsText: false }],
+          },
+          render: () => null,
+        },
+      ],
+    };
+    const violations = validateStrictUi(listTarget, document({
+      instanceId: "stack.one",
+      adapterId: "stack",
+      slots: {
+        content: ["one", "two", "three"].map((id) => ({
+          kind: "component" as const,
+          node: { instanceId: `text.${id}`, adapterId: "text", slots: {} },
+        })),
+      },
+    }));
+
+    expect(violations).toEqual([]);
+  });
+
+  it("reports missing required properties and required slot content", () => {
+    const violations = validateStrictUi(target, document({ instanceId: "card.one", adapterId: "card", slots: { body: [] } }));
+    expect(violations.map((violation) => violation.ruleId)).toEqual(["property.required", "slot.minimum"]);
+  });
+
+  it("does not replace an explicit null with a required control default", () => {
+    const targetWithDefault: TargetModule = {
+      ...target,
+      adapters: target.adapters.map((adapter) => adapter.component.id === "card"
+        ? { ...adapter, defaultProps: { title: "Default title" } }
+        : adapter),
+    };
+    const violations = validateStrictUi(targetWithDefault, document({
+      instanceId: "card.one",
+      adapterId: "card",
+      props: { title: null },
+      slots: { body: [{ kind: "component", node: { instanceId: "text.one", adapterId: "text", slots: {} } }] },
+    }));
+
+    expect(violations).toEqual([
+      expect.objectContaining({ ruleId: "property.required" }),
+    ]);
+  });
+
+  it("enforces declared properties and their text and number limits", () => {
+    const constrainedTarget: TargetModule = {
+      ...target,
+      adapters: [{
+        component: { id: "metrics", label: "Metrics", group: "Content", slots: [] },
+        controls: [
+          { id: "label", label: "Label", kind: "text", prop: "label", maxLength: 4 },
+          { id: "count", label: "Count", kind: "number", prop: "count", min: 1, max: 3 },
+        ],
+        render: () => null,
+      }],
+      defaultAdapterId: "metrics",
+      defaultFixture: { instanceId: "metrics.one", adapterId: "metrics", slots: {} },
+    };
+    const violations = validateStrictUi(constrainedTarget, document({
+      instanceId: "metrics.one",
+      adapterId: "metrics",
+      props: { label: "Too long", count: 4, removed: "stale" },
+      slots: {},
+    }));
+
+    expect(violations.map((violation) => violation.ruleId)).toEqual([
+      "property.undeclared",
+      "property.maxLength",
+      "property.maximum",
+    ]);
+
+    const minimum = validateStrictUi(constrainedTarget, document({
+      instanceId: "metrics.one",
+      adapterId: "metrics",
+      props: { label: "Fine", count: 0 },
+      slots: {},
+    }));
+    expect(minimum).toEqual([expect.objectContaining({ ruleId: "property.minimum" })]);
+  });
+
+  it("rejects duplicate ids across component, text, and outlet nodes", () => {
+    const duplicateText = validateStrictUi(target, document({
+      instanceId: "card.one",
+      adapterId: "card",
+      props: { title: "Card" },
+      slots: {
+        body: [
+          { kind: "text", id: "copy.same", value: "First" },
+          { kind: "text", id: "copy.same", value: "Second" },
+        ],
+      },
+    }));
+    expect(duplicateText).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "node.duplicate" }),
+    ]));
+
+    const authored: DesignDocument = {
+      schemaVersion: 2,
+      id: "component.outlets",
+      label: "Outlets",
+      kind: "component",
+      component: { id: "outlets", label: "Outlets", group: "Custom", properties: [], slots: [{ id: "body", label: "Body" }] },
+      root: {
+        instanceId: "outlets.root",
+        adapterId: "card",
+        props: { title: "Outlets" },
+        slots: {
+          body: [
+            { kind: "slot-outlet", id: "outlet.same", slotId: "body" },
+            { kind: "slot-outlet", id: "outlet.same", slotId: "body" },
+          ],
+        },
+      },
+    };
+    expect(validateStrictUi(target, authored)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "node.duplicate" }),
+      expect.objectContaining({ ruleId: "outlet.duplicate" }),
+    ]));
+  });
+
+  it("reports incompatible children and missing explicit empty slots", () => {
+    const incompatible = validateStrictUi(target, document({
+      instanceId: "card.one",
+      adapterId: "card",
+      props: { title: "Planning" },
+      slots: { body: [{ kind: "component", node: { instanceId: "button.one", adapterId: "button", slots: {} } }] },
+    }));
+    expect(incompatible).toEqual(expect.arrayContaining([expect.objectContaining({ ruleId: "slot.child" })]));
+
+    const missing = validateStrictUi(target, document({
+      instanceId: "card.one",
+      adapterId: "card",
+      props: { title: "Planning" },
+      slots: {},
+    }));
+    expect(missing).toEqual(expect.arrayContaining([expect.objectContaining({ ruleId: "slot.missing" })]));
+  });
+
+  it("requires exactly one outlet for every authored component slot", () => {
+    const authored: DesignDocument = {
+      schemaVersion: 2,
+      id: "component.summary",
+      label: "Summary",
+      kind: "component",
+      component: {
+        id: "summary",
+        label: "Summary",
+        group: "Surfaces",
+        properties: [],
+        slots: [{ id: "body", label: "Body" }],
+      },
+      root: { instanceId: "summary.root", adapterId: "text", slots: {} },
+    };
+    expect(validateStrictUi(target, authored)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        ruleId: "outlet.missing",
+        location: { kind: "slot-outlet", slotId: "body" },
+      }),
+    ]));
+
+  });
+
+  it("requires a public slot outlet to fit its containing slot contract", () => {
+    const authored: DesignDocument = {
+      schemaVersion: 2,
+      id: "component.unsafe-panel",
+      label: "Unsafe panel",
+      kind: "component",
+      component: {
+        id: "unsafe-panel",
+        label: "Unsafe panel",
+        group: "Surfaces",
+        properties: [],
+        slots: [{ id: "body", label: "Public body", min: 0, max: 3, accepts: ["text", "button"] }],
+      },
+      root: {
+        instanceId: "unsafe-panel.root",
+        adapterId: "card",
+        props: { title: "Panel" },
+        slots: { body: [{ kind: "slot-outlet", id: "unsafe-panel.outlet", slotId: "body" }] },
+      },
+    };
+
+    expect(validateStrictUi(target, authored)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "slot.minimum" }),
+      expect.objectContaining({ ruleId: "slot.maximum" }),
+      expect.objectContaining({
+        ruleId: "outlet.child",
+        location: { kind: "slot-outlet", slotId: "body", outletId: "unsafe-panel.outlet" },
+      }),
+    ]));
+
+    const manyUnsupported: DesignDocument = {
+      ...authored,
+      component: {
+        ...authored.component!,
+        slots: [{
+          ...authored.component!.slots[0],
+          accepts: Array.from({ length: 100 }, (_, index) => `unsupported-${index}-${"x".repeat(64)}`),
+        }],
+      },
+    };
+    const boundedMessage = validateStrictUi(target, manyUnsupported)
+      .find((violation) => violation.ruleId === "outlet.child")?.message;
+    expect(boundedMessage).toBeDefined();
+    expect(boundedMessage!.length).toBeLessThanOrEqual(500);
+  });
+
+  it("accepts a public slot whose projected children fit the containing slot", () => {
+    const targetWithPairSlot: TargetModule = {
+      ...target,
+      adapters: target.adapters.map((adapter) => adapter.component.id === "card"
+        ? {
+            ...adapter,
+            component: {
+              ...adapter.component,
+              slots: adapter.component.slots.map((slot) => ({ ...slot, min: 2, max: 2 })),
+            },
+          }
+        : adapter),
+    };
+    const authored: DesignDocument = {
+      schemaVersion: 2,
+      id: "component.safe-panel",
+      label: "Safe panel",
+      kind: "component",
+      component: {
+        id: "safe-panel",
+        label: "Safe panel",
+        group: "Surfaces",
+        properties: [],
+        slots: [{ id: "body", label: "Public body", min: 2, max: 2, accepts: ["text"], acceptsText: false }],
+      },
+      root: {
+        instanceId: "safe-panel.root",
+        adapterId: "card",
+        props: { title: "Panel" },
+        slots: { body: [{ kind: "slot-outlet", id: "safe-panel.outlet", slotId: "body" }] },
+      },
+    };
+
+    expect(validateStrictUi(targetWithPairSlot, authored)).toEqual([]);
+  });
+
+  it("aggregates fixed children and multiple outlet ranges", () => {
+    const targetWithAggregateSlot: TargetModule = {
+      ...target,
+      adapters: target.adapters.map((adapter) => adapter.component.id === "card"
+        ? {
+            ...adapter,
+            component: {
+              ...adapter.component,
+              slots: adapter.component.slots.map((slot) => ({ ...slot, min: 1, max: 3 })),
+            },
+          }
+        : adapter),
+    };
+    const authored: DesignDocument = {
+      schemaVersion: 2,
+      id: "component.aggregate-panel",
+      label: "Aggregate panel",
+      kind: "component",
+      component: {
+        id: "aggregate-panel",
+        label: "Aggregate panel",
+        group: "Surfaces",
+        properties: [],
+        slots: [
+          { id: "primary", label: "Primary", min: 0, max: 2, accepts: ["text"] },
+          { id: "secondary", label: "Secondary", min: 0, max: 2, accepts: [], acceptsText: true },
+        ],
+      },
+      root: {
+        instanceId: "aggregate-panel.root",
+        adapterId: "card",
+        props: { title: "Panel" },
+        slots: {
+          body: [
+            { kind: "component", node: { instanceId: "aggregate-panel.fixed", adapterId: "text", slots: {} } },
+            { kind: "slot-outlet", id: "aggregate-panel.primary", slotId: "primary" },
+            { kind: "slot-outlet", id: "aggregate-panel.secondary", slotId: "secondary" },
+          ],
+        },
+      },
+    };
+
+    expect(validateStrictUi(targetWithAggregateSlot, authored)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "slot.maximum" }),
+    ]));
+  });
+
+  it("blocks public text projection into a slot that forbids text", () => {
+    const targetWithoutText: TargetModule = {
+      ...target,
+      adapters: target.adapters.map((adapter) => adapter.component.id === "card"
+        ? {
+            ...adapter,
+            component: {
+              ...adapter.component,
+              slots: adapter.component.slots.map((slot) => ({ ...slot, acceptsText: false })),
+            },
+          }
+        : adapter),
+    };
+    const authored: DesignDocument = {
+      schemaVersion: 2,
+      id: "component.text-panel",
+      label: "Text panel",
+      kind: "component",
+      component: {
+        id: "text-panel",
+        label: "Text panel",
+        group: "Surfaces",
+        properties: [],
+        slots: [{ id: "body", label: "Public body", min: 1, max: 1, accepts: ["text"] }],
+      },
+      root: {
+        instanceId: "text-panel.root",
+        adapterId: "card",
+        props: { title: "Panel" },
+        slots: { body: [{ kind: "slot-outlet", id: "text-panel.outlet", slotId: "body" }] },
+      },
+    };
+
+    expect(validateStrictUi(targetWithoutText, authored)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "outlet.text" }),
+    ]));
+
+    const textSafe: DesignDocument = {
+      ...authored,
+      component: {
+        ...authored.component!,
+        slots: authored.component!.slots.map((slot) => ({ ...slot, acceptsText: false })),
+      },
+    };
+    expect(validateStrictUi(targetWithoutText, textSafe)).toEqual([]);
+  });
+
+  it("validates authored components inserted into screens through their public contracts", () => {
+    const panel: DesignDocument = {
+      schemaVersion: 2,
+      id: "component.panel",
+      label: "Panel",
+      kind: "component",
+      component: {
+        id: "panel",
+        label: "Panel",
+        group: "Surfaces",
+        properties: [{ id: "title", kind: "text", label: "Title", prop: "title", required: true }],
+        slots: [{ id: "body", label: "Body", accepts: ["text"], acceptsText: false }],
+      },
+      root: { instanceId: "panel.root", adapterId: "text", slots: {} },
+    };
+    const screen = document({
+      instanceId: "panel.one",
+      adapterId: "panel",
+      props: { title: "Planning" },
+      slots: { body: [{ kind: "component", node: { instanceId: "text.one", adapterId: "text", slots: {} } }] },
+    });
+
+    expect(validateStrictUi(target, screen, [panel])).toEqual([]);
+  });
+
+  it("blocks direct and indirect authored component cycles", () => {
+    const component = (id: string, childAdapterId: string): DesignDocument => ({
+      schemaVersion: 2,
+      id: `component.${id}`,
+      label: id,
+      kind: "component",
+      component: { id, label: id, group: "Custom", properties: [], slots: [] },
+      root: { instanceId: `${id}.root`, adapterId: childAdapterId, slots: {} },
+    });
+    const alpha = component("alpha", "beta");
+    const beta = component("beta", "alpha");
+
+    expect(validateStrictUi(target, alpha, [alpha, beta])).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "component.cycle", location: { kind: "document" } }),
+    ]));
+  });
+
+  it("requires one compatible explicit implementation binding per public property", () => {
+    const component = (propertyBindings?: Record<string, string>): DesignDocument => ({
+      schemaVersion: 2,
+      id: "component.heading",
+      label: "Heading",
+      kind: "component",
+      component: {
+        id: "authored-heading",
+        label: "Heading",
+        group: "Custom",
+        properties: [{ id: "title", label: "Title", prop: "title", kind: "text" }],
+        slots: [],
+      },
+      root: { instanceId: "heading.root", adapterId: "text", propertyBindings, slots: {} },
+    });
+
+    expect(validateStrictUi(target, component())).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "binding.missing" }),
+    ]));
+    expect(validateStrictUi(target, component({ children: "title" }))).toEqual([]);
+    expect(validateStrictUi(target, component({ unavailable: "title" }))).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "binding.control" }),
+    ]));
+    expect(validateStrictUi(target, component({ children: "missing" }))).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ruleId: "binding.property" }),
+      expect.objectContaining({ ruleId: "binding.missing" }),
+    ]));
+  });
+});
