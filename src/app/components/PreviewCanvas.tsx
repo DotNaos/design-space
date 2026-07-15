@@ -29,7 +29,7 @@ import {
   selectionForCanvasTarget,
   type CanvasContextMenuRequest,
 } from "./canvas-target-selection";
-import { CanvasViewportControls } from "./CanvasViewportControls";
+import { CanvasViewportControls, type CanvasGridMode } from "./CanvasViewportControls";
 import { useCanvasTrackpadGestures } from "./use-canvas-trackpad-gestures";
 import { useCanvasTouchGestures } from "./use-canvas-touch-gestures";
 
@@ -73,6 +73,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const [emptyRects, setEmptyRects] = useState<Readonly<Record<string, ViewRect>>>({});
   const [strictUiRects, setStrictUiRects] = useState<readonly MeasuredStrictUiTarget[]>([]);
   const [gridAnchor, setGridAnchor] = useState<Point>();
+  const [gridMode, setGridMode] = useState<CanvasGridMode>("dots");
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showGestureHint, setShowGestureHint] = useState(true);
   const [interactionMode, setInteractionMode] = useState<"select" | "interact">("select");
@@ -238,6 +239,15 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     () => canvasGridPresentation(camera.scale, gridAnchor ?? { x: camera.x, y: camera.y }),
     [camera.scale, camera.x, camera.y, gridAnchor],
   );
+  const gridBackground = gridMode === "dots"
+    ? {
+      image: `radial-gradient(circle, #52525b ${grid.dotRadius}px, transparent ${grid.dotRadius}px)`,
+      position: `${grid.backgroundPositionX}px ${grid.backgroundPositionY}px`,
+    }
+    : {
+      image: "linear-gradient(to right, #52525b 1px, transparent 1px), linear-gradient(to bottom, #52525b 1px, transparent 1px)",
+      position: `${grid.anchorX}px ${grid.anchorY}px`,
+    };
   const emptySlotOverlayRects = useMemo(() => layoutEmptySlotOverlays(
     props.slots.filter((slot) => slot.count === 0).flatMap((slot) => {
       const rect = emptyRects[slot.selectionId];
@@ -376,11 +386,12 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       <div
         className="pointer-events-none absolute inset-0"
         data-dot-radius={grid.dotRadius}
+        data-grid-mode={gridMode}
         data-testid="canvas-grid"
         data-world-step={grid.worldStep}
         style={{
-          backgroundImage: `radial-gradient(circle, #52525b ${grid.dotRadius}px, transparent ${grid.dotRadius}px)`,
-          backgroundPosition: `${grid.backgroundPositionX}px ${grid.backgroundPositionY}px`,
+          backgroundImage: gridBackground.image,
+          backgroundPosition: gridBackground.position,
           backgroundSize: `${grid.screenStep}px ${grid.screenStep}px`,
           opacity: grid.opacity,
         }}
@@ -388,6 +399,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 
       <CanvasViewportControls
         compact={props.compact}
+        gridMode={gridMode}
         interactionMode={interactionMode}
         scale={camera.scale}
         onFit={() => {
@@ -396,6 +408,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
           fit();
         }}
         onReset={reset}
+        onGridModeChange={setGridMode}
         onZoomIn={() => zoomBy(0.1)}
         onZoomOut={() => zoomBy(-0.1)}
         onToggleInteractionMode={() => setInteractionMode((current) => current === "select" ? "interact" : "select")}

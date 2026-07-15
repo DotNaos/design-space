@@ -66,6 +66,8 @@ export function canvasGridPresentation(scale: number, anchor: { x: number; y: nu
   const anchorX = snapToDevicePixel(anchor.x);
   const anchorY = snapToDevicePixel(anchor.y);
   return {
+    anchorX,
+    anchorY,
     backgroundPositionX: anchorX - screenStep / 2,
     backgroundPositionY: anchorY - screenStep / 2,
     dotRadius: Math.min(baseGridDotRadius * scale, maximumGridDotRadius),

@@ -321,6 +321,38 @@ describe("preview canvas", () => {
     expect(grid.style.backgroundPosition).not.toBe("16px 56px");
   });
 
+  it("switches between dot and line grids from the canvas HUD", () => {
+    render(
+      <PreviewCanvas
+        compact
+        preview={<div data-design-space-instance-id="one">One</div>}
+        rootInstanceId="one"
+        selectedComponentInstanceId="one"
+        selection={{ kind: "component", id: "one" }}
+        selectionLabel="One"
+        slots={[]}
+        onSelect={() => undefined}
+      />,
+    );
+
+    const grid = screen.getByTestId("canvas-grid");
+    expect(grid.dataset.gridMode).toBe("dots");
+    expect(grid.style.backgroundImage).toContain("radial-gradient");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Line grid" }));
+
+    expect(grid.dataset.gridMode).toBe("lines");
+    expect(grid.style.backgroundImage).toContain("linear-gradient");
+    expect(grid.style.backgroundPosition).toBe("16px 56px");
+
+    fireEvent.keyDown(screen.getByRole("radio", { name: "Line grid" }), { key: "ArrowLeft" });
+    expect(grid.dataset.gridMode).toBe("dots");
+    expect(grid.style.backgroundPosition).toBe("6px 46px");
+
+    fireEvent.keyDown(screen.getByRole("radio", { name: "Dot grid" }), { key: "End" });
+    expect(grid.dataset.gridMode).toBe("lines");
+  });
+
   it("scales an empty slot's minimum height with the canvas instead of the viewport", async () => {
     render(
       <PreviewCanvas
