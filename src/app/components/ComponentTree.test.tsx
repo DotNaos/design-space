@@ -118,10 +118,97 @@ describe("ComponentTree Strict UI markers", () => {
     const closingTag = screen.getByText("</div>").closest("div");
 
     expect(openingTag).toHaveAttribute("data-html-boundary", "open");
-    expect(openingTag).toHaveStyle({ paddingLeft: "28px" });
-    expect(slot).toHaveStyle({ paddingLeft: "46px" });
+    expect(openingTag?.parentElement).toHaveStyle({ paddingLeft: "22px" });
+    expect(slot.parentElement).toHaveStyle({ paddingLeft: "40px" });
     expect(closingTag).toHaveAttribute("data-html-boundary", "close");
     expect(closingTag).toHaveStyle({ paddingLeft: "30px" });
+  });
+
+  it("shows disclosure chevrons only for rows with descendants and does not select on toggle", async () => {
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ComponentTree
+        pageLabel="Dashboard"
+        rows={rows}
+        selectedId="slot:card.one:body"
+        showInternals={false}
+        onSelect={onSelect}
+        onToggleInternals={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Collapse Card" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse Body" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /outlet$/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Collapse Body" }));
+    expect(screen.queryByRole("treeitem", { name: /Body outlet/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand Body" })).toHaveAttribute("aria-expanded", "false");
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("collapses and expands the selected branch one level at a time from the keyboard", () => {
+    render(
+      <ComponentTree
+        pageLabel="Dashboard"
+        rows={rows}
+        selectedId="card.one"
+        showInternals={false}
+        onSelect={vi.fn()}
+        onToggleInternals={vi.fn()}
+      />,
+    );
+    const card = screen.getByRole("treeitem", { name: "Card" });
+    card.focus();
+    fireEvent.keyDown(card, { key: "ArrowLeft" });
+    expect(screen.queryByRole("treeitem", { name: /Body slot/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand Card" })).toBeInTheDocument();
+
+    fireEvent.keyDown(card, { key: "ArrowRight" });
+    expect(screen.getByRole("treeitem", { name: /Body slot/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse Card" })).toBeInTheDocument();
+  });
+
+  it("highlights a selected HTML opening and closing tag with only its exact descendant scope", () => {
+    const { container } = render(
+      <ComponentTree
+        pageLabel="Dashboard"
+        rows={expandedRowsWithSibling}
+        selectedId="html:card.one:surface"
+        showInternals
+        onSelect={vi.fn()}
+        onToggleInternals={vi.fn()}
+      />,
+    );
+
+    const selectedPair = container.querySelectorAll('[data-html-pair-selected="true"]');
+    expect(selectedPair).toHaveLength(2);
+    expect(selectedPair[0]).toHaveTextContent("<div>");
+    expect(selectedPair[1]).toHaveTextContent("</div>");
+    expect(screen.getByRole("treeitem", { name: /Body slot/ }).parentElement).toHaveAttribute("data-html-scope-selected", "true");
+    expect(screen.getByRole("treeitem", { name: /Footer slot/ }).parentElement).not.toHaveAttribute("data-html-scope-selected");
+    expect(container.querySelectorAll('[data-html-scope-guide="html:card.one:surface"]')).toHaveLength(3);
+    expect(container.querySelector(".lucide-tag")).not.toBeInTheDocument();
+  });
+
+  it("matches a nested HTML pair without coloring its outer pair or following sibling", () => {
+    const { container } = render(
+      <ComponentTree
+        pageLabel="Dashboard"
+        rows={nestedHtmlRows}
+        selectedId="html:card.one:inner"
+        showInternals
+        onSelect={vi.fn()}
+        onToggleInternals={vi.fn()}
+      />,
+    );
+
+    const selectedPair = [...container.querySelectorAll('[data-html-pair-selected="true"]')];
+    expect(selectedPair.map((element) => element.textContent)).toEqual(["<span>", "</span>"]);
+    expect(screen.getByText("<div>").parentElement).not.toHaveAttribute("data-html-scope-selected");
+    expect(screen.getByText("</div>").closest("div")).not.toHaveAttribute("data-html-scope-selected");
+    expect(screen.getByRole("treeitem", { name: /Footer slot/ }).parentElement).not.toHaveAttribute("data-html-scope-selected");
   });
 
   it("reports a row hover without changing the current selection", async () => {
@@ -294,6 +381,52 @@ const expandedRows: readonly ComponentTreeRow[] = [
     selection: { kind: "slot", id: "slot:card.one:body", componentInstanceId: "card.one", slotId: "body" },
   },
   { kind: "html-close", depth: 1, label: "div", id: "html:card.one:surface" },
+];
+
+const expandedRowsWithSibling: readonly ComponentTreeRow[] = [
+  ...expandedRows,
+  {
+    kind: "slot",
+    depth: 1,
+    label: "Footer",
+    occupied: false,
+    childCount: 0,
+    selection: { kind: "slot", id: "slot:card.one:footer", componentInstanceId: "card.one", slotId: "footer" },
+  },
+];
+
+const nestedHtmlRows: readonly ComponentTreeRow[] = [
+  {
+    kind: "component",
+    depth: 0,
+    label: "Card",
+    selection: { kind: "component", id: "card.one" },
+  },
+  {
+    kind: "html",
+    depth: 1,
+    label: "div",
+    selfClosing: false,
+    selection: { kind: "html", id: "html:card.one:outer", componentInstanceId: "card.one", nodeId: "outer" },
+  },
+  {
+    kind: "html",
+    depth: 2,
+    label: "span",
+    selfClosing: false,
+    selection: { kind: "html", id: "html:card.one:inner", componentInstanceId: "card.one", nodeId: "inner" },
+  },
+  { kind: "text", depth: 3, label: "Nested", id: "text:nested" },
+  { kind: "html-close", depth: 2, label: "span", id: "html:card.one:inner" },
+  { kind: "html-close", depth: 1, label: "div", id: "html:card.one:outer" },
+  {
+    kind: "slot",
+    depth: 1,
+    label: "Footer",
+    occupied: false,
+    childCount: 0,
+    selection: { kind: "slot", id: "slot:card.one:footer", componentInstanceId: "card.one", slotId: "footer" },
+  },
 ];
 
 const violations: readonly StrictUiViolation[] = [

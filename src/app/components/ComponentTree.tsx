@@ -1,5 +1,5 @@
 import { Tooltip } from "@heroui/react";
-import { ChevronDown, ChevronRight, CircleDot, Code2, Component, Eye, EyeOff, FileBox, Layers3, ListCollapse, Plug, Plus, Tag, X } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleDot, Code2, Component, Eye, EyeOff, FileBox, Layers3, ListCollapse, Plug, Plus, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import type { ComponentTreeRow, SelectionTarget } from "../../model";
@@ -10,6 +10,12 @@ import {
   strictUiMarkerForTreeRow,
   type StrictUiMarker,
 } from "../strict-ui/strict-ui-markers";
+import {
+  annotateTreeRows,
+  treeSelectionPath,
+  visibleTreeRows,
+  type HtmlScopeAnnotation,
+} from "./component-tree-structure";
 
 type ComponentTreeProps = {
   className?: string;
@@ -38,8 +44,9 @@ export function ComponentTree(props: ComponentTreeProps) {
   const [collapsedBranches, setCollapsedBranches] = useState<ReadonlySet<string>>(() => new Set());
   const markers = buildStrictUiSelectionMarkers(props.strictUiViolations ?? []);
   const levelOffset = props.embedded ? 1 : 2;
-  const selectedPath = useMemo(() => treeSelectionPath(props.rows, props.selectedId), [props.rows, props.selectedId]);
-  const visibleRows = useMemo(() => visibleTreeRows(props.rows, collapsedBranches), [collapsedBranches, props.rows]);
+  const annotatedRows = useMemo(() => annotateTreeRows(props.rows, props.selectedId), [props.rows, props.selectedId]);
+  const selectedPath = useMemo(() => treeSelectionPath(annotatedRows, props.selectedId), [annotatedRows, props.selectedId]);
+  const visibleRows = useMemo(() => visibleTreeRows(annotatedRows, collapsedBranches), [annotatedRows, collapsedBranches]);
 
   useEffect(() => {
     setCollapsedBranches((current) => {
@@ -57,12 +64,17 @@ export function ComponentTree(props: ComponentTreeProps) {
 
   const collapseAll = () => {
     const preserved = new Set(selectedPath);
-    setCollapsedBranches(new Set(props.rows.flatMap((row, index) => {
-      if (!("selection" in row) || preserved.has(row.selection.id)) return [];
-      return props.rows[index + 1]?.depth > row.depth ? [row.selection.id] : [];
-    })));
+    setCollapsedBranches(new Set(annotatedRows.flatMap((item) => (
+      item.branchKey && !preserved.has(item.branchKey) ? [item.branchKey] : []
+    ))));
     props.onCollapseAll?.();
   };
+  const toggleBranch = (branchKey: string) => setCollapsedBranches((current) => {
+    const next = new Set(current);
+    if (next.has(branchKey)) next.delete(branchKey);
+    else next.add(branchKey);
+    return next;
+  });
   return (
     <aside className={`${props.className ?? "flex w-64"} min-w-0 shrink-0 flex-col ${props.embedded ? "" : "border-r border-white/10 bg-[#141518]"}`}>
       <div className="flex h-11 items-center gap-2 border-b border-white/10 px-3">
@@ -114,17 +126,22 @@ export function ComponentTree(props: ComponentTreeProps) {
             <span className="truncate">{props.pageLabel}</span>
           </div>
         )}
-        {visibleRows.map((row, index) => (
+        {visibleRows.map((item) => (
           <TreeRow
-            key={`${row.kind}-${"selection" in row ? row.selection.id : "row"}-${index}`}
-            row={row}
+            key={item.key}
+            row={item.row}
+            branchKey={item.branchKey}
+            branchCollapsed={Boolean(item.branchKey && collapsedBranches.has(item.branchKey))}
+            hasDescendants={item.hasDescendants}
+            htmlScope={item.htmlScope}
             selectedId={props.selectedId}
-            marker={strictUiMarkerForTreeRow(row, markers)}
+            marker={strictUiMarkerForTreeRow(item.row, markers)}
             levelOffset={levelOffset}
             onHover={props.onHover}
             onHoverInternals={props.onHoverInternals}
             onContextMenuRequest={props.onContextMenuRequest}
             onSelect={props.onSelect}
+            onToggleBranch={toggleBranch}
             onToggleInternals={props.onToggleInternals}
           />
         ))}
@@ -158,6 +175,10 @@ export function ComponentTree(props: ComponentTreeProps) {
 
 function TreeRow(props: {
   row: ComponentTreeRow;
+  branchKey?: string;
+  branchCollapsed: boolean;
+  hasDescendants: boolean;
+  htmlScope?: HtmlScopeAnnotation;
   selectedId: string;
   marker?: StrictUiMarker;
   levelOffset: number;
@@ -165,39 +186,61 @@ function TreeRow(props: {
   onHoverInternals?: (componentInstanceId: string | undefined) => void;
   onContextMenuRequest?: (selection: SelectionTarget, position: { x: number; y: number }) => void;
   onSelect: (selection: SelectionTarget) => void;
+  onToggleBranch: (branchKey: string) => void;
   onToggleInternals: (componentInstanceId?: string) => void;
 }) {
   const { row } = props;
   if (row.kind === "internals-summary") {
     return (
-      <button
-        aria-expanded={!row.collapsed}
-        aria-level={row.depth + props.levelOffset}
-        className="flex h-11 w-full items-center gap-2 pr-2 text-left text-zinc-500 hover:bg-white/[0.03] lg:h-8"
-        data-tree-disclosure="true"
-        role="treeitem"
-        style={{ paddingLeft: 12 + row.depth * 18 }}
-        tabIndex={-1}
-        type="button"
-        onClick={() => props.onToggleInternals(row.disclosureId)}
+      <div
+        className={`relative flex h-11 w-full items-center pr-2 text-zinc-500 lg:h-8 ${props.htmlScope ? "bg-sky-500/[0.045]" : "hover:bg-white/[0.03]"}`}
+        data-html-pair-id={props.htmlScope?.pairId}
+        data-html-scope-selected={props.htmlScope ? "true" : undefined}
+        style={{ paddingLeft: 4 + row.depth * 18 }}
       >
-        {row.collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-        <span>{row.label}</span>
-        <span className="ml-auto text-[10px]">{row.nodeCount} {row.label === "Implementation" ? "nodes" : "HTML nodes"}</span>
-      </button>
+        <HtmlScopeGuide scope={props.htmlScope} />
+        <BranchChevron {...props} label={row.label} />
+        <button
+          aria-expanded={!row.collapsed}
+          aria-level={row.depth + props.levelOffset}
+          className="flex h-full min-w-0 flex-1 items-center gap-2 text-left"
+          data-tree-disclosure="true"
+          role="treeitem"
+          tabIndex={-1}
+          type="button"
+          onClick={() => props.onToggleInternals(row.disclosureId)}
+        >
+          <span>{row.label}</span>
+          <span className="ml-auto text-[10px]">{row.nodeCount} {row.label === "Implementation" ? "nodes" : "HTML nodes"}</span>
+        </button>
+      </div>
     );
   }
   if (row.kind === "text") {
-    return <div className="h-7 truncate pr-2 text-[10px] text-zinc-600" style={{ paddingLeft: 12 + row.depth * 18 }}>“{row.label}”</div>;
+    return (
+      <div
+        className={`relative h-7 truncate pr-2 text-[10px] text-zinc-600 ${props.htmlScope ? "bg-sky-500/[0.045]" : ""}`}
+        data-html-pair-id={props.htmlScope?.pairId}
+        data-html-scope-selected={props.htmlScope ? "true" : undefined}
+        style={{ paddingLeft: 12 + row.depth * 18 }}
+      >
+        <HtmlScopeGuide scope={props.htmlScope} />
+        “{row.label}”
+      </div>
+    );
   }
 
   if (row.kind === "html-close") {
     return (
       <div
-        className="flex min-h-11 items-center gap-2 pr-3 font-mono text-[10px] text-zinc-600 lg:min-h-8"
+        className={`relative flex min-h-11 items-center gap-2 pr-3 font-mono text-[10px] lg:min-h-8 ${props.htmlScope?.boundary === "close" ? "bg-sky-500/10 text-sky-200" : props.htmlScope ? "bg-sky-500/[0.045] text-zinc-500" : "text-zinc-600"}`}
         data-html-boundary="close"
+        data-html-pair-id={props.htmlScope?.pairId}
+        data-html-pair-selected={props.htmlScope?.boundary === "close" ? "true" : undefined}
+        data-html-scope-selected={props.htmlScope ? "true" : undefined}
         style={{ paddingLeft: 12 + row.depth * 18 }}
       >
+        <HtmlScopeGuide scope={props.htmlScope} />
         <span aria-hidden="true" className="w-3 shrink-0" />
         <span>{`</${row.label}>`}</span>
       </div>
@@ -213,49 +256,62 @@ function TreeRow(props: {
   const isSlot = row.kind === "slot";
   const marker = props.marker;
   return (
-    <button
-      aria-level={row.depth + props.levelOffset}
-      aria-selected={selected}
-      className={`flex min-h-11 w-full items-center gap-2 border-l-2 pr-3 text-left lg:min-h-8 ${selected ? "border-sky-400 bg-sky-500/10 text-zinc-100" : "border-transparent text-zinc-400 hover:bg-white/[0.03]"}`}
-      data-design-space-selection-id={selection.id}
-      data-html-boundary={row.kind === "html" ? "open" : undefined}
-      data-strict-ui-count={marker?.violations.length}
-      data-strict-ui-severity={marker?.severity}
-      role="treeitem"
-      style={{ paddingLeft: 10 + row.depth * 18 }}
-      tabIndex={selected ? 0 : -1}
-      type="button"
-      onBlur={() => props.onHover?.(undefined)}
-      onClick={() => props.onSelect(selection)}
-      onContextMenu={(event) => {
-        if (!props.onContextMenuRequest) return;
-        event.preventDefault();
-        props.onContextMenuRequest(selection, { x: event.clientX, y: event.clientY });
-      }}
-      onFocus={() => props.onHover?.(selection)}
-      onKeyDown={(event) => {
-        if (!(event.shiftKey && event.key === "F10") || !props.onContextMenuRequest) return;
-        event.preventDefault();
-        const rect = event.currentTarget.getBoundingClientRect();
-        props.onContextMenuRequest(selection, { x: rect.left + 20, y: rect.top + 20 });
-      }}
+    <div
+      className={`relative flex min-h-11 w-full items-center border-l-2 pr-3 lg:min-h-8 ${selected ? "border-sky-400 bg-sky-500/10 text-zinc-100" : props.htmlScope ? "border-transparent bg-sky-500/[0.045] text-zinc-400" : "border-transparent text-zinc-400 hover:bg-white/[0.03]"}`}
+      data-html-pair-id={props.htmlScope?.pairId}
+      data-html-pair-selected={props.htmlScope?.boundary === "open" ? "true" : undefined}
+      data-html-scope-selected={props.htmlScope ? "true" : undefined}
+      style={{ paddingLeft: 4 + row.depth * 18 }}
       onPointerEnter={() => props.onHover?.(selection)}
       onPointerLeave={() => props.onHover?.(undefined)}
     >
-      {row.kind === "html" && <Tag size={12} className="text-zinc-600" />}
-      {row.kind === "slot-outlet" && <Plug size={12} className="text-emerald-400" />}
-      {isSlot && <CircleDot size={12} className={row.occupied ? "text-emerald-400" : "text-zinc-600"} />}
-      <span className={`min-w-0 flex-1 truncate ${row.kind === "html" ? "font-mono text-[10px]" : ""}`}>
-        {row.kind === "html" ? `<${row.label}${row.selfClosing ? " /" : ""}>` : isSlot ? `${row.label} slot` : row.label}
-      </span>
-      {isSlot && <span className={`text-[10px] ${row.occupied ? "text-emerald-400" : "text-zinc-600"}`}>{row.occupied ? `${row.childCount} used` : "Empty"}</span>}
-      {marker && <StrictUiIndicator marker={marker} />}
-    </button>
+      <HtmlScopeGuide scope={props.htmlScope} />
+      <BranchChevron {...props} label={row.label} />
+      <button
+        aria-expanded={props.hasDescendants ? !props.branchCollapsed : undefined}
+        aria-level={row.depth + props.levelOffset}
+        aria-selected={selected}
+        className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left lg:min-h-8"
+        data-design-space-selection-id={selection.id}
+        data-html-boundary={row.kind === "html" ? "open" : undefined}
+        data-strict-ui-count={marker?.violations.length}
+        data-strict-ui-severity={marker?.severity}
+        role="treeitem"
+        tabIndex={selected ? 0 : -1}
+        type="button"
+        onBlur={() => props.onHover?.(undefined)}
+        onClick={() => props.onSelect(selection)}
+        onContextMenu={(event) => {
+          if (!props.onContextMenuRequest) return;
+          event.preventDefault();
+          props.onContextMenuRequest(selection, { x: event.clientX, y: event.clientY });
+        }}
+        onFocus={() => props.onHover?.(selection)}
+        onKeyDown={(event) => {
+          if (!(event.shiftKey && event.key === "F10") || !props.onContextMenuRequest) return;
+          event.preventDefault();
+          const rect = event.currentTarget.getBoundingClientRect();
+          props.onContextMenuRequest(selection, { x: rect.left + 20, y: rect.top + 20 });
+        }}
+      >
+        {row.kind === "slot-outlet" && <Plug size={12} className="text-emerald-400" />}
+        {isSlot && <CircleDot size={12} className={row.occupied ? "text-emerald-400" : "text-zinc-600"} />}
+        <span className={`min-w-0 flex-1 truncate ${row.kind === "html" ? "font-mono text-[10px]" : ""}`}>
+          {row.kind === "html" ? `<${row.label}${row.selfClosing ? " /" : ""}>` : isSlot ? `${row.label} slot` : row.label}
+        </span>
+        {isSlot && <span className={`text-[10px] ${row.occupied ? "text-emerald-400" : "text-zinc-600"}`}>{row.occupied ? `${row.childCount} used` : "Empty"}</span>}
+        {marker && <StrictUiIndicator marker={marker} />}
+      </button>
+    </div>
   );
 }
 
 function ComponentRow(props: {
   row: Extract<ComponentTreeRow, { kind: "component" }>;
+  branchKey?: string;
+  branchCollapsed: boolean;
+  hasDescendants: boolean;
+  htmlScope?: HtmlScopeAnnotation;
   selectedId: string;
   marker?: StrictUiMarker;
   levelOffset: number;
@@ -263,6 +319,7 @@ function ComponentRow(props: {
   onHoverInternals?: (componentInstanceId: string | undefined) => void;
   onContextMenuRequest?: (selection: SelectionTarget, position: { x: number; y: number }) => void;
   onSelect: (selection: SelectionTarget) => void;
+  onToggleBranch: (branchKey: string) => void;
   onToggleInternals: (componentInstanceId?: string) => void;
 }) {
   const { row } = props;
@@ -275,20 +332,24 @@ function ComponentRow(props: {
 
   return (
     <div
-      className={`flex min-h-11 w-full items-center border-l-2 lg:min-h-8 ${selected ? "border-sky-400 bg-sky-500/10 text-zinc-100" : "border-transparent text-zinc-400 hover:bg-white/[0.03]"}`}
+      className={`relative flex min-h-11 w-full items-center border-l-2 pr-2 lg:min-h-8 ${selected ? "border-sky-400 bg-sky-500/10 text-zinc-100" : props.htmlScope ? "border-transparent bg-sky-500/[0.045] text-zinc-400" : "border-transparent text-zinc-400 hover:bg-white/[0.03]"}`}
+      data-html-pair-id={props.htmlScope?.pairId}
+      data-html-scope-selected={props.htmlScope ? "true" : undefined}
+      style={{ paddingLeft: 4 + row.depth * 18 }}
       onPointerEnter={() => props.onHover?.(selection)}
       onPointerLeave={() => props.onHover?.(undefined)}
     >
+      <HtmlScopeGuide scope={props.htmlScope} />
+      <BranchChevron {...props} label={row.label} />
       <button
-        aria-expanded={internals ? !internals.collapsed : undefined}
+        aria-expanded={props.hasDescendants ? !props.branchCollapsed : undefined}
         aria-level={row.depth + props.levelOffset}
         aria-selected={selected}
-        className="flex min-h-11 min-w-0 flex-1 items-center gap-2 pr-2 text-left lg:min-h-8"
+        className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left lg:min-h-8"
         data-design-space-selection-id={selection.id}
         data-strict-ui-count={props.marker?.violations.length}
         data-strict-ui-severity={props.marker?.severity}
         role="treeitem"
-        style={{ paddingLeft: 10 + row.depth * 18 }}
         tabIndex={selected ? 0 : -1}
         type="button"
         onBlur={() => props.onHover?.(undefined)}
@@ -335,27 +396,41 @@ function ComponentRow(props: {
   );
 }
 
-function visibleTreeRows(rows: readonly ComponentTreeRow[], collapsed: ReadonlySet<string>): readonly ComponentTreeRow[] {
-  const visible: ComponentTreeRow[] = [];
-  let hiddenBelowDepth: number | undefined;
-  for (const row of rows) {
-    if (hiddenBelowDepth !== undefined && row.depth > hiddenBelowDepth) continue;
-    hiddenBelowDepth = undefined;
-    visible.push(row);
-    if ("selection" in row && collapsed.has(row.selection.id)) hiddenBelowDepth = row.depth;
-  }
-  return visible;
+function BranchChevron(props: {
+  branchKey?: string;
+  branchCollapsed: boolean;
+  hasDescendants: boolean;
+  label: string;
+  onToggleBranch: (branchKey: string) => void;
+}) {
+  if (!props.hasDescendants || !props.branchKey) return <span aria-hidden="true" className="w-6 shrink-0" />;
+  return (
+    <button
+      aria-expanded={!props.branchCollapsed}
+      aria-label={`${props.branchCollapsed ? "Expand" : "Collapse"} ${props.label}`}
+      className="relative z-10 grid size-6 shrink-0 place-items-center rounded text-zinc-600 hover:bg-white/[0.07] hover:text-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-400"
+      data-tree-branch-for={props.branchKey}
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        props.onToggleBranch(props.branchKey!);
+      }}
+    >
+      {props.branchCollapsed ? <ChevronRight aria-hidden="true" size={13} /> : <ChevronDown aria-hidden="true" size={13} />}
+    </button>
+  );
 }
 
-function treeSelectionPath(rows: readonly ComponentTreeRow[], selectedId: string): readonly string[] {
-  const stack: Array<{ id: string; depth: number }> = [];
-  for (const row of rows) {
-    if (!("selection" in row)) continue;
-    while (stack.at(-1) && stack.at(-1)!.depth >= row.depth) stack.pop();
-    if (row.selection.id === selectedId) return [...stack.map((item) => item.id), selectedId];
-    stack.push({ id: row.selection.id, depth: row.depth });
-  }
-  return [selectedId];
+function HtmlScopeGuide(props: { scope?: HtmlScopeAnnotation }) {
+  if (!props.scope) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-y-0 z-0 w-px bg-sky-400/50"
+      data-html-scope-guide={props.scope.pairId}
+      style={{ left: 11 + props.scope.depth * 18 }}
+    />
+  );
 }
 
 function navigateTree(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -378,6 +453,15 @@ function navigateTree(event: ReactKeyboardEvent<HTMLDivElement>) {
     return;
   }
   if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+  const branchDisclosure = target.parentElement?.querySelector<HTMLButtonElement>("[data-tree-branch-for]");
+  if (branchDisclosure) {
+    const expanded = branchDisclosure.getAttribute("aria-expanded") === "true";
+    if ((event.key === "ArrowRight" && !expanded) || (event.key === "ArrowLeft" && expanded)) {
+      event.preventDefault();
+      branchDisclosure.click();
+      return;
+    }
+  }
   const disclosure = target.dataset.treeDisclosure === "true"
     ? target
     : target.parentElement?.querySelector<HTMLButtonElement>("[data-internal-html-toggle-for]");
