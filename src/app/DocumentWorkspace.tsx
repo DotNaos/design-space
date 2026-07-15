@@ -36,6 +36,7 @@ import { BlockedOrLoading, NoSelectionPrompt } from "./document/WorkspaceStates"
 import { PreviewBoundary } from "./PreviewBoundary";
 import { MobileDock, type MobilePane } from "./shell/MobileDock";
 import { WorkspaceTopBar } from "./shell/WorkspaceTopBar";
+import { WorkspaceActivityRail } from "./shell/WorkspaceActivityRail";
 import { createTargetViewModel, findComponentInstance } from "./target-model";
 import type { SlotState } from "./types";
 
@@ -258,6 +259,8 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     setDefinitionEditor(true);
     setMode("library");
     controller.selectDocument(authoredDocument.id);
+    setSidebarView("tree");
+    setBrowserView("documents");
     setMobilePane("inspect");
   };
 
@@ -364,36 +367,56 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     />
   ) : desktopEditor;
 
+  const activity = sidebarView === "catalog" ? "library" : sidebarView === "files" ? "files" : "app";
+  const selectedCatalogLabel = catalog.find((entry) => entry.component.id === selectedCatalogId)?.component.label;
+  const breadcrumb = sidebarView === "catalog"
+    ? ["Library", selectedCatalogLabel ?? "Catalog"]
+    : sidebarView === "files"
+      ? ["Files"]
+      : document.kind === "screen"
+        ? ["App", "Pages", "Desktop", document.label]
+        : ["App", "Components", document.label];
+
   return (
-    <div className="flex h-dvh w-full min-w-0 flex-col overflow-hidden bg-[#0d0e10] text-zinc-200">
+    <div className="flex h-dvh w-full min-w-0 overflow-hidden bg-[#0d0e10] text-zinc-200">
       <style data-design-space-document-preview>{itemEditor.model?.previewCss ?? tailwindPreview.css}</style>
-      <WorkspaceTopBar
-        targetLabel={target.project.label}
-        documentLabel={modeDocumentAvailable ? document.label : `No ${modeDocumentKind} selected`}
-        focusLabel={componentFocus.label}
-        mode={mode}
-        connected={controller.connected}
+      <WorkspaceActivityRail
+        active={activity}
         strictUi={activeSession?.strictUi}
-        checking={activeSession?.phase === "checking"}
-        canUndo={!itemEditor.model && Boolean(activeSession?.past.length)} canRedo={!itemEditor.model && Boolean(activeSession?.future.length)}
-        canReset={modeDocumentAvailable && !itemEditor.model}
+        strictUiChecking={activeSession?.phase === "checking"}
         canStrictUi={modeDocumentAvailable && !itemEditor.model}
-        canDiff={Boolean(!itemEditor.model && activeSession && dirty && controller.connected && activeSession.phase !== "stale" && tailwindReady)}
-        canSave={!itemEditor.model && activeSession?.phase === "diff-ready" && Boolean(preparedSave)}
-        saving={activeSession?.phase === "saving"}
-        onModeChange={switchMode}
-        onUndo={controller.undo}
-        onRedo={controller.redo}
-        onReset={() => { if (modeDocumentAvailable) controller.reset(); }}
+        onApp={() => { setSidebarView("tree"); setBrowserView("documents"); }}
+        onLibrary={() => { setSidebarView("catalog"); setBrowserView("catalog"); }}
+        onFiles={() => { setSidebarView("files"); setBrowserView("files"); }}
         onStrictUi={() => { if (modeDocumentAvailable) setShowStrictUi(true); }}
-        onDiff={() => void controller.prepare().then((result) => {
-          if (result?.state === "ready") setShowDiff(true);
-          else if (result) setShowStrictUi(true);
-        })}
-        onSave={() => void controller.save().then((result) => result && setShowDiff(false))}
-        onExitFocus={componentFocus.close}
       />
-      <DocumentWorkspacePanels
+      <div className="flex min-w-0 flex-1 flex-col">
+        <WorkspaceTopBar
+          targetLabel={target.project.label}
+          documentLabel={modeDocumentAvailable ? document.label : `No ${modeDocumentKind} selected`}
+          breadcrumb={breadcrumb}
+          focusLabel={componentFocus.label}
+          connected={controller.connected}
+          strictUi={activeSession?.strictUi}
+          checking={activeSession?.phase === "checking"}
+          canUndo={!itemEditor.model && Boolean(activeSession?.past.length)} canRedo={!itemEditor.model && Boolean(activeSession?.future.length)}
+          canReset={modeDocumentAvailable && !itemEditor.model}
+          canStrictUi={modeDocumentAvailable && !itemEditor.model}
+          canDiff={Boolean(!itemEditor.model && activeSession && dirty && controller.connected && activeSession.phase !== "stale" && tailwindReady)}
+          canSave={!itemEditor.model && activeSession?.phase === "diff-ready" && Boolean(preparedSave)}
+          saving={activeSession?.phase === "saving"}
+          onUndo={controller.undo}
+          onRedo={controller.redo}
+          onReset={() => { if (modeDocumentAvailable) controller.reset(); }}
+          onStrictUi={() => { if (modeDocumentAvailable) setShowStrictUi(true); }}
+          onDiff={() => void controller.prepare().then((result) => {
+            if (result?.state === "ready") setShowDiff(true);
+            else if (result) setShowStrictUi(true);
+          })}
+          onSave={() => void controller.save().then((result) => result && setShowDiff(false))}
+          onExitFocus={componentFocus.close}
+        />
+        <DocumentWorkspacePanels
         projectId={target.project.id}
         projectLabel={target.project.label}
         documentId={document.id}
@@ -527,9 +550,9 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         onEditComponent={routing.editWorkspaceComponent}
         onDomSnapshot={setObservedDom}
         onMobileDrawerClose={() => setMobilePane("canvas")}
-      />
-      <MobileDock active={mobilePane} onChange={routing.onMobilePaneChange} />
-      <DocumentWorkspaceDialogs
+        />
+        <MobileDock active={mobilePane} onChange={routing.onMobilePaneChange} />
+        <DocumentWorkspaceDialogs
         workspace={{ controller, activeSession, creation, interactions, itemEditor, mode, modeDocumentAvailable, slotPicker, rootPicker, pickerLabel: pickerSlot?.label ?? "slot", pickerEntries, showDiff, showStrictUi }}
         actions={{
           setShowDiff, setShowStrictUi,
@@ -541,7 +564,8 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
           applyItemEditor: () => { itemEditor.apply(); setMobilePane("canvas"); },
           openIsolated: (instanceId) => { componentFocus.open(instanceId); setMobilePane("canvas"); },
         }}
-      />
+        />
+      </div>
     </div>
   );
 }

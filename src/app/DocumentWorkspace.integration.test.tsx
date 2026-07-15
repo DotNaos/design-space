@@ -89,18 +89,32 @@ it("builds an empty authored slot on mobile, edits the item, saves, and reloads 
   expect(await screen.findByText("Written from mobile")).toBeInTheDocument();
 }, 15_000);
 
-it("opens a default component document in Library mode after loading", async () => {
+it("opens a default project component in the App hierarchy after loading", async () => {
   installServer(() => screenDocument, () => undefined, () => undefined);
   const componentTarget: TargetModule = { ...target, defaultDocumentId: panelDocument.id };
 
   render(<DocumentWorkspace target={componentTarget} />);
 
   await userEvent.click(await screen.findByRole("button", { name: "Open Project" }));
-  expect(await screen.findByText("Components")).toBeVisible();
-  const components = screen.getByRole("region", { name: "Components" });
+  const components = await screen.findByRole("region", { name: "Project components" });
   expect(within(components).getByRole("button", { name: "Panel" })).toHaveAttribute("aria-current", "page");
   expect(screen.getByRole("heading", { name: "Layers" })).toBeVisible();
   expect(screen.queryByRole("button", { name: "Documents" })).not.toBeInTheDocument();
+});
+
+it("opens the read-only Library without leaving the App document on the canvas", async () => {
+  installServer(() => screenDocument, () => undefined, () => undefined);
+  render(<DocumentWorkspace target={target} />);
+
+  expect(await screen.findByRole("main", { name: "Preview canvas" })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Open Project" }));
+  await userEvent.click(screen.getByRole("button", { name: /Component library/ }));
+  expect(await screen.findByRole("heading", { name: "Component catalog" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Component library" })).toBeVisible();
+  expect(screen.queryByRole("main", { name: "Preview canvas" })).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: /Stack Target Read only/ }));
+  expect(await screen.findByText("This target component is available to the app and stays read-only here.")).toBeVisible();
 });
 
 it("deletes, restores, saves, reloads, and rebuilds an empty page root", async () => {
@@ -192,7 +206,7 @@ it("lets a connected empty project create its first screen", async () => {
   expect(await screen.findByRole("dialog", { name: "Create screen" })).toBeInTheDocument();
 });
 
-it("shows a truthful empty Library and requires a fresh create diff after save failure", async () => {
+it("shows truthful empty project Components and requires a fresh create diff after save failure", async () => {
   runLocalOperationMock.mockImplementation(async (operation) => {
     if (operation.type === "list-documents") return standaloneCatalog as never;
     if (operation.type === "read-document") return snapshot(standaloneScreen) as never;
@@ -206,10 +220,11 @@ it("shows a truthful empty Library and requires a fresh create diff after save f
 
   render(<DocumentWorkspace target={target} />);
   expect((await screen.findAllByText("Only screen")).length).toBeGreaterThan(0);
-  await userEvent.click(screen.getAllByRole("button", { name: "Library" })[0]!);
+  await userEvent.click(screen.getByRole("button", { name: "Open Project" }));
+  await userEvent.click(screen.getByRole("button", { name: "Components" }));
 
   expect(await screen.findByText("No components are registered yet.")).toBeInTheDocument();
-  expect(screen.queryByText("Only screen")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Only screen" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Reset document" })).toBeDisabled();
   await userEvent.click(screen.getAllByRole("button", { name: "Create component" })[0]!);
   expect(await screen.findByRole("dialog", { name: "Create component" })).toBeInTheDocument();

@@ -30,7 +30,7 @@ export function DocumentWorkspaceSurface(props: {
   return (
     <ResizableWorkspacePanels
       namespace={{ projectId: props.projectId, documentId: props.documentId }}
-      left={{ label: "Project and component tree", content: props.left }}
+      left={{ label: "App structure and component tree", content: props.left, defaultWidth: 280, minWidth: 248, maxWidth: 440 }}
       right={{
         label: "Inspector and source changes",
         content: props.right,

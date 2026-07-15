@@ -10,7 +10,7 @@ function renderTopBar(overrides: Partial<Parameters<typeof WorkspaceTopBar>[0]> 
   const props: Parameters<typeof WorkspaceTopBar>[0] = {
     targetLabel: "Demo target",
     documentLabel: "Quarterly planning",
-    mode: "app",
+    breadcrumb: ["App", "Pages", "Desktop", "Quarterly planning"],
     connected: true,
     checking: false,
     canUndo: true,
@@ -20,7 +20,6 @@ function renderTopBar(overrides: Partial<Parameters<typeof WorkspaceTopBar>[0]> 
     canDiff: true,
     canSave: true,
     saving: false,
-    onModeChange: vi.fn(),
     onUndo: vi.fn(),
     onRedo: vi.fn(),
     onReset: vi.fn(),
@@ -38,20 +37,19 @@ describe("WorkspaceTopBar", () => {
     renderTopBar();
 
     expect(screen.getByText("Demo target")).toBeInTheDocument();
-    expect(screen.getByText("Quarterly planning")).toBeInTheDocument();
+    expect(screen.getByLabelText("Current document path")).toHaveTextContent("AppPagesDesktopQuarterly planning");
     expect(screen.getByRole("status", { name: "Local preview connected" })).toBeInTheDocument();
     expect(screen.queryByText("Design Space")).not.toBeInTheDocument();
   });
 
-  it("keeps mode, strict UI, diff, and save actions available", async () => {
+  it("removes the mode switch and keeps strict UI, diff, and save actions available", async () => {
     const props = renderTopBar();
 
-    await userEvent.click(screen.getByRole("button", { name: "Library" }));
     await userEvent.click(screen.getByRole("button", { name: "Strict UI not checked" }));
     await userEvent.click(screen.getByRole("button", { name: "Prepare exact diff" }));
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(props.onModeChange).toHaveBeenCalledWith("library");
+    expect(screen.queryByRole("button", { name: "Library" })).not.toBeInTheDocument();
     expect(props.onStrictUi).toHaveBeenCalledOnce();
     expect(props.onDiff).toHaveBeenCalledOnce();
     expect(props.onSave).toHaveBeenCalledOnce();

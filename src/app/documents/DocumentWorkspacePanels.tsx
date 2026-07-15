@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Library } from "lucide-react";
 
 import type { ComponentTreeRow, SelectionTarget } from "../../model";
 import type { StrictUiViolation } from "../../shared/strict-ui";
@@ -148,7 +149,14 @@ export function DocumentWorkspacePanels(props: {
       onToggleInternals={props.onToggleInternals}
     />
   ) : empty;
-  const canvas = props.modeDocumentAvailable && props.hasRoot ? (
+  const selectedCatalogEntry = props.catalog.find((entry) => entry.component.id === props.selectedCatalogId);
+  const libraryState = props.sidebarView === "catalog" ? (
+    <LibraryBrowseState
+      label={selectedCatalogEntry?.component.label}
+      readOnly={Boolean(selectedCatalogEntry?.targetAdapter)}
+    />
+  ) : undefined;
+  const canvas = libraryState ?? (props.modeDocumentAvailable && props.hasRoot ? (
     <div className="relative flex min-h-0 min-w-0 flex-1">
       <PreviewCanvas
         cameraKey={props.documentId}
@@ -182,7 +190,7 @@ export function DocumentWorkspacePanels(props: {
     >
       <EmptyDocumentRoot className="flex h-full w-full" documentKind={props.documentKind} onInsert={props.onOpenRootPicker} />
     </div>
-  ) : <div className="flex min-h-0 min-w-0 flex-1">{empty}</div>;
+  ) : <div className="flex min-h-0 min-w-0 flex-1">{empty}</div>);
   const slotInspector = props.modeDocumentAvailable && props.selectedSlot ? (
     <SlotInspector
       className="flex h-full w-full"
@@ -205,6 +213,8 @@ export function DocumentWorkspacePanels(props: {
       onClose={props.onClosePicker}
       onSelect={props.onInsertComponent}
     />
+  ) : props.sidebarView === "catalog" ? (
+    <LibraryInspectorState label={selectedCatalogEntry?.component.label} readOnly={Boolean(selectedCatalogEntry?.targetAdapter)} />
   ) : props.rightOverride ?? (
     <DocumentInspectorTabs
       design={designPanel}
@@ -225,6 +235,7 @@ export function DocumentWorkspacePanels(props: {
       onChange={props.onSidebarViewChange}
       onCreate={props.onCreate}
       onDocumentSelect={props.onDocumentSelect}
+      onModeChange={props.onModeChange}
     />
   );
   return (
@@ -247,5 +258,38 @@ export function DocumentWorkspacePanels(props: {
       )}
       onMobileDrawerClose={props.onMobileDrawerClose}
     />
+  );
+}
+
+function LibraryBrowseState(props: { label?: string; readOnly: boolean }) {
+  return (
+    <section aria-label="Library selection" className="grid h-full w-full place-items-center bg-[#0d0e10] px-6 text-center">
+      <div className="max-w-72">
+        <Library aria-hidden="true" className="mx-auto mb-3 text-zinc-600" size={24} />
+        <h2 className="text-sm font-semibold text-zinc-200">{props.label ?? "Component library"}</h2>
+        <p className="mt-2 text-[11px] leading-5 text-zinc-500">
+          {props.label
+            ? props.readOnly
+              ? "This target component is available to the app and stays read-only here."
+              : "Open this project component to continue editing it in the App workspace."
+            : "Select a component to inspect its source and access level."}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function LibraryInspectorState(props: { label?: string; readOnly: boolean }) {
+  return (
+    <section aria-label="Library component access" className="h-full w-full bg-[#141518] px-4 py-5">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-sky-400">Library access</p>
+      <h2 className="mt-2 text-sm font-semibold text-zinc-100">{props.label ?? "No component selected"}</h2>
+      {props.label ? (
+        <dl className="mt-5 space-y-4 text-[11px]">
+          <div><dt className="text-zinc-600">Source</dt><dd className="mt-1 text-zinc-300">{props.readOnly ? "Target library" : "Project authored"}</dd></div>
+          <div><dt className="text-zinc-600">Access</dt><dd className={`mt-1 ${props.readOnly ? "text-zinc-300" : "text-emerald-400"}`}>{props.readOnly ? "Read only" : "Editable"}</dd></div>
+        </dl>
+      ) : <p className="mt-3 text-[11px] leading-5 text-zinc-500">Choose a catalog entry to see whether it comes from the target library or this project.</p>}
+    </section>
   );
 }
