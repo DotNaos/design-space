@@ -189,7 +189,7 @@ describe("preview canvas", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(1.1)");
+    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(1.2)");
 
     rerender(
       <PreviewCanvas
@@ -223,7 +223,7 @@ describe("preview canvas", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(1.1)");
+    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(1.2)");
 
     rerender(
       <PreviewCanvas
@@ -239,7 +239,7 @@ describe("preview canvas", () => {
       />,
     );
 
-    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(1.1)");
+    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(1.2)");
   });
 
   it("pinches around two touch pointers and pans with one touch pointer", () => {
@@ -323,6 +323,8 @@ describe("preview canvas", () => {
       />,
     );
 
+    expect(screen.queryByTestId("canvas-grid")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show canvas grid" }));
     const grid = screen.getByTestId("canvas-grid");
     expect(grid.style.backgroundSize).toBe("20px 20px");
     expect(Number(grid.dataset.dotRadius)).toBeCloseTo(2);
@@ -330,8 +332,8 @@ describe("preview canvas", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
 
-    expect(grid.style.backgroundSize).toBe("22px 22px");
-    expect(Number(grid.dataset.dotRadius)).toBeCloseTo(2.2);
+    expect(grid.style.backgroundSize).toBe("24px 24px");
+    expect(Number(grid.dataset.dotRadius)).toBeCloseTo(2.4);
     expect(grid.style.backgroundPosition).not.toBe("16px 56px");
   });
 
@@ -349,6 +351,8 @@ describe("preview canvas", () => {
       />,
     );
 
+    expect(screen.queryByTestId("canvas-grid")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show canvas grid" }));
     const grid = screen.getByTestId("canvas-grid");
     expect(grid.dataset.gridMode).toBe("dots");
     expect(grid.style.backgroundImage).toContain("radial-gradient");
@@ -422,12 +426,13 @@ describe("preview canvas", () => {
     const placeholder = await screen.findByRole("button", { name: "Add to empty Footer slot" });
     expect(placeholder).toHaveStyle({ height: "32px" });
 
-    for (let step = 0; step < 5; step += 1) {
+    for (let step = 0; step < 4; step += 1) {
       fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
     }
 
-    expect(canvasScale()).toBeCloseTo(0.5);
-    expect(Number.parseFloat(placeholder.style.height)).toBeCloseTo(16);
+    const expectedScale = 1 / (1.2 ** 4);
+    expect(canvasScale()).toBeCloseTo(expectedScale);
+    expect(Number.parseFloat(placeholder.style.height)).toBe(Math.round(32 * expectedScale));
   });
 
   it("cancels browser wheel zoom and applies it to the canvas", () => {

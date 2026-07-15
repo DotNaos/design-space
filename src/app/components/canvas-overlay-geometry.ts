@@ -15,6 +15,7 @@ export type CanvasOverlayLabel = CanvasOverlayLabelInput & ViewRect;
 export type EmptySlotOverlayInput = { id: string; rect: ViewRect };
 
 const baseGridStep = 20;
+const gridWorldSteps = [320, 160, 80, 40, 20, 10, 5, 4, 2, 1] as const;
 const baseGridDotRadius = 2;
 const maximumGridDotRadius = 3;
 const minimumGridScreenStep = 12;
@@ -78,10 +79,15 @@ export function canvasGridPresentation(scale: number, anchor: { x: number; y: nu
 }
 
 export function gridWorldStep(scale: number): number {
-  let step = baseGridStep;
-  while (step * scale < minimumGridScreenStep) step *= 2;
-  while (step * scale > maximumGridScreenStep) step /= 2;
-  return step;
+  const inRange = gridWorldSteps.filter((step) => {
+    const screenStep = step * scale;
+    return screenStep >= minimumGridScreenStep && screenStep <= maximumGridScreenStep;
+  });
+  if (inRange.length) return inRange.reduce((closest, step) => (
+    Math.abs(step - baseGridStep) < Math.abs(closest - baseGridStep) ? step : closest
+  ));
+  if (gridWorldSteps[0] * scale < minimumGridScreenStep) return gridWorldSteps[0];
+  return 1;
 }
 
 export function layoutEmptySlotOverlays(

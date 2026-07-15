@@ -78,6 +78,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const [strictUiRects, setStrictUiRects] = useState<readonly MeasuredStrictUiTarget[]>([]);
   const [gridRootRect, setGridRootRect] = useState<ViewRect>();
   const [gridMode, setGridMode] = useState<CanvasGridMode>("dots");
+  const [gridVisible, setGridVisible] = useState(false);
   const [layoutGrid, setLayoutGrid] = useState(defaultCanvasLayoutGrid);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showGestureHint, setShowGestureHint] = useState(true);
@@ -239,12 +240,12 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     setCamera({ x: (viewport.clientWidth - worldWidth) / 2, y: props.compact ? 44 : 56, scale: 1 });
   };
 
-  const zoomBy = (amount: number) => {
+  const zoomBy = (factor: number) => {
     const viewport = viewportRef.current;
     if (!viewport) return;
     suppressClick.current = false;
     autoFit.current = false;
-    setCamera(zoomCanvasAt(cameraRef.current, cameraRef.current.scale + amount, {
+    setCamera(zoomCanvasAt(cameraRef.current, cameraRef.current.scale * factor, {
       x: viewport.clientWidth / 2,
       y: viewport.clientHeight / 2,
     }));
@@ -422,11 +423,13 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         mode={gridMode}
         rootRect={gridRootRect}
         scale={camera.scale}
+        visible={gridVisible}
       />
 
       <CanvasViewportControls
         compact={props.compact}
         gridMode={gridMode}
+        gridVisible={gridVisible}
         interactionMode={interactionMode}
         layoutGrid={layoutGrid}
         scale={camera.scale}
@@ -437,9 +440,10 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         }}
         onReset={reset}
         onGridModeChange={setGridMode}
+        onGridVisibleChange={setGridVisible}
         onLayoutGridChange={setLayoutGrid}
-        onZoomIn={() => zoomBy(0.1)}
-        onZoomOut={() => zoomBy(-0.1)}
+        onZoomIn={() => zoomBy(1.2)}
+        onZoomOut={() => zoomBy(1 / 1.2)}
         onToggleInteractionMode={() => setInteractionMode((current) => current === "select" ? "interact" : "select")}
       />
 

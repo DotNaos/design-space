@@ -373,6 +373,7 @@ describe("PreviewCanvas direct interactions", () => {
     renderCanvas();
     const canvas = screen.getByRole("main", { name: "Preview canvas" });
     const root = screen.getByText("One");
+    fireEvent.click(screen.getByRole("button", { name: "Show canvas grid" }));
     const grid = screen.getByTestId("canvas-grid");
     vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(rect(10, 20, 400, 300));
     vi.spyOn(root, "getBoundingClientRect").mockReturnValue(rect(42, 68, 220, 120));

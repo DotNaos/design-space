@@ -10,7 +10,7 @@ export interface Point {
 }
 
 export const minimumCanvasScale = 0.25;
-export const maximumCanvasScale = 4;
+export const maximumCanvasScale = 256;
 
 export function clampCanvasScale(scale: number): number {
   return Math.min(maximumCanvasScale, Math.max(minimumCanvasScale, scale));

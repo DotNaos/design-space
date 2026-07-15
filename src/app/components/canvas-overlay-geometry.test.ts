@@ -33,11 +33,15 @@ describe("canvas overlay geometry", () => {
     const far = canvasGridPresentation(0.25, { x: 10.2, y: 20.2 });
     const normal = canvasGridPresentation(1, { x: 10.2, y: 20.2 });
     const near = canvasGridPresentation(4, { x: 10.2, y: 20.2 });
+    const closer = canvasGridPresentation(8, { x: 10.2, y: 20.2 });
+    const pixelReady = canvasGridPresentation(32, { x: 10.2, y: 20.2 });
 
     expect(far.worldStep).toBe(80);
     expect(far.screenStep).toBe(20);
     expect(normal.worldStep).toBe(20);
     expect(near.worldStep).toBe(5);
+    expect(closer.worldStep).toBe(4);
+    expect(pixelReady.worldStep).toBe(1);
     expect(far.dotRadius).toBe(0.5);
     expect(normal.dotRadius).toBe(2);
     expect(near.dotRadius).toBe(3);

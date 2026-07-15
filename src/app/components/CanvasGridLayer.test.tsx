@@ -7,20 +7,21 @@ import { CanvasGridLayer } from "./CanvasGridLayer";
 afterEach(cleanup);
 
 describe("CanvasGridLayer", () => {
-  it("turns the fully zoomed canvas into a dim one-world-pixel grid above the preview", () => {
+  it("turns a deeply zoomed canvas into a dim one-world-pixel grid above the preview", () => {
     render(
       <CanvasGridLayer
-        grid={canvasGridPresentation(4, { x: 32, y: 48 })}
+        grid={canvasGridPresentation(32, { x: 32, y: 48 })}
         layoutGrid={{ color: "#22D3EE", enabled: false, size: 8 }}
         mode="dots"
-        scale={4}
+        scale={32}
+        visible
       />,
     );
 
     const grid = screen.getByTestId("canvas-grid");
     expect(grid.dataset.gridMode).toBe("pixels");
     expect(grid.dataset.worldStep).toBe("1");
-    expect(grid.style.backgroundSize).toBe("4px 4px");
+    expect(grid.style.backgroundSize).toBe("32px 32px");
     expect(grid.style.backgroundImage).toContain("rgba(226, 232, 240, 0.12)");
     expect(grid.className).toContain("z-[8]");
   });
@@ -33,6 +34,7 @@ describe("CanvasGridLayer", () => {
         mode="lines"
         rootRect={{ left: 40, top: 60, width: 320, height: 180 }}
         scale={2}
+        visible={false}
       />,
     );
 
@@ -46,5 +48,6 @@ describe("CanvasGridLayer", () => {
     expect(ui.style.backgroundImage).toContain("rgba(52, 211, 153, 0.48)");
     expect(ui.style.left).toBe("40px");
     expect(ui.style.width).toBe("320px");
+    expect(screen.queryByTestId("canvas-grid")).not.toBeInTheDocument();
   });
 });

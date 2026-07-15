@@ -1,4 +1,3 @@
-import { maximumCanvasScale } from "../canvas-transform";
 import type { ViewRect } from "./canvas-overlay-geometry";
 import type { CanvasGridMode, CanvasLayoutGridSettings } from "./canvas-grid-types";
 
@@ -19,6 +18,7 @@ export function CanvasGridLayer(props: {
   mode: CanvasGridMode;
   rootRect?: ViewRect;
   scale: number;
+  visible: boolean;
 }) {
   const pixelGrid = isPixelGridScale(props.scale);
   const baseBackground = props.mode === "dots"
@@ -33,19 +33,21 @@ export function CanvasGridLayer(props: {
 
   return (
     <>
-      <div
-        className={`pointer-events-none absolute inset-0 ${pixelGrid ? "z-[8]" : ""}`}
-        data-dot-radius={props.grid.dotRadius}
-        data-grid-mode={pixelGrid ? "pixels" : props.mode}
-        data-testid="canvas-grid"
-        data-world-step={pixelGrid ? 1 : props.grid.worldStep}
-        style={pixelGrid ? pixelGridStyle(props.grid, props.scale) : {
-          backgroundImage: baseBackground.image,
-          backgroundPosition: baseBackground.position,
-          backgroundSize: `${props.grid.screenStep}px ${props.grid.screenStep}px`,
-          opacity: props.grid.opacity,
-        }}
-      />
+      {props.visible && (
+        <div
+          className={`pointer-events-none absolute inset-0 ${pixelGrid ? "z-[8]" : ""}`}
+          data-dot-radius={props.grid.dotRadius}
+          data-grid-mode={pixelGrid ? "pixels" : props.mode}
+          data-testid="canvas-grid"
+          data-world-step={pixelGrid ? 1 : props.grid.worldStep}
+          style={pixelGrid ? pixelGridStyle(props.grid, props.scale) : {
+            backgroundImage: baseBackground.image,
+            backgroundPosition: baseBackground.position,
+            backgroundSize: `${props.grid.screenStep}px ${props.grid.screenStep}px`,
+            opacity: props.grid.opacity,
+          }}
+        />
+      )}
       {props.layoutGrid.enabled && (
         <LayoutGridOverlay grid={props.grid} rootRect={props.rootRect} settings={props.layoutGrid} scale={props.scale} />
       )}
@@ -54,7 +56,7 @@ export function CanvasGridLayer(props: {
 }
 
 export function isPixelGridScale(scale: number): boolean {
-  return scale >= maximumCanvasScale - 0.001;
+  return scale >= 32 - 0.001;
 }
 
 function LayoutGridOverlay(props: {

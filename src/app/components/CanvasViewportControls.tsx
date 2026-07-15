@@ -6,11 +6,13 @@ import type { CanvasGridMode, CanvasLayoutGridSettings } from "./canvas-grid-typ
 type CanvasViewportControlsProps = {
   compact?: boolean;
   gridMode: CanvasGridMode;
+  gridVisible: boolean;
   interactionMode: "select" | "interact";
   layoutGrid: CanvasLayoutGridSettings;
   scale: number;
   onFit: () => void;
   onGridModeChange: (mode: CanvasGridMode) => void;
+  onGridVisibleChange: (visible: boolean) => void;
   onLayoutGridChange: (settings: CanvasLayoutGridSettings) => void;
   onReset: () => void;
   onZoomIn: () => void;
@@ -41,8 +43,10 @@ export function CanvasViewportControls(props: CanvasViewportControlsProps) {
         onPointerUp={(event) => event.stopPropagation()}
       >
         <CanvasGridControls
+          gridVisible={props.gridVisible}
           layoutGrid={props.layoutGrid}
           mode={props.gridMode}
+          onGridVisibleChange={props.onGridVisibleChange}
           onLayoutGridChange={props.onLayoutGridChange}
           onModeChange={props.onGridModeChange}
         />

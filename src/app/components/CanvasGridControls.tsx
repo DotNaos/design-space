@@ -10,15 +10,17 @@ import {
   ToggleButtonGroup,
   parseColor,
 } from "@heroui/react";
-import { Grid2X2, Grip, LayoutGrid } from "lucide-react";
+import { Grid2X2, Grid3X3, Grip, LayoutGrid } from "lucide-react";
 
 import type { CanvasGridMode, CanvasLayoutGridSettings, CanvasLayoutGridSize } from "./canvas-grid-types";
 
 const colorPresets = ["#22D3EE", "#60A5FA", "#34D399", "#FBBF24", "#FB7185", "#F8FAFC"];
 
 export function CanvasGridControls(props: {
+  gridVisible: boolean;
   layoutGrid: CanvasLayoutGridSettings;
   mode: CanvasGridMode;
+  onGridVisibleChange: (visible: boolean) => void;
   onLayoutGridChange: (settings: CanvasLayoutGridSettings) => void;
   onModeChange: (mode: CanvasGridMode) => void;
 }) {
@@ -29,20 +31,36 @@ export function CanvasGridControls(props: {
         const nextMode = gridModeForKey(event.key, props.mode);
         if (!nextMode || !(event.target instanceof Element) || !event.target.closest('[aria-label="Canvas grid style"]')) return;
         event.preventDefault();
+        props.onGridVisibleChange(true);
         props.onModeChange(nextMode);
         event.currentTarget.querySelector<HTMLElement>(`[aria-label="${nextMode === "dots" ? "Dot grid" : "Line grid"}"]`)?.focus();
       }}
     >
       <LayoutGridMenu settings={props.layoutGrid} onChange={props.onLayoutGridChange} />
+      <ToggleButton
+        isIconOnly
+        aria-label={props.gridVisible ? "Hide canvas grid" : "Show canvas grid"}
+        className="size-9 min-w-9 rounded-md bg-transparent text-zinc-500 outline-none data-[focus-visible]:ring-2 data-[focus-visible]:ring-sky-400/70 data-[selected]:bg-white/10 data-[selected]:text-zinc-100 lg:size-7 lg:min-w-7"
+        isSelected={props.gridVisible}
+        size="sm"
+        variant="ghost"
+        onChange={props.onGridVisibleChange}
+      >
+        <Grid3X3 size={13} />
+      </ToggleButton>
       <ToggleButtonGroup
         aria-label="Canvas grid style"
+        className={props.gridVisible ? "" : "opacity-45"}
         disallowEmptySelection
         selectedKeys={[props.mode]}
         selectionMode="single"
         size="sm"
         onSelectionChange={(keys) => {
           const mode = [...keys][0];
-          if (mode === "dots" || mode === "lines") props.onModeChange(mode);
+          if (mode === "dots" || mode === "lines") {
+            props.onGridVisibleChange(true);
+            props.onModeChange(mode);
+          }
         }}
       >
         <GridModeButton icon={<Grip size={13} />} id="dots" label="Dot grid" />
@@ -78,7 +96,7 @@ function LayoutGridMenu(props: {
         <Popover.Dialog className="outline-none">
           <div className="border-b border-white/10 px-3 py-3">
             <Popover.Heading className="text-sm font-semibold">Layout grid</Popover.Heading>
-            <p className="mt-1 text-[10px] leading-4 text-zinc-500">An always-on-top spacing guide. Pixel grid appears automatically at 400%.</p>
+            <p className="mt-1 text-[10px] leading-4 text-zinc-500">An always-on-top spacing guide. Pixel cells appear from 3200% when the canvas grid is visible.</p>
           </div>
           <div className="space-y-4 p-3">
             <Switch isSelected={props.settings.enabled} size="sm" onChange={(enabled) => update({ enabled })}>
