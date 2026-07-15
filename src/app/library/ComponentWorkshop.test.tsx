@@ -33,7 +33,7 @@ it("keeps the complete component workshop scrollable on a phone and creates an e
 
   const changed = onChange.mock.lastCall?.[0] as DesignDocument;
   expect(changed.component?.slots).toContainEqual(expect.objectContaining({ id: "slot-1", label: "Slot 1" }));
-  expect(changed.root.slots.content).toContainEqual({
+  expect(changed.root!.slots.content).toContainEqual({
     kind: "slot-outlet",
     id: "slot-1-outlet",
     slotId: "slot-1",

@@ -52,7 +52,7 @@ export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
   }, [options.sourceSnapshotKey]);
 
   const model = useMemo(() => {
-    if (!session) return undefined;
+    if (!session?.draft.root) return undefined;
     const fixture = documentToFixture(session.draft);
     const componentDocuments = options.library.filter((document) => document.kind === "component");
     const view = createTargetViewModel(options.target, false, fixture, componentDocuments, { contractValidation: "tolerant" });
@@ -98,7 +98,8 @@ export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
       location,
       slots,
       hasTailwind: tailwindInput.length > 0,
-      canDelete: Boolean(location && parentSlot && location.siblingCount > (parentSlot.min ?? 0)),
+      canDelete: instance.instanceId === session.draft.root.instanceId
+        || Boolean(location && parentSlot && location.siblingCount > (parentSlot.min ?? 0)),
       canDuplicate: Boolean(location && (!parentSlot?.max || location.siblingCount < parentSlot.max)),
     };
   }, [options.library, options.target, session]);
@@ -166,7 +167,12 @@ export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
   };
 
   const remove = () => {
-    if (!model?.canDelete || !model.location) return;
+    if (!model?.canDelete) return;
+    if (!model.location) {
+      options.onCommit(removeDesignComponent(model.session.draft, model.instance.instanceId));
+      setSession(undefined);
+      return;
+    }
     setSession((current) => current ? {
       draft: removeDesignComponent(current.draft, current.selectedInstanceId),
       selectedInstanceId: model.location!.parentInstanceId,
@@ -207,7 +213,7 @@ export { collectDocumentTailwind };
 function childLabel(
   target: TargetModule,
   library: readonly DesignDocument[],
-  parent: DesignDocument["root"],
+  parent: NonNullable<DesignDocument["root"]>,
   slotId: string,
 ): string | undefined {
   const child = parent.slots[slotId]?.[0];

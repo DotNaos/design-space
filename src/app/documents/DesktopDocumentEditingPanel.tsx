@@ -33,6 +33,7 @@ export function DesktopDocumentEditingPanel(props: {
         catalogComponents={props.catalogComponents}
         onChange={props.onDocumentChange}
         onEditImplementation={() => {
+          if (!props.document.root) return;
           props.onDefinitionEditorChange(false);
           props.itemEditor.open(props.document.root.instanceId);
         }}

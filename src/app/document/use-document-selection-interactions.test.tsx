@@ -9,14 +9,14 @@ import { useDocumentSelectionInteractions } from "./use-document-selection-inter
 it("clears transient action state when a different document loads", async () => {
   const onSelect = vi.fn();
   const { result, rerender } = renderHook(({ document }: { document: DesignDocument }) => (
-    useDocumentSelectionInteractions(options(document, { kind: "component", id: document.root.instanceId }, onSelect))
+    useDocumentSelectionInteractions(options(document, { kind: "component", id: document.root!.instanceId }, onSelect))
   ), { initialProps: { document: screenDocument } });
 
-  act(() => result.current.deleteSelection({ kind: "component", id: screenDocument.root.instanceId }));
-  expect(result.current.actionError).toBe("The root component cannot be removed.");
+  act(() => result.current.deleteSelection({ kind: "component", id: "missing-component" }));
+  expect(result.current.actionError).toContain("was not found");
 
   act(() => result.current.openContextMenu({
-    selection: { kind: "component", id: screenDocument.root.instanceId },
+    selection: { kind: "component", id: screenDocument.root!.instanceId },
     clientPosition: { x: 24, y: 30 },
     viewportPosition: { x: 4, y: 6 },
   }));
@@ -27,6 +27,23 @@ it("clears transient action state when a different document loads", async () => 
     expect(result.current.actionError).toBeUndefined();
     expect(result.current.contextMenu).toBeUndefined();
   });
+});
+
+it("deletes the root into a real empty document state", () => {
+  const edit = vi.fn();
+  const close = vi.fn();
+  const onSelect = vi.fn();
+  const { result } = renderHook(() => useDocumentSelectionInteractions({
+    ...options(screenDocument, { kind: "component", id: "root" }, onSelect),
+    edit,
+    itemEditor: { close } as never,
+  }));
+
+  act(() => result.current.deleteSelection({ kind: "component", id: "root" }));
+
+  expect(edit).toHaveBeenCalledWith(expect.objectContaining({ root: null }));
+  expect(close).toHaveBeenCalledOnce();
+  expect(onSelect).not.toHaveBeenCalled();
 });
 
 it("applies component deletion, closes the editor, and selects the parent", () => {
@@ -108,6 +125,28 @@ it("inserts an allowed component and hands its new instance to the editor flow",
   expect(onInserted).toHaveBeenCalledWith("created");
 });
 
+it("inserts a catalog component as the first root", () => {
+  const edit = vi.fn();
+  const onSelect = vi.fn();
+  const onInserted = vi.fn();
+  const empty = { ...screenDocument, root: null };
+  const { result } = renderHook(() => useDocumentSelectionInteractions({
+    ...options(empty, { kind: "component", id: "empty-document-root" }, onSelect),
+    edit,
+    onInserted,
+  }));
+
+  let inserted = false;
+  act(() => { inserted = result.current.insertRootComponent("stack"); });
+
+  expect(inserted).toBe(true);
+  expect(edit).toHaveBeenCalledWith(expect.objectContaining({
+    root: expect.objectContaining({ instanceId: "created", adapterId: "stack", slots: { content: [] } }),
+  }));
+  expect(onSelect).toHaveBeenCalledWith({ kind: "component", id: "created" });
+  expect(onInserted).toHaveBeenCalledWith("created");
+});
+
 it("rejects a forged direct insertion when the slot does not allow the component", () => {
   const edit = vi.fn();
   const selection = contentSlot();
@@ -179,13 +218,13 @@ const nextScreenDocument: DesignDocument = {
   ...screenDocument,
   id: "screen.two",
   label: "Two",
-  root: { ...screenDocument.root, instanceId: "next-root" },
+  root: { ...screenDocument.root!, instanceId: "next-root" },
 };
 
 const screenWithChild: DesignDocument = {
   ...screenDocument,
   root: {
-    ...screenDocument.root,
+    ...screenDocument.root!,
     slots: { content: [{ kind: "component", node: { instanceId: "child", adapterId: "text", slots: {} } }] },
   },
 };

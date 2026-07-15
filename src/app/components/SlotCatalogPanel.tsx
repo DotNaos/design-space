@@ -6,6 +6,7 @@ import type { CatalogEntry } from "./CatalogPanel";
 export function SlotCatalogPanel(props: {
   className?: string;
   slotLabel: string;
+  targetKind?: "slot" | "root";
   entries: readonly CatalogEntry[];
   onClose: () => void;
   onSelect: (id: string) => void;
@@ -18,12 +19,13 @@ export function SlotCatalogPanel(props: {
     return props.entries.filter((entry) => `${entry.label} ${entry.group} ${entry.description ?? ""}`.toLowerCase().includes(normalized));
   }, [props.entries, query]);
 
+  const root = props.targetKind === "root";
   return (
-    <section aria-label={`Add to ${props.slotLabel} slot`} className={`${props.className ?? "flex"} min-h-0 min-w-0 flex-col bg-[#141518] text-zinc-200`}>
+    <section aria-label={root ? "Choose root component" : `Add to ${props.slotLabel} slot`} className={`${props.className ?? "flex"} min-h-0 min-w-0 flex-col bg-[#141518] text-zinc-200`}>
       <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-white/10 px-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[9px] uppercase tracking-[0.14em] text-zinc-600">Compatible components</p>
-          <h2 className="mt-0.5 truncate text-sm font-semibold text-zinc-100">Insert into {props.slotLabel}</h2>
+          <p className="text-[9px] uppercase tracking-[0.14em] text-zinc-600">{root ? "Root components" : "Compatible components"}</p>
+          <h2 className="mt-0.5 truncate text-sm font-semibold text-zinc-100">{root ? "Start this document" : `Insert into ${props.slotLabel}`}</h2>
         </div>
         <button aria-label="Close component picker" className="grid size-10 shrink-0 place-items-center rounded-lg text-zinc-500 hover:bg-white/5 hover:text-white" type="button" onClick={props.onClose}>
           <X size={16} />
@@ -56,7 +58,7 @@ export function SlotCatalogPanel(props: {
             </span>
           </button>
         ))}
-        {entries.length === 0 && <p className="px-3 py-10 text-center text-xs text-zinc-500">No compatible components match this search.</p>}
+        {entries.length === 0 && <p className="px-3 py-10 text-center text-xs text-zinc-500">No {root ? "root" : "compatible"} components match this search.</p>}
       </div>
     </section>
   );

@@ -33,9 +33,9 @@ export function ComponentWorkshop(props: {
 }) {
   const definition = props.document.component;
   if (!definition) return null;
-  const canAddSlot = Boolean(props.recipe);
+  const canAddSlot = Boolean(props.recipe && props.document.root);
   const addSlot = () => {
-    if (!props.recipe) return;
+    if (!props.recipe || !props.document.root) return;
     const sequence = definition.slots.length + 1;
     const slotId = uniqueId(`slot-${sequence}`, new Set(definition.slots.map((slot) => slot.id)));
     props.onChange(addComponentSlot(
@@ -93,7 +93,7 @@ export function ComponentWorkshop(props: {
                 document: props.document,
                 documents: props.documents,
                 slotId: slot.id,
-                selection: { kind: "component", id: props.document.root.instanceId },
+                selection: { kind: "component", id: props.document.root?.instanceId ?? "empty-implementation" },
               });
               if (result.status === "applied") props.onChange(result.document);
             }}
@@ -118,8 +118,8 @@ export function ComponentWorkshop(props: {
       </WorkshopSection>
 
       <WorkshopSection title="Implementation">
-        <Button className="w-full" variant="secondary" onPress={props.onEditImplementation}><Component size={14} /> Edit component body</Button>
-        <p className="mt-2 flex items-start gap-2 text-[10px] leading-4 text-zinc-600"><Braces size={13} className="mt-0.5 shrink-0" />The body executes registered React adapters directly. Slot outlets stay explicit in the document.</p>
+        <Button className="w-full" isDisabled={!props.document.root} variant="secondary" onPress={props.onEditImplementation}><Component size={14} /> Edit component body</Button>
+        <p className="mt-2 flex items-start gap-2 text-[10px] leading-4 text-zinc-600"><Braces size={13} className="mt-0.5 shrink-0" />{props.document.root ? "The body executes registered React adapters directly. Slot outlets stay explicit in the document." : "Add a root component to start the component body."}</p>
       </WorkshopSection>
     </aside>
   );

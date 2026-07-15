@@ -119,7 +119,7 @@ export function createDocumentWorkspaceRouting(options: {
     }
     if (options.selection.kind === "slot" || options.selection.kind === "slot-outlet") {
       options.setMobilePane("inspect");
-    } else if (options.definitionEditor && options.selection.kind === "component" && options.selection.id === options.document.root.instanceId) {
+    } else if (options.definitionEditor && options.selection.kind === "component" && options.selection.id === options.document.root?.instanceId) {
       options.setMobilePane("inspect");
     } else {
       options.setDefinitionEditor(false);

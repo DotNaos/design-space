@@ -60,7 +60,7 @@ describe("component document tree", () => {
   });
 
   it("shows a missing public outlet instead of hiding the slot", () => {
-    const missing = { ...panel, root: { ...panel.root, slots: { content: [] } } };
+    const missing: DesignDocument = { ...panel, root: { ...panel.root!, slots: { content: [] } } };
 
     expect(buildDesignDocumentTree(target, missing, [missing], false)).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: "text", label: "Body slot · outlet missing" }),

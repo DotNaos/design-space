@@ -62,7 +62,7 @@ it("collects and deduplicates Tailwind from authored templates, bindings, and pr
     },
   };
 
-  expect(collectDocumentTailwind(target, [panel], screen.root)).toBe("p-2 gap-4 p-6 rounded-xl mt-2");
+  expect(collectDocumentTailwind(target, [panel], screen.root!)).toBe("p-2 gap-4 p-6 rounded-xl mt-2");
 });
 
 it("passes an outer authored binding through a nested authored component template", () => {
@@ -139,7 +139,7 @@ it("passes an outer authored binding through a nested authored component templat
     },
   };
 
-  expect(collectDocumentTailwind(target, [outer, inner], screen.root)).toBe("bg-cyan-500 p-4");
+  expect(collectDocumentTailwind(target, [outer, inner], screen.root!)).toBe("bg-cyan-500 p-4");
 });
 
 it("keeps implementation and adapter Tailwind when an optional binding is unset", () => {
@@ -175,8 +175,8 @@ it("keeps implementation and adapter Tailwind when an optional binding is unset"
     adapters: target.adapters.map((adapter) => ({ ...adapter, defaultProps: { className: "p-4" } })),
   };
 
-  expect(collectDocumentTailwind(targetWithDefault, [panel("rounded-xl")], screen.root)).toBe("rounded-xl");
-  expect(collectDocumentTailwind(targetWithDefault, [panel()], screen.root)).toBe("p-4");
+  expect(collectDocumentTailwind(targetWithDefault, [panel("rounded-xl")], screen.root!)).toBe("rounded-xl");
+  expect(collectDocumentTailwind(targetWithDefault, [panel()], screen.root!)).toBe("p-4");
 });
 
 it.each([

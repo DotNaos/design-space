@@ -229,11 +229,11 @@ it("maps authored component internals to each outer public instance", () => {
   const nestedPanel: DesignDocument = {
     ...panel,
     root: {
-      ...panel.root,
+      ...panel.root!,
       slots: {
         content: [
           { kind: "component", node: { instanceId: "internal.copy", adapterId: "text", props: { children: "Internal" }, slots: {} } },
-          ...panel.root.slots.content,
+          ...panel.root!.slots.content,
         ],
       },
     },
@@ -284,11 +284,11 @@ it("keeps sibling implementation slot and HTML evidence uniquely scoped behind t
   const boxedPanel: DesignDocument = {
     ...panel,
     root: {
-      ...panel.root,
+      ...panel.root!,
       slots: { content: [
         { kind: "component", node: { instanceId: "box.one", adapterId: "box", props: { label: "First box" }, slots: { content: [] } } },
         { kind: "component", node: { instanceId: "box.two", adapterId: "box", props: { label: "Second box" }, slots: { content: [] } } },
-        ...panel.root.slots.content,
+        ...panel.root!.slots.content,
       ] },
     },
   };

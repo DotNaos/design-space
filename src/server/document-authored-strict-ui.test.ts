@@ -55,7 +55,7 @@ describe("server-owned authored component validation", () => {
     const proposed = structuredClone(snapshot.document);
     if (!proposed.component) throw new Error("Expected a component document");
     proposed.component.slots = [];
-    proposed.root.slots.content = [];
+    proposed.root!.slots.content = [];
 
     const prepared = await fixture.service.prepare(
       "component.panel",
@@ -79,7 +79,7 @@ describe("server-owned authored component validation", () => {
     const proposed = structuredClone(snapshot.document);
     if (!proposed.component) throw new Error("Expected a component document");
     proposed.component.properties = [];
-    delete proposed.root.propertyBindings;
+    delete proposed.root!.propertyBindings;
 
     const prepared = await fixture.service.prepare(
       "component.panel",

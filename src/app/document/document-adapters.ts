@@ -77,12 +77,12 @@ export function wouldCreateAuthoredComponentCycle(
     if (visited.has(adapterId)) return false;
     visited.add(adapterId);
     const definition = definitions.get(adapterId);
-    return Boolean(definition && collectAdapterIds(definition.root).some(reachesTarget));
+    return Boolean(definition?.root && collectAdapterIds(definition.root).some(reachesTarget));
   };
   return reachesTarget(candidateAdapterId);
 }
 
-function collectAdapterIds(node: DesignDocument["root"]): string[] {
+function collectAdapterIds(node: NonNullable<DesignDocument["root"]>): string[] {
   return [
     node.adapterId,
     ...Object.values(node.slots).flatMap((children) => children.flatMap((child) => child.kind === "component"

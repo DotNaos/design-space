@@ -21,6 +21,10 @@ describe("design document contract", () => {
     expect(designDocumentSchema.parse(screen)).toEqual(screen);
   });
 
+  it("accepts a deliberately empty page without a root component", () => {
+    expect(designDocumentSchema.parse({ ...screen, root: null })).toEqual({ ...screen, root: null });
+  });
+
   it("rejects duplicate public React prop names in a component contract", () => {
     expect(designDocumentSchema.safeParse({
       schemaVersion: 2,

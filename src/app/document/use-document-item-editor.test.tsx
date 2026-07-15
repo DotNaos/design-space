@@ -76,15 +76,36 @@ it("closes a private item draft when a newer source snapshot arrives with the sa
 
   act(() => result.current.open("copy.one"));
   act(() => result.current.updateControl("children", "Private draft"));
-  expect(result.current.model?.session.draft.root.props?.children).toBe("Private draft");
+  expect(result.current.model?.session.draft.root?.props?.children).toBe("Private draft");
 
   rerender({
-    document: { ...initialDocument, root: { ...initialDocument.root, props: { children: "External change" } } },
+    document: { ...initialDocument, root: { ...initialDocument.root!, props: { children: "External change" } } },
     sourceSnapshotKey: "source-v2",
   });
 
   expect(result.current.model).toBeUndefined();
   expect(onCommit).not.toHaveBeenCalled();
+});
+
+it("deletes the root from the item inspector and commits an empty document", () => {
+  const onCommit = vi.fn();
+  const { result } = renderHook(() => useDocumentItemEditor({
+    target,
+    document: initialDocument,
+    library: [],
+    connected: true,
+    sourceSnapshotKey: "source-v1",
+    createId: () => "unused",
+    onCommit,
+    onSelect: vi.fn(),
+  }));
+
+  act(() => result.current.open("copy.one"));
+  expect(result.current.model?.canDelete).toBe(true);
+  act(() => result.current.remove());
+
+  expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ root: null }));
+  expect(result.current.model).toBeUndefined();
 });
 
 it("removes stale compiled CSS when the last Tailwind class is cleared in the same editor session", async () => {

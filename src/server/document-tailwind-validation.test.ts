@@ -93,7 +93,7 @@ describe("server-owned document Tailwind validation", () => {
     const { documentPath, service } = await fixture();
     const snapshot = await service.read("screen.home");
     const proposed = structuredClone(snapshot.document);
-    proposed.root.props = { className: "not-a-real-design-space-utility" };
+    proposed.root!.props = { className: "not-a-real-design-space-utility" };
 
     await expect(service.prepare(
       snapshot.documentId,
@@ -111,7 +111,7 @@ describe("server-owned document Tailwind validation", () => {
     const { service, themePath } = await fixture();
     const snapshot = await service.read("screen.home");
     const proposed = structuredClone(snapshot.document);
-    proposed.root.props = { className: "surface p-6" };
+    proposed.root!.props = { className: "surface p-6" };
     const prepared = await service.prepare(
       snapshot.documentId,
       proposed,

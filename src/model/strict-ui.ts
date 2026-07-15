@@ -30,7 +30,7 @@ export function validateStrictUi(
   const publicSlots = new Map(document.component?.slots.map((slot) => [slot.id, slot]) ?? []);
   const publicProperties = new Map(document.component?.properties.map((property) => [property.id, property]) ?? []);
   validatePublicPropertyDefaults(document.component?.properties ?? [], violations);
-  visitNode(target, definitions, document.root, nodeIds, outlets, publicSlots, publicProperties, violations);
+  if (document.root) visitNode(target, definitions, document.root, nodeIds, outlets, publicSlots, publicProperties, violations);
   validateOutlets(document, outlets, violations);
   validatePropertyBindings(target, document, definitions, violations);
   if (hasAuthoredComponentCycle(document, library)) {
@@ -49,7 +49,7 @@ function validatePropertyBindings(
   violations: StrictUiViolation[],
 ): void {
   const bindings: Array<{ instanceId: string; targetProp: string; propertyId: string }> = [];
-  collectPropertyBindings(document.root, bindings);
+  if (document.root) collectPropertyBindings(document.root, bindings);
   if (document.kind === "screen") {
     for (const binding of bindings) {
       violations.push(issue(
@@ -70,7 +70,7 @@ function validatePropertyBindings(
       continue;
     }
     counts.set(property.id, (counts.get(property.id) ?? 0) + 1);
-    const node = findNode(document.root, binding.instanceId);
+    const node = document.root ? findNode(document.root, binding.instanceId) : undefined;
     const adapter = node ? resolveStrictAdapter(target, library, node.adapterId) : undefined;
     const control = adapter?.controls?.find((candidate) => candidate.prop === binding.targetProp);
     if (!control) {
@@ -348,7 +348,7 @@ function hasAuthoredComponentCycle(document: DesignDocument, library: readonly D
   }
   const roots = document.kind === "component" && document.component
     ? [document.component.id]
-    : collectAuthoredReferences(document.root, definitions);
+    : document.root ? collectAuthoredReferences(document.root, definitions) : [];
   const complete = new Set<string>();
   const visiting = new Set<string>();
   const visit = (componentId: string): boolean => {
@@ -357,7 +357,7 @@ function hasAuthoredComponentCycle(document: DesignDocument, library: readonly D
     const definition = definitions.get(componentId);
     if (!definition) return false;
     visiting.add(componentId);
-    if (collectAuthoredReferences(definition.root, definitions).some(visit)) return true;
+    if (definition.root && collectAuthoredReferences(definition.root, definitions).some(visit)) return true;
     visiting.delete(componentId);
     complete.add(componentId);
     return false;

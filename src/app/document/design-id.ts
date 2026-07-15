@@ -1,7 +1,7 @@
 import type { DesignComponentNode } from "../../shared/design-document";
 
 export function createDesignIdFactory(
-  root: DesignComponentNode,
+  root: DesignComponentNode | null,
   createUuid: () => string = createPortableUuid,
 ): () => string {
   const used = collectDesignIds(root);
@@ -29,7 +29,7 @@ export function createPortableDraftId(): string {
   return `draft-${createPortableUuid().toLowerCase()}`;
 }
 
-export function collectDesignIds(root: DesignComponentNode): Set<string> {
+export function collectDesignIds(root: DesignComponentNode | null): Set<string> {
   const ids = new Set<string>();
   const visit = (node: DesignComponentNode) => {
     ids.add(node.instanceId);
@@ -40,6 +40,6 @@ export function collectDesignIds(root: DesignComponentNode): Set<string> {
       }
     }
   };
-  visit(root);
+  if (root) visit(root);
   return ids;
 }

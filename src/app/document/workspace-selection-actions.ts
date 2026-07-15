@@ -11,7 +11,7 @@ import {
 } from "./document-commands";
 
 export type WorkspaceSelectionActionResult =
-  | { status: "applied"; document: DesignDocument; selection: SelectionTarget }
+  | { status: "applied"; document: DesignDocument; selection?: SelectionTarget }
   | { status: "blocked"; document: DesignDocument; selection: SelectionTarget; message: string }
   | { status: "unchanged"; document: DesignDocument; selection: SelectionTarget };
 
@@ -30,9 +30,12 @@ export function componentMutationAvailability(options: {
   instanceId: string;
   resolveSlotContract: SlotContractResolver;
 }): ComponentMutationAvailability {
+  if (!options.document.root) {
+    const message = "The document has no root component.";
+    return { deleteBlocked: message, duplicateBlocked: message };
+  }
   if (options.instanceId === options.document.root.instanceId) {
     return {
-      deleteBlocked: "The root component cannot be removed.",
       duplicateBlocked: "The root component cannot be duplicated.",
     };
   }
@@ -76,6 +79,10 @@ export function deleteWorkspaceSelection(options: {
       resolveSlotContract: options.resolveSlotContract,
     });
     if (availability.deleteBlocked) return blocked(document, selection, availability.deleteBlocked);
+    if (document.root?.instanceId === selection.id) {
+      return { status: "applied", document: removeDesignComponent(document, selection.id) };
+    }
+    if (!document.root) return blocked(document, selection, "The document has no root component.");
     const location = findDesignNodeLocation(document.root, selection.id);
     if (!location) return blocked(document, selection, `Component instance ${selection.id} was not found.`);
     return {
@@ -104,7 +111,7 @@ export function deleteWorkspaceSelection(options: {
   }
 
   if (selection.kind === "slot-outlet") {
-    const parentId = findSlotOutletParent(document.root, selection.outletId);
+    const parentId = document.root ? findSlotOutletParent(document.root, selection.outletId) : undefined;
     if (!parentId) return blocked(document, selection, `Slot outlet ${selection.outletId} was not found.`);
     return {
       status: "applied",
@@ -155,7 +162,7 @@ export function authoredSlotDependencyMessage(
   const slot = authoredDocument.component.slots.find((candidate) => candidate.id === slotId);
   if (!slot) return `Slot definition ${slotId} was not found.`;
   const dependencies = uniqueDocuments(documents).filter((candidate) => (
-    candidate.id !== authoredDocument.id && containsAdapter(candidate.root, authoredDocument.component!.id)
+    candidate.id !== authoredDocument.id && candidate.root && containsAdapter(candidate.root, authoredDocument.component!.id)
   ));
   if (dependencies.length === 0) return undefined;
   const componentLabel = authoredDocument.component.label;
@@ -176,6 +183,7 @@ export function removeAuthoredSlotDefinition(options: {
 }): WorkspaceSelectionActionResult {
   const dependencyMessage = authoredSlotDependencyMessage(options.document, options.documents, options.slotId);
   if (dependencyMessage) return blocked(options.document, options.selection, dependencyMessage);
+  if (!options.document.root) return blocked(options.document, options.selection, "Add an implementation root before removing slot outlets.");
   return {
     status: "applied",
     document: removeComponentSlot(options.document, options.slotId),

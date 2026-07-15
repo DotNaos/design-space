@@ -13,6 +13,7 @@ import type { SelectionNavigationCommand } from "../document/selection-navigatio
 import type { MobilePane } from "../shell/MobileDock";
 import type { SlotState } from "../types";
 import { EmptyModeState } from "./EmptyModeState";
+import { EmptyDocumentRoot } from "./EmptyDocumentRoot";
 import type { ProductMode } from "./DocumentNavigator";
 import { DocumentWorkspaceSurface } from "./DocumentWorkspaceSurface";
 import { WorkspaceBrowser, type WorkspaceBrowserView } from "./WorkspaceBrowser";
@@ -33,6 +34,8 @@ export function DocumentWorkspacePanels(props: {
   sidebarView: WorkspaceSidebarView;
   browserView: WorkspaceBrowserView;
   modeDocumentAvailable: boolean;
+  hasRoot: boolean;
+  rootPicker: boolean;
   canCreate: boolean;
   entries: readonly TargetDocumentEntry[];
   files: readonly TargetFileEntry[];
@@ -69,6 +72,7 @@ export function DocumentWorkspacePanels(props: {
   onFileOpened: () => void;
   onCatalogSelect: (id: string) => void;
   onCreate: () => void;
+  onOpenRootPicker: () => void;
   onSelect: (selection: SelectionTarget) => void;
   onCanvasSelect?: (selection: SelectionTarget) => void;
   onHover: (selection: SelectionTarget | undefined) => void;
@@ -121,7 +125,8 @@ export function DocumentWorkspacePanels(props: {
       selectedId={props.selection.id}
       showInternals={props.showInternals}
       insertMode={props.insertMode}
-      prompt={props.insertMode ? "Choose a slot with room, then pick a compatible component." : undefined}
+      prompt={props.hasRoot && props.insertMode ? "Choose a slot with room, then pick a compatible component." : undefined}
+      emptyMessage={!props.hasRoot ? "Add one root component to begin building this document." : undefined}
       toggleLabel={props.documentKind === "component" ? "Show implementation" : undefined}
       toggleHint={props.documentKind === "component" ? "Public slots stay visible while internals collapse" : undefined}
       strictUiViolations={props.strictUiViolations}
@@ -132,13 +137,13 @@ export function DocumentWorkspacePanels(props: {
         clientPosition: position,
         viewportPosition: position,
       })}
-      onInsert={props.onToggleInsert}
+      onInsert={props.hasRoot ? props.onToggleInsert : props.onOpenRootPicker}
       onSelect={props.onSelect}
       onCollapseAll={props.onCollapseAll}
       onToggleInternals={props.onToggleInternals}
     />
   ) : empty;
-  const canvas = props.modeDocumentAvailable ? (
+  const canvas = props.modeDocumentAvailable && props.hasRoot ? (
     <div className="relative flex min-h-0 min-w-0 flex-1">
       <PreviewCanvas
         cameraKey={props.documentId}
@@ -163,6 +168,13 @@ export function DocumentWorkspacePanels(props: {
         </p>
       )}
     </div>
+  ) : props.modeDocumentAvailable ? (
+    <div
+      className="relative flex min-h-0 min-w-0 flex-1 bg-[#0d0e10]"
+      style={{ backgroundImage: "radial-gradient(circle, #3f3f46 1px, transparent 1px)", backgroundSize: "24px 24px" }}
+    >
+      <EmptyDocumentRoot className="flex h-full w-full" documentKind={props.documentKind} onInsert={props.onOpenRootPicker} />
+    </div>
   ) : <div className="flex min-h-0 min-w-0 flex-1">{empty}</div>;
   const slotInspector = props.modeDocumentAvailable && props.selectedSlot ? (
     <SlotInspector
@@ -176,10 +188,11 @@ export function DocumentWorkspacePanels(props: {
       onRemoveDefinition={outletSelection ? props.onRemoveSlotDefinition : undefined}
     />
   ) : undefined;
-  const right = props.slotPicker ? (
+  const right = props.rootPicker || props.slotPicker ? (
     <SlotCatalogPanel
       className="flex h-full w-full"
-      slotLabel={props.pickerLabel}
+      slotLabel={props.rootPicker ? "document" : props.pickerLabel}
+      targetKind={props.rootPicker ? "root" : "slot"}
       entries={props.pickerEntries}
       onClose={props.onClosePicker}
       onSelect={props.onInsertComponent}
@@ -211,7 +224,7 @@ export function DocumentWorkspacePanels(props: {
       right={right}
       mobileProject={left}
       mobileTree={left}
-      mobileInspect={slotInspector ?? props.mobileDefinition}
+      mobileInspect={props.hasRoot ? slotInspector ?? props.mobileDefinition : <EmptyDocumentRoot className="flex h-full w-full" compact documentKind={props.documentKind} onInsert={props.onOpenRootPicker} />}
       onMobileDrawerClose={props.onMobileDrawerClose}
     />
   );

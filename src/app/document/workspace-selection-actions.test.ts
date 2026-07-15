@@ -21,18 +21,15 @@ describe("workspace selection actions", () => {
     });
 
     expect(result.status).toBe("applied");
-    expect(result.document.root.slots.content).toHaveLength(1);
+    expect(result.document.root!.slots.content).toHaveLength(1);
     expect(result.selection).toEqual({ kind: "component", id: "panel.one" });
     expect(findNode(document, "panel.one")?.slots.body).toHaveLength(1);
   });
 
-  it("blocks root deletion and duplication while selecting a new duplicate", () => {
+  it("allows root deletion, blocks root duplication, and selects a new nested duplicate", () => {
     const document = screenDocument();
     const root = { kind: "component", id: "screen.root" } satisfies SelectionTarget;
-    expect(deleteWorkspaceSelection({ document, selection: root, resolveSlotContract: optionalSlot })).toMatchObject({
-      status: "blocked",
-      message: "The root component cannot be removed.",
-    });
+    expect(deleteWorkspaceSelection({ document, selection: root, resolveSlotContract: optionalSlot })).toMatchObject({ status: "applied", document: { root: null } });
     expect(duplicateWorkspaceSelection({ document, selection: root, createId: () => "unused", resolveSlotContract: optionalSlot })).toMatchObject({ status: "blocked" });
 
     const duplicate = duplicateWorkspaceSelection({
@@ -106,7 +103,7 @@ describe("workspace selection actions", () => {
 
     expect(result.status).toBe("applied");
     expect(result.selection).toEqual({ kind: "component", id: "panel.root" });
-    expect(result.document.root.slots.content).toEqual([]);
+    expect(result.document.root!.slots.content).toEqual([]);
     expect(result.document.component?.slots).toEqual([expect.objectContaining({ id: "body" })]);
   });
 
@@ -139,7 +136,7 @@ describe("workspace selection actions", () => {
     });
     expect(result.status).toBe("applied");
     expect(result.document.component?.slots).toEqual([]);
-    expect(result.document.root.slots.content).toEqual([]);
+    expect(result.document.root!.slots.content).toEqual([]);
     expect(result.selection).toEqual({ kind: "component", id: "panel.root" });
   });
 });
@@ -196,7 +193,7 @@ function componentDocument(id: string, label: string, componentId: string, adapt
 }
 
 function findNode(document: DesignDocument, id: string) {
-  const visit = (node: DesignDocument["root"]): DesignDocument["root"] | undefined => {
+  const visit = (node: NonNullable<DesignDocument["root"]>): NonNullable<DesignDocument["root"]> | undefined => {
     if (node.instanceId === id) return node;
     for (const child of Object.values(node.slots).flat()) {
       if (child.kind !== "component") continue;
@@ -205,5 +202,5 @@ function findNode(document: DesignDocument, id: string) {
     }
     return undefined;
   };
-  return visit(document.root);
+  return document.root ? visit(document.root) : undefined;
 }

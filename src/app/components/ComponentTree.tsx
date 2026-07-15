@@ -1,5 +1,5 @@
 import { Tooltip } from "@heroui/react";
-import { ChevronDown, ChevronRight, CircleDot, Code2, Component, Eye, EyeOff, FileBox, ListCollapse, Plug, Plus, Tag, X } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleDot, Code2, Component, Eye, EyeOff, FileBox, Layers3, ListCollapse, Plug, Plus, Tag, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import type { ComponentTreeRow, SelectionTarget } from "../../model";
@@ -20,6 +20,7 @@ type ComponentTreeProps = {
   showInternals: boolean;
   insertMode?: boolean;
   prompt?: string;
+  emptyMessage?: string;
   toggleLabel?: string;
   toggleHint?: string;
   strictUiViolations?: readonly StrictUiViolation[];
@@ -67,7 +68,7 @@ export function ComponentTree(props: ComponentTreeProps) {
       <div className="flex h-11 items-center gap-2 border-b border-white/10 px-3">
         <h2 className="min-w-0 flex-1 truncate text-xs font-semibold text-zinc-200">{props.embedded ? "Layers" : "Component tree"}</h2>
         {!props.embedded && <span className="max-w-20 truncate text-[10px] text-zinc-600">{props.pageLabel}</span>}
-        <Tooltip delay={350}>
+        {!props.emptyMessage && <Tooltip delay={350}>
           <button
             aria-label="Collapse all tree branches"
             className="grid size-8 shrink-0 place-items-center rounded-lg text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"
@@ -77,7 +78,7 @@ export function ComponentTree(props: ComponentTreeProps) {
             <ListCollapse aria-hidden="true" size={14} />
           </button>
           <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Collapse all · keeps selection visible</Tooltip.Content>
-        </Tooltip>
+        </Tooltip>}
         {props.onInsert && (
           <button
             aria-pressed={props.insertMode}
@@ -127,9 +128,16 @@ export function ComponentTree(props: ComponentTreeProps) {
             onToggleInternals={props.onToggleInternals}
           />
         ))}
+        {props.emptyMessage && (
+          <div className="flex h-full min-h-48 flex-col items-center justify-center px-6 text-center">
+            <Layers3 aria-hidden="true" className="mb-3 text-zinc-700" size={24} />
+            <p className="text-xs font-medium text-zinc-300">No layers yet</p>
+            <p className="mt-1 max-w-48 text-[10px] leading-4 text-zinc-600">{props.emptyMessage}</p>
+          </div>
+        )}
       </div>
 
-      <button
+      {!props.emptyMessage && <button
         aria-pressed={props.showInternals}
         className="flex h-12 items-center gap-2 border-t border-white/10 px-3 text-left text-xs text-zinc-400 hover:bg-white/[0.03]"
         type="button"
@@ -143,7 +151,7 @@ export function ComponentTree(props: ComponentTreeProps) {
         <span className={`h-4 w-7 rounded-full p-0.5 ${props.showInternals ? "bg-sky-500" : "bg-zinc-700"}`}>
           <span className={`block size-3 rounded-full bg-white transition-transform ${props.showInternals ? "translate-x-3" : ""}`} />
         </span>
-      </button>
+      </button>}
     </aside>
   );
 }

@@ -36,17 +36,24 @@ const screen: DesignDocument = {
 describe("design document commands", () => {
   it("edits, inserts, moves, duplicates, and removes without mutating the base", () => {
     const edited = updateDesignProps(screen, "first", { children: "Changed" });
-    expect(screen.root.slots.content[0]).toMatchObject({ node: { props: { children: "One" } } });
-    expect(edited.root.slots.content[0]).toMatchObject({ node: { props: { children: "Changed" } } });
+    expect(screen.root!.slots.content[0]).toMatchObject({ node: { props: { children: "One" } } });
+    expect(edited.root!.slots.content[0]).toMatchObject({ node: { props: { children: "Changed" } } });
 
     const inserted = insertDesignChild(edited, "root", "content", { kind: "text", id: "copy", value: "Tail" });
-    expect(inserted.root.slots.content).toHaveLength(3);
-    expect(moveDesignComponent(inserted, "second", -1).root.slots.content[0]).toMatchObject({ node: { instanceId: "second" } });
+    expect(inserted.root!.slots.content).toHaveLength(3);
+    expect(moveDesignComponent(inserted, "second", -1).root!.slots.content[0]).toMatchObject({ node: { instanceId: "second" } });
 
     let sequence = 0;
     const duplicate = duplicateDesignComponent(inserted, "first", () => `copy-${++sequence}`);
     expect(duplicate.duplicateId).toBe("copy-1");
-    expect(removeDesignComponent(duplicate.document, duplicate.duplicateId).root.slots.content).toHaveLength(3);
+    expect(removeDesignComponent(duplicate.document, duplicate.duplicateId).root!.slots.content).toHaveLength(3);
+  });
+
+  it("removes the root as the complete page contents", () => {
+    const emptied = removeDesignComponent(screen, "root");
+
+    expect(emptied.root).toBeNull();
+    expect(screen.root).not.toBeNull();
   });
 
   it("creates explicit slot outlets in component definitions", () => {
@@ -60,13 +67,13 @@ describe("design document commands", () => {
     };
     const next = addComponentSlot(component, { id: "body", label: "Body" }, "panel.root", "content", () => "outlet.body");
     expect(next.component?.slots).toEqual([{ id: "body", label: "Body" }]);
-    expect(next.root.slots.content).toEqual([{ kind: "slot-outlet", id: "outlet.body", slotId: "body" }]);
+    expect(next.root!.slots.content).toEqual([{ kind: "slot-outlet", id: "outlet.body", slotId: "body" }]);
   });
 
   it("clears only the selected slot and removes a selected outlet by stable ID", () => {
     const cleared = clearDesignSlot(screen, "root", "content");
-    expect(cleared.root.slots.content).toEqual([]);
-    expect(screen.root.slots.content).toHaveLength(2);
+    expect(cleared.root!.slots.content).toEqual([]);
+    expect(screen.root!.slots.content).toHaveLength(2);
 
     const component = addComponentSlot(
       componentDocument(),
@@ -75,7 +82,7 @@ describe("design document commands", () => {
       "content",
       () => "outlet.body",
     );
-    expect(removeDesignSlotOutlet(component, "outlet.body").root.slots.content).toEqual([]);
+    expect(removeDesignSlotOutlet(component, "outlet.body").root!.slots.content).toEqual([]);
     expect(() => removeDesignSlotOutlet(component, "missing.outlet")).toThrow("was not found");
   });
 
@@ -131,11 +138,11 @@ describe("design document commands", () => {
     };
 
     const bound = bindComponentProperty(component, "title", { instanceId: "hero.heading", prop: "children" });
-    expect(findBoundNode(bound.root, "hero.heading").propertyBindings).toEqual({ children: "title" });
+    expect(findBoundNode(bound.root!, "hero.heading").propertyBindings).toEqual({ children: "title" });
     const rebound = bindComponentProperty(bound, "title", { instanceId: "hero.root", prop: "className" });
-    expect(findBoundNode(rebound.root, "hero.heading").propertyBindings).toBeUndefined();
-    expect(rebound.root.propertyBindings).toEqual({ className: "title" });
-    expect(removeComponentProperty(rebound, "title").root.propertyBindings).toBeUndefined();
+    expect(findBoundNode(rebound.root!, "hero.heading").propertyBindings).toBeUndefined();
+    expect(rebound.root!.propertyBindings).toEqual({ className: "title" });
+    expect(removeComponentProperty(rebound, "title").root!.propertyBindings).toBeUndefined();
   });
 });
 
@@ -150,16 +157,16 @@ function componentDocument(): DesignDocument {
   };
 }
 
-function findBoundNode(root: DesignDocument["root"], instanceId: string): DesignDocument["root"] {
+function findBoundNode(root: NonNullable<DesignDocument["root"]>, instanceId: string): NonNullable<DesignDocument["root"]> {
   const found = maybeFindBoundNode(root, instanceId);
   if (found) return found;
   throw new Error(`Missing ${instanceId}`);
 }
 
 function maybeFindBoundNode(
-  root: DesignDocument["root"],
+  root: NonNullable<DesignDocument["root"]>,
   instanceId: string,
-): DesignDocument["root"] | undefined {
+): NonNullable<DesignDocument["root"]> | undefined {
   if (root.instanceId === instanceId) return root;
   for (const children of Object.values(root.slots)) {
     for (const child of children) {

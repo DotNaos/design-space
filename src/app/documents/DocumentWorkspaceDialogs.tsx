@@ -27,6 +27,7 @@ export function DocumentWorkspaceDialogs(props: {
     mode: ProductMode;
     modeDocumentAvailable: boolean;
     slotPicker?: SlotSelection;
+    rootPicker: boolean;
     pickerLabel: string;
     pickerEntries: Parameters<typeof SlotCatalogDialog>[0]["entries"];
     showDiff: boolean;
@@ -49,7 +50,17 @@ export function DocumentWorkspaceDialogs(props: {
     <>
       {interactions.contextMenu && <WorkspaceContextMenu menu={{ x: interactions.contextMenu.clientPosition.x, y: interactions.contextMenu.clientPosition.y, label: interactions.contextMenu.label }} actions={interactions.contextActions} onClose={interactions.closeContextMenu} />}
       {props.workspace.showDiff && preparedSave && <DiffSheet desktopHidden diff={preparedSave.exactDiff} saving={activeSession?.phase === "saving"} onClose={() => props.actions.setShowDiff(false)} onSave={() => void controller.save().then((result) => result && props.actions.setShowDiff(false))} />}
-      <SlotCatalogDialog open={props.workspace.modeDocumentAvailable && Boolean(props.workspace.slotPicker)} slotLabel={props.workspace.pickerLabel} entries={props.workspace.pickerEntries} onClose={props.actions.closeSlotPicker} onSelect={(id) => { if (props.workspace.slotPicker) interactions.insertComponent(id, props.workspace.slotPicker); }} />
+      <SlotCatalogDialog
+        open={props.workspace.modeDocumentAvailable && (props.workspace.rootPicker || Boolean(props.workspace.slotPicker))}
+        slotLabel={props.workspace.rootPicker ? "document" : props.workspace.pickerLabel}
+        targetKind={props.workspace.rootPicker ? "root" : "slot"}
+        entries={props.workspace.pickerEntries}
+        onClose={props.actions.closeSlotPicker}
+        onSelect={(id) => {
+          if (props.workspace.rootPicker) interactions.insertRootComponent(id);
+          else if (props.workspace.slotPicker) interactions.insertComponent(id, props.workspace.slotPicker);
+        }}
+      />
       <CreateDocumentSheet open={creation.isOpen} mode={props.workspace.mode} recipes={controller.creationRecipes} busy={creation.preparing} error={creation.error} onClose={creation.close} onPrepare={(recipeId, label) => void creation.prepare(recipeId, label)} />
       {creation.prepared && <DiffSheet diff={creation.prepared.diff} saving={creation.saving} onClose={creation.discard} onSave={() => void creation.save()} />}
       <StrictUiSheet open={Boolean(activeSession) && props.workspace.showStrictUi} evidence={activeSession?.strictUi} liveViolations={activeSession ? controller.liveViolations : []} checking={activeSession?.phase === "checking"} onClose={() => props.actions.setShowStrictUi(false)} onSelect={props.actions.openViolation} onRecheck={() => void controller.prepare()} />

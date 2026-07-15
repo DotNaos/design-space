@@ -27,6 +27,7 @@ export function fixtureToDesignNode(fixture: ComponentFixture): DesignComponentN
 }
 
 export function documentToFixture(document: DesignDocument): ComponentFixture {
+  if (!document.root) throw new Error("The document has no root component.");
   return designNodeToFixture(document.root);
 }
 

@@ -82,7 +82,7 @@ it("builds an empty authored slot on mobile, edits the item, saves, and reloads 
   expect(await screen.findByRole("dialog", { name: "Exact source diff" })).toBeInTheDocument();
   expect(screen.getByLabelText("Source diff, scroll in both directions")).toHaveTextContent("Written from mobile");
   await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
-  await waitFor(() => expect(persistedScreen.root.slots.body).toHaveLength(1));
+  await waitFor(() => expect(persistedScreen.root!.slots.body).toHaveLength(1));
 
   first.unmount();
   render(<DocumentWorkspace target={target} />);
@@ -102,6 +102,56 @@ it("opens a default component document in Library mode after loading", async () 
   expect(screen.getByRole("heading", { name: "Layers" })).toBeVisible();
   expect(screen.queryByRole("button", { name: "Documents" })).not.toBeInTheDocument();
 });
+
+it("deletes, restores, saves, reloads, and rebuilds an empty page root", async () => {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn((query: string) => ({
+      matches: query.includes("min-width"),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  });
+  let persisted = screenDocument;
+  let preparedDocument: DesignDocument | undefined;
+  installServer(() => persisted, (document) => { preparedDocument = document; }, () => {
+    if (!preparedDocument) throw new Error("No prepared empty document");
+    persisted = preparedDocument;
+  });
+
+  const first = render(<DocumentWorkspace target={target} />);
+  await screen.findByRole("heading", { name: "Layers" });
+
+  fireEvent.keyDown(window, { key: "Delete" });
+  expect((await screen.findAllByLabelText("Empty page")).some((element) => element.getClientRects().length > 0 || !element.closest('[aria-hidden="true"]'))).toBe(true);
+  expect(screen.getByText("No layers yet")).toBeVisible();
+
+  await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+  await waitFor(() => expect(screen.queryAllByLabelText("Empty page")).toHaveLength(0));
+
+  fireEvent.keyDown(window, { key: "Delete" });
+  await screen.findAllByLabelText("Empty page");
+  await userEvent.click(screen.getByRole("button", { name: "Reset document" }));
+  await waitFor(() => expect(screen.queryAllByLabelText("Empty page")).toHaveLength(0));
+
+  fireEvent.keyDown(window, { key: "Delete" });
+  await screen.findAllByLabelText("Empty page");
+  const prepareButton = screen.getByRole("button", { name: "Prepare exact diff" });
+  await waitFor(() => expect(prepareButton).toBeEnabled());
+  await userEvent.click(prepareButton);
+  expect(await screen.findByLabelText("Source diff, scroll in both directions")).toHaveTextContent('"root": null');
+  await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  await waitFor(() => expect(persisted.root).toBeNull());
+
+  first.unmount();
+  render(<DocumentWorkspace target={target} />);
+  expect((await screen.findAllByLabelText("Empty page")).length).toBeGreaterThan(0);
+
+  await userEvent.click(screen.getAllByRole("button", { name: "Add root component" })[0]!);
+  expect(await screen.findByRole("region", { name: "Choose root component" })).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: /^Stack,/ }));
+  expect(await screen.findByRole("treeitem", { name: "Stack" })).toBeVisible();
+}, 15_000);
 
 it("blocks an unsourced fallback after the initial read fails and recovers on focus", async () => {
   let failNextCatalogRead = true;
@@ -234,8 +284,8 @@ function snapshot(document: DesignDocument): DocumentSnapshot {
   return {
     documentId: document.id,
     document,
-    documentDigest: digest(document.label === "Mobile home" && document.root.slots.body?.length === 0 ? "a" : "b"),
-    sourceVersions: { [`source.${document.id}`]: digest(document.root.slots.body?.length ? "b" : "a") },
+    documentDigest: digest(document.label === "Mobile home" && document.root?.slots.body?.length === 0 ? "a" : "b"),
+    sourceVersions: { [`source.${document.id}`]: digest(document.root?.slots.body?.length ? "b" : "a") },
   };
 }
 
@@ -253,7 +303,7 @@ function prepared(document: DesignDocument): PreparedDocumentSave {
       beforeVersion: digest("a"),
       nextVersion: digest("b"),
     }],
-    diff: '+ "children": "Written from mobile"',
+    diff: document.root ? '+ "children": "Written from mobile"' : '- "root": { ... }\n+ "root": null',
     strictUi: evidence(document.id),
     compile: { status: "passed", checkedAt: "2026-07-14T00:00:00.000Z" },
     transactionDigest: digest("c"),

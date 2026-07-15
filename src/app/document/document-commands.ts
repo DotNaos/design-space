@@ -8,7 +8,8 @@ import type {
   DesignValue,
 } from "../../shared/design-document";
 
-export function findDesignNode(root: DesignComponentNode, instanceId: string): DesignComponentNode | undefined {
+export function findDesignNode(root: DesignComponentNode | null, instanceId: string): DesignComponentNode | undefined {
+  if (!root) return undefined;
   if (root.instanceId === instanceId) return root;
   for (const children of Object.values(root.slots)) {
     for (const child of children) {
@@ -70,8 +71,9 @@ export function bindComponentProperty(
   if (!document.component.properties.some((property) => property.id === propertyId)) {
     throw new Error(`Property ${propertyId} was not found.`);
   }
-  let root = removePropertyBinding(document.root, propertyId);
+  let root = document.root ? removePropertyBinding(document.root, propertyId) : null;
   if (target) {
+    if (!root) throw new Error("The document has no root component.");
     root = updateNode(root, target.instanceId, (node) => ({
       ...node,
       propertyBindings: { ...node.propertyBindings, [target.prop]: propertyId },
@@ -110,6 +112,7 @@ export function clearDesignSlot(
 }
 
 export function removeDesignSlotOutlet(document: DesignDocument, outletId: string): DesignDocument {
+  if (!document.root) throw new Error("The document has no root component.");
   let removed = false;
   const root = updateDesignChildren(document.root, (child) => {
     if (child.kind !== "slot-outlet" || child.id !== outletId) return [child];
@@ -121,13 +124,20 @@ export function removeDesignSlotOutlet(document: DesignDocument, outletId: strin
 }
 
 export function removeDesignComponent(document: DesignDocument, instanceId: string): DesignDocument {
-  if (document.root.instanceId === instanceId) throw new Error("The root component cannot be removed.");
+  if (!document.root) throw new Error("The document has no root component.");
+  if (document.root.instanceId === instanceId) return { ...document, root: null };
   const root = updateParentChildren(document.root, instanceId, (children, index) => children.filter((_, item) => item !== index));
   if (root === document.root) throw new Error(`Component instance ${instanceId} was not found.`);
   return { ...document, root };
 }
 
+export function setDesignRoot(document: DesignDocument, root: DesignComponentNode): DesignDocument {
+  if (document.root) throw new Error("The document already has a root component.");
+  return { ...document, root };
+}
+
 export function moveDesignComponent(document: DesignDocument, instanceId: string, offset: -1 | 1): DesignDocument {
+  if (!document.root) throw new Error("The document has no root component.");
   if (document.root.instanceId === instanceId) throw new Error("The root component cannot be moved.");
   const root = updateParentChildren(document.root, instanceId, (children, index) => {
     const destination = index + offset;
@@ -145,6 +155,7 @@ export function duplicateDesignComponent(
   instanceId: string,
   createId: () => string,
 ): { document: DesignDocument; duplicateId: string } {
+  if (!document.root) throw new Error("The document has no root component.");
   if (document.root.instanceId === instanceId) throw new Error("The root component cannot be duplicated.");
   let duplicateId = "";
   const root = updateParentChildren(document.root, instanceId, (children, index) => {
@@ -161,7 +172,7 @@ export function duplicateDesignComponent(
 export function addComponentSlot(
   document: DesignDocument,
   slot: ComponentSlotDraft,
-  outletParentInstanceId = document.root.instanceId,
+  outletParentInstanceId = document.root?.instanceId ?? "",
   outletParentSlotId?: string,
   createId: () => string = defaultId,
 ): DesignDocument {
@@ -212,7 +223,7 @@ export function removeComponentSlot(document: DesignDocument, slotId: string): D
       ...document.component,
       slots: document.component.slots.filter((slot) => slot.id !== slotId),
     },
-    root: removeSlotOutlets(document.root, slotId),
+    root: document.root ? removeSlotOutlets(document.root, slotId) : null,
   };
 }
 
@@ -248,7 +259,7 @@ export function removeComponentProperty(document: DesignDocument, propertyId: st
       ...document.component,
       properties: document.component.properties.filter((property) => property.id !== propertyId),
     },
-    root: removePropertyBinding(document.root, propertyId),
+    root: document.root ? removePropertyBinding(document.root, propertyId) : null,
   };
 }
 
@@ -281,6 +292,7 @@ function updateDocumentRoot(
   instanceId: string,
   update: (node: DesignComponentNode) => DesignComponentNode,
 ): DesignDocument {
+  if (!document.root) throw new Error("The document has no root component.");
   const root = updateNode(document.root, instanceId, update);
   if (root === document.root) throw new Error(`Component instance ${instanceId} was not found.`);
   return { ...document, root };

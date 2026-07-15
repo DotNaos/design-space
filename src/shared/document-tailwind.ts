@@ -23,17 +23,18 @@ export function collectDocumentTailwind(
     document.kind === "component" && document.component ? [[document.component.id, document] as const] : []
   )));
   const tokens = new Set<string>();
+  if (isDesignDocument(documentOrRoot) && !documentOrRoot.root) return "";
   if (isDesignDocument(documentOrRoot) && documentOrRoot.kind === "component" && documentOrRoot.component) {
     const publicValues = componentDefaults(documentOrRoot);
     collectTailwindValues(documentOrRoot.component.properties, publicValues, tokens);
-    visitNode(target, definitions, documentOrRoot.root, tokens, [documentOrRoot.component.id], {
+    visitNode(target, definitions, documentOrRoot.root!, tokens, [documentOrRoot.component.id], {
       definition: documentOrRoot,
       publicValues,
       externalSlots: emptySlots(documentOrRoot),
       callerAuthoredPath: [],
     });
   } else {
-    const root = isDesignDocument(documentOrRoot) ? documentOrRoot.root : documentOrRoot;
+    const root = isDesignDocument(documentOrRoot) ? documentOrRoot.root! : documentOrRoot;
     visitNode(target, definitions, root, tokens, [], undefined);
   }
   return [...tokens].join(" ");
@@ -57,7 +58,7 @@ function visitNode(
   }
 
   const definition = definitions.get(node.adapterId);
-  if (!definition?.component) return;
+  if (!definition?.component || !definition.root) return;
   if (authoredPath.includes(definition.component.id)) return;
   const publicValues = { ...componentDefaults(definition), ...node.props, ...bound };
   collectTailwindValues(definition.component.properties, publicValues, tokens);

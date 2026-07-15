@@ -79,7 +79,7 @@ export interface DesignDocument {
   id: string;
   label: string;
   kind: "screen" | "component";
-  root: DesignComponentNode;
+  root: DesignComponentNode | null;
   component?: ComponentDefinitionDraft;
 }
 
@@ -202,7 +202,7 @@ export const designDocumentSchema: z.ZodType<DesignDocument> = z.object({
   id: opaqueIdSchema,
   label: z.string().trim().min(1).max(120),
   kind: z.enum(["screen", "component"]),
-  root: designComponentNodeSchema,
+  root: designComponentNodeSchema.nullable(),
   component: componentDefinitionDraftSchema.optional(),
 }).strict().superRefine((document, context) => {
   if (document.kind === "component" && !document.component) {

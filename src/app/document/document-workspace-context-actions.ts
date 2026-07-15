@@ -84,7 +84,8 @@ export function contextSourceFileId(
     ? selection.id
     : selection.kind === "slot" || selection.kind === "html"
       ? selection.componentInstanceId
-      : document.root.instanceId;
+      : document.root?.instanceId;
+  if (!instanceId) return undefined;
   const node = findDesignNode(document.root, instanceId);
   return node ? resolveDocumentAdapter(target, library, node.adapterId)?.sourceFileId : undefined;
 }

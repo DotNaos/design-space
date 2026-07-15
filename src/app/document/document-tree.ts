@@ -14,6 +14,7 @@ export function buildDesignDocumentTree(
   observedDom: PreviewDomSnapshot = {},
 ): readonly ComponentTreeRow[] {
   const rows: ComponentTreeRow[] = [];
+  if (!document.root) return rows;
   if (document.kind === "component" && document.component) {
     const implementationDisclosureId = `implementation:${encodeURIComponent(document.id)}`;
     rows.push({

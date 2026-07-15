@@ -24,7 +24,9 @@ export function ComponentPropertyBindings(props: {
 }) {
   const definition = props.document.component;
   if (!definition) return null;
-  const targets = collectTargets(props.document.root, new Map(props.catalogComponents.map((item) => [item.id, item])));
+  const targets = props.document.root
+    ? collectTargets(props.document.root, new Map(props.catalogComponents.map((item) => [item.id, item])))
+    : [];
   return (
     <div className="space-y-3 border-t border-white/10 pt-4">
       <div className="flex items-start gap-2">
@@ -54,7 +56,7 @@ function PropertyBinding(props: {
   targets: readonly BindingTarget[];
   onChange: (document: DesignDocument) => void;
 }) {
-  const current = findBinding(props.document.root, props.property.id);
+  const current = props.document.root ? findBinding(props.document.root, props.property.id) : undefined;
   const currentIndex = current
     ? props.targets.findIndex((target) => target.instanceId === current.instanceId && target.prop === current.prop)
     : -1;

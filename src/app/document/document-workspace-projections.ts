@@ -10,7 +10,7 @@ type PreviewInstance = Parameters<typeof projectPreviewSlots>[1];
 export function projectDocumentSlots(
   target: TargetModule,
   library: readonly DesignDocument[],
-  selectedNode: DesignDocument["root"],
+  selectedNode: NonNullable<DesignDocument["root"]>,
   catalog: PreviewCatalog,
   instance: PreviewInstance,
 ): SlotState[] {
@@ -32,7 +32,7 @@ export function projectDocumentSlots(
   });
 }
 
-function childLabel(target: TargetModule, library: readonly DesignDocument[], parent: DesignDocument["root"], slotId: string) {
+function childLabel(target: TargetModule, library: readonly DesignDocument[], parent: NonNullable<DesignDocument["root"]>, slotId: string) {
   const child = parent.slots[slotId]?.[0];
   if (!child) return undefined;
   if (child.kind === "text") return "Text";

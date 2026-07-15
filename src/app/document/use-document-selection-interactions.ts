@@ -7,7 +7,7 @@ import type { CanvasContextMenuRequest } from "../components/PreviewCanvas";
 import type { useDocumentItemEditor } from "./use-document-item-editor";
 import type { SlotState } from "../types";
 import { resolveDocumentAdapter, wouldCreateAuthoredComponentCycle } from "./document-adapters";
-import { findDesignNode, insertDesignChild } from "./document-commands";
+import { findDesignNode, insertDesignChild, setDesignRoot } from "./document-commands";
 import {
   contextSelectionLabel,
   contextSourceFileId,
@@ -62,7 +62,7 @@ export function useDocumentSelectionInteractions(options: {
     if (result.status === "unchanged") return;
     options.edit(result.document);
     options.itemEditor.close();
-    options.onSelect(result.selection);
+    if (result.selection) options.onSelect(result.selection);
   };
   const resolveSlotContract = (adapterId: string, slotId: string) => (
     resolveDocumentAdapter(options.target, options.library, adapterId)?.component.slots.find((slot) => slot.id === slotId)
@@ -109,6 +109,21 @@ export function useDocumentSelectionInteractions(options: {
         props: { ...childAdapter.defaultProps },
         slots: Object.fromEntries(childAdapter.component.slots.map((childSlot) => [childSlot.id, []])),
       },
+    }));
+    options.onSelect({ kind: "component", id: instanceId });
+    options.onInserted(instanceId);
+    return true;
+  };
+  const insertRootComponent = (adapterId: string): boolean => {
+    if (options.document.root || wouldCreateAuthoredComponentCycle(options.document, options.library, adapterId)) return false;
+    const adapter = resolveDocumentAdapter(options.target, options.library, adapterId);
+    if (!adapter) return false;
+    const instanceId = options.createId();
+    options.edit(setDesignRoot(options.document, {
+      instanceId,
+      adapterId,
+      props: { ...adapter.defaultProps },
+      slots: Object.fromEntries(adapter.component.slots.map((slot) => [slot.id, []])),
     }));
     options.onSelect({ kind: "component", id: instanceId });
     options.onInserted(instanceId);
@@ -162,6 +177,7 @@ export function useDocumentSelectionInteractions(options: {
     selectTarget,
     openSlotCatalog,
     insertComponent,
+    insertRootComponent,
     clearSlot: (slot: SlotSelection) => deleteSelection(slot),
     deleteSelection,
     removeOutlet,

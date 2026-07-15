@@ -20,7 +20,9 @@ export function renderDesignDocument(
   document: DesignDocument,
   library: readonly DesignDocument[],
 ): ReactNode {
-  const preview = document.kind === "component" && document.component
+  const preview = !document.root
+    ? null
+    : document.kind === "component" && document.component
     ? renderComponentImplementation(target, document, document.component, library)
     : renderNode(target, document.root, library, undefined, {}, []);
   const PreviewRoot = target.previewRoot;
@@ -86,7 +88,7 @@ function renderNode(
   }
 
   const authored = library.find((candidate) => candidate.kind === "component" && candidate.component?.id === node.adapterId);
-  if (!authored?.component) throw new Error(`Missing adapter: ${node.adapterId}`);
+  if (!authored?.component || !authored.root) throw new Error(`Missing adapter implementation: ${node.adapterId}`);
   if (authoredPath.includes(node.adapterId)) {
     throw new Error(`Recursive authored component: ${[...authoredPath, node.adapterId].join(" → ")}`);
   }
@@ -208,6 +210,7 @@ function renderComponentImplementation(
   definition: ComponentDefinitionDraft,
   library: readonly DesignDocument[],
 ): ReactNode {
+  if (!document.root) return null;
   const values = Object.fromEntries(definition.properties.flatMap((property) => (
     property.defaultValue === undefined ? [] : [[property.prop, property.defaultValue]]
   )));
