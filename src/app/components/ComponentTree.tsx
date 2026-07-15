@@ -115,7 +115,7 @@ export function ComponentTree(props: ComponentTreeProps) {
         )}
         {visibleRows.map((row, index) => (
           <TreeRow
-            key={`${row.kind}-${"selection" in row ? row.selection.id : index}`}
+            key={`${row.kind}-${"selection" in row ? row.selection.id : "row"}-${index}`}
             row={row}
             selectedId={props.selectedId}
             marker={strictUiMarkerForTreeRow(row, markers)}
