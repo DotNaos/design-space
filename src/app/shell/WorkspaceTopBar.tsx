@@ -1,14 +1,12 @@
 import { Button } from "@heroui/react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, FileDiff, LoaderCircle, Redo2, RotateCcw, Save, Shield, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, FileDiff, LoaderCircle, Redo2, RotateCcw, Save, Shield, Undo2 } from "lucide-react";
 
 import type { StrictUiEvidence } from "../../shared/strict-ui";
-import type { ProductMode } from "../documents/DocumentNavigator";
-
 export function WorkspaceTopBar(props: {
   targetLabel: string;
   documentLabel: string;
+  breadcrumb: readonly string[];
   focusLabel?: string;
-  mode: ProductMode;
   connected: boolean;
   strictUi?: StrictUiEvidence;
   checking: boolean;
@@ -19,7 +17,6 @@ export function WorkspaceTopBar(props: {
   canDiff: boolean;
   canSave: boolean;
   saving: boolean;
-  onModeChange: (mode: ProductMode) => void;
   onUndo: () => void;
   onRedo: () => void;
   onReset: () => void;
@@ -29,29 +26,31 @@ export function WorkspaceTopBar(props: {
   onExitFocus?: () => void;
 }) {
   return (
-    <header className="flex h-12 shrink-0 items-center gap-1 border-b border-white/10 bg-[#101113] px-2 lg:h-14 lg:gap-3 lg:px-3">
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 lg:flex-initial lg:gap-2">
+    <header className="flex h-12 shrink-0 items-center gap-1 border-b border-white/10 bg-[#101113] px-2 lg:h-14 lg:gap-0 lg:px-0">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 lg:w-[280px] lg:flex-none lg:px-4">
         {props.focusLabel && props.onExitFocus && (
           <Button aria-label={`Back to ${props.documentLabel}`} className="size-9 shrink-0 lg:size-8" isIconOnly size="sm" variant="ghost" onPress={props.onExitFocus}>
             <ArrowLeft size={16} />
           </Button>
         )}
-        <div className="min-w-0 max-w-36 lg:max-w-60">
-          <span className="hidden truncate text-[9px] font-medium uppercase tracking-[0.12em] text-zinc-600 lg:block">
-            {props.focusLabel ? `${props.documentLabel} · Component` : props.targetLabel}
-          </span>
-          <span className="block truncate text-sm font-semibold tracking-tight text-zinc-100">{props.focusLabel ?? props.documentLabel}</span>
-        </div>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-zinc-100">{props.targetLabel}</span>
         <ConnectionStatus connected={props.connected} />
-        <StrictStatusButton disabled={!props.canStrictUi} evidence={props.strictUi} checking={props.checking} onPress={props.onStrictUi} />
+        <div className="lg:hidden"><StrictStatusButton disabled={!props.canStrictUi} evidence={props.strictUi} checking={props.checking} onPress={props.onStrictUi} /></div>
       </div>
 
-      <div aria-label="Workspace mode" className="mx-auto hidden items-center rounded-lg bg-black/20 p-1 lg:flex">
-        <Button size="sm" variant={props.mode === "app" ? "secondary" : "ghost"} onPress={() => props.onModeChange("app")}>App</Button>
-        <Button size="sm" variant={props.mode === "library" ? "secondary" : "ghost"} onPress={() => props.onModeChange("library")}>Library</Button>
-      </div>
+      <nav aria-label="Current document path" className="hidden min-w-0 flex-1 border-l border-white/10 px-5 text-xs text-zinc-500 lg:block">
+        <ol className="flex h-full min-w-0 items-center gap-2">
+          {props.breadcrumb.map((item, index) => (
+          <li className="contents" key={`${item}-${index}`}>
+            {index > 0 && <ChevronRight aria-hidden="true" className="shrink-0 text-zinc-700" size={13} />}
+            <span aria-current={!props.focusLabel && index === props.breadcrumb.length - 1 ? "page" : undefined} className={`truncate ${index === props.breadcrumb.length - 1 ? "font-semibold text-zinc-100" : ""}`}>{item}</span>
+          </li>
+        ))}
+          {props.focusLabel && <li className="contents"><ChevronRight aria-hidden="true" className="shrink-0 text-zinc-700" size={13} /><span aria-current="page" className="truncate font-semibold text-zinc-100">{props.focusLabel}</span></li>}
+        </ol>
+      </nav>
 
-      <div className="ml-auto flex shrink-0 items-center lg:gap-1">
+      <div className="ml-auto flex shrink-0 items-center lg:gap-1 lg:px-3">
         <Button aria-label="Undo" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canUndo} onPress={props.onUndo}><Undo2 size={15} /></Button>
         <Button aria-label="Redo" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canRedo} onPress={props.onRedo}><Redo2 size={15} /></Button>
         <Button aria-label="Reset document" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canReset} onPress={props.onReset}><RotateCcw size={14} /></Button>

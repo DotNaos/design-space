@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -12,79 +12,57 @@ const entries = [
   { id: "card", label: "Card", kind: "component" as const },
 ];
 
-it("keeps project, pages, and layers in one stable hierarchy", async () => {
-  const onChange = vi.fn();
-  const onDocumentSelect = vi.fn();
-  render(
-    <WorkspaceSidebar
-      active="tree"
-      activeDocumentId="dashboard"
-      canCreate
-      entries={entries}
-      layers={<p>Card layer</p>}
-      mode="app"
-      projectLabel="Design Space Demo Target"
-      onChange={onChange}
-      onCreate={vi.fn()}
-      onDocumentSelect={onDocumentSelect}
-    />,
-  );
+function renderSidebar(overrides: Partial<Parameters<typeof WorkspaceSidebar>[0]> = {}) {
+  const props: Parameters<typeof WorkspaceSidebar>[0] = {
+    active: "tree",
+    activeDocumentId: "dashboard",
+    canCreate: true,
+    entries,
+    layers: <p>Card layer</p>,
+    mode: "app",
+    projectLabel: "Design Space Demo Target",
+    onChange: vi.fn(),
+    onCreate: vi.fn(),
+    onDocumentSelect: vi.fn(),
+    onModeChange: vi.fn(),
+    ...overrides,
+  };
+  render(<WorkspaceSidebar {...props} />);
+  return props;
+}
 
-  expect(screen.getByRole("heading", { name: "Design Space Demo Target" })).toBeVisible();
-  expect(screen.getByRole("region", { name: "Pages" })).toBeVisible();
-  expect(screen.getByRole("tab", { name: "Layers" })).toHaveAttribute("aria-selected", "true");
-  expect(screen.getByRole("tab", { name: "Files" })).toBeVisible();
+it("keeps Root, Pages, devices, Components, and Layers in one stable hierarchy", async () => {
+  const props = renderSidebar();
+
+  expect(screen.getByRole("heading", { name: "App" })).toBeVisible();
+  expect(screen.getByText("Root")).toBeVisible();
+  expect(screen.getByRole("region", { name: "Desktop pages" })).toBeVisible();
+  expect(screen.getByText("Tablet")).toBeVisible();
+  expect(screen.getByText("Mobile")).toBeVisible();
+  expect(screen.getAllByText("Not configured")).toHaveLength(2);
   expect(screen.getByRole("button", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
   expect(screen.getByText("Card layer")).toBeVisible();
-  expect(screen.queryByRole("button", { name: "Documents" })).not.toBeInTheDocument();
 
   await userEvent.click(screen.getByRole("button", { name: "Settings" }));
-  expect(onDocumentSelect).toHaveBeenCalledWith("settings");
+  expect(props.onDocumentSelect).toHaveBeenCalledWith("settings");
 
-  await userEvent.click(screen.getByRole("tab", { name: "Files" }));
-  expect(onChange).toHaveBeenCalledWith("files");
+  await userEvent.click(screen.getByRole("button", { name: "Components" }));
+  expect(props.onModeChange).toHaveBeenCalledWith("library");
+  expect(within(screen.getByRole("region", { name: "Project components" })).getByRole("button", { name: "Card" })).toBeVisible();
 });
 
-it("renders the file explorer inside its persistent sidebar tab", () => {
-  render(
-    <WorkspaceSidebar
-      active="files"
-      auxiliary={<div aria-label="Allowlisted files">src/App.tsx</div>}
-      canCreate
-      entries={entries}
-      layers={<p>Card layer</p>}
-      mode="app"
-      projectLabel="Demo"
-      onChange={vi.fn()}
-      onCreate={vi.fn()}
-      onDocumentSelect={vi.fn()}
-    />,
-  );
+it("renders the file explorer as a dedicated navigation area with a mobile return", async () => {
+  const props = renderSidebar({ active: "files", auxiliary: <div aria-label="Allowlisted files">src/App.tsx</div> });
 
-  expect(screen.getByRole("tab", { name: "Files" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("heading", { name: "Files" })).toBeVisible();
   expect(screen.getByLabelText("Allowlisted files")).toHaveTextContent("src/App.tsx");
   expect(screen.queryByText("Card layer")).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Back to App" }));
+  expect(props.onChange).toHaveBeenCalledWith("tree");
 });
 
-it("shows secondary tools temporarily with a direct return to pages and layers", async () => {
-  const onChange = vi.fn();
-  render(
-    <WorkspaceSidebar
-      active="catalog"
-      auxiliary={<p>Catalog entries</p>}
-      canCreate
-      entries={entries}
-      layers={<p>Card layer</p>}
-      mode="app"
-      projectLabel="Demo"
-      onChange={onChange}
-      onCreate={vi.fn()}
-      onDocumentSelect={vi.fn()}
-    />,
-  );
-
-  expect(screen.getByText("Catalog entries")).toBeVisible();
-  expect(screen.queryByText("Card layer")).not.toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "Back to pages and layers" }));
-  expect(onChange).toHaveBeenCalledWith("tree");
+it("opens the real component catalog from the persistent library connection", async () => {
+  const props = renderSidebar();
+  await userEvent.click(screen.getByRole("button", { name: /Component library/ }));
+  expect(props.onChange).toHaveBeenCalledWith("catalog");
 });
