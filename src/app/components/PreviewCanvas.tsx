@@ -380,7 +380,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         data-world-step={grid.worldStep}
         style={{
           backgroundImage: `radial-gradient(circle, #52525b ${grid.dotRadius}px, transparent ${grid.dotRadius}px)`,
-          backgroundPosition: `${grid.anchorX}px ${grid.anchorY}px`,
+          backgroundPosition: `${grid.backgroundPositionX}px ${grid.backgroundPositionY}px`,
           backgroundSize: `${grid.screenStep}px ${grid.screenStep}px`,
           opacity: grid.opacity,
         }}

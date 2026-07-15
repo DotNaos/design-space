@@ -16,6 +16,7 @@ export type EmptySlotOverlayInput = { id: string; rect: ViewRect };
 
 const baseGridStep = 20;
 const baseGridDotRadius = 2;
+const maximumGridDotRadius = 3;
 const minimumGridScreenStep = 12;
 const maximumGridScreenStep = 32;
 const labelHeight = 20;
@@ -61,13 +62,15 @@ export function selectorForStrictUiTarget(target: StrictUiCanvasTarget): string 
 
 export function canvasGridPresentation(scale: number, anchor: { x: number; y: number }) {
   const worldStep = gridWorldStep(scale);
-  const dotRadius = baseGridDotRadius * scale;
+  const screenStep = worldStep * scale;
+  const anchorX = snapToDevicePixel(anchor.x);
+  const anchorY = snapToDevicePixel(anchor.y);
   return {
-    anchorX: snapToDevicePixel(anchor.x),
-    anchorY: snapToDevicePixel(anchor.y),
-    dotRadius,
+    backgroundPositionX: anchorX - screenStep / 2,
+    backgroundPositionY: anchorY - screenStep / 2,
+    dotRadius: Math.min(baseGridDotRadius * scale, maximumGridDotRadius),
     opacity: scale < 0.5 ? 0.72 : scale < 0.75 ? 0.58 : 0.42,
-    screenStep: worldStep * scale,
+    screenStep,
     worldStep,
   };
 }

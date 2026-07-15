@@ -312,6 +312,7 @@ describe("preview canvas", () => {
     const grid = screen.getByTestId("canvas-grid");
     expect(grid.style.backgroundSize).toBe("20px 20px");
     expect(Number(grid.dataset.dotRadius)).toBeCloseTo(2);
+    expect(grid.style.backgroundPosition).toBe("6px 46px");
 
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
 

@@ -29,7 +29,7 @@ describe("canvas overlay geometry", () => {
     )).toEqual({ left: 32.5, top: 48, width: 120, height: 44.5 });
   });
 
-  it("changes grid detail while dot radius continues to follow world scale", () => {
+  it("changes grid detail while capping the dot radius at strong zoom", () => {
     const far = canvasGridPresentation(0.25, { x: 10.2, y: 20.2 });
     const normal = canvasGridPresentation(1, { x: 10.2, y: 20.2 });
     const near = canvasGridPresentation(4, { x: 10.2, y: 20.2 });
@@ -40,7 +40,16 @@ describe("canvas overlay geometry", () => {
     expect(near.worldStep).toBe(5);
     expect(far.dotRadius).toBe(0.5);
     expect(normal.dotRadius).toBe(2);
-    expect(near.dotRadius).toBe(8);
+    expect(near.dotRadius).toBe(3);
+  });
+
+  it("keeps a dot centered on the component edge when grid detail changes", () => {
+    for (const scale of [1, 0.7, 0.5, 0.25]) {
+      const grid = canvasGridPresentation(scale, { x: 32, y: 48 });
+
+      expect(grid.backgroundPositionX + grid.screenStep / 2).toBe(32);
+      expect(grid.backgroundPositionY + grid.screenStep / 2).toBe(48);
+    }
   });
 
   it("caps synthetic empty-slot height before the next slot begins", () => {

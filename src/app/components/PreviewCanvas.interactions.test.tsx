@@ -342,7 +342,7 @@ describe("PreviewCanvas direct interactions", () => {
     vi.spyOn(root, "getBoundingClientRect").mockReturnValue(rect(42, 68, 220, 120));
 
     fireEvent(window, new Event("resize"));
-    await waitFor(() => expect(grid.style.backgroundPosition).toBe("32px 48px"));
+    await waitFor(() => expect(grid.style.backgroundPosition).toBe("22px 38px"));
     expect(Number(grid.dataset.dotRadius)).toBeCloseTo(2);
     expect(grid.dataset.worldStep).toBe("20");
 
@@ -354,6 +354,7 @@ describe("PreviewCanvas direct interactions", () => {
     expect(Number(grid.dataset.dotRadius)).toBeCloseTo(0.5);
     expect(grid.dataset.worldStep).toBe("80");
     expect(grid.style.backgroundSize).toBe("20px 20px");
+    expect(grid.style.backgroundPosition).toBe("22px 38px");
     expect(grid.style.opacity).toBe("0.72");
   });
 });
