@@ -44,13 +44,14 @@ type PreviewCanvasProps = {
   selectedComponentInstanceId: string;
   selectionLabel: string;
   slots: readonly SlotState[];
-  selection: Selection;
+  selection?: Selection;
   hoveredSelection?: Selection;
   highlightedInternalHtmlComponentId?: string;
   cameraKey?: string;
   strictUiViolations?: readonly StrictUiViolation[];
   compact?: boolean;
   onSelect: (selection: Selection) => void;
+  onDeselect?: () => void;
   onNavigate?: (command: SelectionNavigationCommand) => void;
   onEditComponent?: (instanceId: string) => void;
   onContextMenuRequest?: (request: CanvasContextMenuRequest) => void;
@@ -139,9 +140,11 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         ? current
         : rootRect);
     } else setGridRootRect((current) => current === undefined ? current : undefined);
-    setSelectionRect(measureCanvasSelector(world, selectorForSelection(props.selection), viewportRect));
+    setSelectionRect(props.selection
+      ? measureCanvasSelector(world, selectorForSelection(props.selection), viewportRect)
+      : undefined);
     const hoveredSelection = pointerHoveredSelection ?? props.hoveredSelection;
-    setHoveredRect(hoveredSelection && !sameSelection(hoveredSelection, props.selection)
+    setHoveredRect(hoveredSelection && (!props.selection || !sameSelection(hoveredSelection, props.selection))
       ? measureCanvasSelector(world, selectorForSelection(hoveredSelection), viewportRect)
       : undefined);
     setInternalHtmlRect(props.highlightedInternalHtmlComponentId
@@ -207,6 +210,10 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   useLayoutEffect(scheduleMeasure, [camera, props.preview, scheduleMeasure]);
 
   useLayoutEffect(() => {
+    if (!props.selection) setSelectionRect(undefined);
+  }, [props.selection]);
+
+  useLayoutEffect(() => {
     if (props.cameraKey === undefined) return;
     const resetKey = `${props.cameraKey}:${props.compact ? "compact" : "full"}`;
     if (lastCameraResetKey.current === resetKey) return;
@@ -254,14 +261,15 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     }),
     camera.scale,
   ), [camera.scale, emptyRects, props.slots]);
+  const visibleSelectionRect = props.selection ? selectionRect : undefined;
   const overlayLabels = useMemo(() => placeCanvasOverlayLabels([
-    ...(selectionRect ? [{
+    ...(visibleSelectionRect ? [{
       id: "selection-label",
       text: props.selectionLabel,
-      anchor: selectionRect,
+      anchor: visibleSelectionRect,
       placement: "selection" as const,
     }] : []),
-    ...props.slots.filter((slot) => slot.count === 0 && props.selection.id !== slot.selectionId).flatMap((slot) => {
+    ...props.slots.filter((slot) => slot.count === 0 && props.selection?.id !== slot.selectionId).flatMap((slot) => {
       const rect = emptySlotOverlayRects[slot.selectionId];
       return rect ? [{
         id: `slot-label:${slot.selectionId}`,
@@ -272,10 +280,10 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     }),
   ], strictUiRects.map(({ rect }) => strictUiBadgeObstacle(rect)), viewportSize), [
     emptySlotOverlayRects,
-    props.selection.id,
+    props.selection?.id,
     props.selectionLabel,
     props.slots,
-    selectionRect,
+    visibleSelectionRect,
     strictUiRects,
     viewportSize,
   ]);
@@ -297,6 +305,11 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       event.stopPropagation();
       props.onSelect(selection);
       viewportRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    if (event.target === event.currentTarget) {
+      props.onDeselect?.();
+      viewportRef.current?.focus({ preventScroll: true });
     }
   };
 
@@ -304,6 +317,8 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     if (interactionMode !== "select" || event.target !== event.currentTarget || !props.onNavigate) return;
     const command = event.key === "Enter"
       ? event.shiftKey ? "parent" : "child"
+      : event.key === "Escape"
+        ? "parent"
       : event.key === "Tab"
         ? event.shiftKey ? "previous-sibling" : "next-sibling"
         : undefined;
@@ -446,11 +461,11 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
             </button>
           </div>
         ))}
-        {selectionRect && (
+        {visibleSelectionRect && (
           <div
             data-testid="selection-outline"
             className="absolute border-2 border-sky-400 shadow-[0_0_0_1px_rgba(13,14,16,0.7)]"
-            style={{ left: selectionRect.left, top: selectionRect.top, width: selectionRect.width, height: selectionRect.height }}
+            style={{ left: visibleSelectionRect.left, top: visibleSelectionRect.top, width: visibleSelectionRect.width, height: visibleSelectionRect.height }}
           />
         )}
         {hoveredRect && (
@@ -471,7 +486,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         )}
         {!props.compact && props.slots.filter((slot) => slot.count === 0).map((slot) => {
           const rect = emptySlotOverlayRects[slot.selectionId];
-          if (!rect || props.selection.id === slot.selectionId) return null;
+          if (!rect || props.selection?.id === slot.selectionId) return null;
           return (
             <button
               key={slot.selectionId}

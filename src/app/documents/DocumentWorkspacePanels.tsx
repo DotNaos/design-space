@@ -47,7 +47,7 @@ export function DocumentWorkspacePanels(props: {
   selectedCatalogId?: string;
   requestedFileId?: string;
   rows: readonly ComponentTreeRow[];
-  selection: SelectionTarget;
+  selection?: SelectionTarget;
   hoveredSelection?: SelectionTarget;
   highlightedInternalHtmlComponentId?: string;
   showInternals: boolean;
@@ -56,7 +56,7 @@ export function DocumentWorkspacePanels(props: {
   preview: ReactNode;
   canvasRootId: string;
   canvasSelectedId: string;
-  canvasSelection: SelectionTarget;
+  canvasSelection?: SelectionTarget;
   canvasSelectionLabel: string;
   canvasSlots: readonly SlotState[];
   selectedSlot?: SlotState;
@@ -78,6 +78,7 @@ export function DocumentWorkspacePanels(props: {
   onOpenRootPicker: () => void;
   onSelect: (selection: SelectionTarget) => void;
   onCanvasSelect?: (selection: SelectionTarget) => void;
+  onCanvasDeselect: () => void;
   onHover: (selection: SelectionTarget | undefined) => void;
   onHoverInternals: (componentInstanceId: string | undefined) => void;
   onNavigate: (command: SelectionNavigationCommand) => void;
@@ -95,8 +96,8 @@ export function DocumentWorkspacePanels(props: {
   onDomSnapshot: (snapshot: import("../dom/dom-snapshot").PreviewDomSnapshot) => void;
   onMobileDrawerClose: () => void;
 }) {
-  const slotSelection = props.selection.kind === "slot" ? props.selection : undefined;
-  const outletSelection = props.selection.kind === "slot-outlet" ? props.selection : undefined;
+  const slotSelection = props.selection?.kind === "slot" ? props.selection : undefined;
+  const outletSelection = props.selection?.kind === "slot-outlet" ? props.selection : undefined;
   const empty = <EmptyModeState className="flex h-full w-full" mode={props.mode} canCreate={props.canCreate} onCreate={props.onCreate} />;
   const projectBrowser = (showViewNavigation: boolean) => (
     <WorkspaceBrowser
@@ -125,7 +126,7 @@ export function DocumentWorkspacePanels(props: {
       embedded
       pageLabel={props.documentLabel}
       rows={props.rows}
-      selectedId={props.selection.id}
+      selectedId={props.selection?.id ?? ""}
       showInternals={props.showInternals}
       insertMode={props.insertMode}
       prompt={props.hasRoot && props.insertMode ? "Choose a slot with room, then pick a compatible component." : undefined}
@@ -163,6 +164,7 @@ export function DocumentWorkspacePanels(props: {
         onEditComponent={props.onEditComponent}
         onDomSnapshot={props.onDomSnapshot}
         onSelect={props.onCanvasSelect ?? props.onSelect}
+        onDeselect={props.onCanvasDeselect}
         onNavigate={props.onNavigate}
       />
       {props.actionMessage && (
@@ -183,7 +185,7 @@ export function DocumentWorkspacePanels(props: {
     <SlotInspector
       className="flex h-full w-full"
       slot={props.selectedSlot}
-      authoredDefinition={props.selection.kind === "slot-outlet"}
+      authoredDefinition={props.selection?.kind === "slot-outlet"}
       dependencyMessage={props.slotDependencyMessage ?? props.actionMessage}
       onInsert={slotSelection ? () => props.onOpenSlot(slotSelection) : undefined}
       onClear={slotSelection ? () => props.onClearSlot(slotSelection) : undefined}

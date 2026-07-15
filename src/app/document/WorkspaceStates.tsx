@@ -18,6 +18,10 @@ export function InspectorPrompt({ className, onEdit }: { className?: string; onE
   return <aside className={`${className ?? "grid w-80"} min-h-0 min-w-0 shrink-0 place-items-center border-l border-white/10 bg-[#141518] px-6 text-center`}><button className="text-xs text-zinc-500 hover:text-zinc-200" type="button" onClick={onEdit}>Edit selected item</button></aside>;
 }
 
+export function NoSelectionPrompt({ className }: { className?: string }) {
+  return <aside className={`${className ?? "grid w-80"} min-h-0 min-w-0 shrink-0 place-items-center border-l border-white/10 bg-[#141518] px-6 text-center`}><p className="max-w-48 text-xs leading-5 text-zinc-500">Select an element on the canvas or in Layers.</p></aside>;
+}
+
 export function BlockedOrLoading(props: { loading: boolean; message?: string }) {
   return <main className="grid h-dvh place-items-center bg-[#0d0e10] p-8 text-center text-zinc-200"><div><p className={`text-sm font-medium ${props.loading ? "text-zinc-300" : "text-rose-300"}`}>{props.loading ? "Opening registered documents…" : "Document workspace blocked"}</p>{props.message && <p className="mt-2 max-w-md text-xs leading-5 text-zinc-500">{props.message}</p>}</div></main>;
 }

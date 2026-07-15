@@ -31,7 +31,7 @@ import { useDocumentSelectionInteractions } from "./document/use-document-select
 import { useWorkspaceKeyboardCommands } from "./document/use-workspace-keyboard-commands";
 import { collectDocumentTailwind, useDocumentItemEditor } from "./document/use-document-item-editor";
 import { useDocumentWorkspace } from "./document/use-document-workspace";
-import { BlockedOrLoading } from "./document/WorkspaceStates";
+import { BlockedOrLoading, NoSelectionPrompt } from "./document/WorkspaceStates";
 import { PreviewBoundary } from "./PreviewBoundary";
 import { MobileDock, type MobilePane } from "./shell/MobileDock";
 import { WorkspaceTopBar } from "./shell/WorkspaceTopBar";
@@ -54,6 +54,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const [selectedCatalogId, setSelectedCatalogId] = useState<string>();
   const [revealedInternals, setRevealedInternals] = useState<ReadonlySet<string>>(() => new Set());
   const [selection, setSelection] = useState<SelectionTarget>(document.root ? { kind: "component", id: document.root.instanceId } : emptyRootSelection);
+  const [selectionActive, setSelectionActive] = useState(Boolean(document.root));
   const [slotPicker, setSlotPicker] = useState<SlotSelection>();
   const [rootPicker, setRootPicker] = useState(false);
   const [insertMode, setInsertMode] = useState(false);
@@ -68,6 +69,10 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const [hoveredSelection, setHoveredSelection] = useState<SelectionTarget>();
   const [highlightedInternalHtmlComponentId, setHighlightedInternalHtmlComponentId] = useState<string>();
   const [requestedFileId, setRequestedFileId] = useState<string>();
+  const selectTarget = (next: SelectionTarget) => {
+    setSelection(next);
+    setSelectionActive(true);
+  };
   const creation = useDocumentCreationFlow({
     prepareCreate: controller.prepareCreate,
     saveCreate: controller.saveCreate,
@@ -134,7 +139,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     sourceSnapshotKey,
     createId,
     onCommit: controller.edit,
-    onSelect: setSelection,
+    onSelect: selectTarget,
   });
   useEffect(() => {
     const loadedKind = session?.draft.kind;
@@ -142,6 +147,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   }, [controller.activeDocumentId, session?.draft.kind]);
   useEffect(() => {
     setSelection(document.root ? { kind: "component", id: document.root.instanceId } : emptyRootSelection);
+    setSelectionActive(Boolean(document.root));
     setSelectedCatalogId(document.component?.id);
     setDefinitionEditor(true);
     setObservedDom({});
@@ -268,9 +274,9 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     createId,
     itemEditor,
     edit: controller.edit,
-    onSelect: setSelection,
+    onSelect: selectTarget,
     onEdit: (instanceId) => {
-      setSelection({ kind: "component", id: instanceId });
+      selectTarget({ kind: "component", id: instanceId });
       setDefinitionEditor(false);
       itemEditor.open(instanceId);
       setMobilePane("canvas");
@@ -303,12 +309,12 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const routing = createDocumentWorkspaceRouting({
     document, selection, selectedNodeInstanceId: selectedNode?.instanceId ?? emptyRootSelection.id,
     definitionEditor, modeDocumentAvailable, itemEditor, interactions,
-    setSelection, setDefinitionEditor, setPendingEditId, setMobilePane,
+    setSelection: selectTarget, setDefinitionEditor, setPendingEditId, setMobilePane,
     setBrowserView, setInsertMode, setSlotPicker, setShowStrictUi,
   });
 
   useWorkspaceKeyboardCommands({
-    enabled: modeDocumentAvailable && Boolean(document.root) && !interactions.contextMenu && !slotPicker && !rootPicker && !showDiff && !creation.isOpen && !showStrictUi,
+    enabled: selectionActive && modeDocumentAvailable && Boolean(document.root) && !interactions.contextMenu && !slotPicker && !rootPicker && !showDiff && !creation.isOpen && !showStrictUi,
     onDelete: () => itemEditor.model ? itemEditor.remove() : interactions.deleteSelection(selection),
   });
 
@@ -317,7 +323,9 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   }
 
   const canShowDocumentEditor = modeDocumentAvailable && (hasRoot || (document.kind === "component" && definitionEditor));
-  const desktopEditor = canShowDocumentEditor ? (
+  const desktopEditor = modeDocumentAvailable && hasRoot && !selectionActive ? (
+    <NoSelectionPrompt className="grid h-full w-full border-l-0" />
+  ) : canShowDocumentEditor ? (
     <DesktopDocumentEditingPanel
       definitionEditor={definitionEditor}
       document={document}
@@ -336,7 +344,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   ) : (
     <EmptyModeState className="flex h-full w-full" mode={mode} canCreate={canCreateInMode} onCreate={creation.open} />
   );
-  const mobileDefinition = definitionEditor && modeDocumentAvailable && (hasRoot || document.kind === "component") ? (
+  const mobileDefinition = selectionActive && definitionEditor && modeDocumentAvailable && (hasRoot || document.kind === "component") ? (
     <DocumentDefinitionPanel
       className="flex h-full w-full border-l-0"
       document={document}
@@ -404,7 +412,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         selectedCatalogId={selectedCatalogId}
         requestedFileId={requestedFileId}
         rows={rows}
-        selection={selection}
+        selection={selectionActive ? selection : undefined}
         hoveredSelection={hoveredSelection}
         highlightedInternalHtmlComponentId={highlightedInternalHtmlComponentId}
         showInternals={showInternals}
@@ -413,10 +421,10 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         preview={<PreviewBoundary resetKey={`${document.id}:${itemEditor.model?.tailwindInput ?? tailwindInput}`}>{preview}</PreviewBoundary>}
         canvasRootId={canvasRootId}
         canvasSelectedId={canvasSelectedId}
-        canvasSelection={canvasSelection}
+        canvasSelection={selectionActive ? canvasSelection : undefined}
         canvasSelectionLabel={canvasSelectionLabel}
         canvasSlots={canvasSlots}
-        selectedSlot={selectedSlot}
+        selectedSlot={selectionActive ? selectedSlot : undefined}
         slotPicker={slotPicker}
         pickerLabel={pickerSlot?.label ?? "slot"}
         pickerEntries={pickerEntries}
@@ -457,9 +465,19 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         }}
         onSelect={routing.selectWorkspaceTarget}
         onCanvasSelect={routing.selectCanvasTarget}
+        onCanvasDeselect={() => {
+          setSelectionActive(false);
+          setHoveredSelection(undefined);
+          setHighlightedInternalHtmlComponentId(undefined);
+          setSlotPicker(undefined);
+          setRootPicker(false);
+          setInsertMode(false);
+          itemEditor.close();
+        }}
         onHover={setHoveredSelection}
         onHoverInternals={setHighlightedInternalHtmlComponentId}
         onNavigate={(command) => {
+          if (!selectionActive) return;
           const next = navigateSelection(selectionNavigation, selection.id, command);
           if (next) routing.navigateWorkspaceTarget(next);
         }}

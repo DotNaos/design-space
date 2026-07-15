@@ -254,6 +254,48 @@ it("keeps one item draft while canvas selection moves between rendered component
   await waitFor(() => expect(screen.getByRole("textbox", { name: "Content" })).toHaveValue("Alpha draft"));
 });
 
+it("navigates the selected hierarchy from the canvas and clears selection on empty space", async () => {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn((query: string) => ({
+      matches: query.includes("min-width"),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  });
+  runLocalOperationMock.mockImplementation(async (operation) => {
+    if (operation.type === "list-documents") return editingCatalog as never;
+    if (operation.type === "read-document") return snapshot(editingScreen) as never;
+    if (operation.type === "compile-tailwind") return { value: operation.value, css: ".p-4{padding:1rem}" } as never;
+    throw new Error(`Unexpected operation ${operation.type}`);
+  });
+
+  render(<DocumentWorkspace target={target} />);
+  const alpha = await screen.findByText("Alpha");
+  const canvas = screen.getByRole("main", { name: "Preview canvas" });
+  fireEvent.click(alpha);
+  await waitFor(() => expect(screen.getAllByRole("treeitem", { name: "Text" })[0]).toHaveAttribute("aria-selected", "true"));
+
+  fireEvent.keyDown(canvas, { key: "Tab" });
+  await waitFor(() => {
+    const textRows = screen.getAllByRole("treeitem", { name: "Text" });
+    expect(textRows[1]).toHaveAttribute("aria-selected", "true");
+  });
+
+  fireEvent.keyDown(canvas, { key: "Escape" });
+  await waitFor(() => expect(screen.getByRole("treeitem", { name: /Content slot/ })).toHaveAttribute("aria-selected", "true"));
+
+  fireEvent.keyDown(canvas, { key: "Enter" });
+  await waitFor(() => {
+    const textRows = screen.getAllByRole("treeitem", { name: "Text" });
+    expect(textRows[0]).toHaveAttribute("aria-selected", "true");
+  });
+
+  fireEvent.click(canvas);
+  await waitFor(() => expect(screen.getByText("Select an element on the canvas or in Layers.")).toBeVisible());
+  expect(screen.getAllByRole("treeitem").every((row) => row.getAttribute("aria-selected") !== "true")).toBe(true);
+});
+
 function installServer(
   currentScreen: () => DesignDocument,
   onPrepare: (document: DesignDocument) => void,

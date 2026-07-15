@@ -25,9 +25,45 @@ describe("PreviewCanvas direct interactions", () => {
     canvas.focus();
     fireEvent.keyDown(canvas, { key: "Enter" });
     fireEvent.keyDown(canvas, { key: "Enter", shiftKey: true });
+    fireEvent.keyDown(canvas, { key: "Escape" });
     fireEvent.keyDown(canvas, { key: "Tab" });
     fireEvent.keyDown(canvas, { key: "Tab", shiftKey: true });
-    expect(onNavigate.mock.calls.map(([command]) => command)).toEqual(["child", "parent", "next-sibling", "previous-sibling"]);
+    fireEvent.keyDown(window, { key: "Escape" });
+    const input = document.createElement("input");
+    document.body.append(input);
+    fireEvent.keyDown(input, { key: "Escape" });
+    input.remove();
+    expect(onNavigate.mock.calls.map(([command]) => command)).toEqual(["child", "parent", "parent", "next-sibling", "previous-sibling", "parent"]);
+  });
+
+  it("deselects only when the empty canvas surface is clicked", () => {
+    const onDeselect = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <PreviewCanvas
+        compact
+        preview={<div data-design-space-instance-id="root">Content</div>}
+        rootInstanceId="root"
+        selectedComponentInstanceId="root"
+        selection={{ kind: "component", id: "root" }}
+        selectionLabel="Root"
+        slots={[]}
+        onDeselect={onDeselect}
+        onSelect={onSelect}
+      />,
+    );
+
+    const canvas = screen.getByRole("main", { name: "Preview canvas" });
+    fireEvent.click(screen.getByText("Content"));
+    expect(onSelect).toHaveBeenCalledWith({ kind: "component", id: "root" });
+    expect(onDeselect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(onDeselect).not.toHaveBeenCalled();
+
+    fireEvent.click(canvas);
+    expect(onDeselect).toHaveBeenCalledOnce();
+    expect(canvas).toHaveFocus();
   });
 
   it("selects the most specific target on click and only opens editing on double click", () => {

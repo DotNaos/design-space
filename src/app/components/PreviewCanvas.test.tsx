@@ -8,7 +8,7 @@ afterEach(cleanup);
 describe("preview canvas", () => {
   it("draws the selection from the measured target DOM rectangle", async () => {
     const onSelect = vi.fn();
-    render(
+    const result = render(
       <PreviewCanvas
         compact
         preview={<div data-design-space-instance-id="copy">Copy</div>}
@@ -35,6 +35,20 @@ describe("preview canvas", () => {
 
     fireEvent.click(copy);
     expect(onSelect).toHaveBeenCalledWith({ kind: "component", id: "copy" });
+
+    result.rerender(
+      <PreviewCanvas
+        compact
+        preview={<div data-design-space-instance-id="copy">Copy</div>}
+        rootInstanceId="root"
+        selectedComponentInstanceId="copy"
+        selection={undefined}
+        selectionLabel="Copy"
+        slots={[]}
+        onSelect={onSelect}
+      />,
+    );
+    expect(screen.queryByTestId("selection-outline")).not.toBeInTheDocument();
   });
 
   it("marks affected canvas elements and lets a marker navigate to its editor", async () => {
