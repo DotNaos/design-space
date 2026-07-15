@@ -297,7 +297,7 @@ const panelDocument: DesignDocument = {
     label: "Panel",
     group: "Surfaces",
     properties: [],
-    slots: [{ id: "body", label: "Body" }],
+    slots: [{ id: "body", label: "Body", accepts: ["text"], acceptsText: false }],
   },
   root: {
     instanceId: "panel.template",
@@ -351,7 +351,7 @@ const createdComponent: DesignDocument = {
     group: "Surfaces",
     recipeId: "recipe.component.panel",
     properties: [],
-    slots: [{ id: "body", label: "Body" }],
+    slots: [{ id: "body", label: "Body", accepts: ["text"], acceptsText: false }],
   },
   root: {
     instanceId: "created.template",
@@ -421,7 +421,7 @@ const target: TargetModule = {
   files: [],
   adapters: [
     {
-      component: { id: "stack", label: "Stack", group: "Layout", slots: [{ id: "content", label: "Content" }] },
+      component: { id: "stack", label: "Stack", group: "Layout", slots: [{ id: "content", label: "Content", accepts: ["text", "card"], acceptsText: false }] },
       controls: [{ id: "surface", label: "Surface", kind: "tailwind", prop: "className" }],
       defaultProps: { className: "p-4" },
       render: (props, context) => <div {...context.slotAttributes.content} className={String(props.className ?? "")}>{context.slotChildren.content}</div>,

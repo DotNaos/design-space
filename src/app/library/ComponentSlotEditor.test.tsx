@@ -16,6 +16,7 @@ describe("component slot editor", () => {
         label: "Header",
         min: 1,
         max: 2,
+        accepts: [],
         acceptsText: true,
       });
       return (
@@ -48,12 +49,17 @@ describe("component slot editor", () => {
     fireEvent.click(screen.getByRole("switch", { name: "Accept text children" }));
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ acceptsText: false }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Selected only" }));
     fireEvent.click(screen.getByRole("button", { name: /Card title/ }));
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ accepts: ["catalog.card-title"] }));
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Any component" }));
-    expect(onChange.mock.lastCall?.[0]).not.toHaveProperty("accepts");
+  it("switches between a single child and an ordered child list", () => {
+    const onChange = vi.fn();
+    render(<ComponentSlotEditor slot={{ id: "content", label: "Content", max: 1, accepts: [], acceptsText: false }} catalogComponents={[]} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: /List/ }));
+    expect(onChange.mock.lastCall?.[0]).not.toHaveProperty("max");
+    fireEvent.click(screen.getByRole("button", { name: /Single/ }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ max: 1 }));
   });
 
   it("surfaces an invalid child range without mutating it", () => {

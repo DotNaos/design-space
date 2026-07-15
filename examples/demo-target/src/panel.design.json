@@ -17,6 +17,7 @@
     "recipeId": "stack-component",
     "slots": [
       {
+        "accepts": ["heading", "text", "badge", "button", "input", "card", "stack"],
         "acceptsText": true,
         "id": "content",
         "label": "Content",

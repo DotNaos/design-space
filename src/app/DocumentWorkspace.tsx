@@ -23,6 +23,7 @@ import { isDocumentDirty } from "./document/document-session";
 import { buildDesignDocumentTree } from "./document/document-tree";
 import { createDocumentWorkspaceRouting } from "./document/document-workspace-routing";
 import { projectDocumentSlots } from "./document/document-workspace-projections";
+import { buildSelectionNavigation, navigateSelection, requiredTreeDisclosures } from "./document/selection-navigation";
 import type { PreviewDomSnapshot } from "./dom/dom-snapshot";
 import { useDocumentCreationFlow } from "./document/use-document-creation-flow";
 import { useDocumentSelectionInteractions } from "./document/use-document-selection-interactions";
@@ -62,6 +63,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const [previewError, setPreviewError] = useState<string>();
   const [observedDom, setObservedDom] = useState<PreviewDomSnapshot>({});
   const [hoveredSelection, setHoveredSelection] = useState<SelectionTarget>();
+  const [highlightedInternalHtmlComponentId, setHighlightedInternalHtmlComponentId] = useState<string>();
   const [requestedFileId, setRequestedFileId] = useState<string>();
   const creation = useDocumentCreationFlow({
     prepareCreate: controller.prepareCreate,
@@ -93,6 +95,8 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     ? projectDocumentSlots(target, library, selectedNode, view.catalog, selectedInstance)
     : [];
   const rows = useMemo(() => buildDesignDocumentTree(target, document, library, revealedInternals, observedDom), [document, library, observedDom, revealedInternals, target]);
+  const allRows = useMemo(() => buildDesignDocumentTree(target, document, library, true, observedDom), [document, library, observedDom, target]);
+  const selectionNavigation = useMemo(() => buildSelectionNavigation(allRows), [allRows]);
   const internalTreeIds = useMemo(() => {
     const implementationIds = rows.flatMap((row) => row.kind === "internals-summary" ? [row.disclosureId] : []);
     if (implementationIds.length > 0) return implementationIds;
@@ -110,7 +114,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const pickerAdapter = pickerParent ? resolveDocumentAdapter(target, library, pickerParent.adapterId) : undefined;
   const pickerSlot = pickerAdapter?.component.slots.find((slot) => slot.id === slotPicker?.slotId);
   const pickerEntries = catalogEntries.filter((entry) => (
-    (!pickerSlot?.accepts || pickerSlot.accepts.includes(entry.id)) &&
+    Boolean(pickerSlot?.accepts?.includes(entry.id)) &&
     !wouldCreateAuthoredComponentCycle(document, library, entry.id)
   ));
   const sourceSnapshotKey = session?.staleSnapshot?.documentDigest
@@ -137,9 +141,19 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     setObservedDom({});
     setRevealedInternals(new Set());
     setHoveredSelection(undefined);
+    setHighlightedInternalHtmlComponentId(undefined);
     setRequestedFileId(undefined);
     itemEditor.close();
   }, [document.id, document.kind, document.root.instanceId, sourceSnapshotKey]);
+  useEffect(() => {
+    const required = requiredTreeDisclosures(selectionNavigation, selection.id);
+    if (!required.size) return;
+    setRevealedInternals((current) => {
+      const next = new Set(current);
+      for (const id of required) next.add(id);
+      return next.size === current.size ? current : next;
+    });
+  }, [selection.id, selectionNavigation]);
   useEffect(() => {
     if (!pendingEditId || !findDesignNode(document.root, pendingEditId)) return;
     itemEditor.open(pendingEditId);
@@ -374,6 +388,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         rows={rows}
         selection={selection}
         hoveredSelection={hoveredSelection}
+        highlightedInternalHtmlComponentId={highlightedInternalHtmlComponentId}
         showInternals={showInternals}
         insertMode={insertMode}
         strictUiViolations={controller.liveViolations}
@@ -419,6 +434,12 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         onSelect={routing.selectWorkspaceTarget}
         onCanvasSelect={routing.selectCanvasTarget}
         onHover={setHoveredSelection}
+        onHoverInternals={setHighlightedInternalHtmlComponentId}
+        onNavigate={(command) => {
+          const next = navigateSelection(selectionNavigation, selection.id, command);
+          if (next) routing.navigateWorkspaceTarget(next);
+        }}
+        onCollapseAll={() => setRevealedInternals(requiredTreeDisclosures(selectionNavigation, selection.id))}
         onToggleInsert={() => {
           setInsertMode((current) => !current);
           setSlotPicker(undefined);

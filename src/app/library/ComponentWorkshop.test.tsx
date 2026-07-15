@@ -1,10 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 
 import type { DesignDocument } from "../../shared/design-document";
 import { ComponentWorkshop } from "./ComponentWorkshop";
+
+afterEach(cleanup);
 
 it("keeps the complete component workshop scrollable on a phone and creates an explicit outlet", async () => {
   const user = userEvent.setup();
@@ -41,7 +43,7 @@ it("keeps the complete component workshop scrollable on a phone and creates an e
   expect(screen.queryByRole("button", { name: "Edit component body" })).not.toBeInTheDocument();
 });
 
-it("removes cleared maximum and accepted-component constraints from the saved slot", async () => {
+it("keeps explicit accepted-component constraints when cardinality becomes a list", async () => {
   const user = userEvent.setup();
   const onChange = vi.fn();
   function Harness() {
@@ -79,10 +81,32 @@ it("removes cleared maximum and accepted-component constraints from the saved sl
   expect(changed.component?.slots[0]).not.toHaveProperty("max");
   expect(changed.component?.slots[0]).toHaveProperty("accepts", ["catalog.heading"]);
 
-  await user.click(screen.getByRole("button", { name: "Any component" }));
-  changed = onChange.mock.lastCall?.[0] as DesignDocument;
-  expect(changed.component?.slots[0]).not.toHaveProperty("max");
-  expect(changed.component?.slots[0]).not.toHaveProperty("accepts");
+  expect(screen.getByRole("button", { name: /List/ })).toHaveAttribute("aria-pressed", "true");
+});
+
+it("creates typed component properties as public arguments", async () => {
+  const user = userEvent.setup();
+  const onChange = vi.fn();
+  render(
+    <ComponentWorkshop
+      document={component}
+      documents={[component]}
+      catalogComponents={[]}
+      onChange={onChange}
+      onEditImplementation={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByText("Properties / arguments")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /^text$/i }));
+
+  const changed = onChange.mock.lastCall?.[0] as DesignDocument;
+  expect(changed.component?.properties).toContainEqual({
+    id: "property-1",
+    label: "Property 1",
+    prop: "property-1",
+    kind: "text",
+  });
 });
 
 it("keeps a public slot when another document depends on its component", async () => {

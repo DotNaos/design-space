@@ -1,4 +1,4 @@
-import { Button } from "@heroui/react";
+import { Button, Label, Slider, Tooltip } from "@heroui/react";
 import {
   AlignCenterVertical,
   AlignEndVertical,
@@ -17,6 +17,7 @@ import {
   LayoutGrid,
   Minus,
   MoveDiagonal2,
+  RotateCcw,
   Scaling,
   Sparkles,
   Square,
@@ -153,13 +154,13 @@ export function TailwindMappedControls(props: { value: string; onChange: (value:
           </div>
         </ControlSection>
         <ControlSection initialOpen icon={MoveDiagonal2} title="Spacing">
-          <SelectGrid current={props.value} groups={spacingGroups} onChange={props.onChange} />
+          <SliderGrid current={props.value} groups={spacingGroups} onChange={props.onChange} />
         </ControlSection>
         <ControlSection icon={Scaling} title="Size">
           <SelectGrid current={props.value} groups={sizeGroups} onChange={props.onChange} />
         </ControlSection>
         <ControlSection icon={Sparkles} title="Appearance">
-          <SelectGrid current={props.value} groups={appearanceGroups} onChange={props.onChange} />
+          <SliderGrid current={props.value} groups={appearanceGroups} onChange={props.onChange} />
         </ControlSection>
       </div>
     </fieldset>
@@ -228,17 +229,72 @@ function SegmentedUtilityControl(props: {
 function SegmentButton(props: { active: boolean; icon: LucideIcon; label: string; onPress: () => void }) {
   const Icon = props.icon;
   return (
-    <Button
-      isIconOnly
-      aria-label={props.label}
-      aria-pressed={props.active}
-      className={`min-h-9 min-w-0 flex-1 rounded-md px-0 transition-colors ${props.active ? "bg-sky-400/15 text-sky-200" : "text-zinc-600 hover:bg-white/[0.05] hover:text-zinc-300"}`}
-      size="sm"
-      variant="ghost"
-      onPress={props.onPress}
+    <Tooltip delay={350} closeDelay={80}>
+      <Button
+        isIconOnly
+        aria-label={props.label}
+        aria-pressed={props.active}
+        className={`min-h-9 min-w-0 flex-1 rounded-md px-0 transition-colors ${props.active ? "bg-sky-400/15 text-sky-200" : "text-zinc-600 hover:bg-white/[0.05] hover:text-zinc-300"}`}
+        size="sm"
+        variant="ghost"
+        onPress={props.onPress}
+      >
+        <Icon aria-hidden="true" size={14} strokeWidth={1.7} />
+      </Button>
+      <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">{props.label}</Tooltip.Content>
+    </Tooltip>
+  );
+}
+
+function SliderGrid(props: { current: string; groups: readonly UtilityGroup[]; onChange: (value: string) => void }) {
+  return <div className="grid gap-3">{props.groups.map((group) => <SliderUtilityControl key={group.id} {...props} group={group} />)}</div>;
+}
+
+function SliderUtilityControl(props: { current: string; group: UtilityGroup; onChange: (value: string) => void }) {
+  const selection = findBaseSelection(props.current, props.group);
+  const steps = [{ label: "Auto", value: "" }, ...props.group.options];
+  const selectedIndex = selection.custom ? 0 : Math.max(0, steps.findIndex((step) => step.value === selection.utility));
+  const output = selection.custom ? `Custom · ${selection.token}` : steps[selectedIndex]?.label ?? "Auto";
+  const setIndex = (next: number | number[]) => {
+    const index = Array.isArray(next) ? next[0] : next;
+    const value = steps[index]?.value ?? "";
+    props.onChange(replaceTailwindUtilityGroup(props.current, optionValues(props.group), value, props.group.matches));
+  };
+  const reset = () => props.onChange(replaceTailwindUtilityGroup(props.current, optionValues(props.group), "", props.group.matches));
+  return (
+    <Slider
+      aria-label={`${props.group.label} Tailwind value`}
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1"
+      maxValue={steps.length - 1}
+      minValue={0}
+      step={1}
+      value={selectedIndex}
+      onChange={setIndex}
     >
-      <Icon aria-hidden="true" size={14} strokeWidth={1.7} />
-    </Button>
+      <Label className="text-[9px] text-zinc-600">{props.group.label}</Label>
+      <span className="flex items-center gap-1">
+        <Slider.Output className={`max-w-36 truncate text-[9px] ${selection.custom ? "text-amber-300/80" : "text-zinc-400"}`}>{output}</Slider.Output>
+        <Tooltip delay={350} closeDelay={80}>
+          <button
+            aria-label={`Reset ${props.group.label} to Auto`}
+            className="grid size-6 place-items-center rounded text-zinc-600 hover:bg-white/5 hover:text-zinc-300"
+            type="button"
+            onClick={reset}
+          >
+            <RotateCcw aria-hidden="true" size={11} />
+          </button>
+          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Reset {props.group.label} to Auto</Tooltip.Content>
+        </Tooltip>
+      </span>
+      <Slider.Track className="col-span-2 h-7 w-full cursor-pointer">
+        <span className="absolute left-0 top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-white/10" />
+        <Slider.Fill className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-sky-400" />
+        <Slider.Thumb
+          aria-valuetext={output}
+          className="top-1/2 size-5 rounded-full border-2 border-[#141518] bg-sky-300 shadow-md outline-none ring-offset-2 ring-offset-[#141518] data-[focus-visible]:ring-2 data-[focus-visible]:ring-sky-300"
+        />
+      </Slider.Track>
+    </Slider>
   );
 }
 
@@ -340,7 +396,9 @@ function scaleGroup(id: string, label: string, prefix: string, pattern: RegExp):
       ["8 px", `${prefix}-2`],
       ["12 px", `${prefix}-3`],
       ["16 px", `${prefix}-4`],
+      ["20 px", `${prefix}-5`],
       ["24 px", `${prefix}-6`],
+      ["28 px", `${prefix}-7`],
       ["32 px", `${prefix}-8`],
     ]),
     matches: match(pattern),

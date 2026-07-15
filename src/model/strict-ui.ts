@@ -23,15 +23,16 @@ export function validateStrictUi(
   document: DesignDocument,
   library: readonly DesignDocument[] = [],
 ): StrictUiViolation[] {
+  const definitions = document.kind === "component" ? [...library, document] : library;
   const violations: StrictUiViolation[] = [];
   const nodeIds = new Set<string>();
   const outlets: DesignSlotOutletNode[] = [];
   const publicSlots = new Map(document.component?.slots.map((slot) => [slot.id, slot]) ?? []);
   const publicProperties = new Map(document.component?.properties.map((property) => [property.id, property]) ?? []);
   validatePublicPropertyDefaults(document.component?.properties ?? [], violations);
-  visitNode(target, library, document.root, nodeIds, outlets, publicSlots, publicProperties, violations);
+  visitNode(target, definitions, document.root, nodeIds, outlets, publicSlots, publicProperties, violations);
   validateOutlets(document, outlets, violations);
-  validatePropertyBindings(target, document, library, violations);
+  validatePropertyBindings(target, document, definitions, violations);
   if (hasAuthoredComponentCycle(document, library)) {
     violations.push({
       ...issue("component.cycle", "Authored components cannot contain themselves through a direct or indirect component cycle.", { kind: "document" }),
@@ -180,6 +181,29 @@ function validateSlot(
   violations: StrictUiViolation[],
 ): void {
   const location = slotLocation(node.instanceId, slot.id);
+  if (slot.accepts === undefined) {
+    violations.push({
+      ...issue("slot.contract.components", `${slot.label} must explicitly list the component types it accepts.`, location),
+      suggestion: "Choose the allowed components in the slot contract. Use an empty list when no component children are valid.",
+    });
+  }
+  if (slot.acceptsText === undefined) {
+    violations.push({
+      ...issue("slot.contract.text", `${slot.label} must explicitly allow or reject text children.`, location),
+      suggestion: "Set the slot text policy explicitly in the component workshop.",
+    });
+  }
+  if (slot.accepts) {
+    const accepted = new Set<string>();
+    for (const adapterId of slot.accepts) {
+      if (accepted.has(adapterId)) {
+        violations.push(issue("slot.contract.duplicate", `${slot.label} lists ${adapterId} more than once.`, location));
+      } else if (!resolveStrictAdapter(target, library, adapterId)) {
+        violations.push(issue("slot.contract.unknown", `${slot.label} accepts an unavailable component type: ${adapterId}.`, location));
+      }
+      accepted.add(adapterId);
+    }
+  }
   const cardinality = projectedCardinality(children, publicSlots);
   if (cardinality && cardinality.minimum < (slot.min ?? 0)) {
     violations.push(issue("slot.minimum", `${slot.label} requires at least ${slot.min} item${slot.min === 1 ? "" : "s"}.`, location));

@@ -1,5 +1,6 @@
-import { ChevronDown, ChevronRight, CircleDot, Code2, Component, Eye, EyeOff, FileBox, Plug, Plus, Tag, X } from "lucide-react";
-import { useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { Tooltip } from "@heroui/react";
+import { ChevronDown, ChevronRight, CircleDot, Code2, Component, Eye, EyeOff, FileBox, ListCollapse, Plug, Plus, Tag, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import type { ComponentTreeRow, SelectionTarget } from "../../model";
 import type { StrictUiViolation } from "../../shared/strict-ui";
@@ -22,20 +23,59 @@ type ComponentTreeProps = {
   toggleHint?: string;
   strictUiViolations?: readonly StrictUiViolation[];
   onHover?: (selection: SelectionTarget | undefined) => void;
+  onHoverInternals?: (componentInstanceId: string | undefined) => void;
   onContextMenuRequest?: (selection: SelectionTarget, position: { x: number; y: number }) => void;
   onInsert?: () => void;
   onSelect: (selection: SelectionTarget) => void;
+  onCollapseAll?: () => void;
   onToggleInternals: (componentInstanceId?: string) => void;
 };
 
 export function ComponentTree(props: ComponentTreeProps) {
   const treeRef = useRef<HTMLDivElement>(null);
+  const [collapsedBranches, setCollapsedBranches] = useState<ReadonlySet<string>>(() => new Set());
   const markers = buildStrictUiSelectionMarkers(props.strictUiViolations ?? []);
+  const selectedPath = useMemo(() => treeSelectionPath(props.rows, props.selectedId), [props.rows, props.selectedId]);
+  const visibleRows = useMemo(() => visibleTreeRows(props.rows, collapsedBranches), [collapsedBranches, props.rows]);
+
+  useEffect(() => {
+    setCollapsedBranches((current) => {
+      const next = new Set(current);
+      for (const id of selectedPath) next.delete(id);
+      return next.size === current.size ? current : next;
+    });
+  }, [selectedPath]);
+
+  useLayoutEffect(() => {
+    const selected = [...(treeRef.current?.querySelectorAll<HTMLElement>("[data-design-space-selection-id]") ?? [])]
+      .find((element) => element.dataset.designSpaceSelectionId === props.selectedId);
+    selected?.scrollIntoView?.({ block: "nearest" });
+  }, [props.selectedId, visibleRows]);
+
+  const collapseAll = () => {
+    const preserved = new Set(selectedPath);
+    setCollapsedBranches(new Set(props.rows.flatMap((row, index) => {
+      if (!("selection" in row) || preserved.has(row.selection.id)) return [];
+      return props.rows[index + 1]?.depth > row.depth ? [row.selection.id] : [];
+    })));
+    props.onCollapseAll?.();
+  };
   return (
     <aside className={`${props.className ?? "flex w-64"} min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
       <div className="flex h-11 items-center gap-2 border-b border-white/10 px-3">
         <h2 className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-300">Component tree</h2>
         <span className="max-w-20 truncate text-[10px] text-zinc-600">{props.pageLabel}</span>
+        <Tooltip delay={350}>
+          <button
+            aria-label="Collapse all tree branches"
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"
+            type="button"
+            onClick={collapseAll}
+          >
+            <ListCollapse aria-hidden="true" size={14} />
+          </button>
+          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Collapse all · keeps selection visible</Tooltip.Content>
+        </Tooltip>
         {props.onInsert && (
           <button
             aria-pressed={props.insertMode}
@@ -69,13 +109,14 @@ export function ComponentTree(props: ComponentTreeProps) {
           <FileBox size={14} />
           <span className="truncate">{props.pageLabel}</span>
         </div>
-        {props.rows.map((row, index) => (
+        {visibleRows.map((row, index) => (
           <TreeRow
             key={`${row.kind}-${"selection" in row ? row.selection.id : index}`}
             row={row}
             selectedId={props.selectedId}
             marker={strictUiMarkerForTreeRow(row, markers)}
             onHover={props.onHover}
+            onHoverInternals={props.onHoverInternals}
             onContextMenuRequest={props.onContextMenuRequest}
             onSelect={props.onSelect}
             onToggleInternals={props.onToggleInternals}
@@ -107,6 +148,7 @@ function TreeRow(props: {
   selectedId: string;
   marker?: StrictUiMarker;
   onHover?: (selection: SelectionTarget | undefined) => void;
+  onHoverInternals?: (componentInstanceId: string | undefined) => void;
   onContextMenuRequest?: (selection: SelectionTarget, position: { x: number; y: number }) => void;
   onSelect: (selection: SelectionTarget) => void;
   onToggleInternals: (componentInstanceId?: string) => void;
@@ -203,6 +245,7 @@ function ComponentRow(props: {
   selectedId: string;
   marker?: StrictUiMarker;
   onHover?: (selection: SelectionTarget | undefined) => void;
+  onHoverInternals?: (componentInstanceId: string | undefined) => void;
   onContextMenuRequest?: (selection: SelectionTarget, position: { x: number; y: number }) => void;
   onSelect: (selection: SelectionTarget) => void;
   onToggleInternals: (componentInstanceId?: string) => void;
@@ -254,23 +297,50 @@ function ComponentRow(props: {
       </button>
 
       {internals && (
-        <button
-          aria-expanded={!internals.collapsed}
-          aria-label={toggleLabel}
-          className="mr-2 inline-flex h-6 shrink-0 items-center gap-1 rounded-md bg-transparent px-1.5 text-[10px] tabular-nums text-zinc-500 transition-colors hover:bg-white/[0.07] hover:text-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-400"
-          data-internal-html-toggle-for={selection.id}
-          title={`${row.label} internal HTML`}
-          type="button"
-          onBlur={() => props.onHover?.(undefined)}
-          onClick={() => props.onToggleInternals(selection.id)}
-          onFocus={() => props.onHover?.(selection)}
-        >
-          <Code2 aria-hidden="true" size={12} />
-          <span>{internals.nodeCount}</span>
-        </button>
+        <Tooltip delay={350}>
+          <button
+            aria-expanded={!internals.collapsed}
+            aria-label={toggleLabel}
+            className="mr-2 inline-flex h-6 shrink-0 items-center gap-1 rounded-md bg-transparent px-1.5 text-[10px] tabular-nums text-zinc-500 transition-colors hover:bg-white/[0.07] hover:text-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-400"
+            data-internal-html-toggle-for={selection.id}
+            type="button"
+            onBlur={() => props.onHoverInternals?.(undefined)}
+            onClick={() => props.onToggleInternals(selection.id)}
+            onFocus={() => props.onHoverInternals?.(selection.id)}
+            onPointerEnter={() => props.onHoverInternals?.(selection.id)}
+            onPointerLeave={() => props.onHoverInternals?.(undefined)}
+          >
+            <Code2 aria-hidden="true" size={12} />
+            <span>{internals.nodeCount}</span>
+          </button>
+          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">{toggleLabel}</Tooltip.Content>
+        </Tooltip>
       )}
     </div>
   );
+}
+
+function visibleTreeRows(rows: readonly ComponentTreeRow[], collapsed: ReadonlySet<string>): readonly ComponentTreeRow[] {
+  const visible: ComponentTreeRow[] = [];
+  let hiddenBelowDepth: number | undefined;
+  for (const row of rows) {
+    if (hiddenBelowDepth !== undefined && row.depth > hiddenBelowDepth) continue;
+    hiddenBelowDepth = undefined;
+    visible.push(row);
+    if ("selection" in row && collapsed.has(row.selection.id)) hiddenBelowDepth = row.depth;
+  }
+  return visible;
+}
+
+function treeSelectionPath(rows: readonly ComponentTreeRow[], selectedId: string): readonly string[] {
+  const stack: Array<{ id: string; depth: number }> = [];
+  for (const row of rows) {
+    if (!("selection" in row)) continue;
+    while (stack.at(-1) && stack.at(-1)!.depth >= row.depth) stack.pop();
+    if (row.selection.id === selectedId) return [...stack.map((item) => item.id), selectedId];
+    stack.push({ id: row.selection.id, depth: row.depth });
+  }
+  return [selectedId];
 }
 
 function navigateTree(event: ReactKeyboardEvent<HTMLDivElement>) {

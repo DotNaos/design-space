@@ -46,6 +46,10 @@ export function selectorForSelection(selection: Selection): string {
   return attributeSelector("data-design-space-outlet-id", selection.outletId);
 }
 
+export function selectorForInternalHtml(componentInstanceId: string): string {
+  return attributePrefixSelector("data-design-space-html-id", `html:${encodeURIComponent(componentInstanceId)}:`);
+}
+
 export function selectorForStrictUiTarget(target: StrictUiCanvasTarget): string {
   const attribute = target.kind === "instance"
     ? "data-design-space-instance-id"
@@ -139,6 +143,10 @@ function measurableRects(element: HTMLElement): DOMRect[] {
 
 function attributeSelector(attribute: string, value: string): string {
   return `[${attribute}="${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"]`;
+}
+
+function attributePrefixSelector(attribute: string, value: string): string {
+  return `[${attribute}^="${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"]`;
 }
 
 function labelCandidates(input: CanvasOverlayLabelInput, width: number): ViewRect[] {

@@ -15,7 +15,7 @@ const target: TargetModule = {
         id: "card",
         label: "Card",
         group: "Surfaces",
-        slots: [{ id: "body", label: "Body", min: 1, max: 1, accepts: ["text"] }],
+        slots: [{ id: "body", label: "Body", min: 1, max: 1, accepts: ["text"], acceptsText: false }],
       },
       controls: [{ id: "title", label: "Title", kind: "text", prop: "title", required: true }],
       render: () => null,
@@ -34,6 +34,61 @@ function document(root: DesignDocument["root"]): DesignDocument {
 }
 
 describe("core Strict UI validation", () => {
+  it("blocks slots without an explicit child allow-list and text policy", () => {
+    const legacyTarget: TargetModule = {
+      ...target,
+      adapters: target.adapters.map((adapter) => adapter.component.id === "card"
+        ? { ...adapter, component: { ...adapter.component, slots: [{ id: "body", label: "Body" }] } }
+        : adapter),
+    };
+    const rules = validateStrictUi(legacyTarget, document({ instanceId: "card.one", adapterId: "card", props: { title: "Ready" }, slots: { body: [] } }))
+      .map((violation) => violation.ruleId);
+    expect(rules).toEqual(expect.arrayContaining(["slot.contract.components", "slot.contract.text"]));
+  });
+
+  it("blocks duplicate and unavailable accepted component IDs", () => {
+    const invalidTarget: TargetModule = {
+      ...target,
+      adapters: target.adapters.map((adapter) => adapter.component.id === "card"
+        ? { ...adapter, component: { ...adapter.component, slots: [{ id: "body", label: "Body", accepts: ["text", "text", "missing"], acceptsText: false }] } }
+        : adapter),
+    };
+    const rules = validateStrictUi(invalidTarget, document({ instanceId: "card.one", adapterId: "card", props: { title: "Ready" }, slots: { body: [] } }))
+      .map((violation) => violation.ruleId);
+    expect(rules).toEqual(expect.arrayContaining(["slot.contract.duplicate", "slot.contract.unknown"]));
+  });
+
+  it("allows an ordered list of multiple accepted component children", () => {
+    const listTarget: TargetModule = {
+      ...target,
+      defaultAdapterId: "stack",
+      adapters: [
+        ...target.adapters,
+        {
+          component: {
+            id: "stack",
+            label: "Stack",
+            group: "Layout",
+            slots: [{ id: "content", label: "Content", accepts: ["text"], acceptsText: false }],
+          },
+          render: () => null,
+        },
+      ],
+    };
+    const violations = validateStrictUi(listTarget, document({
+      instanceId: "stack.one",
+      adapterId: "stack",
+      slots: {
+        content: ["one", "two", "three"].map((id) => ({
+          kind: "component" as const,
+          node: { instanceId: `text.${id}`, adapterId: "text", slots: {} },
+        })),
+      },
+    }));
+
+    expect(violations).toEqual([]);
+  });
+
   it("reports missing required properties and required slot content", () => {
     const violations = validateStrictUi(target, document({ instanceId: "card.one", adapterId: "card", slots: { body: [] } }));
     expect(violations.map((violation) => violation.ruleId)).toEqual(["property.required", "slot.minimum"]);
@@ -245,7 +300,7 @@ describe("core Strict UI validation", () => {
         label: "Safe panel",
         group: "Surfaces",
         properties: [],
-        slots: [{ id: "body", label: "Public body", min: 2, max: 2, accepts: ["text"] }],
+        slots: [{ id: "body", label: "Public body", min: 2, max: 2, accepts: ["text"], acceptsText: false }],
       },
       root: {
         instanceId: "safe-panel.root",
@@ -363,7 +418,7 @@ describe("core Strict UI validation", () => {
         label: "Panel",
         group: "Surfaces",
         properties: [{ id: "title", kind: "text", label: "Title", prop: "title", required: true }],
-        slots: [{ id: "body", label: "Body", accepts: ["text"] }],
+        slots: [{ id: "body", label: "Body", accepts: ["text"], acceptsText: false }],
       },
       root: { instanceId: "panel.root", adapterId: "text", slots: {} },
     };

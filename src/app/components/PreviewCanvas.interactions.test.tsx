@@ -6,6 +6,30 @@ import { PreviewCanvas } from "./PreviewCanvas";
 afterEach(cleanup);
 
 describe("PreviewCanvas direct interactions", () => {
+  it("uses Figma-style hierarchy keys only while the canvas owns focus", () => {
+    const onNavigate = vi.fn();
+    render(
+      <PreviewCanvas
+        compact
+        preview={<div data-design-space-instance-id="root" />}
+        rootInstanceId="root"
+        selectedComponentInstanceId="root"
+        selection={{ kind: "component", id: "root" }}
+        selectionLabel="Root"
+        slots={[]}
+        onNavigate={onNavigate}
+        onSelect={() => undefined}
+      />,
+    );
+    const canvas = screen.getByRole("main", { name: "Preview canvas" });
+    canvas.focus();
+    fireEvent.keyDown(canvas, { key: "Enter" });
+    fireEvent.keyDown(canvas, { key: "Enter", shiftKey: true });
+    fireEvent.keyDown(canvas, { key: "Tab" });
+    fireEvent.keyDown(canvas, { key: "Tab", shiftKey: true });
+    expect(onNavigate.mock.calls.map(([command]) => command)).toEqual(["child", "parent", "next-sibling", "previous-sibling"]);
+  });
+
   it("selects the most specific target on click and only opens editing on double click", () => {
     const onSelect = vi.fn();
     const onEditComponent = vi.fn();
@@ -158,6 +182,75 @@ describe("PreviewCanvas direct interactions", () => {
 
     expect(screen.getByTestId("hover-outline")).toHaveClass("border-dashed");
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("highlights the union of a component's hidden internal HTML", async () => {
+    render(
+      <PreviewCanvas
+        compact
+        preview={(
+          <article data-design-space-instance-id="card.one">
+            <header data-design-space-html-id="html:card.one:header">Header</header>
+            <section data-design-space-html-id="html:card.one:body">Body</section>
+          </article>
+        )}
+        highlightedInternalHtmlComponentId="card.one"
+        rootInstanceId="card.one"
+        selectedComponentInstanceId="card.one"
+        selection={{ kind: "component", id: "card.one" }}
+        selectionLabel="Card"
+        slots={[]}
+        onSelect={() => undefined}
+      />,
+    );
+    const canvas = screen.getByRole("main", { name: "Preview canvas" });
+    const [header, body] = [screen.getByText("Header"), screen.getByText("Body")];
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(rect(10, 20, 400, 300));
+    vi.spyOn(header, "getBoundingClientRect").mockReturnValue(rect(50, 70, 160, 30));
+    vi.spyOn(body, "getBoundingClientRect").mockReturnValue(rect(40, 110, 220, 80));
+    fireEvent(window, new Event("resize"));
+    await waitFor(() => expect(screen.getByTestId("internal-html-outline")).toHaveStyle({
+      left: "30px", top: "50px", width: "220px", height: "120px",
+    }));
+  });
+
+  it("previews the element under a mouse pointer without changing selection", async () => {
+    const onSelect = vi.fn();
+    render(
+      <PreviewCanvas
+        compact
+        preview={(
+          <article data-design-space-instance-id="card.one">
+            <button data-design-space-html-id="html:card.one:action">Action</button>
+          </article>
+        )}
+        rootInstanceId="card.one"
+        selectedComponentInstanceId="card.one"
+        selection={{ kind: "component", id: "card.one" }}
+        selectionLabel="Card"
+        slots={[]}
+        onSelect={onSelect}
+      />,
+    );
+    const canvas = screen.getByRole("main", { name: "Preview canvas" });
+    const card = canvas.querySelector<HTMLElement>('[data-design-space-instance-id="card.one"]')!;
+    const action = screen.getByRole("button", { name: "Action" });
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(rect(10, 20, 400, 300));
+    vi.spyOn(card, "getBoundingClientRect").mockReturnValue(rect(42, 68, 220, 120));
+    vi.spyOn(action, "getBoundingClientRect").mockReturnValue(rect(54, 82, 100, 32));
+
+    dispatchPointer(action, "pointermove", "mouse", 1, 70, 90);
+
+    await waitFor(() => expect(screen.getByTestId("hover-outline")).toHaveStyle({
+      left: "44px",
+      top: "62px",
+      width: "100px",
+      height: "32px",
+    }));
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.pointerLeave(canvas);
+    await waitFor(() => expect(screen.queryByTestId("hover-outline")).not.toBeInTheDocument());
   });
 
   it("reports a typed context-menu request for the target under the pointer", () => {

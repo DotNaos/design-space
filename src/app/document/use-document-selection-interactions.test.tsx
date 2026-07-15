@@ -108,6 +108,21 @@ it("inserts an allowed component and hands its new instance to the editor flow",
   expect(onInserted).toHaveBeenCalledWith("created");
 });
 
+it("rejects a forged direct insertion when the slot does not allow the component", () => {
+  const edit = vi.fn();
+  const selection = contentSlot();
+  const { result } = renderHook(() => useDocumentSelectionInteractions({
+    ...options(screenDocument, selection, vi.fn()),
+    edit,
+  }));
+
+  let inserted = true;
+  act(() => { inserted = result.current.insertComponent("button", selection); });
+
+  expect(inserted).toBe(false);
+  expect(edit).not.toHaveBeenCalled();
+});
+
 function options(document: DesignDocument, selection: SelectionTarget, onSelect: (selection: SelectionTarget) => void) {
   return {
     target,
@@ -145,7 +160,7 @@ const target: TargetModule = {
   files: [],
   adapters: [
     {
-      component: { id: "stack", label: "Stack", group: "Layout", slots: [{ id: "content", label: "Content" }] },
+      component: { id: "stack", label: "Stack", group: "Layout", slots: [{ id: "content", label: "Content", accepts: ["text"], acceptsText: false }] },
       render: () => null,
     },
     { component: { id: "text", label: "Text", group: "Content", slots: [] }, render: () => null },

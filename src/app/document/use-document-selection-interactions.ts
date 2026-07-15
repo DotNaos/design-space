@@ -98,7 +98,7 @@ export function useDocumentSelectionInteractions(options: {
     const slot = parentAdapter?.component.slots.find((candidate) => candidate.id === targetSlot.slotId);
     const childAdapter = resolveDocumentAdapter(options.target, options.library, adapterId);
     const children = parent?.slots[targetSlot.slotId] ?? [];
-    if (!parent || !slot || !childAdapter || (slot.accepts && !slot.accepts.includes(adapterId))) return false;
+    if (!parent || !slot || !childAdapter || !slot.accepts?.includes(adapterId)) return false;
     if (!slotHasCapacity(slot, children.length)) return false;
     const instanceId = options.createId();
     options.edit(insertDesignChild(options.document, parent.instanceId, slot.id, {

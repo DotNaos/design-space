@@ -17,9 +17,9 @@ const adapters: ComponentAdapter[] = [
         ] },
       ],
       slots: [
-        { id: "header", label: "Header", min: 0, max: 1 },
-        { id: "body", label: "Body", min: 0, max: 1 },
-        { id: "footer", label: "Footer", min: 0, max: 1 },
+        { id: "header", label: "Header", min: 0, max: 1, accepts: ["heading"], acceptsText: false },
+        { id: "body", label: "Body", min: 0, max: 1, accepts: ["stack", "text"], acceptsText: false },
+        { id: "footer", label: "Footer", min: 0, max: 1, accepts: ["badge", "button"], acceptsText: false },
       ],
     },
     controls: [{ id: "surface", label: "Tailwind classes", kind: "tailwind", prop: "className" }],
@@ -67,11 +67,45 @@ const adapters: ComponentAdapter[] = [
   )),
   {
     component: {
+      id: "app-layout",
+      label: "App layout",
+      group: "Layout",
+      description: "A strict two-region application shell.",
+      slots: [
+        { id: "sidebar", label: "Sidebar", min: 1, max: 1, accepts: ["sidebar"], acceptsText: false },
+        { id: "main", label: "Main", min: 1, max: 1, accepts: ["main"], acceptsText: false },
+      ],
+    },
+    controls: [{ id: "surface", label: "Tailwind classes", kind: "tailwind", prop: "className" }],
+    defaultProps: { className: "grid min-h-96 grid-cols-[14rem_minmax(0,1fr)] overflow-hidden rounded-2xl border border-white/10" },
+    render: (props, context) => (
+      <div {...context.previewAttributes} className={stringProp(props, "className", "")}>
+        <div {...context.slotAttributes.sidebar}>{context.slotChildren.sidebar}</div>
+        <div {...context.slotAttributes.main}>{context.slotChildren.main}</div>
+      </div>
+    ),
+  },
+  slotAdapter(
+    "sidebar",
+    "Sidebar",
+    "Layout",
+    "flex min-h-96 flex-col gap-3 border-r border-white/10 bg-white/[0.03] p-4",
+    { id: "content", label: "Content", accepts: ["heading", "text", "badge", "button"], acceptsText: false },
+  ),
+  slotAdapter(
+    "main",
+    "Main container",
+    "Layout",
+    "flex min-h-96 min-w-0 flex-col gap-4 p-6",
+    { id: "content", label: "Content", accepts: ["heading", "text", "badge", "button", "input", "card", "stack", "panel"], acceptsText: false },
+  ),
+  {
+    component: {
       id: "stack",
       label: "Stack",
       group: "Layout",
       description: "Vertical layout primitive with an explicit content slot.",
-      slots: [{ id: "content", label: "Content" }],
+      slots: [{ id: "content", label: "Content", accepts: ["heading", "text", "badge", "button", "input", "card", "panel"], acceptsText: false }],
     },
     controls: [{ id: "surface", label: "Tailwind classes", kind: "tailwind", prop: "className" }],
     defaultProps: { className: "flex flex-col items-start gap-3" },
@@ -143,6 +177,25 @@ function simpleAdapter(
     ],
     defaultProps,
     render,
+  };
+}
+
+function slotAdapter(
+  id: string,
+  label: string,
+  group: string,
+  className: string,
+  slot: ComponentAdapter["component"]["slots"][number],
+): ComponentAdapter {
+  return {
+    component: { id, label, group, slots: [slot] },
+    controls: [{ id: "surface", label: "Tailwind classes", kind: "tailwind", prop: "className" }],
+    defaultProps: { className },
+    render: (props, context) => (
+      <div {...context.previewAttributes} {...context.slotAttributes[slot.id]} className={stringProp(props, "className", className)}>
+        {context.slotChildren[slot.id]}
+      </div>
+    ),
   };
 }
 

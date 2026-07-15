@@ -71,6 +71,16 @@ export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
     const parentAdapter = parentNode ? resolveDocumentAdapter(options.target, options.library, parentNode.adapterId) : undefined;
     const parentSlot = parentAdapter?.component.slots.find((slot) => slot.id === location?.slotId);
     const slots: SlotState[] = projectPreviewSlots(view.catalog, instance, { contractValidation: "tolerant" }).map((slot) => ({
+      ...(() => {
+        const definition = adapter.component.slots.find((candidate) => candidate.id === slot.selection.slotId);
+        return {
+          min: definition?.min,
+          max: definition?.max,
+          accepts: definition?.accepts,
+          acceptedLabels: definition?.accepts?.map((adapterId) => resolveDocumentAdapter(options.target, options.library, adapterId)?.component.label ?? adapterId),
+          acceptsText: definition?.acceptsText,
+        };
+      })(),
       id: slot.selection.slotId,
       selectionId: slot.selection.id,
       label: slot.label,

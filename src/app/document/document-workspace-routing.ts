@@ -53,6 +53,19 @@ export function createDocumentWorkspaceRouting(options: {
     else options.itemEditor.open(instanceId);
   };
 
+  const navigateWorkspaceTarget = (next: SelectionTarget) => {
+    options.setSelection(next);
+    options.setDefinitionEditor(false);
+    options.setSlotPicker(undefined);
+    const draft = options.itemEditor.model?.session.draft;
+    const instanceId = next.kind === "component"
+      ? next.id
+      : next.kind === "slot" || next.kind === "html"
+        ? next.componentInstanceId
+        : undefined;
+    if (draft && instanceId && findDesignNode(draft.root, instanceId)) options.itemEditor.selectComponent(instanceId);
+  };
+
   const selectCanvasTarget = (next: SelectionTarget) => {
     selectWorkspaceTarget(next);
     if (options.itemEditor.model) return;
@@ -115,5 +128,5 @@ export function createDocumentWorkspaceRouting(options: {
     }
   };
 
-  return { editWorkspaceComponent, onMobilePaneChange, openViolation, selectCanvasTarget, selectWorkspaceTarget };
+  return { editWorkspaceComponent, navigateWorkspaceTarget, onMobilePaneChange, openViolation, selectCanvasTarget, selectWorkspaceTarget };
 }

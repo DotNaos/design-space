@@ -292,7 +292,7 @@ function componentDocument(id: string, label: string, componentId: string, neste
       properties: isPanel
         ? [{ id: "title", label: "Title", prop: "title", kind: "text" }]
         : [],
-      slots: [{ id: "content", label: "Content" }],
+      slots: [{ id: "content", label: "Content", accepts: ["authored.panel", "authored.alpha", "authored.beta"], acceptsText: false }],
     },
     root: {
       instanceId: `${id}.root`,
@@ -310,7 +310,7 @@ async function writeDocument(path: string, document: DesignDocument): Promise<vo
 const target: TargetModule = {
   project: { id: "authored-strict", label: "Authored Strict UI" },
   adapters: [{
-    component: { id: "stack", label: "Stack", group: "Layout", slots: [{ id: "content", label: "Content" }] },
+    component: { id: "stack", label: "Stack", group: "Layout", slots: [{ id: "content", label: "Content", accepts: ["authored.panel", "authored.alpha", "authored.beta"], acceptsText: false }] },
     controls: [{ id: "title", label: "Title", kind: "text", prop: "title" }],
     render: () => null,
   }],

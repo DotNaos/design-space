@@ -40,7 +40,7 @@ export function ComponentWorkshop(props: {
     const slotId = uniqueId(`slot-${sequence}`, new Set(definition.slots.map((slot) => slot.id)));
     props.onChange(addComponentSlot(
       props.document,
-      { id: slotId, label: `Slot ${sequence}`, acceptsText: true },
+      { id: slotId, label: `Slot ${sequence}`, accepts: [], acceptsText: false },
       props.document.root.instanceId,
       props.recipe.rootSlotId,
       () => `${slotId}-outlet`,
@@ -101,7 +101,8 @@ export function ComponentWorkshop(props: {
         ))}
       </WorkshopSection>
 
-      <WorkshopSection title="Properties">
+      <WorkshopSection title="Properties / arguments">
+        <p className="text-[10px] leading-4 text-zinc-600">Define the typed arguments exposed by this component, including defaults, required values, and allowed options.</p>
         <div className="flex flex-wrap gap-1.5">
           {propertyKinds.map((kind) => <Button key={kind} size="sm" variant="secondary" onPress={() => addProperty(kind)}><Plus size={11} />{kind}</Button>)}
         </div>

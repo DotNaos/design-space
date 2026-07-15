@@ -10,6 +10,7 @@ import {
   type StrictUiCanvasTarget,
 } from "../strict-ui/strict-ui-markers";
 import type { Selection, SlotState } from "../types";
+import type { SelectionNavigationCommand } from "../document/selection-navigation";
 import {
   canvasGridPresentation,
   layoutEmptySlotOverlays,
@@ -17,6 +18,7 @@ import {
   placeCanvasOverlayLabels,
   sameSelection,
   selectorForSelection,
+  selectorForInternalHtml,
   selectorForStrictUiTarget,
   strictUiBadgeObstacle,
   type ViewRect,
@@ -42,10 +44,12 @@ type PreviewCanvasProps = {
   slots: readonly SlotState[];
   selection: Selection;
   hoveredSelection?: Selection;
+  highlightedInternalHtmlComponentId?: string;
   cameraKey?: string;
   strictUiViolations?: readonly StrictUiViolation[];
   compact?: boolean;
   onSelect: (selection: Selection) => void;
+  onNavigate?: (command: SelectionNavigationCommand) => void;
   onEditComponent?: (instanceId: string) => void;
   onContextMenuRequest?: (request: CanvasContextMenuRequest) => void;
   onDomSnapshot?: (snapshot: PreviewDomSnapshot) => void;
@@ -63,7 +67,9 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const frame = useRef<number | undefined>(undefined);
   const [camera, setCameraState] = useState(cameraRef.current);
   const [selectionRect, setSelectionRect] = useState<ViewRect>();
+  const [pointerHoveredSelection, setPointerHoveredSelection] = useState<Selection>();
   const [hoveredRect, setHoveredRect] = useState<ViewRect>();
+  const [internalHtmlRect, setInternalHtmlRect] = useState<ViewRect>();
   const [emptyRects, setEmptyRects] = useState<Readonly<Record<string, ViewRect>>>({});
   const [strictUiRects, setStrictUiRects] = useState<readonly MeasuredStrictUiTarget[]>([]);
   const [gridAnchor, setGridAnchor] = useState<Point>();
@@ -127,8 +133,13 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         : { x: rootRect.left, y: rootRect.top });
     } else setGridAnchor((current) => current === undefined ? current : undefined);
     setSelectionRect(measureCanvasSelector(world, selectorForSelection(props.selection), viewportRect));
-    setHoveredRect(props.hoveredSelection && !sameSelection(props.hoveredSelection, props.selection)
-      ? measureCanvasSelector(world, selectorForSelection(props.hoveredSelection), viewportRect)
+    const hoveredSelection = pointerHoveredSelection ?? props.hoveredSelection;
+    setHoveredRect(hoveredSelection && !sameSelection(hoveredSelection, props.selection)
+      ? measureCanvasSelector(world, selectorForSelection(hoveredSelection), viewportRect)
+      : undefined);
+    setInternalHtmlRect(props.highlightedInternalHtmlComponentId
+      ? measureCanvasSelector(world, selectorForInternalHtml(props.highlightedInternalHtmlComponentId), viewportRect)
+        ?? measureCanvasSelector(world, selectorForSelection({ kind: "component", id: props.highlightedInternalHtmlComponentId }), viewportRect)
       : undefined);
     setEmptyRects(Object.fromEntries(props.slots.filter((slot) => slot.count === 0).flatMap((slot) => {
       const rect = measureCanvasSelector(
@@ -142,7 +153,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       const rect = measureCanvasSelector(world, selectorForStrictUiTarget(target), viewportRect);
       return rect ? [{ target, rect }] : [];
     }));
-  }, [props.hoveredSelection, props.onDomSnapshot, props.rootInstanceId, props.selectedComponentInstanceId, props.selection, props.slots, strictUiTargets]);
+  }, [pointerHoveredSelection, props.highlightedInternalHtmlComponentId, props.hoveredSelection, props.onDomSnapshot, props.rootInstanceId, props.selectedComponentInstanceId, props.selection, props.slots, strictUiTargets]);
 
   const scheduleMeasure = useCallback(() => {
     if (frame.current !== undefined) cancelAnimationFrame(frame.current);
@@ -276,7 +287,31 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       event.preventDefault();
       event.stopPropagation();
       props.onSelect(selection);
+      viewportRef.current?.focus({ preventScroll: true });
     }
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (interactionMode !== "select" || event.target !== event.currentTarget || !props.onNavigate) return;
+    const command = event.key === "Enter"
+      ? event.shiftKey ? "parent" : "child"
+      : event.key === "Tab"
+        ? event.shiftKey ? "previous-sibling" : "next-sibling"
+        : undefined;
+    if (!command) return;
+    event.preventDefault();
+    props.onNavigate(command);
+  };
+
+  const onPointerMove = (event: React.PointerEvent<HTMLElement>) => {
+    touchGestures.onPointerMove(event);
+    if (interactionMode !== "select" || event.pointerType !== "mouse") return;
+    const next = selectionForCanvasTarget(
+      event.target instanceof Element ? event.target : undefined,
+      props.slots,
+      props.selectedComponentInstanceId,
+    );
+    setPointerHoveredSelection((current) => sameSelection(current, next) ? current : next);
   };
 
   const onDoubleClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -330,10 +365,13 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       onClickCapture={interactionMode === "select" ? onClick : undefined}
       onContextMenuCapture={interactionMode === "select" ? onContextMenu : undefined}
       onDoubleClickCapture={interactionMode === "select" ? onDoubleClick : undefined}
+      onKeyDown={onKeyDown}
       onPointerCancel={touchGestures.finishPointer}
       onPointerDown={touchGestures.onPointerDown}
-      onPointerMove={touchGestures.onPointerMove}
+      onPointerLeave={() => setPointerHoveredSelection(undefined)}
+      onPointerMove={onPointerMove}
       onPointerUp={touchGestures.finishPointer}
+      tabIndex={interactionMode === "select" ? 0 : -1}
     >
       <div
         className="pointer-events-none absolute inset-0"
@@ -413,6 +451,14 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
             data-testid="hover-outline"
             className="absolute border border-dashed border-sky-300/80 bg-sky-300/[0.025]"
             style={{ left: hoveredRect.left, top: hoveredRect.top, width: hoveredRect.width, height: Math.max(1, hoveredRect.height) }}
+          />
+        )}
+        {internalHtmlRect && (
+          <div
+            aria-hidden="true"
+            data-testid="internal-html-outline"
+            className="absolute border border-dashed border-amber-300/80 bg-amber-300/[0.045] shadow-[inset_0_0_0_1px_rgba(252,211,77,0.08)]"
+            style={{ left: internalHtmlRect.left, top: internalHtmlRect.top, width: internalHtmlRect.width, height: Math.max(1, internalHtmlRect.height) }}
           />
         )}
         {!props.compact && props.slots.filter((slot) => slot.count === 0).map((slot) => {

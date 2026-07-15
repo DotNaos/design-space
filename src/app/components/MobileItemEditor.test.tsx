@@ -119,13 +119,14 @@ describe("mobile item editor", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Gap Tailwind utility/ }));
-    const listbox = screen.getByRole("listbox", { name: "Gap Tailwind utility" });
+    fireEvent.click(screen.getByRole("button", { name: "Size" }));
+    fireEvent.click(screen.getByRole("button", { name: /Width Tailwind utility/ }));
+    const listbox = screen.getByRole("listbox", { name: "Width Tailwind utility" });
     expect(listbox).toBeVisible();
     fireEvent.keyDown(listbox, { key: "Escape", code: "Escape" });
 
     expect(onCancel).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "Edit Stack" })).toBeVisible();
-    expect(screen.queryByRole("listbox", { name: "Gap Tailwind utility" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox", { name: "Width Tailwind utility" })).not.toBeInTheDocument();
   });
 });

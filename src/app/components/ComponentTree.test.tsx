@@ -68,6 +68,7 @@ describe("ComponentTree Strict UI markers", () => {
   it("toggles a component's compact internal HTML control without selecting the component", async () => {
     const onSelect = vi.fn();
     const onHover = vi.fn();
+    const onHoverInternals = vi.fn();
     const onToggleInternals = vi.fn();
     render(
       <ComponentTree
@@ -76,6 +77,7 @@ describe("ComponentTree Strict UI markers", () => {
         selectedId="slot:card.one:body"
         showInternals={false}
         onHover={onHover}
+        onHoverInternals={onHoverInternals}
         onSelect={onSelect}
         onToggleInternals={onToggleInternals}
       />,
@@ -88,9 +90,9 @@ describe("ComponentTree Strict UI markers", () => {
     expect(toggle.className).not.toMatch(/(?:^|:)border(?:-|\s|$)/);
 
     fireEvent.focus(toggle);
-    expect(onHover).toHaveBeenLastCalledWith({ kind: "component", id: "card.one" });
+    expect(onHoverInternals).toHaveBeenLastCalledWith("card.one");
     fireEvent.blur(toggle);
-    expect(onHover).toHaveBeenLastCalledWith(undefined);
+    expect(onHoverInternals).toHaveBeenLastCalledWith(undefined);
 
     await userEvent.click(toggle);
 
@@ -202,6 +204,27 @@ describe("ComponentTree Strict UI markers", () => {
     fireEvent.keyDown(card, { key: "ArrowRight" });
     expect(onToggleInternals).toHaveBeenCalledWith("card.one");
     expect(tree).toContainElement(card);
+  });
+
+  it("collapses descendant branches while keeping the selected path visible", async () => {
+    const user = userEvent.setup();
+    const onCollapseAll = vi.fn();
+    render(
+      <ComponentTree
+        pageLabel="Dashboard"
+        rows={rows}
+        selectedId="card.one"
+        showInternals={false}
+        onCollapseAll={onCollapseAll}
+        onSelect={vi.fn()}
+        onToggleInternals={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("treeitem", { name: /Body outlet/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Collapse all tree branches" }));
+    expect(screen.queryByRole("treeitem", { name: /Body outlet/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: "Card" })).toHaveAttribute("aria-selected", "true");
+    expect(onCollapseAll).toHaveBeenCalledOnce();
   });
 });
 

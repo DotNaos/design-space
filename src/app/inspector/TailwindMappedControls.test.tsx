@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -91,10 +91,8 @@ describe("TailwindMappedControls", () => {
     const onChange = vi.fn();
     render(<TailwindMappedControls value="flex p-[18px] sm:p-8 text-sm" onChange={onChange} />);
 
-    const trigger = screen.getByRole("button", { name: /Padding Tailwind utility/ });
-    expect(trigger).toHaveTextContent("Custom · p-[18px]");
-    await user.click(trigger);
-    await user.click(screen.getByRole("option", { name: "24 px" }));
+    expect(screen.getByText("Custom · p-[18px]")).toBeInTheDocument();
+    moveSlider("Padding", 7);
 
     expect(onChange).toHaveBeenCalledWith("flex p-6 sm:p-8 text-sm");
   });
@@ -104,13 +102,11 @@ describe("TailwindMappedControls", () => {
     const onChange = vi.fn();
     render(<TailwindMappedControls value="gap-4 gap-x-2 gap-y-3 p-4 px-8 py-2" onChange={onChange} />);
 
-    await user.click(screen.getByRole("button", { name: /Gap Tailwind utility/ }));
-    await user.click(screen.getByRole("option", { name: "24 px" }));
+    moveSlider("Gap", 7);
     expect(onChange).toHaveBeenCalledWith("gap-6 gap-x-2 gap-y-3 p-4 px-8 py-2");
 
     onChange.mockClear();
-    await user.click(screen.getByRole("button", { name: /Padding X Tailwind utility/ }));
-    await user.click(screen.getByRole("option", { name: "12 px" }));
+    moveSlider("Padding X", 4);
     expect(onChange).toHaveBeenCalledWith("gap-4 gap-x-2 gap-y-3 p-4 px-3 py-2");
   });
 
@@ -120,10 +116,8 @@ describe("TailwindMappedControls", () => {
     render(<TailwindMappedControls value="rounded-t-lg rounded-[18px] border-white/10" onChange={onChange} />);
 
     await user.click(screen.getByRole("button", { name: "Appearance" }));
-    const trigger = screen.getByRole("button", { name: /Radius Tailwind utility/ });
-    expect(trigger).toHaveTextContent("Custom · rounded-[18px]");
-    await user.click(trigger);
-    await user.click(screen.getByRole("option", { name: "Medium" }));
+    expect(screen.getByText("Custom · rounded-[18px]")).toBeInTheDocument();
+    moveSlider("Radius", 4);
 
     expect(onChange).toHaveBeenCalledWith("rounded-t-lg rounded-md border-white/10");
   });
@@ -134,8 +128,7 @@ describe("TailwindMappedControls", () => {
     render(<TailwindMappedControls value="shadow-lg shadow-[#50d71e] border-white/10" onChange={onChange} />);
 
     await user.click(screen.getByRole("button", { name: "Appearance" }));
-    await user.click(screen.getByRole("button", { name: /Shadow Tailwind utility/ }));
-    await user.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Medium" }));
+    moveSlider("Shadow", 4);
 
     expect(onChange).toHaveBeenCalledWith("shadow-md shadow-[#50d71e] border-white/10");
   });
@@ -148,10 +141,14 @@ describe("TailwindMappedControls", () => {
       render(<TailwindMappedControls value={`${customShadow} shadow-[#50d71e]`} onChange={onChange} />);
 
       await user.click(screen.getByRole("button", { name: "Appearance" }));
-      await user.click(screen.getByRole("button", { name: /Shadow Tailwind utility/ }));
-      await user.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Medium" }));
+      moveSlider("Shadow", 4);
 
       expect(onChange).toHaveBeenCalledWith("shadow-md shadow-[#50d71e]");
     },
   );
 });
+
+function moveSlider(name: string, index: number) {
+  const slider = screen.getByRole("slider", { name });
+  fireEvent.change(slider, { target: { value: String(index) } });
+}

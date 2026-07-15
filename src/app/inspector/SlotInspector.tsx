@@ -20,7 +20,7 @@ export function SlotInspector(props: {
     ? props.slot.acceptedLabels.join(", ")
     : props.slot.accepts?.length
       ? props.slot.accepts.join(", ")
-      : "Any registered component";
+      : "No component types";
   return (
     <aside aria-label={`${props.slot.label} slot inspector`} className={`${props.className ?? "flex"} min-h-0 min-w-0 flex-col overflow-y-auto bg-[#141518]`}>
       <header className="border-b border-white/10 px-4 py-3">

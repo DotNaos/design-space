@@ -1,5 +1,5 @@
 import { Button } from "@heroui/react";
-import { Check, Trash2 } from "lucide-react";
+import { Check, List, Square, Trash2 } from "lucide-react";
 
 import type { ComponentSlotDraft } from "../../shared/design-document";
 import {
@@ -25,9 +25,9 @@ export interface ComponentSlotEditorProps {
 
 export function ComponentSlotEditor(props: ComponentSlotEditorProps) {
   const { slot } = props;
-  const acceptsAnyComponent = slot.accepts === undefined;
   const accepted = new Set(slot.accepts ?? []);
   const rangeInvalid = slot.min !== undefined && slot.max !== undefined && slot.min > slot.max;
+  const singleChild = slot.max === 1;
 
   const setOptionalNumber = (key: "min" | "max", value: number | undefined) => {
     if (value === undefined) {
@@ -44,15 +44,6 @@ export function ComponentSlotEditor(props: ComponentSlotEditorProps) {
       return;
     }
     props.onChange({ ...slot, [key]: value });
-  };
-
-  const setAcceptanceMode = (mode: "any" | "selected") => {
-    if (mode === "any") {
-      const { accepts: _removed, ...next } = slot;
-      props.onChange(next);
-      return;
-    }
-    props.onChange({ ...slot, accepts: slot.accepts ?? [] });
   };
 
   const toggleAcceptedComponent = (componentId: string) => {
@@ -75,6 +66,34 @@ export function ComponentSlotEditor(props: ComponentSlotEditorProps) {
       {props.removeBlockedReason ? <p className="text-[10px] leading-4 text-amber-200/80">{props.removeBlockedReason}</p> : null}
 
       <ContractTextInput label="Slot label" value={slot.label} onChange={(label) => props.onChange({ ...slot, label })} />
+
+      <fieldset>
+        <legend className="text-[10px] text-zinc-500">Child collection</legend>
+        <div className="mt-1 grid grid-cols-2 gap-1 rounded-lg border border-white/5 bg-black/10 p-1">
+          <Button
+            aria-pressed={singleChild}
+            className="min-h-10"
+            size="sm"
+            variant={singleChild ? "secondary" : "ghost"}
+            onPress={() => props.onChange({ ...slot, min: Math.min(slot.min ?? 0, 1), max: 1 })}
+          >
+            <Square aria-hidden size={13} /> Single
+          </Button>
+          <Button
+            aria-pressed={!singleChild}
+            className="min-h-10"
+            size="sm"
+            variant={!singleChild ? "secondary" : "ghost"}
+            onPress={() => {
+              const { max: _removed, ...listSlot } = slot;
+              props.onChange(listSlot);
+            }}
+          >
+            <List aria-hidden size={13} /> List
+          </Button>
+        </div>
+        <p className="mt-1 text-[9px] leading-4 text-zinc-600">List slots keep ordered children and may use minimum and maximum limits.</p>
+      </fieldset>
 
       <div className="grid grid-cols-2 gap-2">
         <OptionalNumberInput
@@ -99,35 +118,14 @@ export function ComponentSlotEditor(props: ComponentSlotEditorProps) {
       <ContractSwitch
         description="Allow plain text as a direct child of this slot."
         label="Accept text children"
-        selected={slot.acceptsText !== false}
+        selected={slot.acceptsText === true}
         onChange={(acceptsText) => props.onChange({ ...slot, acceptsText })}
       />
 
       <fieldset>
         <legend className="text-[10px] text-zinc-500">Accepted components</legend>
-        <div className="mt-1 grid grid-cols-2 gap-1 rounded-lg border border-white/5 bg-black/10 p-1">
-          <Button
-            aria-pressed={acceptsAnyComponent}
-            className="min-h-10"
-            size="sm"
-            variant={acceptsAnyComponent ? "secondary" : "ghost"}
-            onPress={() => setAcceptanceMode("any")}
-          >
-            Any component
-          </Button>
-          <Button
-            aria-pressed={!acceptsAnyComponent}
-            className="min-h-10"
-            size="sm"
-            variant={!acceptsAnyComponent ? "secondary" : "ghost"}
-            onPress={() => setAcceptanceMode("selected")}
-          >
-            Selected only
-          </Button>
-        </div>
-
-        {!acceptsAnyComponent ? (
-          <div aria-label="Allowed catalog components" className="mt-2 space-y-1">
+        <p className="mt-1 text-[9px] leading-4 text-zinc-600">Strict UI allows only the checked component types. An empty list rejects component children.</p>
+        <div aria-label="Allowed catalog components" className="mt-2 space-y-1">
             {props.catalogComponents.length ? props.catalogComponents.map((component) => {
               const selected = accepted.has(component.id);
               return (
@@ -152,8 +150,7 @@ export function ComponentSlotEditor(props: ComponentSlotEditorProps) {
             <p className="px-2 pt-1 text-[9px] leading-4 text-zinc-600">
               {accepted.size === 0 ? "No components are accepted; text may still be allowed." : `${accepted.size} component ${accepted.size === 1 ? "type" : "types"} accepted.`}
             </p>
-          </div>
-        ) : null}
+        </div>
       </fieldset>
     </section>
   );

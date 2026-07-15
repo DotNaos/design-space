@@ -9,6 +9,7 @@ import { PreviewCanvas } from "../components/PreviewCanvas";
 import type { CatalogEntry } from "../components/CatalogPanel";
 import { SlotCatalogPanel } from "../components/SlotCatalogPanel";
 import type { DocumentAdapterView } from "../document/document-adapters";
+import type { SelectionNavigationCommand } from "../document/selection-navigation";
 import type { MobilePane } from "../shell/MobileDock";
 import type { SlotState } from "../types";
 import { EmptyModeState } from "./EmptyModeState";
@@ -41,6 +42,7 @@ export function DocumentWorkspacePanels(props: {
   rows: readonly ComponentTreeRow[];
   selection: SelectionTarget;
   hoveredSelection?: SelectionTarget;
+  highlightedInternalHtmlComponentId?: string;
   showInternals: boolean;
   insertMode: boolean;
   strictUiViolations: readonly StrictUiViolation[];
@@ -69,6 +71,9 @@ export function DocumentWorkspacePanels(props: {
   onSelect: (selection: SelectionTarget) => void;
   onCanvasSelect?: (selection: SelectionTarget) => void;
   onHover: (selection: SelectionTarget | undefined) => void;
+  onHoverInternals: (componentInstanceId: string | undefined) => void;
+  onNavigate: (command: SelectionNavigationCommand) => void;
+  onCollapseAll: () => void;
   onToggleInsert: () => void;
   onToggleInternals: (componentInstanceId?: string) => void;
   onOpenSlot: (slot: SlotSelection) => void;
@@ -119,6 +124,7 @@ export function DocumentWorkspacePanels(props: {
       toggleHint={props.documentKind === "component" ? "Public slots stay visible while internals collapse" : undefined}
       strictUiViolations={props.strictUiViolations}
       onHover={props.onHover}
+      onHoverInternals={props.onHoverInternals}
       onContextMenuRequest={(selection, position) => props.onContextMenu({
         selection,
         clientPosition: position,
@@ -126,6 +132,7 @@ export function DocumentWorkspacePanels(props: {
       })}
       onInsert={props.onToggleInsert}
       onSelect={props.onSelect}
+      onCollapseAll={props.onCollapseAll}
       onToggleInternals={props.onToggleInternals}
     />
   ) : empty;
@@ -140,11 +147,13 @@ export function DocumentWorkspacePanels(props: {
         selectionLabel={props.canvasSelectionLabel}
         slots={props.canvasSlots}
         hoveredSelection={props.hoveredSelection}
+        highlightedInternalHtmlComponentId={props.highlightedInternalHtmlComponentId}
         strictUiViolations={props.strictUiViolations}
         onContextMenuRequest={props.onContextMenu}
         onEditComponent={props.onEditComponent}
         onDomSnapshot={props.onDomSnapshot}
         onSelect={props.onCanvasSelect ?? props.onSelect}
+        onNavigate={props.onNavigate}
       />
       {props.actionMessage && (
         <p aria-live="polite" className="pointer-events-none absolute bottom-3 left-3 z-30 max-w-[min(28rem,calc(100%-1.5rem))] rounded-lg border border-amber-400/20 bg-[#17181b]/95 px-3 py-2 text-[10px] leading-4 text-amber-100 shadow-xl">
