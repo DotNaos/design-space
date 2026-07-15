@@ -1,3 +1,4 @@
+import { ToggleButton } from "@heroui/react";
 import { Boxes, FileCode2, Layers3, Search, SlidersHorizontal } from "lucide-react";
 
 export type WorkspaceMode = "tree" | "files" | "catalog" | "search" | "inspector";
@@ -16,17 +17,21 @@ export function ActivityRail(props: { active: WorkspaceMode; onChange: (mode: Wo
       {actions.map(({ label, mode, icon: Icon, narrowOnly }) => {
         const active = props.active === mode;
         return (
-        <button
-          key={label}
-          aria-label={label}
-          className={`relative size-9 place-items-center rounded-lg transition-colors ${narrowOnly ? "grid xl:hidden" : "grid"} ${active ? "bg-white/10 text-zinc-100" : "text-zinc-600 hover:bg-white/5 hover:text-zinc-300"}`}
-          type="button"
-          onClick={() => props.onChange(mode)}
-        >
-          {active && <span className="absolute -left-1.5 h-5 w-0.5 rounded-full bg-sky-400" />}
-          <Icon size={17} />
-        </button>
-      );})}
+          <ToggleButton
+            key={label}
+            isIconOnly
+            aria-label={label}
+            className={`relative size-9 min-w-9 place-items-center rounded-lg transition-colors ${narrowOnly ? "grid xl:hidden" : "grid"} ${active ? "bg-white/10 text-zinc-100" : "text-zinc-600 hover:bg-white/5 hover:text-zinc-300"}`}
+            isSelected={active}
+            size="sm"
+            variant="ghost"
+            onChange={(selected) => { if (selected) props.onChange(mode); }}
+          >
+            {active && <span className="absolute -left-1.5 h-5 w-0.5 rounded-full bg-sky-400" />}
+            <Icon size={17} />
+          </ToggleButton>
+        );
+      })}
     </nav>
   );
 }

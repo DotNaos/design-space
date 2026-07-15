@@ -1,3 +1,4 @@
+import { Button } from "@heroui/react";
 import { Boxes, Files, LayoutGrid } from "lucide-react";
 
 import type { TargetDocumentEntry, TargetFileEntry } from "../../shared/target-module";
@@ -43,17 +44,17 @@ export function WorkspaceBrowser(props: WorkspaceBrowserProps) {
       {props.showViewNavigation !== false && (
         <nav aria-label="Project browser views" className="grid h-12 shrink-0 grid-cols-3 border-b border-white/10 p-1">
           {views.map(({ id, label, shortLabel, icon: Icon }) => (
-            <button
+            <Button
               key={id}
               aria-current={props.view === id ? "page" : undefined}
               aria-label={label}
               className={`flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-[10px] transition-colors ${props.view === id ? "bg-white/10 text-zinc-100" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}
-              type="button"
-              onClick={() => props.onViewChange(id)}
+              variant="ghost"
+              onPress={() => props.onViewChange(id)}
             >
               <Icon aria-hidden="true" size={13} />
               <span className="truncate">{shortLabel}</span>
-            </button>
+            </Button>
           ))}
         </nav>
       )}

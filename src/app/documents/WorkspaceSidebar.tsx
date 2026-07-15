@@ -99,16 +99,17 @@ export function WorkspaceSidebar(props: {
                 {pages.map((entry) => {
                   const active = entry.id === props.activeDocumentId;
                   return (
-                    <button
+                    <Button
                       key={entry.id}
                       aria-current={active ? "page" : undefined}
+                      fullWidth
                       className={`flex min-h-9 w-full items-center gap-2 rounded-md px-3 text-left text-xs transition-colors ${active ? "bg-white/[0.09] text-zinc-100" : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"}`}
-                      type="button"
-                      onClick={() => props.onDocumentSelect(entry.id)}
+                      variant="ghost"
+                      onPress={() => props.onDocumentSelect(entry.id)}
                     >
                       {entry.kind === "screen" ? <Smartphone aria-hidden="true" size={13} /> : <Component aria-hidden="true" size={13} />}
                       <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-                    </button>
+                    </Button>
                   );
                 })}
                 {!pages.length && (

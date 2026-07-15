@@ -1,4 +1,4 @@
-import { Tabs } from "@heroui/react";
+import { Button, Tabs, Tooltip } from "@heroui/react";
 import { Braces, ChevronDown, CircleDot, LayoutPanelTop, Plus, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -68,8 +68,8 @@ export function ItemEditorTools(props: {
         style={desktop ? undefined : { gridTemplateColumns: `repeat(${tools.length}, minmax(0, 1fr))` }}
       >
         {tools.map((tool) => (
+          <Tooltip key={tool.id} delay={350} isDisabled={!desktop}>
           <Tabs.Tab
-            key={tool.id}
             id={tool.id}
             aria-label={tool.label}
             className={desktop
@@ -80,16 +80,13 @@ export function ItemEditorTools(props: {
           >
             {tool.icon}
             {!desktop && <span className="truncate">{tool.label}</span>}
-            {desktop && (
-              <span className="pointer-events-none absolute left-[calc(100%+0.625rem)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[9px] font-medium text-zinc-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                {tool.label}
-              </span>
-            )}
             <span
               aria-hidden="true"
               className={`${desktop ? "absolute -right-1.5 h-5 w-0.5 rounded-l-full" : "absolute inset-x-3 bottom-0 h-0.5 rounded-t-full"} bg-sky-400 opacity-0 group-data-[selected]:opacity-100`}
             />
           </Tabs.Tab>
+          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[9px] font-medium text-zinc-200 shadow-xl" placement="right">{tool.label}</Tooltip.Content>
+          </Tooltip>
         ))}
       </Tabs.List>
 
@@ -137,13 +134,13 @@ export function ItemEditorTools(props: {
                 : slot.acceptedLabels?.length ? `Accepts ${slot.acceptedLabels.join(", ")}` : "Ready for content";
               const status = slot.count ? `${slot.count}${slot.max ? ` / ${slot.max}` : ""} used` : "Empty";
               return (
-                <button
+                <Button
                   key={slot.id}
                   aria-label={`${slot.label} slot, ${slot.count ? `${slot.count} used` : "empty"}`}
-                  className="group flex min-h-14 w-full items-center gap-3 border-t border-white/10 px-4 text-left first:border-t-0 enabled:hover:bg-white/[0.025] disabled:cursor-default"
-                  disabled={!props.onSelectSlot}
-                  type="button"
-                  onClick={() => props.onSelectSlot?.(slot)}
+                  className="group flex min-h-14 w-full items-center justify-start gap-3 rounded-none border-t border-white/10 px-4 text-left first:border-t-0 hover:bg-white/[0.025]"
+                  isDisabled={!props.onSelectSlot}
+                  variant="ghost"
+                  onPress={() => props.onSelectSlot?.(slot)}
                 >
                   <CircleDot size={14} className={slot.count ? "text-emerald-400" : "text-zinc-600"} />
                   <span className="min-w-0 flex-1">
@@ -155,7 +152,7 @@ export function ItemEditorTools(props: {
                   </span>
                   <span className={`shrink-0 text-[9px] ${slot.count ? "text-emerald-400" : "text-zinc-600"}`}>{status}</span>
                   {!slot.count && !full && <Plus size={14} className="text-sky-300" />}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -201,9 +198,12 @@ function ToolHeading(props: { title: string; description: string; strictUi?: boo
         <span className="mt-0.5 block truncate text-[9px] text-zinc-600">{props.description}</span>
       </span>
       {props.strictUi && (
-        <span className="flex shrink-0 items-center gap-1 text-[9px] text-emerald-400/80" title="Strict UI exposes only controls that map deterministically to Tailwind CSS">
-          <ShieldCheck size={12} /> Strict UI
-        </span>
+        <Tooltip delay={350}>
+          <span className="flex shrink-0 items-center gap-1 text-[9px] text-emerald-400/80">
+            <ShieldCheck size={12} /> Strict UI
+          </span>
+          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[9px] text-zinc-200 shadow-xl">Only controls that map deterministically to Tailwind CSS</Tooltip.Content>
+        </Tooltip>
       )}
     </div>
   );
@@ -233,15 +233,15 @@ function PropertyGroup(props: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
     <section className="border-b border-white/10">
-      <button
+      <Button
         aria-expanded={open}
-        className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-[10px] font-medium text-zinc-400 hover:bg-white/[0.02]"
-        type="button"
-        onClick={() => setOpen((value) => !value)}
+        className="flex min-h-11 w-full items-center justify-start gap-2 rounded-none px-4 text-left text-[10px] font-medium text-zinc-400 hover:bg-white/[0.02]"
+        variant="ghost"
+        onPress={() => setOpen((value) => !value)}
       >
         <span className="flex-1">{props.title}</span>
         <ChevronDown size={13} className={`text-zinc-600 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
+      </Button>
       {open && <div className="space-y-4 px-4 pb-4">{props.children}</div>}
     </section>
   );

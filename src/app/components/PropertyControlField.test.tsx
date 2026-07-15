@@ -42,8 +42,9 @@ describe("PropertyControlField", () => {
         onChange={onChange}
       />,
     );
-    const input = screen.getByRole("spinbutton", { name: "Columns" });
-    expect(input).toHaveValue(null);
+    const input = screen.getByRole("textbox", { name: "Columns" });
+    expect(input).toHaveAttribute("aria-roledescription", "Number field");
+    expect(input).toHaveValue("");
     fireEvent.change(input, { target: { value: "3" } });
     expect(onChange).toHaveBeenLastCalledWith(3);
     rerender(
@@ -66,7 +67,7 @@ describe("PropertyControlField", () => {
         onChange={onChange}
       />,
     );
-    const input = screen.getByRole("spinbutton", { name: "Columns" });
+    const input = screen.getByRole("textbox", { name: "Columns" });
     Object.defineProperty(input, "value", { configurable: true, value: "1e999", writable: true });
 
     expect(() => fireEvent.change(input)).not.toThrow();
@@ -83,7 +84,7 @@ describe("PropertyControlField", () => {
       />,
     );
 
-    expect(() => fireEvent.click(screen.getByRole("button", { name: "Increase Scale" }))).not.toThrow();
+    expect(() => fireEvent.click(screen.getByRole("button", { name: /Increase Scale/ }))).not.toThrow();
     expect(onChange).not.toHaveBeenCalled();
   });
 });

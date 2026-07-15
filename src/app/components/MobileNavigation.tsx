@@ -1,3 +1,4 @@
+import { ToggleButton } from "@heroui/react";
 import { Boxes, Eye, FileCode2, Layers3, SlidersHorizontal } from "lucide-react";
 
 export type MobileWorkspaceMode = "preview" | "tree" | "catalog" | "files" | "inspector";
@@ -19,17 +20,19 @@ export function MobileNavigation(props: {
       {actions.map(({ label, mode, icon: Icon }) => {
         const active = props.active === mode;
         return (
-          <button
+          <ToggleButton
             key={mode}
             aria-current={active ? "page" : undefined}
-            className={`relative flex min-w-0 flex-col items-center justify-center gap-1 text-[9px] transition-colors ${active ? "text-sky-300" : "text-zinc-500"}`}
-            type="button"
-            onClick={() => props.onChange(mode)}
+            aria-label={label}
+            className={`relative flex h-full min-w-0 flex-col items-center justify-center gap-1 rounded-none px-0 text-[9px] transition-colors ${active ? "text-sky-300" : "text-zinc-500"}`}
+            isSelected={active}
+            variant="ghost"
+            onChange={(selected) => { if (selected) props.onChange(mode); }}
           >
             {active && <span className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-sky-400" />}
             <Icon size={17} strokeWidth={active ? 2.2 : 1.8} />
             <span className="truncate">{label}</span>
-          </button>
+          </ToggleButton>
         );
       })}
     </nav>

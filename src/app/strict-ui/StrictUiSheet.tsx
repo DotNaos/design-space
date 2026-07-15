@@ -74,11 +74,11 @@ export function StrictUiSheet(props: {
               </div>
             )}
             {violations.map((violation, index) => (
-              <button
+              <Button
                 key={`${violation.ruleId}-${index}`}
-                className="flex min-h-16 w-full items-start gap-3 border-b border-white/5 px-4 py-3 text-left hover:bg-white/[0.03]"
-                type="button"
-                onClick={() => props.onSelect(violation)}
+                className="flex min-h-16 w-full items-start justify-start gap-3 rounded-none border-b border-white/5 px-4 py-3 text-left hover:bg-white/[0.03]"
+                variant="ghost"
+                onPress={() => props.onSelect(violation)}
               >
                 {violation.severity === "error" ? (
                   <AlertTriangle className="mt-0.5 shrink-0 text-rose-400" size={15} />
@@ -92,7 +92,7 @@ export function StrictUiSheet(props: {
                   <span className="mt-1 block text-[9px] text-zinc-600">{violation.ruleId}</span>
                 </span>
                 <ChevronRight className="mt-1 text-zinc-700" size={13} />
-              </button>
+              </Button>
             ))}
           </Modal.Body>
           <Modal.Footer className="border-t border-white/10 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">

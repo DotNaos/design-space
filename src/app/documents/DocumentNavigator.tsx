@@ -43,17 +43,18 @@ export function DocumentNavigator(props: {
         {entries.map((entry) => {
           const active = entry.id === props.activeDocumentId;
           return (
-            <button
+            <Button
               key={entry.id}
               aria-current={active ? "page" : undefined}
+              fullWidth
               className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-3 text-left text-xs lg:min-h-9 ${active ? "border-sky-400 bg-sky-500/10 text-zinc-100" : "border-transparent text-zinc-400 hover:bg-white/[0.03]"}`}
-              type="button"
-              onClick={() => props.onSelect(entry.id)}
+              variant="ghost"
+              onPress={() => props.onSelect(entry.id)}
             >
               {entry.kind === "screen" ? <Smartphone size={13} /> : <Boxes size={13} />}
               <span className="min-w-0 flex-1 truncate">{entry.label}</span>
               <ChevronRight size={12} className="text-zinc-700" />
-            </button>
+            </Button>
           );
         })}
         {!entries.length && <p className="px-3 py-5 text-xs leading-5 text-zinc-600">{normalizedQuery ? `No ${expectedKind}s match “${query.trim()}”.` : `No ${expectedKind}s are registered yet.`}</p>}

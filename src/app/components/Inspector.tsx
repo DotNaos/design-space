@@ -1,4 +1,4 @@
-import { Button, Input, Label, TextField } from "@heroui/react";
+import { Button, Input, Label, ListBox, TextField } from "@heroui/react";
 import { ChevronDown, CircleDot, Plus } from "lucide-react";
 import type { Selection, SlotState } from "../types";
 
@@ -31,16 +31,25 @@ export function Inspector(props: InspectorProps) {
 
       <InspectorSection title="Children" open>
         <p className="mb-2 text-[10px] leading-4 text-zinc-500">Direct children: declared slots only</p>
-        <div className="divide-y divide-white/5 border-y border-white/5">
+        <ListBox
+          aria-label="Component slots"
+          className="divide-y divide-white/5 border-y border-white/5 p-0"
+          selectedKeys={selectedSlotId ? [selectedSlotId] : []}
+          selectionMode="single"
+          onAction={(key) => {
+            const slot = props.slots.find((candidate) => candidate.id === String(key));
+            if (slot) props.onSelectSlot(slot);
+          }}
+        >
           {props.slots.map((slot) => (
-            <button key={slot.id} aria-selected={selectedSlotId === slot.id} className="flex min-h-11 w-full items-center gap-2 py-2 text-left" type="button" onClick={() => props.onSelectSlot(slot)}>
+            <ListBox.Item key={slot.id} id={slot.id} textValue={slot.label} className="flex min-h-11 w-full items-center gap-2 rounded-none py-2 text-left">
               <CircleDot size={11} className={slot.count ? "text-emerald-400" : "text-zinc-600"} />
               <span className="flex-1 text-xs text-zinc-300">{slot.label}</span>
               <span className="text-[10px] text-zinc-600">{slot.count} item{slot.count === 1 ? "" : "s"}</span>
               <span className={`rounded px-1.5 py-0.5 text-[9px] ${slot.count ? "bg-emerald-400/10 text-emerald-400" : "bg-white/5 text-zinc-500"}`}>{slot.count ? "Used" : "Empty"}</span>
-            </button>
+            </ListBox.Item>
           ))}
-        </div>
+        </ListBox>
         {selectedSlot?.count === 0 && (
           <Button className="mt-3 w-full" size="sm" variant="secondary" onPress={() => props.onAddToSlot(selectedSlot)}>
             <Plus size={13} /> Add to {selectedSlot.label}

@@ -1,3 +1,5 @@
+import { Button } from "@heroui/react";
+
 export function workspaceStatusText(phase: string | undefined, dirty: boolean): string {
   if (phase === "stale") return "Source changed outside Design Space · Reset reloads the registered document";
   if (phase === "strict-blocked") return "Strict UI blocked this revision · open findings to continue";
@@ -15,7 +17,7 @@ export function workspaceStatusTone(phase: string | undefined, connected: boolea
 }
 
 export function InspectorPrompt({ className, onEdit }: { className?: string; onEdit: () => void }) {
-  return <aside className={`${className ?? "grid w-80"} min-h-0 min-w-0 shrink-0 place-items-center border-l border-white/10 bg-[#141518] px-6 text-center`}><button className="text-xs text-zinc-500 hover:text-zinc-200" type="button" onClick={onEdit}>Edit selected item</button></aside>;
+  return <aside className={`${className ?? "grid w-80"} min-h-0 min-w-0 shrink-0 place-items-center border-l border-white/10 bg-[#141518] px-6 text-center`}><Button className="text-xs text-zinc-500 hover:text-zinc-200" variant="ghost" onPress={onEdit}>Edit selected item</Button></aside>;
 }
 
 export function NoSelectionPrompt({ className }: { className?: string }) {

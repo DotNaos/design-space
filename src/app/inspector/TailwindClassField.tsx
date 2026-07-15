@@ -1,3 +1,4 @@
+import { Input, Label, ListBox, TextField } from "@heroui/react";
 import { AlertCircle, Check, LoaderCircle, WandSparkles } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -75,40 +76,41 @@ export function TailwindClassField(props: {
 
   return (
     <div className="relative">
-      <label className="block">
+      <TextField
+        fullWidth
+        isDisabled={props.disabled}
+        value={props.value}
+        onChange={(next) => {
+          markFocused();
+          setCursor(inputRef.current?.selectionStart ?? next.length);
+          setUnavailable(false);
+          props.onChange(next);
+        }}
+      >
         <span className="flex items-center justify-between gap-2 text-[10px] text-zinc-500">
-          <span>{props.label ?? "Tailwind classes"}</span>
+          <Label>{props.label ?? "Tailwind classes"}</Label>
           <span className="flex items-center gap-1 text-[9px] text-zinc-700">
             {loading ? <LoaderCircle className="animate-spin" size={10} /> : unavailable ? <AlertCircle size={10} /> : result ? <Check size={10} /> : <WandSparkles size={10} />}
             {unavailable ? "Compile checks only" : "IntelliSense"}
           </span>
         </span>
-        <input
+        <Input
           ref={inputRef}
           aria-autocomplete="list"
           aria-controls={open ? listboxId : undefined}
           aria-expanded={open}
           aria-label={props.label ?? "Tailwind classes"}
-          aria-activedescendant={open ? `${listboxId}-${activeIndex}` : undefined}
           autoCapitalize="none"
           autoComplete="off"
           autoCorrect="off"
           className={`mt-1 min-h-11 w-full rounded-lg border bg-black/20 px-3 font-mono text-base text-zinc-100 outline-none lg:text-xs ${diagnostic ? "border-rose-400/60 focus:border-rose-300" : "border-white/10 focus:border-sky-400"}`}
-          disabled={props.disabled}
           role="combobox"
           spellCheck={false}
-          value={props.value}
           onBlur={() => {
             blurTimer.current = window.setTimeout(() => {
               blurTimer.current = undefined;
               setFocused(false);
             }, 100);
-          }}
-          onChange={(event) => {
-            markFocused();
-            setCursor(event.currentTarget.selectionStart ?? event.currentTarget.value.length);
-            setUnavailable(false);
-            props.onChange(event.currentTarget.value);
           }}
           onClick={(event) => {
             markFocused();
@@ -134,26 +136,29 @@ export function TailwindClassField(props: {
           }}
           onSelect={(event) => setCursor(event.currentTarget.selectionStart ?? props.value.length)}
         />
-      </label>
+      </TextField>
 
       {open && (
-        <div id={listboxId} aria-label="Tailwind suggestions" className="absolute inset-x-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-lg border border-white/10 bg-[#1a1b1e] p-1 shadow-2xl" role="listbox">
+        <ListBox
+          id={listboxId}
+          aria-label="Tailwind suggestions"
+          className="absolute inset-x-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-lg border border-white/10 bg-[#1a1b1e] p-1 shadow-2xl"
+          selectedKeys={[String(activeIndex)]}
+          selectionMode="single"
+          onAction={(key) => accept(completions[Number(key)])}
+        >
           {completions.map((completion, index) => (
-            <button
+            <ListBox.Item
               key={`${completion.label}:${completion.insertText}:${index}`}
-              id={`${listboxId}-${index}`}
-              aria-selected={index === activeIndex}
-              className={`flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left ${index === activeIndex ? "bg-sky-500/10 text-sky-100" : "text-zinc-300 hover:bg-white/5"}`}
-              role="option"
-              type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => accept(completion)}
+              id={String(index)}
+              className={`flex min-h-10 w-full items-center justify-start gap-2 rounded-md px-2 text-left ${index === activeIndex ? "bg-sky-500/10 text-sky-100" : "text-zinc-300 hover:bg-white/5"}`}
+              textValue={completion.label}
             >
               <span className="min-w-0 flex-1 truncate font-mono text-xs">{completion.label}</span>
               {completion.detail && <span className="max-w-36 truncate text-[9px] text-zinc-600">{completion.detail}</span>}
-            </button>
+            </ListBox.Item>
           ))}
-        </div>
+        </ListBox>
       )}
 
       <p aria-live="polite" className={`mt-1 min-h-4 text-[9px] leading-4 ${diagnostic ? "text-rose-300" : "text-zinc-700"}`}>

@@ -1,4 +1,4 @@
-import { Button, Label, Slider, Tooltip } from "@heroui/react";
+import { Button, Label, Slider, ToggleButton, Tooltip } from "@heroui/react";
 import {
   AlignCenterVertical,
   AlignEndVertical,
@@ -230,17 +230,17 @@ function SegmentButton(props: { active: boolean; icon: LucideIcon; label: string
   const Icon = props.icon;
   return (
     <Tooltip delay={350} closeDelay={80}>
-      <Button
+      <ToggleButton
         isIconOnly
         aria-label={props.label}
-        aria-pressed={props.active}
         className={`min-h-9 min-w-0 flex-1 rounded-md px-0 transition-colors ${props.active ? "bg-sky-400/15 text-sky-200" : "text-zinc-600 hover:bg-white/[0.05] hover:text-zinc-300"}`}
+        isSelected={props.active}
         size="sm"
         variant="ghost"
-        onPress={props.onPress}
+        onChange={props.onPress}
       >
         <Icon aria-hidden="true" size={14} strokeWidth={1.7} />
-      </Button>
+      </ToggleButton>
       <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">{props.label}</Tooltip.Content>
     </Tooltip>
   );
@@ -275,14 +275,16 @@ function SliderUtilityControl(props: { current: string; group: UtilityGroup; onC
       <span className="flex items-center gap-1">
         <Slider.Output className={`max-w-36 truncate text-[9px] ${selection.custom ? "text-amber-300/80" : "text-zinc-400"}`}>{output}</Slider.Output>
         <Tooltip delay={350} closeDelay={80}>
-          <button
+          <Button
+            isIconOnly
             aria-label={`Reset ${props.group.label} to Auto`}
-            className="grid size-6 place-items-center rounded text-zinc-600 hover:bg-white/5 hover:text-zinc-300"
-            type="button"
-            onClick={reset}
+            className="size-6 min-w-6 rounded text-zinc-600 hover:bg-white/5 hover:text-zinc-300"
+            size="sm"
+            variant="ghost"
+            onPress={reset}
           >
             <RotateCcw aria-hidden="true" size={11} />
-          </button>
+          </Button>
           <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Reset {props.group.label} to Auto</Tooltip.Content>
         </Tooltip>
       </span>
@@ -339,16 +341,16 @@ function ControlSection(props: { icon: LucideIcon; title: string; children: Reac
   return (
     <section className="py-1 first:pt-0">
       <h4>
-        <button
+        <Button
           aria-expanded={open}
-          className="flex min-h-9 w-full items-center gap-1.5 text-left text-[10px] font-medium text-zinc-400 hover:text-zinc-200"
-          type="button"
-          onClick={() => setOpen((value) => !value)}
+          className="flex min-h-9 w-full items-center justify-start gap-1.5 rounded-none px-0 text-left text-[10px] font-medium text-zinc-400 hover:text-zinc-200"
+          variant="ghost"
+          onPress={() => setOpen((value) => !value)}
         >
           <Icon aria-hidden="true" className="text-zinc-600" size={12} />
           <span className="flex-1">{props.title}</span>
           <ChevronDown aria-hidden="true" className={`text-zinc-600 transition-transform ${open ? "rotate-180" : ""}`} size={13} />
-        </button>
+        </Button>
       </h4>
       {open && <div className="pb-3">{props.children}</div>}
     </section>

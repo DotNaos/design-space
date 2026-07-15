@@ -1,3 +1,4 @@
+import { Button } from "@heroui/react";
 import { FolderKanban, Layers3, SlidersHorizontal } from "lucide-react";
 
 import { useMobileViewport } from "../components/use-mobile-viewport";
@@ -20,9 +21,9 @@ export function MobileDock(props: { active: MobilePane; onChange: (pane: MobileP
       {actions.map(({ destination, pane, label, icon: Icon }) => {
         const active = activeDestination === destination;
         return (
-          <button key={destination} aria-label={active ? `Close ${label}` : `Open ${label}`} aria-pressed={active} className={`grid size-11 place-items-center rounded-xl transition-colors ${active ? "bg-sky-400/15 text-sky-300" : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100"}`} type="button" onClick={() => props.onChange(active ? "canvas" : pane)}>
+          <Button key={destination} aria-label={active ? `Close ${label}` : `Open ${label}`} aria-pressed={active} className={`size-11 rounded-xl transition-colors ${active ? "bg-sky-400/15 text-sky-300" : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100"}`} isIconOnly variant="ghost" onPress={() => props.onChange(active ? "canvas" : pane)}>
             <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
-          </button>
+          </Button>
         );
       })}
     </nav>

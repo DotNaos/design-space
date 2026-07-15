@@ -288,7 +288,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     onInserted: (instanceId) => {
       setDefinitionEditor(false);
       setPendingEditId(instanceId);
-      setMobilePane("inspect");
+      setMobilePane("canvas");
       setSlotPicker(undefined);
       setRootPicker(false);
     },

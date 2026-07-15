@@ -1,4 +1,4 @@
-import { Tooltip } from "@heroui/react";
+import { Button, Switch, ToggleButton, Tooltip } from "@heroui/react";
 import { Box, ChevronDown, ChevronRight, CircleDot, Code2, Component, Eye, EyeOff, FileBox, Image, Layers3, List, ListCollapse, MousePointerClick, Plug, Plus, Type, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
@@ -81,26 +81,29 @@ export function ComponentTree(props: ComponentTreeProps) {
         <h2 className="min-w-0 flex-1 truncate text-xs font-semibold text-zinc-200">{props.embedded ? "Layers" : "Component tree"}</h2>
         {!props.embedded && <span className="max-w-20 truncate text-[10px] text-zinc-600">{props.pageLabel}</span>}
         {!props.emptyMessage && <Tooltip delay={350}>
-          <button
+          <Button
+            isIconOnly
             aria-label="Collapse all tree branches"
-            className="grid size-8 shrink-0 place-items-center rounded-lg text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"
-            type="button"
-            onClick={collapseAll}
+            className="size-8 min-w-8 shrink-0 rounded-lg text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"
+            size="sm"
+            variant="ghost"
+            onPress={collapseAll}
           >
             <ListCollapse aria-hidden="true" size={14} />
-          </button>
+          </Button>
           <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Collapse all · keeps selection visible</Tooltip.Content>
         </Tooltip>}
         {props.onInsert && (
-          <button
-            aria-pressed={props.insertMode}
+          <ToggleButton
             className={`inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-[10px] font-medium transition-colors ${props.insertMode ? "bg-sky-500/20 text-sky-200" : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200"}`}
-            type="button"
-            onClick={props.onInsert}
+            isSelected={props.insertMode}
+            size="sm"
+            variant="ghost"
+            onChange={props.onInsert}
           >
             {props.insertMode ? <X aria-hidden="true" size={12} /> : <Plus aria-hidden="true" size={12} />}
             {props.insertMode ? "Cancel" : "Insert"}
-          </button>
+          </ToggleButton>
         )}
       </div>
 
@@ -154,21 +157,16 @@ export function ComponentTree(props: ComponentTreeProps) {
         )}
       </div>
 
-      {!props.emptyMessage && <button
-        aria-pressed={props.showInternals}
-        className="flex h-12 items-center gap-2 border-t border-white/10 px-3 text-left text-xs text-zinc-400 hover:bg-white/[0.03]"
-        type="button"
-        onClick={() => props.onToggleInternals()}
-      >
-        {props.showInternals ? <Eye size={14} /> : <EyeOff size={14} />}
-        <span className="flex-1">
-          <span className="block">{props.toggleLabel ?? "Show internal HTML"}</span>
-          <span className="block text-[9px] text-zinc-600">{props.toggleHint ?? "Collapsed inside components by default"}</span>
-        </span>
-        <span className={`h-4 w-7 rounded-full p-0.5 ${props.showInternals ? "bg-sky-500" : "bg-zinc-700"}`}>
-          <span className={`block size-3 rounded-full bg-white transition-transform ${props.showInternals ? "translate-x-3" : ""}`} />
-        </span>
-      </button>}
+      {!props.emptyMessage && <Switch isSelected={props.showInternals} onChange={() => props.onToggleInternals()}>
+        <Switch.Content className="flex h-12 w-full items-center gap-2 border-t border-white/10 px-3 text-left text-xs text-zinc-400 hover:bg-white/[0.03]">
+          {props.showInternals ? <Eye size={14} /> : <EyeOff size={14} />}
+          <span className="flex-1">
+            <span className="block">{props.toggleLabel ?? "Show internal HTML"}</span>
+            <span className="block text-[9px] text-zinc-600">{props.toggleHint ?? "Collapsed inside components by default"}</span>
+          </span>
+          <Switch.Control className="shrink-0"><Switch.Thumb /></Switch.Control>
+        </Switch.Content>
+      </Switch>}
     </aside>
   );
 }
@@ -361,24 +359,28 @@ function ComponentRow(props: {
       </button>
 
       {internals && (
+        <span
+          className="contents"
+          onBlurCapture={() => props.onHoverInternals?.(undefined)}
+          onFocusCapture={() => props.onHoverInternals?.(selection.id)}
+        >
         <Tooltip delay={350}>
-          <button
+          <Button
+            isIconOnly={false}
             aria-expanded={!internals.collapsed}
             aria-label={toggleLabel}
             className="mr-2 inline-flex h-6 shrink-0 items-center gap-1 rounded-md bg-transparent px-1.5 text-[10px] tabular-nums text-zinc-500 transition-colors hover:bg-white/[0.07] hover:text-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-400"
             data-internal-html-toggle-for={selection.id}
-            type="button"
-            onBlur={() => props.onHoverInternals?.(undefined)}
-            onClick={() => props.onToggleInternals(selection.id)}
-            onFocus={() => props.onHoverInternals?.(selection.id)}
+            onPress={() => props.onToggleInternals(selection.id)}
             onPointerEnter={() => props.onHoverInternals?.(selection.id)}
             onPointerLeave={() => props.onHoverInternals?.(undefined)}
           >
             <Code2 aria-hidden="true" size={12} />
             <span>{internals.nodeCount}</span>
-          </button>
+          </Button>
           <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">{toggleLabel}</Tooltip.Content>
         </Tooltip>
+        </span>
       )}
     </div>
   );

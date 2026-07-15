@@ -56,12 +56,13 @@ export function CreateDocumentSheet(props: {
                 {recipes.map((recipe) => {
                   const selected = recipe.id === recipeId;
                   return (
-                    <button
+                    <Button
                       key={recipe.id}
                       aria-pressed={selected}
+                      fullWidth
                       className={`flex min-h-16 w-full items-start gap-3 px-2 py-3 text-left ${selected ? "bg-sky-500/10" : "hover:bg-white/[0.03]"}`}
-                      type="button"
-                      onClick={() => setRecipeId(recipe.id)}
+                      variant="ghost"
+                      onPress={() => setRecipeId(recipe.id)}
                     >
                       <span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-sky-500 text-white" : "bg-white/5 text-zinc-500"}`}>
                         {recipe.kind === "screen" ? <Smartphone size={15} /> : <Boxes size={15} />}
@@ -70,7 +71,7 @@ export function CreateDocumentSheet(props: {
                         <span className="block text-sm font-medium text-zinc-100">{recipe.label}</span>
                         {recipe.description && <span className="mt-1 block text-xs leading-5 text-zinc-500">{recipe.description}</span>}
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>

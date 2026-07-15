@@ -1,3 +1,4 @@
+import { Tabs } from "@heroui/react";
 import { useMemo, useState } from "react";
 
 export type DiffLineKind = "add" | "context" | "file" | "hunk" | "meta" | "remove";
@@ -26,22 +27,38 @@ export function RenderedDiff(props: { diff: string; className?: string }) {
 
   return (
     <section className={`${props.className ?? "flex"} min-h-0 min-w-0 flex-col bg-[#101113]`}>
-      {files.length > 1 && (
-        <div aria-label="Changed files" className="flex shrink-0 overflow-x-auto border-b border-white/10" role="tablist">
+      {files.length > 1 ? (
+        <Tabs
+          aria-label="Changed files"
+          className="min-h-0 flex-1 !gap-0"
+          selectedKey={selected.id}
+          variant="secondary"
+          onSelectionChange={(key) => setSelectedId(String(key))}
+        >
+          <Tabs.List aria-label="Changed files" className="flex shrink-0 overflow-x-auto border-b border-white/10">
           {files.map((file) => (
-            <button
+            <Tabs.Tab
               key={file.id}
-              aria-selected={file.id === selected.id}
-              className={`min-h-10 shrink-0 border-b-2 px-3 font-mono text-[10px] ${file.id === selected.id ? "border-sky-400 text-zinc-100" : "border-transparent text-zinc-500"}`}
-              role="tab"
-              type="button"
-              onClick={() => setSelectedId(file.id)}
+              id={file.id}
+              className="min-h-10 shrink-0 border-b-2 border-transparent px-3 font-mono text-[10px] text-zinc-500 data-[selected]:border-sky-400 data-[selected]:text-zinc-100"
             >
               {file.label}
-            </button>
+            </Tabs.Tab>
           ))}
-        </div>
-      )}
+          </Tabs.List>
+          {files.map((file) => (
+            <Tabs.Panel key={file.id} id={file.id} className="!m-0 min-h-0 flex-1 !p-0">
+              <DiffBody file={file} />
+            </Tabs.Panel>
+          ))}
+        </Tabs>
+      ) : <DiffBody file={selected} />}
+    </section>
+  );
+}
+
+function DiffBody({ file }: { file: RenderedDiffFile }) {
+  return (
       <div
         aria-label="Source diff, scroll in both directions"
         className="min-h-0 flex-1 touch-auto overflow-auto overscroll-contain py-2 font-mono text-[11px] leading-5"
@@ -49,12 +66,11 @@ export function RenderedDiff(props: { diff: string; className?: string }) {
         tabIndex={0}
       >
         <div className="min-w-max" role="table">
-          {selected.lines.map((line, index) => (
+          {file.lines.map((line, index) => (
             <DiffLine key={`${index}:${line.text}`} line={line} />
           ))}
         </div>
       </div>
-    </section>
   );
 }
 

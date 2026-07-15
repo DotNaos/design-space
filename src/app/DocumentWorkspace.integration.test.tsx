@@ -68,7 +68,7 @@ it("builds an empty authored slot on mobile, edits the item, saves, and reloads 
   expect(await screen.findByRole("dialog", { name: "Add to Body slot" })).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: /^Text\b/ }));
   const editor = await screen.findByRole("dialog", { name: "Edit Text" });
-  expect(editor).toHaveAttribute("open");
+  expect(editor).toHaveAttribute("aria-modal", "true");
 
   const mobileEditor = within(editor);
   const content = mobileEditor.getByRole("textbox", { name: "Content" });

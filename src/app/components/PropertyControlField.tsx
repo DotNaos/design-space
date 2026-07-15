@@ -1,4 +1,4 @@
-import { Input, Label, Switch, TextField } from "@heroui/react";
+import { Button, Input, Label, NumberField, Switch, TextField } from "@heroui/react";
 import { Minus, Plus } from "lucide-react";
 
 import type { ComponentControl } from "../../shared/contracts";
@@ -43,22 +43,33 @@ export function PropertyControlField(props: {
       if (Number.isFinite(bounded)) props.onChange(bounded);
     };
     return (
-      <label className="block">
+      <NumberField
+        className="block"
+        maxValue={control.max}
+        minValue={control.min}
+        step={step}
+        value={value ?? Number.NaN}
+      >
         <Label className="text-[10px] text-zinc-500">{control.label}{control.unit ? ` · ${control.unit}` : ""}</Label>
-        <span className="mt-1 flex min-h-11 overflow-hidden rounded-lg border border-white/10 bg-black/20">
-          <button aria-label={`Decrease ${control.label}`} className="grid w-11 place-items-center border-r border-white/10 text-zinc-500" type="button" onClick={() => changeBy(-1)}><Minus size={14} /></button>
-          <input aria-label={control.label} className="min-w-0 flex-1 bg-transparent px-3 text-center text-base text-zinc-200 outline-none lg:text-sm" max={control.max} min={control.min} placeholder={control.required ? "Required" : "Not set"} step={step} type="number" value={value ?? ""} onChange={(event) => {
-            const raw = event.currentTarget.value;
-            if (raw === "") {
-              props.onChange(undefined);
-              return;
-            }
-            const next = Number(raw);
-            if (Number.isFinite(next)) props.onChange(next);
-          }} />
-          <button aria-label={`Increase ${control.label}`} className="grid w-11 place-items-center border-l border-white/10 text-zinc-500" type="button" onClick={() => changeBy(1)}><Plus size={14} /></button>
-        </span>
-      </label>
+        <NumberField.Group className="mt-1 flex min-h-11 overflow-hidden rounded-lg border border-white/10 bg-black/20">
+          <Button isIconOnly aria-label={`Decrease ${control.label}`} className="h-auto w-11 min-w-11 rounded-none border-r border-white/10 text-zinc-500" slot="decrement" variant="ghost" onPress={() => changeBy(-1)}><Minus size={14} /></Button>
+          <NumberField.Input
+            aria-label={control.label}
+            className="min-w-0 flex-1 bg-transparent px-3 text-center text-base text-zinc-200 outline-none lg:text-sm"
+            placeholder={control.required ? "Required" : "Not set"}
+            onChange={(event) => {
+              const raw = event.currentTarget.value;
+              if (raw === "") {
+                props.onChange(undefined);
+                return;
+              }
+              const next = Number(raw);
+              if (Number.isFinite(next)) props.onChange(next);
+            }}
+          />
+          <Button isIconOnly aria-label={`Increase ${control.label}`} className="h-auto w-11 min-w-11 rounded-none border-l border-white/10 text-zinc-500" slot="increment" variant="ghost" onPress={() => changeBy(1)}><Plus size={14} /></Button>
+        </NumberField.Group>
+      </NumberField>
     );
   }
   if (control.kind === "select") {

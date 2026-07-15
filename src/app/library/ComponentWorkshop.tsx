@@ -1,5 +1,5 @@
-import { Button, Input, Label, TextField } from "@heroui/react";
-import { Braces, ChevronDown, Component, Plus } from "lucide-react";
+import { Button, Disclosure, Input, Label, TextField } from "@heroui/react";
+import { Braces, Component, Plus } from "lucide-react";
 import { useState } from "react";
 
 import type { ComponentPropertyDraft, DesignDocument } from "../../shared/design-document";
@@ -128,21 +128,18 @@ export function ComponentWorkshop(props: {
 function WorkshopSection(props: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   const [expanded, setExpanded] = useState(true);
   return (
-    <section className="border-b border-white/10 px-4 py-4">
-      <div className={`${expanded ? "mb-3" : ""} flex min-h-9 items-center gap-2`}>
-        <button
-          aria-expanded={expanded}
-          className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left lg:min-h-8"
-          type="button"
-          onClick={() => setExpanded((current) => !current)}
-        >
-          <ChevronDown className={`shrink-0 text-zinc-600 transition-transform ${expanded ? "" : "-rotate-90"}`} size={14} />
-          <h3 className="truncate text-xs font-semibold text-zinc-300">{props.title}</h3>
-        </button>
+    <Disclosure className="border-b border-white/10 px-4 py-4" isExpanded={expanded} onExpandedChange={setExpanded}>
+      <Disclosure.Heading className={`${expanded ? "mb-3" : ""} flex min-h-9 items-center gap-2`}>
+        <Disclosure.Trigger className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left lg:min-h-8">
+          <Disclosure.Indicator className="shrink-0 text-zinc-600" />
+          <span className="truncate text-xs font-semibold text-zinc-300">{props.title}</span>
+        </Disclosure.Trigger>
         {props.action}
-      </div>
-      {expanded && <div className="space-y-3">{props.children}</div>}
-    </section>
+      </Disclosure.Heading>
+      <Disclosure.Content>
+        <Disclosure.Body className="space-y-3 p-0">{props.children}</Disclosure.Body>
+      </Disclosure.Content>
+    </Disclosure>
   );
 }
 

@@ -44,6 +44,8 @@ describe("mobile item editor", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Edit Text" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAttribute("data-slot", "drawer-dialog");
+    expect(dialog.querySelector('[data-slot="drawer-handle"]')).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Move up" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Duplicate" })).toBeEnabled();

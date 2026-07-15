@@ -1,4 +1,5 @@
-import { Modal } from "@heroui/react";
+import { Button, Drawer } from "@heroui/react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { CatalogEntry } from "./CatalogPanel";
@@ -20,17 +21,31 @@ export function SlotCatalogDialog(props: {
   if (!mobile) return null;
 
   return (
-    <Modal.Backdrop isOpen={props.open} onOpenChange={(open) => { if (!open) props.onClose(); }} variant="transparent">
-      <Modal.Container className="items-end p-0" placement="bottom" size="lg">
-        <Modal.Dialog aria-label={props.targetKind === "root" ? "Choose root component" : `Add to ${props.slotLabel} slot`} className={`mt-auto w-full overflow-hidden rounded-b-none rounded-t-2xl border border-white/10 bg-[#141518] text-zinc-200 shadow-2xl transition-[height] duration-300 ${expanded ? "h-[82dvh]" : "h-[52dvh]"}`}>
-          <button aria-label={expanded ? "Collapse component picker" : "Expand component picker"} className="grid h-7 w-full place-items-center" type="button" onClick={() => setExpanded((value) => !value)}>
-            <span className="h-1 w-10 rounded-full bg-zinc-700" />
-          </button>
-          <Modal.Body className="min-h-0 p-0">
+    <Drawer.Backdrop isOpen={props.open} onOpenChange={(open) => { if (!open) props.onClose(); }} variant="transparent">
+      <Drawer.Content placement="bottom">
+        <Drawer.Dialog
+          aria-label={props.targetKind === "root" ? "Choose root component" : `Add to ${props.slotLabel} slot`}
+          className={`max-h-none w-full overflow-hidden rounded-b-none rounded-t-2xl border border-white/10 bg-[#141518] p-0 text-zinc-200 shadow-2xl transition-[height] duration-300 ${expanded ? "h-[82dvh]" : "h-[52dvh]"}`}
+          render={(dialogProps) => <section {...dialogProps} aria-modal="true" />}
+        >
+          <div className="relative shrink-0">
+            <Drawer.Handle className="h-11 pb-0" />
+            <Button
+              isIconOnly
+              aria-label={expanded ? "Collapse component picker" : "Expand component picker"}
+              className="absolute right-1 top-0 size-11"
+              size="sm"
+              variant="ghost"
+              onPress={() => setExpanded((value) => !value)}
+            >
+              {expanded ? <Minimize2 aria-hidden="true" size={14} /> : <Maximize2 aria-hidden="true" size={14} />}
+            </Button>
+          </div>
+          <Drawer.Body className="m-0 min-h-0 p-0">
             <SlotCatalogPanel className="flex h-full" slotLabel={props.slotLabel} targetKind={props.targetKind} entries={props.entries} onClose={props.onClose} onSelect={props.onSelect} />
-          </Modal.Body>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal.Backdrop>
+          </Drawer.Body>
+        </Drawer.Dialog>
+      </Drawer.Content>
+    </Drawer.Backdrop>
   );
 }

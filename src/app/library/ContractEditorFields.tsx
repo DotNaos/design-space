@@ -1,4 +1,4 @@
-import { Input, Label, Switch, TextArea, TextField } from "@heroui/react";
+import { Input, Label, NumberField, Switch, TextArea, TextField } from "@heroui/react";
 
 import { EditorSelectField } from "../components/EditorSelectField";
 
@@ -62,32 +62,36 @@ export function OptionalNumberInput(props: {
   onChange: (value: number | undefined) => void;
 }) {
   return (
-    <label className="block text-[10px] text-zinc-500">
-      {props.label}
-      <input
-        aria-label={props.label}
-        className={inputClassName}
-        inputMode={props.integer ? "numeric" : "decimal"}
-        max={props.max}
-        min={props.min}
-        placeholder={props.placeholder}
-        step={props.step ?? (props.integer ? 1 : "any")}
-        type="number"
-        value={props.value ?? ""}
-        onChange={(event) => {
-          const raw = event.currentTarget.value;
-          if (raw === "") {
-            props.onChange(undefined);
-            return;
-          }
-          const value = Number(raw);
-          if (!Number.isFinite(value) || (props.integer && !Number.isInteger(value))) return;
-          if (props.min !== undefined && value < props.min) return;
-          if (props.max !== undefined && value > props.max) return;
-          props.onChange(value);
-        }}
-      />
-    </label>
+    <NumberField
+      className="block"
+      maxValue={props.max}
+      minValue={props.min}
+      step={props.step ?? (props.integer ? 1 : undefined)}
+      value={props.value ?? Number.NaN}
+    >
+      <Label className="text-[10px] text-zinc-500">{props.label}</Label>
+      <NumberField.Group className="mt-1">
+        <NumberField.Input
+          aria-label={props.label}
+          className={inputClassName}
+          inputMode={props.integer ? "numeric" : "decimal"}
+          placeholder={props.placeholder}
+          role="spinbutton"
+          onChange={(event) => {
+            const raw = event.currentTarget.value;
+            if (raw === "") {
+              props.onChange(undefined);
+              return;
+            }
+            const value = Number(raw);
+            if (!Number.isFinite(value) || (props.integer && !Number.isInteger(value))) return;
+            if (props.min !== undefined && value < props.min) return;
+            if (props.max !== undefined && value > props.max) return;
+            props.onChange(value);
+          }}
+        />
+      </NumberField.Group>
+    </NumberField>
   );
 }
 
