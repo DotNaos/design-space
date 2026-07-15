@@ -16,6 +16,7 @@ import { EmptyModeState } from "./EmptyModeState";
 import { EmptyDocumentRoot } from "./EmptyDocumentRoot";
 import type { ProductMode } from "./DocumentNavigator";
 import { DocumentWorkspaceSurface } from "./DocumentWorkspaceSurface";
+import { DocumentInspectorTabs } from "./DocumentInspectorTabs";
 import { WorkspaceBrowser, type WorkspaceBrowserView } from "./WorkspaceBrowser";
 import { WorkspaceSidebar, type WorkspaceSidebarView } from "./WorkspaceSidebar";
 import { SlotInspector } from "../inspector/SlotInspector";
@@ -27,6 +28,8 @@ export function DocumentWorkspacePanels(props: {
   projectLabel: string;
   documentId: string;
   documentLabel: string;
+  documentSource: string;
+  documentSourceLabel: string;
   documentKind: "screen" | "component";
   mode: ProductMode;
   mobilePane: MobilePane;
@@ -188,6 +191,7 @@ export function DocumentWorkspacePanels(props: {
       onRemoveDefinition={outletSelection ? props.onRemoveSlotDefinition : undefined}
     />
   ) : undefined;
+  const designPanel = slotInspector ?? props.desktopEditor;
   const right = props.rootPicker || props.slotPicker ? (
     <SlotCatalogPanel
       className="flex h-full w-full"
@@ -197,7 +201,13 @@ export function DocumentWorkspacePanels(props: {
       onClose={props.onClosePicker}
       onSelect={props.onInsertComponent}
     />
-  ) : props.rightOverride ?? slotInspector ?? props.desktopEditor;
+  ) : props.rightOverride ?? (
+    <DocumentInspectorTabs
+      design={designPanel}
+      source={props.documentSource}
+      sourceLabel={props.documentSourceLabel}
+    />
+  );
   const left = (
     <WorkspaceSidebar
       active={props.sidebarView}
@@ -224,7 +234,13 @@ export function DocumentWorkspacePanels(props: {
       right={right}
       mobileProject={left}
       mobileTree={left}
-      mobileInspect={props.hasRoot ? slotInspector ?? props.mobileDefinition : <EmptyDocumentRoot className="flex h-full w-full" compact documentKind={props.documentKind} onInsert={props.onOpenRootPicker} />}
+      mobileInspect={(
+        <DocumentInspectorTabs
+          design={props.hasRoot ? slotInspector ?? props.mobileDefinition : <EmptyDocumentRoot className="flex h-full w-full" compact documentKind={props.documentKind} onInsert={props.onOpenRootPicker} />}
+          source={props.documentSource}
+          sourceLabel={props.documentSourceLabel}
+        />
+      )}
       onMobileDrawerClose={props.onMobileDrawerClose}
     />
   );

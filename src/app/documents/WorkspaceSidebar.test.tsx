@@ -32,6 +32,8 @@ it("keeps project, pages, and layers in one stable hierarchy", async () => {
 
   expect(screen.getByRole("heading", { name: "Design Space Demo Target" })).toBeVisible();
   expect(screen.getByRole("region", { name: "Pages" })).toBeVisible();
+  expect(screen.getByRole("tab", { name: "Layers" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("tab", { name: "Files" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
   expect(screen.getByText("Card layer")).toBeVisible();
   expect(screen.queryByRole("button", { name: "Documents" })).not.toBeInTheDocument();
@@ -39,8 +41,29 @@ it("keeps project, pages, and layers in one stable hierarchy", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Settings" }));
   expect(onDocumentSelect).toHaveBeenCalledWith("settings");
 
-  await userEvent.click(screen.getByRole("button", { name: "Project files" }));
+  await userEvent.click(screen.getByRole("tab", { name: "Files" }));
   expect(onChange).toHaveBeenCalledWith("files");
+});
+
+it("renders the file explorer inside its persistent sidebar tab", () => {
+  render(
+    <WorkspaceSidebar
+      active="files"
+      auxiliary={<div aria-label="Allowlisted files">src/App.tsx</div>}
+      canCreate
+      entries={entries}
+      layers={<p>Card layer</p>}
+      mode="app"
+      projectLabel="Demo"
+      onChange={vi.fn()}
+      onCreate={vi.fn()}
+      onDocumentSelect={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole("tab", { name: "Files" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByLabelText("Allowlisted files")).toHaveTextContent("src/App.tsx");
+  expect(screen.queryByText("Card layer")).not.toBeInTheDocument();
 });
 
 it("shows secondary tools temporarily with a direct return to pages and layers", async () => {

@@ -385,6 +385,8 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         projectLabel={target.project.label}
         documentId={document.id}
         documentLabel={document.label}
+        documentSource={JSON.stringify(document, null, 2)}
+        documentSourceLabel={`${document.id}.design.json`}
         documentKind={document.kind}
         mode={mode}
         mobilePane={mobilePane}
