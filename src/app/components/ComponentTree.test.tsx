@@ -101,8 +101,8 @@ describe("ComponentTree Strict UI markers", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("renders balanced HTML tags and keeps a nested slot visually inside its host element", () => {
-    render(
+  it("renders HTML as icon-led layers without syntax or closing rows", () => {
+    const { container } = render(
       <ComponentTree
         pageLabel="Dashboard"
         rows={expandedRows}
@@ -113,18 +113,19 @@ describe("ComponentTree Strict UI markers", () => {
       />,
     );
 
-    const openingTag = screen.getByText("<div>").closest("button");
+    const htmlLayer = screen.getByRole("treeitem", { name: "div" });
     const slot = screen.getByRole("treeitem", { name: /Body slot/ });
-    const closingTag = screen.getByText("</div>").closest("button");
 
-    expect(openingTag).toHaveAttribute("data-html-boundary", "open");
-    expect(openingTag?.parentElement).toHaveStyle({ paddingLeft: "22px" });
-    expect(slot.parentElement).toHaveStyle({ paddingLeft: "40px" });
-    expect(closingTag).toHaveAttribute("data-html-boundary", "close");
-    expect(closingTag).toHaveStyle({ paddingLeft: "30px" });
+    expect(htmlLayer).toHaveAttribute("data-html-boundary", "open");
+    expect(htmlLayer.parentElement).toHaveStyle({ paddingLeft: "24px" });
+    expect(htmlLayer.parentElement?.querySelector('[data-layer-icon="html-div"]')).toBeInTheDocument();
+    expect(slot.parentElement).toHaveStyle({ paddingLeft: "42px" });
+    expect(screen.queryByText("<div>")).not.toBeInTheDocument();
+    expect(screen.queryByText("</div>")).not.toBeInTheDocument();
+    expect(container.querySelector('[data-html-boundary="close"]')).not.toBeInTheDocument();
   });
 
-  it("selects the same HTML element from its closing tag", async () => {
+  it("selects the HTML layer from its syntax-free row", async () => {
     const onSelect = vi.fn();
     render(
       <ComponentTree
@@ -137,7 +138,7 @@ describe("ComponentTree Strict UI markers", () => {
       />,
     );
 
-    await userEvent.click(screen.getByRole("treeitem", { name: "</div>" }));
+    await userEvent.click(screen.getByRole("treeitem", { name: "div" }));
 
     expect(onSelect).toHaveBeenCalledWith({
       kind: "html",
@@ -193,7 +194,7 @@ describe("ComponentTree Strict UI markers", () => {
     expect(screen.getByRole("button", { name: "Collapse Card" })).toBeInTheDocument();
   });
 
-  it("highlights a selected HTML opening and closing tag with only its exact descendant scope", () => {
+  it("highlights a selected HTML layer with only its exact descendant scope", () => {
     const { container } = render(
       <ComponentTree
         pageLabel="Dashboard"
@@ -206,13 +207,13 @@ describe("ComponentTree Strict UI markers", () => {
     );
 
     const selectedPair = container.querySelectorAll('[data-html-pair-selected="true"]');
-    expect(selectedPair).toHaveLength(2);
-    expect(selectedPair[0]).toHaveTextContent("<div>");
-    expect(selectedPair[1]).toHaveTextContent("</div>");
+    expect(selectedPair).toHaveLength(1);
+    expect(selectedPair[0]).toHaveTextContent("div");
+    expect(selectedPair[0]).toHaveClass("mx-1", "rounded-md");
     expect(screen.getByRole("treeitem", { name: /Body slot/ }).parentElement).toHaveAttribute("data-html-scope-selected", "true");
     expect(screen.getByRole("treeitem", { name: /Footer slot/ }).parentElement).not.toHaveAttribute("data-html-scope-selected");
-    expect(container.querySelectorAll('[data-html-scope-guide="html:card.one:surface"]')).toHaveLength(3);
-    expect(container.querySelector(".lucide-tag")).not.toBeInTheDocument();
+    expect(container.querySelectorAll('[data-html-scope-guide="html:card.one:surface"]')).toHaveLength(2);
+    expect([...container.querySelectorAll("[data-layer-row]")].every((row) => row.querySelector("[data-layer-icon]"))).toBe(true);
   });
 
   it("matches a nested HTML pair without coloring its outer pair or following sibling", () => {
@@ -228,9 +229,10 @@ describe("ComponentTree Strict UI markers", () => {
     );
 
     const selectedPair = [...container.querySelectorAll('[data-html-pair-selected="true"]')];
-    expect(selectedPair.map((element) => element.textContent)).toEqual(["<span>", "</span>"]);
-    expect(screen.getByText("<div>").parentElement).not.toHaveAttribute("data-html-scope-selected");
-    expect(screen.getByText("</div>").closest("div")).not.toHaveAttribute("data-html-scope-selected");
+    expect(selectedPair.map((element) => element.textContent)).toEqual(["span"]);
+    expect(screen.getByRole("treeitem", { name: "div" }).parentElement).not.toHaveAttribute("data-html-scope-selected");
+    expect(screen.queryByText("</span>")).not.toBeInTheDocument();
+    expect(screen.queryByText("</div>")).not.toBeInTheDocument();
     expect(screen.getByRole("treeitem", { name: /Footer slot/ }).parentElement).not.toHaveAttribute("data-html-scope-selected");
   });
 

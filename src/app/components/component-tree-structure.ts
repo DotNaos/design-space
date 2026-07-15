@@ -1,4 +1,4 @@
-import type { ComponentTreeRow, SelectionTarget } from "../../model";
+import type { ComponentTreeRow } from "../../model";
 
 export type HtmlScopeAnnotation = {
   readonly pairId: string;
@@ -63,7 +63,7 @@ export function visibleTreeRows(
   for (const item of rows) {
     if (hiddenBelowDepth !== undefined && item.row.depth > hiddenBelowDepth) continue;
     hiddenBelowDepth = undefined;
-    visible.push(item);
+    if (item.row.kind !== "html-close") visible.push(item);
     if (item.branchKey && collapsed.has(item.branchKey)) hiddenBelowDepth = item.row.depth;
   }
   return visible;
@@ -82,21 +82,6 @@ export function treeSelectionPath(
     if (item.branchKey) stack.push({ key: item.branchKey, depth: item.row.depth });
   }
   return [];
-}
-
-export function parseHtmlSelection(id: string): Extract<SelectionTarget, { kind: "html" }> | undefined {
-  const parts = id.split(":");
-  if (parts.length !== 3 || parts[0] !== "html") return undefined;
-  try {
-    return {
-      kind: "html",
-      id,
-      componentInstanceId: decodeURIComponent(parts[1]),
-      nodeId: decodeURIComponent(parts[2]),
-    };
-  } catch {
-    return undefined;
-  }
 }
 
 function treeBranchKey(row: ComponentTreeRow, index: number): string {
