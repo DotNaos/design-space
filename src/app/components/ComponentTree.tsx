@@ -198,7 +198,6 @@ function TreeRow(props: {
         data-html-scope-selected={props.htmlScope ? "true" : undefined}
         style={{ paddingLeft: 4 + row.depth * 18 }}
       >
-        <HtmlScopeGuide scope={props.htmlScope} />
         <BranchChevron {...props} label={row.label} />
         <button
           aria-expanded={!row.collapsed}
@@ -225,7 +224,6 @@ function TreeRow(props: {
         data-html-scope-selected={props.htmlScope ? "true" : undefined}
         style={{ paddingLeft: 12 + row.depth * 18 }}
       >
-        <HtmlScopeGuide scope={props.htmlScope} />
         <Type aria-hidden="true" className="shrink-0 text-zinc-600" data-layer-icon="text" size={13} />
         <span className="truncate">{row.label}</span>
       </div>
@@ -254,7 +252,6 @@ function TreeRow(props: {
       onPointerEnter={() => props.onHover?.(selection)}
       onPointerLeave={() => props.onHover?.(undefined)}
     >
-      <HtmlScopeGuide scope={props.htmlScope} />
       <BranchChevron {...props} label={row.label} />
       <button
         aria-expanded={props.hasDescendants ? !props.branchCollapsed : undefined}
@@ -331,7 +328,6 @@ function ComponentRow(props: {
       onPointerEnter={() => props.onHover?.(selection)}
       onPointerLeave={() => props.onHover?.(undefined)}
     >
-      <HtmlScopeGuide scope={props.htmlScope} />
       <BranchChevron {...props} label={row.label} />
       <button
         aria-expanded={props.hasDescendants ? !props.branchCollapsed : undefined}
@@ -420,18 +416,6 @@ function BranchChevron(props: {
     >
       {props.branchCollapsed ? <ChevronRight aria-hidden="true" size={13} /> : <ChevronDown aria-hidden="true" size={13} />}
     </button>
-  );
-}
-
-function HtmlScopeGuide(props: { scope?: HtmlScopeAnnotation }) {
-  if (!props.scope) return null;
-  return (
-    <span
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-y-0 z-0 w-px bg-sky-400/50"
-      data-html-scope-guide={props.scope.pairId}
-      style={{ left: 11 + props.scope.depth * 18 }}
-    />
   );
 }
 

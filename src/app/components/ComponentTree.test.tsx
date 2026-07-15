@@ -212,7 +212,7 @@ describe("ComponentTree Strict UI markers", () => {
     expect(selectedPair[0]).toHaveClass("mx-1", "rounded-md");
     expect(screen.getByRole("treeitem", { name: /Body slot/ }).parentElement).toHaveAttribute("data-html-scope-selected", "true");
     expect(screen.getByRole("treeitem", { name: /Footer slot/ }).parentElement).not.toHaveAttribute("data-html-scope-selected");
-    expect(container.querySelectorAll('[data-html-scope-guide="html:card.one:surface"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-html-scope-guide]')).toHaveLength(0);
     expect([...container.querySelectorAll("[data-layer-row]")].every((row) => row.querySelector("[data-layer-icon]"))).toBe(true);
   });
 
