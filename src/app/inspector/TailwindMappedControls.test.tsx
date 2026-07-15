@@ -1,25 +1,157 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { replaceTailwindUtilityGroup, TailwindMappedControls } from "./TailwindMappedControls";
 
 afterEach(cleanup);
 
-it("replaces only the selected Tailwind utility group", () => {
-  expect(replaceTailwindUtilityGroup("flex flex-row p-4 text-sm", ["flex-row", "flex-col"], "flex-col"))
-    .toBe("flex p-4 text-sm flex-col");
+describe("replaceTailwindUtilityGroup", () => {
+  it("replaces in place while preserving unrelated token order", () => {
+    expect(replaceTailwindUtilityGroup(
+      "flex flex-row p-4 text-sm",
+      ["flex-row", "flex-col"],
+      "flex-col",
+    )).toBe("flex flex-col p-4 text-sm");
+  });
+
+  it("mutates only base utilities and preserves modifier variants", () => {
+    const padding = (utility: string) => /^p-.+$/.test(utility);
+
+    expect(replaceTailwindUtilityGroup(
+      "flex p-4 sm:p-8 hover:p-2 dark:p-3 text-sm",
+      ["p-4", "p-6"],
+      "p-6",
+      padding,
+    )).toBe("flex p-6 sm:p-8 hover:p-2 dark:p-3 text-sm");
+
+    expect(replaceTailwindUtilityGroup(
+      "flex p-4 sm:p-8 hover:p-2 text-sm",
+      ["p-4", "p-6"],
+      "",
+      padding,
+    )).toBe("flex sm:p-8 hover:p-2 text-sm");
+  });
+
+  it("keeps arbitrary variants intact", () => {
+    expect(replaceTailwindUtilityGroup(
+      "grid supports-[display:grid]:grid [&>svg]:grid p-4",
+      ["grid", "flex"],
+      "flex",
+      (utility) => /^(?:grid|flex)$/.test(utility),
+    )).toBe("flex supports-[display:grid]:grid [&>svg]:grid p-4");
+  });
+
+  it("preserves importance when changing a base utility", () => {
+    const padding = (utility: string) => /^p-.+$/.test(utility);
+    expect(replaceTailwindUtilityGroup("!p-4 text-sm", ["p-4", "p-6"], "p-6", padding)).toBe("!p-6 text-sm");
+    expect(replaceTailwindUtilityGroup("p-4! text-sm", ["p-4", "p-6"], "p-6", padding)).toBe("p-6! text-sm");
+  });
 });
 
-it("emits Tailwind classes from visual inspector controls", async () => {
-  const user = userEvent.setup();
-  const onChange = vi.fn();
-  render(<TailwindMappedControls value="flex p-4 px-8 sm:p-6 rounded-lg" onChange={onChange} />);
+describe("TailwindMappedControls", () => {
+  it("uses accessible icon segments for common layout choices", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<TailwindMappedControls value="grid sm:flex p-4" onChange={onChange} />);
 
-  const trigger = screen.getByRole("button", { name: /Padding Tailwind utility/ });
-  expect(trigger).toHaveTextContent("p-4");
-  await user.click(trigger);
-  await user.click(screen.getByRole("option", { name: "p-6" }));
+    const flex = screen.getByRole("button", { name: "Display: Flex" });
+    expect(screen.getByRole("button", { name: "Display: Grid" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(flex);
 
-  expect(onChange).toHaveBeenCalledWith("flex rounded-lg p-6");
+    expect(onChange).toHaveBeenCalledWith("flex sm:flex p-4");
+  });
+
+  it("replaces valid display utilities that are not exposed as visual presets", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<TailwindMappedControls value="table-cell p-4" onChange={onChange} />);
+
+    expect(screen.getByText("Custom · table-cell")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Display: Flex" }));
+
+    expect(onChange).toHaveBeenCalledWith("flex p-4");
+  });
+
+  it("replaces safe alignment utilities without leaving conflicting classes", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<TailwindMappedControls value="flex items-center-safe justify-center-safe gap-4" onChange={onChange} />);
+
+    await user.click(screen.getByRole("button", { name: "Align: Start" }));
+    expect(onChange).toHaveBeenCalledWith("flex items-start justify-center-safe gap-4");
+
+    onChange.mockClear();
+    await user.click(screen.getByRole("button", { name: "Justify: End" }));
+    expect(onChange).toHaveBeenCalledWith("flex items-center-safe justify-end gap-4");
+  });
+
+  it("shows arbitrary base values as Custom and replaces them in place", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<TailwindMappedControls value="flex p-[18px] sm:p-8 text-sm" onChange={onChange} />);
+
+    const trigger = screen.getByRole("button", { name: /Padding Tailwind utility/ });
+    expect(trigger).toHaveTextContent("Custom · p-[18px]");
+    await user.click(trigger);
+    await user.click(screen.getByRole("option", { name: "24 px" }));
+
+    expect(onChange).toHaveBeenCalledWith("flex p-6 sm:p-8 text-sm");
+  });
+
+  it("edits uniform and axis spacing independently", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<TailwindMappedControls value="gap-4 gap-x-2 gap-y-3 p-4 px-8 py-2" onChange={onChange} />);
+
+    await user.click(screen.getByRole("button", { name: /Gap Tailwind utility/ }));
+    await user.click(screen.getByRole("option", { name: "24 px" }));
+    expect(onChange).toHaveBeenCalledWith("gap-6 gap-x-2 gap-y-3 p-4 px-8 py-2");
+
+    onChange.mockClear();
+    await user.click(screen.getByRole("button", { name: /Padding X Tailwind utility/ }));
+    await user.click(screen.getByRole("option", { name: "12 px" }));
+    expect(onChange).toHaveBeenCalledWith("gap-4 gap-x-2 gap-y-3 p-4 px-3 py-2");
+  });
+
+  it("does not let uniform appearance controls consume directional utilities", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<TailwindMappedControls value="rounded-t-lg rounded-[18px] border-white/10" onChange={onChange} />);
+
+    await user.click(screen.getByRole("button", { name: "Appearance" }));
+    const trigger = screen.getByRole("button", { name: /Radius Tailwind utility/ });
+    expect(trigger).toHaveTextContent("Custom · rounded-[18px]");
+    await user.click(trigger);
+    await user.click(screen.getByRole("option", { name: "Medium" }));
+
+    expect(onChange).toHaveBeenCalledWith("rounded-t-lg rounded-md border-white/10");
+  });
+
+  it("preserves arbitrary shadow colors when changing shadow size", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<TailwindMappedControls value="shadow-lg shadow-[#50d71e] border-white/10" onChange={onChange} />);
+
+    await user.click(screen.getByRole("button", { name: "Appearance" }));
+    await user.click(screen.getByRole("button", { name: /Shadow Tailwind utility/ }));
+    await user.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Medium" }));
+
+    expect(onChange).toHaveBeenCalledWith("shadow-md shadow-[#50d71e] border-white/10");
+  });
+
+  it.each(["shadow-(--my-shadow)", "shadow-[none]", "shadow-[inherit]"])(
+    "replaces custom shadow size %s without leaving a conflicting utility",
+    async (customShadow) => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(<TailwindMappedControls value={`${customShadow} shadow-[#50d71e]`} onChange={onChange} />);
+
+      await user.click(screen.getByRole("button", { name: "Appearance" }));
+      await user.click(screen.getByRole("button", { name: /Shadow Tailwind utility/ }));
+      await user.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Medium" }));
+
+      expect(onChange).toHaveBeenCalledWith("shadow-md shadow-[#50d71e]");
+    },
+  );
 });

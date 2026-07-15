@@ -24,13 +24,19 @@ export function DocumentWorkspaceSurface(props: {
       : props.mobilePane === "canvas"
         ? undefined
         : { label: "Project", content: props.mobileProject };
-  const canvasBottom = drawer ? "bottom-[70dvh]" : props.mobileEditorOpen ? "bottom-[58dvh]" : "bottom-0";
+  const canvasBottom = drawer ? "bottom-[70dvh]" : props.mobileEditorOpen ? "bottom-[62dvh]" : "bottom-0";
   const hideGestureHint = drawer || props.mobileEditorOpen;
   return (
     <ResizableWorkspacePanels
       namespace={{ projectId: props.projectId, documentId: props.documentId }}
       left={{ label: "Project and component tree", content: props.left }}
-      right={{ label: "Inspector and source changes", content: props.right }}
+      right={{
+        label: "Inspector and source changes",
+        content: props.right,
+        defaultWidth: 352,
+        minWidth: 300,
+        maxWidth: 640,
+      }}
       mobile={(
         <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <div

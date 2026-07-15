@@ -45,6 +45,7 @@ export function DesktopDocumentEditingPanel(props: {
       className="flex h-full w-full border-l-0"
       componentLabel={model.adapter.component.label}
       sourceLabel={model.adapter.sourceFileId ? props.files.find((file) => file.id === model.adapter.sourceFileId)?.label : undefined}
+      sourceBacked={Boolean(model.adapter.sourceFileId)}
       controls={model.adapter.controls}
       values={model.controlValues}
       slots={model.slots}

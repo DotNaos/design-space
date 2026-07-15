@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MobileItemEditor, replaceClassGroup } from "./MobileItemEditor";
+
+afterEach(cleanup);
 
 describe("mobile item editor", () => {
   it("keeps class replacement scoped to one property group", () => {
@@ -45,10 +47,14 @@ describe("mobile item editor", () => {
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Move up" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Duplicate" })).toBeEnabled();
+    expect(screen.getByRole("tab", { name: "Design" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Properties" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Content" }), { target: { value: "Updated" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Classes" }));
     fireEvent.change(screen.getByRole("combobox", { name: "Tailwind classes" }), { target: { value: "text-lg" } });
     expect(onControlChange).toHaveBeenCalledWith("children", "Updated");
     expect(onControlChange).toHaveBeenCalledWith("className", "text-lg");
+    fireEvent.click(screen.getByRole("tab", { name: "Slots" }));
     fireEvent.click(screen.getByRole("button", { name: "Body slot, empty" }));
     expect(onSelectSlot).toHaveBeenCalledWith(expect.objectContaining({ id: "body", count: 0 }));
     fireEvent.keyDown(dialog, { key: "Escape" });
@@ -81,9 +87,45 @@ describe("mobile item editor", () => {
         onApply={vi.fn()}
       />,
     );
+    fireEvent.click(screen.getByRole("tab", { name: "Properties" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Label" }), { target: { value: "Renamed" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Classes" }));
     fireEvent.change(screen.getByRole("combobox", { name: "Classes" }), { target: { value: "text-lg" } });
     expect(onControlChange).toHaveBeenCalledWith("label", "Renamed");
     expect(onControlChange).toHaveBeenCalledWith("classes", "text-lg");
+  });
+
+  it("lets Escape close an open property menu before closing the editor", () => {
+    const onCancel = vi.fn();
+    render(
+      <MobileItemEditor
+        componentLabel="Stack"
+        controls={[{ id: "style", label: "Classes", kind: "tailwind", prop: "classes" }]}
+        controlValues={{ classes: "flex gap-3" }}
+        previewCss=""
+        slots={[]}
+        compilePending={false}
+        sourceBacked={false}
+        canMoveUp={false}
+        canMoveDown={false}
+        canDuplicate={false}
+        canDelete
+        onControlChange={vi.fn()}
+        onMove={vi.fn()}
+        onDuplicate={vi.fn()}
+        onDelete={vi.fn()}
+        onCancel={onCancel}
+        onApply={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Gap Tailwind utility/ }));
+    const listbox = screen.getByRole("listbox", { name: "Gap Tailwind utility" });
+    expect(listbox).toBeVisible();
+    fireEvent.keyDown(listbox, { key: "Escape", code: "Escape" });
+
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Edit Stack" })).toBeVisible();
+    expect(screen.queryByRole("listbox", { name: "Gap Tailwind utility" })).not.toBeInTheDocument();
   });
 });
