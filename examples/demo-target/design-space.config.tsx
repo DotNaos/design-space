@@ -105,7 +105,7 @@ const adapters: ComponentAdapter[] = [
       label: "Stack",
       group: "Layout",
       description: "Vertical layout primitive with an explicit content slot.",
-      slots: [{ id: "content", label: "Content", accepts: ["heading", "text", "badge", "button", "input", "card", "panel"], acceptsText: false }],
+      slots: [{ id: "content", label: "Content", accepts: ["heading", "text", "badge", "button", "input", "card", "stack", "panel"], acceptsText: true }],
     },
     controls: [{ id: "surface", label: "Tailwind classes", kind: "tailwind", prop: "className" }],
     defaultProps: { className: "flex flex-col items-start gap-3" },

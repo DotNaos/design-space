@@ -6,6 +6,7 @@ import { validateStrictUi } from "../../src/model/strict-ui";
 import type { DesignDocument } from "../../src/shared/design-document";
 import type { ComponentFixture } from "../../src/shared/target-module";
 import { target } from "./design-space.config";
+import panelDocumentJson from "./src/panel.design.json";
 
 afterEach(cleanup);
 
@@ -70,5 +71,9 @@ describe("demo target adapter evidence", () => {
       ruleId: "slot.child",
       location: { kind: "slot", instanceId: "layout.one", slotId: "sidebar" },
     }));
+  });
+
+  it("keeps the authored Panel contract compatible with its Stack implementation", () => {
+    expect(validateStrictUi(target, panelDocumentJson as DesignDocument)).toEqual([]);
   });
 });

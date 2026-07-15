@@ -54,10 +54,10 @@ Status legend: `[ ]` queued, `[-]` active, `[x]` verified, `[!]` blocked on a de
 
 ## 3. Slots, keyboard actions, and context menus
 
-- [-] **UX-030A — Figma hierarchy navigation.** On the focused canvas, Enter selects the first child, Shift+Enter selects the parent, and Tab/Shift+Tab move between siblings without opening editors or slot pickers. Canvas, Tree, and Inspector must keep one authoritative selection.
-- [-] **UX-030B — Collapse and hidden implementation context.** Add Collapse all while preserving the selected path, automatically reveal/scroll canvas selections in the Tree, and highlight the union of hidden internal HTML when its disclosure is hovered or focused.
-- [-] **UX-030C — Explicit Strict UI child allow-lists.** Every new slot must explicitly define accepted component IDs and a text policy. Picker and direct insertion fail closed. Provide a Layout example whose Sidebar and Main slots only accept their matching containers.
-- [-] **UX-030D — Slot collections and component arguments.** Slot contracts distinguish a single child from an ordered child list with minimum/maximum cardinality. Component authoring exposes typed properties/arguments, defaults, required values, and option constraints.
+- [x] **UX-030A — Figma hierarchy navigation.** On the focused canvas, Enter selects the first child, Shift+Enter selects the parent, and Tab/Shift+Tab move between siblings without opening editors or slot pickers. Canvas, Tree, and Inspector must keep one authoritative selection.
+- [x] **UX-030B — Collapse and hidden implementation context.** Add Collapse all while preserving the selected path, automatically reveal/scroll canvas selections in the Tree, and highlight the union of hidden internal HTML when its disclosure is hovered or focused.
+- [x] **UX-030C — Explicit Strict UI child allow-lists.** Every new slot must explicitly define accepted component IDs and a text policy. Picker and direct insertion fail closed. Provide a Layout example whose Sidebar and Main slots only accept their matching containers.
+- [x] **UX-030D — Slot collections and component arguments.** Slot contracts distinguish a single child from an ordered child list with minimum/maximum cardinality. Component authoring exposes typed properties/arguments, defaults, required values, and option constraints.
 
 - [-] **UX-030 — Delete selected composition content.** Delete/Backspace removes the selected child from its parent slot with undo, reset, exact diff, stale-source protection, and focus guards so text fields are never affected.
 - [-] **UX-031 — Delete authored slot definitions safely.** In Library authoring only, allow an explicitly selected slot definition/outlet to be removed after dependency validation. Block destructive changes when dependent documents would become invalid.
@@ -77,7 +77,7 @@ Status legend: `[ ]` queued, `[-]` active, `[x]` verified, `[!]` blocked on a de
 
 ## 5. Tailwind code editor and language intelligence
 
-- [-] **UX-049A — Slider-first mapped controls and tooltips.** Use accessible HeroUI sliders for ordered Tailwind scales (spacing, radius, opacity, shadow), retain semantic selects and icon segments where appropriate, and add HeroUI tooltips to icon-only actions without replacing accessible labels.
+- [x] **UX-049A — Slider-first mapped controls and tooltips.** Use accessible HeroUI sliders for ordered Tailwind scales (spacing, radius, opacity, shadow), retain semantic selects and icon segments where appropriate, and add HeroUI tooltips to icon-only actions without replacing accessible labels.
 
 - [x] **UX-050 — Official Tailwind intelligence spike.** Prove how the official Tailwind language service can run locally against the server-registered target configuration/theme without browser-supplied executable paths, commands, or module paths.
 - [-] **UX-051 — Single-field Tailwind editor.** Add exactly one focused Tailwind class field, not a component source-code view. It may render committed classes as chips outside the typing surface, but editing remains one compact VS-Code-like input with keyboard navigation, completion UI, Tab acceptance, and mobile-safe text entry.
