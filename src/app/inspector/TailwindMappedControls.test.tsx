@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { replaceTailwindUtilityGroup, TailwindMappedControls } from "./TailwindMappedControls";
+import { replaceTailwindUtilityGroup, snapSliderIndex, TailwindMappedControls } from "./TailwindMappedControls";
 
 afterEach(cleanup);
 
@@ -50,6 +51,55 @@ describe("replaceTailwindUtilityGroup", () => {
 });
 
 describe("TailwindMappedControls", () => {
+  it("renders one visible track marker for Auto and every spacing token", () => {
+    const { container } = render(<TailwindMappedControls value="gap-4" onChange={vi.fn()} />);
+    const track = container.querySelector('[data-slider-group="gap"]');
+    const ticks = [...(track?.querySelectorAll<HTMLElement>("[data-slider-step]") ?? [])];
+
+    expect(ticks.map((tick) => tick.dataset.sliderStep)).toEqual([
+      "auto", "gap-0", "gap-1", "gap-2", "gap-3", "gap-4", "gap-5", "gap-6", "gap-7", "gap-8",
+    ]);
+    expect(ticks[0]).toHaveStyle({ left: "0%" });
+    expect(ticks.at(-1)).toHaveStyle({ left: "100%" });
+  });
+
+  it.each([
+    ["Gap", "gap"],
+    ["Gap X", "gap-x"],
+    ["Gap Y", "gap-y"],
+    ["Padding", "p"],
+    ["Padding X", "px"],
+    ["Padding Y", "py"],
+  ])("emits only named Tailwind spacing tokens for %s", (name, prefix) => {
+    for (let index = 0; index <= 9; index += 1) {
+      const onChange = vi.fn();
+      const initialValue = index === 0 ? `${prefix}-1` : `${prefix}-[13px]`;
+      const { unmount } = render(<TailwindMappedControls value={initialValue} onChange={onChange} />);
+      moveSlider(name, index);
+      const emitted = onChange.mock.lastCall?.[0] as string;
+      expect(emitted).toBe(index === 0 ? "" : `${prefix}-${index - 1}`);
+      expect(emitted).not.toContain("[");
+      unmount();
+    }
+  });
+
+  it("moves exactly one named token per Arrow key and keeps Home/End semantics", () => {
+    const onChange = vi.fn();
+    function Harness() {
+      const [value, setValue] = useState("gap-2");
+      return <TailwindMappedControls value={value} onChange={(next) => { setValue(next); onChange(next); }} />;
+    }
+    render(<Harness />);
+    const slider = screen.getByRole("slider", { name: "Gap" });
+
+    fireEvent.keyDown(slider, { key: "ArrowRight", code: "ArrowRight" });
+    expect(onChange).toHaveBeenLastCalledWith("gap-3");
+    fireEvent.keyDown(slider, { key: "Home", code: "Home" });
+    expect(onChange).toHaveBeenLastCalledWith("");
+    fireEvent.keyDown(slider, { key: "End", code: "End" });
+    expect(onChange).toHaveBeenLastCalledWith("gap-8");
+  });
+
   it("uses accessible icon segments for common layout choices", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -146,6 +196,17 @@ describe("TailwindMappedControls", () => {
       expect(onChange).toHaveBeenCalledWith("shadow-md shadow-[#50d71e]");
     },
   );
+});
+
+describe("snapSliderIndex", () => {
+  it("rounds and clamps every incoming position to a deterministic option index", () => {
+    expect(snapSliderIndex(undefined, 9)).toBe(0);
+    expect(snapSliderIndex(Number.NaN, 9)).toBe(0);
+    expect(snapSliderIndex(-3, 9)).toBe(0);
+    expect(snapSliderIndex(2.49, 9)).toBe(2);
+    expect(snapSliderIndex(2.5, 9)).toBe(3);
+    expect(snapSliderIndex(99, 9)).toBe(9);
+  });
 });
 
 function moveSlider(name: string, index: number) {

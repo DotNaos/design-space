@@ -256,7 +256,7 @@ function SliderUtilityControl(props: { current: string; group: UtilityGroup; onC
   const selectedIndex = selection.custom ? 0 : Math.max(0, steps.findIndex((step) => step.value === selection.utility));
   const output = selection.custom ? `Custom · ${selection.token}` : steps[selectedIndex]?.label ?? "Auto";
   const setIndex = (next: number | number[]) => {
-    const index = Array.isArray(next) ? next[0] : next;
+    const index = snapSliderIndex(Array.isArray(next) ? next[0] : next, steps.length - 1);
     const value = steps[index]?.value ?? "";
     props.onChange(replaceTailwindUtilityGroup(props.current, optionValues(props.group), value, props.group.matches));
   };
@@ -286,9 +286,18 @@ function SliderUtilityControl(props: { current: string; group: UtilityGroup; onC
           <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Reset {props.group.label} to Auto</Tooltip.Content>
         </Tooltip>
       </span>
-      <Slider.Track className="col-span-2 h-7 w-full cursor-pointer">
+      <Slider.Track data-slider-group={props.group.id} className="relative col-span-2 h-7 w-full cursor-pointer">
         <span className="absolute left-0 top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-white/10" />
         <Slider.Fill className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-sky-400" />
+        {steps.map((step, index) => (
+          <span
+            key={`${props.group.id}-${step.value || "auto"}`}
+            aria-hidden="true"
+            className={`pointer-events-none absolute top-1/2 h-2 w-px -translate-x-1/2 -translate-y-1/2 rounded-full ${!selection.custom && index === selectedIndex ? "bg-sky-100" : "bg-zinc-500/80"}`}
+            data-slider-step={step.value || "auto"}
+            style={{ left: `${steps.length === 1 ? 0 : (index / (steps.length - 1)) * 100}%` }}
+          />
+        ))}
         <Slider.Thumb
           aria-valuetext={output}
           className="top-1/2 size-5 rounded-full border-2 border-[#141518] bg-sky-300 shadow-md outline-none ring-offset-2 ring-offset-[#141518] data-[focus-visible]:ring-2 data-[focus-visible]:ring-sky-300"
@@ -296,6 +305,11 @@ function SliderUtilityControl(props: { current: string; group: UtilityGroup; onC
       </Slider.Track>
     </Slider>
   );
+}
+
+export function snapSliderIndex(value: number | undefined, maxIndex: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || maxIndex <= 0) return 0;
+  return Math.max(0, Math.min(maxIndex, Math.round(value)));
 }
 
 function SelectGrid(props: { current: string; groups: readonly UtilityGroup[]; onChange: (value: string) => void }) {
