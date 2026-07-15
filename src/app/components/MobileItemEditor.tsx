@@ -17,6 +17,7 @@ type MobileItemEditorProps = {
   compileError?: string;
   compilePending: boolean;
   sourceBacked: boolean;
+  htmlElement?: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   canDuplicate: boolean;
@@ -24,6 +25,7 @@ type MobileItemEditorProps = {
   onControlChange: (prop: string, value: DesignValue | undefined) => void;
   onSelectSlot?: (slot: SlotState) => void;
   onEditDefinition?: () => void;
+  onOpenIsolated?: () => void;
   onMove: (offset: -1 | 1) => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -96,10 +98,12 @@ export function MobileItemEditor(props: MobileItemEditorProps) {
         componentLabel={props.componentLabel}
         sourceLabel={props.sourceLabel}
         sourceBacked={props.sourceBacked}
+        htmlElement={props.htmlElement}
         onBack={props.onCancel}
         onEditDefinition={props.onEditDefinition}
+        onOpenIsolated={props.onOpenIsolated}
       />
-      <ItemEditorActions
+      {!props.htmlElement && <ItemEditorActions
         canMoveUp={props.canMoveUp}
         canMoveDown={props.canMoveDown}
         canDuplicate={props.canDuplicate}
@@ -107,7 +111,7 @@ export function MobileItemEditor(props: MobileItemEditorProps) {
         onMove={props.onMove}
         onDuplicate={props.onDuplicate}
         onDelete={props.onDelete}
-      />
+      />}
       <ItemEditorTools
         mode="mobile"
         controls={props.controls}

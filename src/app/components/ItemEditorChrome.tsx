@@ -1,13 +1,15 @@
 import { Button } from "@heroui/react";
-import { ArrowDown, ArrowLeft, ArrowUp, Component, Copy, PencilRuler, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Code2, Component, Copy, Focus, PencilRuler, Trash2 } from "lucide-react";
 
 export function ItemEditorIdentity(props: {
   componentLabel: string;
   sourceLabel?: string;
   sourceBacked?: boolean;
   mobile?: boolean;
+  htmlElement?: boolean;
   onBack?: () => void;
   onEditDefinition?: () => void;
+  onOpenIsolated?: () => void;
 }) {
   return (
     <header className="flex min-h-14 shrink-0 items-center gap-2 border-b border-white/10 px-2.5 py-2">
@@ -17,7 +19,7 @@ export function ItemEditorIdentity(props: {
         </Button>
       ) : (
         <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg bg-sky-400/10 text-sky-300">
-          <Component size={16} strokeWidth={1.8} />
+          {props.htmlElement ? <Code2 size={16} strokeWidth={1.8} /> : <Component size={16} strokeWidth={1.8} />}
         </span>
       )}
 
@@ -28,6 +30,11 @@ export function ItemEditorIdentity(props: {
         </p>
       </div>
 
+      {props.onOpenIsolated && (
+        <Button aria-label="Open component in isolation" className="shrink-0" isIconOnly size="sm" variant="ghost" onPress={props.onOpenIsolated}>
+          <Focus size={15} />
+        </Button>
+      )}
       {props.onEditDefinition ? (
         <Button className="shrink-0 gap-1.5 text-[10px]" size="sm" variant="ghost" onPress={props.onEditDefinition}>
           <PencilRuler size={14} />

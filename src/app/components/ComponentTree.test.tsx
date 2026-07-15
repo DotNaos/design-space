@@ -115,13 +115,36 @@ describe("ComponentTree Strict UI markers", () => {
 
     const openingTag = screen.getByText("<div>").closest("button");
     const slot = screen.getByRole("treeitem", { name: /Body slot/ });
-    const closingTag = screen.getByText("</div>").closest("div");
+    const closingTag = screen.getByText("</div>").closest("button");
 
     expect(openingTag).toHaveAttribute("data-html-boundary", "open");
     expect(openingTag?.parentElement).toHaveStyle({ paddingLeft: "22px" });
     expect(slot.parentElement).toHaveStyle({ paddingLeft: "40px" });
     expect(closingTag).toHaveAttribute("data-html-boundary", "close");
     expect(closingTag).toHaveStyle({ paddingLeft: "30px" });
+  });
+
+  it("selects the same HTML element from its closing tag", async () => {
+    const onSelect = vi.fn();
+    render(
+      <ComponentTree
+        pageLabel="Dashboard"
+        rows={expandedRows}
+        selectedId="card.one"
+        showInternals
+        onSelect={onSelect}
+        onToggleInternals={vi.fn()}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("treeitem", { name: "</div>" }));
+
+    expect(onSelect).toHaveBeenCalledWith({
+      kind: "html",
+      id: "html:card.one:surface",
+      componentInstanceId: "card.one",
+      nodeId: "surface",
+    });
   });
 
   it("shows disclosure chevrons only for rows with descendants and does not select on toggle", async () => {

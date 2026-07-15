@@ -13,6 +13,7 @@ import {
   removeComponentProperty,
   updateComponentSlot,
   updateDocumentLabel,
+  updateDesignHtmlClassName,
   updateDesignProps,
 } from "./document-commands";
 
@@ -54,6 +55,18 @@ describe("design document commands", () => {
 
     expect(emptied.root).toBeNull();
     expect(screen.root).not.toBeNull();
+  });
+
+  it("stores Tailwind classes on one internal HTML node without changing component props", () => {
+    const edited = updateDesignHtmlClassName(screen, "first", "copy.surface", "rounded-xl p-6");
+
+    expect(edited.root!.slots.content[0]).toMatchObject({
+      node: {
+        props: { children: "One" },
+        htmlClassNames: { "copy.surface": "rounded-xl p-6" },
+      },
+    });
+    expect(screen.root!.slots.content[0]).not.toHaveProperty("node.htmlClassNames");
   });
 
   it("creates explicit slot outlets in component definitions", () => {

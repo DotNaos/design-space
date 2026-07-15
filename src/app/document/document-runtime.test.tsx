@@ -286,7 +286,7 @@ it("keeps sibling implementation slot and HTML evidence uniquely scoped behind t
     root: {
       ...panel.root!,
       slots: { content: [
-        { kind: "component", node: { instanceId: "box.one", adapterId: "box", props: { label: "First box" }, slots: { content: [] } } },
+        { kind: "component", node: { instanceId: "box.one", adapterId: "box", props: { label: "First box" }, htmlClassNames: { surface: "rounded-xl p-6" }, slots: { content: [] } } },
         { kind: "component", node: { instanceId: "box.two", adapterId: "box", props: { label: "Second box" }, slots: { content: [] } } },
         ...panel.root!.slots.content,
       ] },
@@ -306,6 +306,7 @@ it("keeps sibling implementation slot and HTML evidence uniquely scoped behind t
 
   const workshop = render(<>{renderDesignDocument(targetWithBoxes, boxedPanel, [boxedPanel])}</>);
   expect(screen.getByText("First box")).toHaveAttribute("data-design-space-html-id", "html:box.one:surface");
+  expect(screen.getByText("First box")).toHaveClass("rounded-xl", "p-6");
   expect(workshop.container.querySelector('[data-design-space-slot-id="slot:box.two:content"]')).toBeInTheDocument();
   workshop.unmount();
 

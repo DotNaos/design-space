@@ -38,6 +38,7 @@ export type ComponentTreeRow =
       readonly depth: number;
       readonly label: string;
       readonly id: string;
+      readonly closeSelection?: Extract<SelectionTarget, { kind: "html" }>;
     }
   | {
       readonly kind: "slot";
@@ -112,7 +113,18 @@ function appendHtmlRows(
     if (selfClosing) continue;
     appendHtmlRows(rows, node.children ?? [], depth + 1, componentInstanceId, appendSlot);
     if (node.slotId) appendSlot(node.slotId, depth + 1);
-    rows.push({ kind: "html-close", depth, label: node.tagName, id: selectionId });
+    rows.push({
+      kind: "html-close",
+      depth,
+      label: node.tagName,
+      id: selectionId,
+      closeSelection: {
+        kind: "html",
+        id: selectionId,
+        componentInstanceId,
+        nodeId: node.id,
+      },
+    });
   }
 }
 

@@ -20,6 +20,7 @@ export function DesktopDocumentEditingPanel(props: {
   itemEditor: ItemEditor;
   onDocumentChange: (document: DesignDocument) => void;
   onDefinitionEditorChange: (open: boolean) => void;
+  onOpenIsolated: (instanceId: string) => void;
   onSelectSlot: (slot: SlotState, instanceId: string) => void;
 }) {
   const model = props.itemEditor.model;
@@ -44,10 +45,11 @@ export function DesktopDocumentEditingPanel(props: {
   return (
     <DocumentInspector
       className="flex h-full w-full border-l-0"
-      componentLabel={model.adapter.component.label}
+      componentLabel={model.htmlElement ? `<${model.htmlElement.tagName}>` : model.adapter.component.label}
+      htmlElement={Boolean(model.htmlElement)}
       sourceLabel={model.adapter.sourceFileId ? props.files.find((file) => file.id === model.adapter.sourceFileId)?.label : undefined}
       sourceBacked={Boolean(model.adapter.sourceFileId)}
-      controls={model.adapter.controls}
+      controls={model.controls}
       values={model.controlValues}
       slots={model.slots}
       compileError={model.compileError}
@@ -56,10 +58,11 @@ export function DesktopDocumentEditingPanel(props: {
       canMoveDown={Boolean(model.location && model.location.index < model.location.siblingCount - 1)}
       canDuplicate={model.canDuplicate}
       canDelete={model.canDelete}
-      onEditDefinition={() => {
+      onEditDefinition={model.htmlElement ? undefined : () => {
         props.itemEditor.close();
         props.onDefinitionEditorChange(true);
       }}
+      onOpenIsolated={() => props.onOpenIsolated(model.instance.instanceId)}
       onControlChange={props.itemEditor.updateControl}
       onSelectSlot={(slot) => props.onSelectSlot(slot, model.instance.instanceId)}
       onMove={props.itemEditor.move}

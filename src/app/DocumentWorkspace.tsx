@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { SelectionTarget } from "../model";
-import type { TailwindPreview } from "../shared/contracts";
 import type { DesignDocument } from "../shared/design-document";
 import type { TargetModule } from "../shared/target-module";
 import { DiffPanel } from "./components/DiffPanel";
-import { runLocalOperation } from "./api";
 import type { ProductMode } from "./documents/DocumentNavigator";
 import { DesktopDocumentEditingPanel } from "./documents/DesktopDocumentEditingPanel";
 import { DocumentDefinitionPanel } from "./documents/DocumentDefinitionPanel";
@@ -19,6 +17,7 @@ import { documentCatalog, resolveDocumentAdapter, wouldCreateAuthoredComponentCy
 import { findDesignNode } from "./document/document-commands";
 import { createDesignIdFactory } from "./document/design-id";
 import { createLegacyDocument, documentToFixture } from "./document/fixture-document";
+import { documentHtmlClassNames, observedHtmlClassName } from "./document/html-style-overrides";
 import { DesignDocumentPreview } from "./document/document-runtime";
 import { isDocumentDirty } from "./document/document-session";
 import { buildDesignDocumentTree } from "./document/document-tree";
@@ -27,9 +26,11 @@ import { projectDocumentSlots } from "./document/document-workspace-projections"
 import { buildSelectionNavigation, navigateSelection, requiredTreeDisclosures } from "./document/selection-navigation";
 import type { PreviewDomSnapshot } from "./dom/dom-snapshot";
 import { useDocumentCreationFlow } from "./document/use-document-creation-flow";
+import { useComponentFocus } from "./document/use-component-focus";
+import { useDocumentTailwindPreview } from "./document/use-document-tailwind-preview";
 import { useDocumentSelectionInteractions } from "./document/use-document-selection-interactions";
 import { useWorkspaceKeyboardCommands } from "./document/use-workspace-keyboard-commands";
-import { collectDocumentTailwind, useDocumentItemEditor } from "./document/use-document-item-editor";
+import { useDocumentItemEditor } from "./document/use-document-item-editor";
 import { useDocumentWorkspace } from "./document/use-document-workspace";
 import { BlockedOrLoading, NoSelectionPrompt } from "./document/WorkspaceStates";
 import { PreviewBoundary } from "./PreviewBoundary";
@@ -46,7 +47,6 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const fallback = useMemo(() => createLegacyDocument(target), [target]);
   const document = session?.draft ?? fallback;
   const library = controller.documents;
-  const fixture = useMemo(() => document.root ? documentToFixture(document) : undefined, [document]);
   const [mode, setMode] = useState<ProductMode>(document.kind === "component" ? "library" : "app");
   const [mobilePane, setMobilePane] = useState<MobilePane>("canvas");
   const [browserView, setBrowserView] = useState<WorkspaceBrowserView>("documents");
@@ -62,13 +62,13 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const [showStrictUi, setShowStrictUi] = useState(false);
   const [definitionEditor, setDefinitionEditor] = useState(true);
   const [pendingEditId, setPendingEditId] = useState<string>();
-  const [previewCss, setPreviewCss] = useState("");
-  const [compiledTailwind, setCompiledTailwind] = useState<string>();
-  const [previewError, setPreviewError] = useState<string>();
   const [observedDom, setObservedDom] = useState<PreviewDomSnapshot>({});
   const [hoveredSelection, setHoveredSelection] = useState<SelectionTarget>();
   const [highlightedInternalHtmlComponentId, setHighlightedInternalHtmlComponentId] = useState<string>();
   const [requestedFileId, setRequestedFileId] = useState<string>();
+  const componentFocus = useComponentFocus(document, target, library);
+  const focusedDocument = componentFocus.document;
+  const fixture = useMemo(() => focusedDocument.root ? documentToFixture(focusedDocument) : undefined, [focusedDocument]);
   const selectTarget = (next: SelectionTarget) => {
     setSelection(next);
     setSelectionActive(true);
@@ -104,8 +104,8 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const slots: SlotState[] = view && selectedInstance && selectedNode
     ? projectDocumentSlots(target, library, selectedNode, view.catalog, selectedInstance)
     : [];
-  const rows = useMemo(() => buildDesignDocumentTree(target, document, library, revealedInternals, observedDom), [document, library, observedDom, revealedInternals, target]);
-  const allRows = useMemo(() => buildDesignDocumentTree(target, document, library, true, observedDom), [document, library, observedDom, target]);
+  const rows = useMemo(() => buildDesignDocumentTree(target, focusedDocument, library, revealedInternals, observedDom), [focusedDocument, library, observedDom, revealedInternals, target]);
+  const allRows = useMemo(() => buildDesignDocumentTree(target, focusedDocument, library, true, observedDom), [focusedDocument, library, observedDom, target]);
   const selectionNavigation = useMemo(() => buildSelectionNavigation(allRows), [allRows]);
   const internalTreeIds = useMemo(() => {
     const implementationIds = rows.flatMap((row) => row.kind === "internals-summary" ? [row.disclosureId] : []);
@@ -140,6 +140,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     createId,
     onCommit: controller.edit,
     onSelect: selectTarget,
+    previewRootInstanceId: componentFocus.instanceId,
   });
   useEffect(() => {
     const loadedKind = session?.draft.kind;
@@ -155,6 +156,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     setHoveredSelection(undefined);
     setHighlightedInternalHtmlComponentId(undefined);
     setRequestedFileId(undefined);
+    componentFocus.close();
     setRootPicker(false);
     itemEditor.close();
   }, [document.id, document.kind, document.root?.instanceId, sourceSnapshotKey]);
@@ -173,28 +175,15 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     setPendingEditId(undefined);
   }, [document, pendingEditId]);
 
-  const tailwindInput = useMemo(() => collectDocumentTailwind(target, library, document), [document, library, target]);
-  useEffect(() => {
-    if (!controller.connected || !session) return;
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      try {
-        const result = await runLocalOperation<TailwindPreview>({ type: "compile-tailwind", value: tailwindInput });
-        if (!cancelled) {
-          setPreviewCss(result.css);
-          setCompiledTailwind(result.value);
-          setPreviewError(undefined);
-        }
-      } catch (error) {
-        if (!cancelled) setPreviewError(error instanceof Error ? error.message : "The preview did not compile.");
-      }
-    }, 120);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [controller.connected, session?.draft.id, tailwindInput]);
-  const preview = itemEditor.model?.preview ?? <DesignDocumentPreview target={target} document={document} library={library} />;
+  const tailwindPreview = useDocumentTailwindPreview({
+    target,
+    library,
+    document,
+    connected: controller.connected,
+    sessionId: session?.draft.id,
+  });
+  const tailwindInput = tailwindPreview.input;
+  const preview = itemEditor.model?.preview ?? <DesignDocumentPreview target={target} document={focusedDocument} library={library} />;
   const selectionLabel = selection.kind === "slot"
     ? slots.find((slot) => slot.id === selection.slotId)?.label ?? "Slot"
     : selection.kind === "html"
@@ -207,7 +196,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const activeSession = modeDocumentAvailable ? session : undefined;
   const preparedSave = activeSession?.prepared;
   const dirty = Boolean(activeSession && isDocumentDirty(activeSession));
-  const tailwindReady = compiledTailwind === tailwindInput && !previewError;
+  const tailwindReady = tailwindPreview.ready;
   const selectedRecipe = target.componentRecipes?.find((recipe) => recipe.id === document.component?.recipeId);
   const editorSelectionMatches = itemEditor.model && (
     selection.kind === "html" && selection.componentInstanceId === itemEditor.model.instance.instanceId
@@ -220,7 +209,10 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   const canvasSlots = itemEditor.model?.slots ?? slots;
   const canvasRootId = itemEditor.model?.view.root.instanceId ?? view?.root.instanceId ?? document.root?.instanceId ?? emptyRootSelection.id;
   const canvasSelectedId = itemEditor.model?.instance.instanceId ?? selectedNode?.instanceId ?? emptyRootSelection.id;
-  const canvasSelectionLabel = itemEditor.model?.adapter.component.label ?? selectionLabel;
+  const canvasSelectionLabel = itemEditor.model?.htmlElement
+    ? `<${itemEditor.model.htmlElement.tagName}>`
+    : itemEditor.model?.adapter.component.label ?? selectionLabel;
+  const canvasHtmlClassNames = documentHtmlClassNames(itemEditor.model?.session.draft ?? document);
   const outletSlotDefinition = selection.kind === "slot-outlet"
     ? document.component?.slots.find((slot) => slot.id === selection.slotId)
     : undefined;
@@ -234,9 +226,15 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
           acceptedLabels: outletSlotDefinition.accepts?.map((adapterId) => resolveDocumentAdapter(target, library, adapterId)?.component.label ?? adapterId),
         }
       : undefined;
+  const resolveHtmlEditor = (htmlSelection: Extract<SelectionTarget, { kind: "html" }>) => ({
+    tagName: allRows.find((row) => row.kind === "html" && row.selection.id === htmlSelection.id)?.label ?? "div",
+    className: findDesignNode(document.root, htmlSelection.componentInstanceId)?.htmlClassNames?.[htmlSelection.nodeId]
+      ?? observedHtmlClassName(observedDom, htmlSelection),
+  });
 
   const switchMode = (next: ProductMode) => {
     setMode(next);
+    componentFocus.close();
     itemEditor.close();
     setDefinitionEditor(true); setPendingEditId(undefined);
     setSlotPicker(undefined); setRootPicker(false); setInsertMode(false);
@@ -311,6 +309,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
     definitionEditor, modeDocumentAvailable, itemEditor, interactions,
     setSelection: selectTarget, setDefinitionEditor, setPendingEditId, setMobilePane,
     setBrowserView, setInsertMode, setSlotPicker, setShowStrictUi,
+    resolveHtmlEditor,
   });
 
   useWorkspaceKeyboardCommands({
@@ -338,6 +337,10 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
       onDocumentChange={controller.edit}
       onDefinitionEditorChange={setDefinitionEditor}
       onSelectSlot={(slot, instanceId) => interactions.selectTarget({ kind: "slot", id: slot.selectionId, componentInstanceId: instanceId, slotId: slot.id })}
+      onOpenIsolated={(instanceId) => {
+        componentFocus.open(instanceId);
+        setMobilePane("canvas");
+      }}
     />
   ) : modeDocumentAvailable ? (
     <EmptyDocumentRoot className="flex h-full w-full" compact documentKind={document.kind} onInsert={() => setRootPicker(true)} />
@@ -363,10 +366,11 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
 
   return (
     <div className="flex h-dvh w-full min-w-0 flex-col overflow-hidden bg-[#0d0e10] text-zinc-200">
-      <style data-design-space-document-preview>{itemEditor.model?.previewCss ?? previewCss}</style>
+      <style data-design-space-document-preview>{itemEditor.model?.previewCss ?? tailwindPreview.css}</style>
       <WorkspaceTopBar
         targetLabel={target.project.label}
         documentLabel={modeDocumentAvailable ? document.label : `No ${modeDocumentKind} selected`}
+        focusLabel={componentFocus.label}
         mode={mode}
         connected={controller.connected}
         strictUi={activeSession?.strictUi}
@@ -387,6 +391,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
           else if (result) setShowStrictUi(true);
         })}
         onSave={() => void controller.save().then((result) => result && setShowDiff(false))}
+        onExitFocus={componentFocus.close}
       />
       <DocumentWorkspacePanels
         projectId={target.project.id}
@@ -424,11 +429,12 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         canvasSelection={selectionActive ? canvasSelection : undefined}
         canvasSelectionLabel={canvasSelectionLabel}
         canvasSlots={canvasSlots}
+        htmlClassNames={canvasHtmlClassNames}
         selectedSlot={selectionActive ? selectedSlot : undefined}
         slotPicker={slotPicker}
         pickerLabel={pickerSlot?.label ?? "slot"}
         pickerEntries={pickerEntries}
-        actionMessage={interactions.actionError ?? controller.message ?? previewError}
+        actionMessage={interactions.actionError ?? controller.message ?? tailwindPreview.error}
         slotDependencyMessage={interactions.slotDependencyMessage}
         rightOverride={showDiff && preparedSave ? (
           <DiffPanel
@@ -451,6 +457,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         onModeChange={switchMode}
         onDocumentSelect={(id) => {
           itemEditor.close();
+          componentFocus.close();
           controller.selectDocument(id);
           setMobilePane("canvas");
         }}
@@ -532,6 +539,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
           selectSlot: (slot, occupied) => { itemEditor.close(); interactions.selectTarget(slot); setMobilePane(occupied ? "tree" : "canvas"); },
           closeItemEditor: () => { itemEditor.close(); setMobilePane("canvas"); },
           applyItemEditor: () => { itemEditor.apply(); setMobilePane("canvas"); },
+          openIsolated: (instanceId) => { componentFocus.open(instanceId); setMobilePane("canvas"); },
         }}
       />
     </div>

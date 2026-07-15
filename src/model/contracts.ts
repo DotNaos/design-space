@@ -14,6 +14,7 @@ export interface HtmlTreeNode {
   readonly kind: "html";
   readonly id: string;
   readonly tagName: string;
+  readonly className?: string;
   readonly slotId?: SlotId;
   readonly children?: readonly HtmlTreeNode[];
 }

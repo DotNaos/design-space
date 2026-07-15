@@ -59,6 +59,7 @@ export function DocumentWorkspacePanels(props: {
   canvasSelection?: SelectionTarget;
   canvasSelectionLabel: string;
   canvasSlots: readonly SlotState[];
+  htmlClassNames?: Readonly<Record<string, string>>;
   selectedSlot?: SlotState;
   slotPicker?: SlotSelection;
   pickerLabel: string;
@@ -157,6 +158,7 @@ export function DocumentWorkspacePanels(props: {
         selection={props.canvasSelection}
         selectionLabel={props.canvasSelectionLabel}
         slots={props.canvasSlots}
+        htmlClassNames={props.htmlClassNames}
         hoveredSelection={props.hoveredSelection}
         highlightedInternalHtmlComponentId={props.highlightedInternalHtmlComponentId}
         strictUiViolations={props.strictUiViolations}

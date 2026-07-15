@@ -80,7 +80,10 @@ function renderNode(
     ]));
     const htmlAttributes = Object.fromEntries(flattenInternalHtml(adapter.component.internalHtml ?? []).map((item) => [
       item.id,
-      { "data-design-space-html-id": htmlSelectionId(node.instanceId, item.id) },
+      {
+        "data-design-space-html-id": htmlSelectionId(node.instanceId, item.id),
+        ...(node.htmlClassNames?.[item.id] !== undefined ? { className: node.htmlClassNames[item.id] } : {}),
+      },
     ]));
     const context: AdapterRenderContext = { slotChildren, previewAttributes, slotAttributes, htmlAttributes };
     const rendered = adapter.render({ ...adapter.defaultProps, ...node.props, ...inheritedProps, ...boundProps }, context);
@@ -160,7 +163,10 @@ function renderTemplateNode(
   ]));
   const htmlAttributes = Object.fromEntries(flattenInternalHtml(adapter.component.internalHtml ?? []).map((item) => [
     item.id,
-    { "data-design-space-html-id": htmlSelectionId(template.instanceId, item.id) },
+    {
+      "data-design-space-html-id": htmlSelectionId(template.instanceId, item.id),
+      ...(template.htmlClassNames?.[item.id] !== undefined ? { className: template.htmlClassNames[item.id] } : {}),
+    },
   ]));
   const rendered = adapter.render(
     { ...adapter.defaultProps, ...template.props, ...resolveBoundProps(template, bindingContext) },

@@ -48,6 +48,7 @@ function visitNode(
   authoredPath: readonly string[],
   templateContext: TailwindTemplateContext | undefined,
 ): void {
+  collectClassNames(node.htmlClassNames, tokens);
   const bound = resolveBindings(node, templateContext);
   const targetAdapter = target.adapters.find((candidate) => candidate.component.id === node.adapterId);
   if (targetAdapter) {
@@ -76,6 +77,12 @@ function visitNode(
       callerAuthoredPath: authoredPath,
     },
   );
+}
+
+function collectClassNames(values: Readonly<Record<string, string>> | undefined, tokens: Set<string>): void {
+  for (const value of Object.values(values ?? {})) {
+    for (const token of value.trim().split(/\s+/).filter(Boolean)) tokens.add(token);
+  }
 }
 
 function visitSlots(

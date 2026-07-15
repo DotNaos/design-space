@@ -65,6 +65,23 @@ it("collects and deduplicates Tailwind from authored templates, bindings, and pr
   expect(collectDocumentTailwind(target, [panel], screen.root!)).toBe("p-2 gap-4 p-6 rounded-xl mt-2");
 });
 
+it("collects Tailwind overrides from internal HTML nodes", () => {
+  const screen: DesignDocument = {
+    schemaVersion: 2,
+    id: "screen.html",
+    label: "HTML styles",
+    kind: "screen",
+    root: {
+      instanceId: "stack.html",
+      adapterId: "stack",
+      htmlClassNames: { surface: "rounded-2xl p-8 border" },
+      slots: { content: [] },
+    },
+  };
+
+  expect(collectDocumentTailwind(target, [], screen)).toBe("rounded-2xl p-8 border");
+});
+
 it("passes an outer authored binding through a nested authored component template", () => {
   const inner: DesignDocument = {
     schemaVersion: 2,

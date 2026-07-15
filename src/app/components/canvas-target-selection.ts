@@ -39,14 +39,14 @@ export function selectionForCanvasTarget(
 
     if (parsedSlot && !element.dataset.designSpaceInstanceId) return parsedSlot;
 
+    const instanceId = element.dataset.designSpaceInstanceId;
+    if (instanceId) return { kind: "component", id: instanceId };
+
     const htmlId = element.dataset.designSpaceHtmlId;
     if (htmlId) {
       const parsed = parseHtmlSelectionId(htmlId);
       if (parsed) return parsed;
     }
-
-    const instanceId = element.dataset.designSpaceInstanceId;
-    if (instanceId) return { kind: "component", id: instanceId };
 
     if (parsedSlot) return parsedSlot;
     if (slot) return selectionForSlot(slot, selectedComponentInstanceId);

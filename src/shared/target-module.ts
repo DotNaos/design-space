@@ -13,6 +13,7 @@ export type PreviewSlotAttributes = Readonly<{
 
 export type PreviewHtmlAttributes = Readonly<{
   "data-design-space-html-id": string;
+  className?: string;
 }>;
 
 export interface AdapterRenderContext {

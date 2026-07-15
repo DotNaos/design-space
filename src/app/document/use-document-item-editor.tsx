@@ -15,6 +15,7 @@ import {
   findDesignNodeLocation,
   moveDesignComponent,
   removeDesignComponent,
+  updateDesignHtmlClassName,
   updateDesignProps,
 } from "./document-commands";
 import { resolveDocumentAdapter } from "./document-adapters";
@@ -23,6 +24,11 @@ import { DesignDocumentPreview } from "./document-runtime";
 interface EditorSession {
   draft: DesignDocument;
   selectedInstanceId: string;
+  selectedHtml?: {
+    nodeId: string;
+    tagName: string;
+    initialClassName: string;
+  };
 }
 
 interface UseDocumentItemEditorOptions {
@@ -34,6 +40,7 @@ interface UseDocumentItemEditorOptions {
   createId: () => string;
   onCommit: (document: DesignDocument) => void;
   onSelect: (selection: SelectionTarget) => void;
+  previewRootInstanceId?: string;
 }
 
 export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
@@ -53,7 +60,8 @@ export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
 
   const model = useMemo(() => {
     if (!session?.draft.root) return undefined;
-    const fixture = documentToFixture(session.draft);
+    const editorDocument = focusEditorDocument(session.draft, options.previewRootInstanceId);
+    const fixture = documentToFixture(editorDocument);
     const componentDocuments = options.library.filter((document) => document.kind === "component");
     const view = createTargetViewModel(options.target, false, fixture, componentDocuments, { contractValidation: "tolerant" });
     const instance = findComponentInstance(view.root, session.selectedInstanceId) ?? view.root;
@@ -61,10 +69,16 @@ export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
     const adapter = resolveDocumentAdapter(options.target, options.library, node.adapterId);
     if (!adapter) return undefined;
     const props = { ...adapter.defaultProps, ...node.props };
-    const controlValues = Object.fromEntries(adapter.controls.map((control) => [
-      control.prop,
-      props[control.prop],
-    ])) as Readonly<Record<string, DesignValue | undefined>>;
+    const htmlControl = session.selectedHtml
+      ? [{ id: "internal-html-class", label: "Tailwind classes", kind: "tailwind" as const, prop: "className", section: "style" as const }]
+      : undefined;
+    const controls = htmlControl ?? adapter.controls;
+    const controlValues = session.selectedHtml
+      ? { className: node.htmlClassNames?.[session.selectedHtml.nodeId] ?? session.selectedHtml.initialClassName }
+      : Object.fromEntries(adapter.controls.map((control) => [
+          control.prop,
+          props[control.prop],
+        ])) as Readonly<Record<string, DesignValue | undefined>>;
     const tailwindInput = collectDocumentTailwind(options.target, options.library, session.draft);
     const location = findDesignNodeLocation(session.draft.root, instance.instanceId);
     const parentNode = location ? findDesignNode(session.draft.root, location.parentInstanceId) : undefined;
@@ -93,16 +107,18 @@ export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
       instance,
       node,
       adapter,
+      controls,
       controlValues,
       tailwindInput,
       location,
-      slots,
+      slots: session.selectedHtml ? [] : slots,
+      htmlElement: session.selectedHtml,
       hasTailwind: tailwindInput.length > 0,
-      canDelete: instance.instanceId === session.draft.root.instanceId
-        || Boolean(location && parentSlot && location.siblingCount > (parentSlot.min ?? 0)),
-      canDuplicate: Boolean(location && (!parentSlot?.max || location.siblingCount < parentSlot.max)),
+      canDelete: !session.selectedHtml && (instance.instanceId === session.draft.root.instanceId
+        || Boolean(location && parentSlot && location.siblingCount > (parentSlot.min ?? 0))),
+      canDuplicate: !session.selectedHtml && Boolean(location && (!parentSlot?.max || location.siblingCount < parentSlot.max)),
     };
-  }, [options.library, options.target, session]);
+  }, [options.library, options.previewRootInstanceId, options.target, session]);
 
   useEffect(() => {
     if (!model?.hasTailwind) {
@@ -147,9 +163,24 @@ export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
     setCompileError(undefined);
   };
 
+  const openHtml = (selection: Extract<SelectionTarget, { kind: "html" }>, tagName: string, className: string) => {
+    if (!findDesignNode(options.document.root, selection.componentInstanceId)) return;
+    setSession({
+      draft: options.document,
+      selectedInstanceId: selection.componentInstanceId,
+      selectedHtml: { nodeId: selection.nodeId, tagName, initialClassName: className },
+    });
+    setCompileError(undefined);
+  };
+
   const updateControl = (prop: string, value: DesignValue | undefined) => {
     setSession((current) => current
-      ? { ...current, draft: updateDesignProps(current.draft, current.selectedInstanceId, { [prop]: value }) }
+      ? {
+          ...current,
+          draft: current.selectedHtml && prop === "className"
+            ? updateDesignHtmlClassName(current.draft, current.selectedInstanceId, current.selectedHtml.nodeId, typeof value === "string" ? value : "")
+            : updateDesignProps(current.draft, current.selectedInstanceId, { [prop]: value }),
+        }
       : current);
   };
 
@@ -182,24 +213,43 @@ export function useDocumentItemEditor(options: UseDocumentItemEditorOptions) {
   const apply = () => {
     if (!model || compilePending || compileError || (model.hasTailwind && compiledValue !== model.tailwindInput)) return;
     options.onCommit(model.session.draft);
-    options.onSelect({ kind: "component", id: model.instance.instanceId });
+    options.onSelect(model.htmlElement
+      ? {
+          kind: "html",
+          id: `html:${encodeURIComponent(model.instance.instanceId)}:${encodeURIComponent(model.htmlElement.nodeId)}`,
+          componentInstanceId: model.instance.instanceId,
+          nodeId: model.htmlElement.nodeId,
+        }
+      : { kind: "component", id: model.instance.instanceId });
     setSession(undefined);
   };
 
   return {
     model: model && {
       ...model,
-      preview: <DesignDocumentPreview target={options.target} document={model.session.draft} library={options.library} />,
+      preview: <DesignDocumentPreview
+        target={options.target}
+        document={focusEditorDocument(model.session.draft, options.previewRootInstanceId)}
+        library={options.library}
+      />,
       previewCss,
       compileError,
       compilePending,
       sourceBacked: true,
     },
     open,
+    openHtml,
     close: () => setSession(undefined),
     updateControl,
     selectComponent: (instanceId: string) => setSession((current) => current && findDesignNode(current.draft.root, instanceId)
-      ? { ...current, selectedInstanceId: instanceId }
+      ? { ...current, selectedInstanceId: instanceId, selectedHtml: undefined }
+      : current),
+    selectHtml: (selection: Extract<SelectionTarget, { kind: "html" }>, tagName: string, className: string) => setSession((current) => current && findDesignNode(current.draft.root, selection.componentInstanceId)
+      ? {
+          ...current,
+          selectedInstanceId: selection.componentInstanceId,
+          selectedHtml: { nodeId: selection.nodeId, tagName, initialClassName: className },
+        }
       : current),
     move,
     duplicate,
@@ -221,4 +271,9 @@ function childLabel(
   if (child.kind === "text") return "Text";
   if (child.kind === "slot-outlet") return "Slot outlet";
   return resolveDocumentAdapter(target, library, child.node.adapterId)?.component.label;
+}
+
+function focusEditorDocument(document: DesignDocument, instanceId: string | undefined): DesignDocument {
+  const root = instanceId ? findDesignNode(document.root, instanceId) : undefined;
+  return root ? { ...document, root } : document;
 }

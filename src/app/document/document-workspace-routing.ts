@@ -8,7 +8,7 @@ import type { useDocumentItemEditor } from "./use-document-item-editor";
 import type { useDocumentSelectionInteractions } from "./use-document-selection-interactions";
 
 type SlotSelection = Extract<SelectionTarget, { kind: "slot" }>;
-type ItemEditor = Pick<ReturnType<typeof useDocumentItemEditor>, "model" | "open" | "close" | "selectComponent">;
+type ItemEditor = Pick<ReturnType<typeof useDocumentItemEditor>, "model" | "open" | "openHtml" | "close" | "selectComponent" | "selectHtml">;
 type SelectionInteractions = Pick<ReturnType<typeof useDocumentSelectionInteractions>, "selectTarget">;
 
 export function createDocumentWorkspaceRouting(options: {
@@ -27,6 +27,7 @@ export function createDocumentWorkspaceRouting(options: {
   setInsertMode: (active: boolean) => void;
   setSlotPicker: (slot: SlotSelection | undefined) => void;
   setShowStrictUi: (open: boolean) => void;
+  resolveHtmlEditor: (selection: Extract<SelectionTarget, { kind: "html" }>) => { tagName: string; className: string };
 }) {
   const selectWorkspaceTarget = (next: SelectionTarget) => {
     const editorDraft = options.itemEditor.model?.session.draft;
@@ -35,11 +36,17 @@ export function createDocumentWorkspaceRouting(options: {
       : next.kind === "html"
         ? next.componentInstanceId
         : undefined;
-    if (editorDraft && editorInstanceId && findDesignNode(editorDraft.root, editorInstanceId)) {
+    const editableDocument = editorDraft ?? options.document;
+    if (editorInstanceId && findDesignNode(editableDocument.root, editorInstanceId)) {
       options.setSelection(next);
       options.setDefinitionEditor(false);
       options.setSlotPicker(undefined);
-      options.itemEditor.selectComponent(editorInstanceId);
+      if (next.kind === "html") {
+        const html = options.resolveHtmlEditor(next);
+        if (editorDraft) options.itemEditor.selectHtml(next, html.tagName, html.className);
+        else options.itemEditor.openHtml(next, html.tagName, html.className);
+      } else if (editorDraft) options.itemEditor.selectComponent(editorInstanceId);
+      else options.itemEditor.open(editorInstanceId);
       return;
     }
     if (options.itemEditor.model) options.itemEditor.close();
@@ -54,29 +61,11 @@ export function createDocumentWorkspaceRouting(options: {
   };
 
   const navigateWorkspaceTarget = (next: SelectionTarget) => {
-    options.setSelection(next);
-    options.setDefinitionEditor(false);
-    options.setSlotPicker(undefined);
-    const draft = options.itemEditor.model?.session.draft;
-    const instanceId = next.kind === "component"
-      ? next.id
-      : next.kind === "slot" || next.kind === "html"
-        ? next.componentInstanceId
-        : undefined;
-    if (draft && instanceId && findDesignNode(draft.root, instanceId)) options.itemEditor.selectComponent(instanceId);
+    selectWorkspaceTarget(next);
   };
 
   const selectCanvasTarget = (next: SelectionTarget) => {
     selectWorkspaceTarget(next);
-    if (options.itemEditor.model) return;
-    const instanceId = next.kind === "component"
-      ? next.id
-      : next.kind === "html"
-        ? next.componentInstanceId
-        : undefined;
-    if (!instanceId || !findDesignNode(options.document.root, instanceId)) return;
-    options.setDefinitionEditor(false);
-    options.itemEditor.open(instanceId);
     options.setMobilePane("canvas");
   };
 

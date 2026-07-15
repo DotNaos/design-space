@@ -11,6 +11,7 @@ export function DocumentInspector(props: {
   componentLabel: string;
   sourceLabel?: string;
   sourceBacked?: boolean;
+  htmlElement?: boolean;
   controls: readonly ComponentControl[];
   values: Readonly<Record<string, DesignValue | undefined>>;
   slots: readonly SlotState[];
@@ -21,6 +22,7 @@ export function DocumentInspector(props: {
   canDuplicate: boolean;
   canDelete: boolean;
   onEditDefinition?: () => void;
+  onOpenIsolated?: () => void;
   onControlChange: (prop: string, value: DesignValue | undefined) => void;
   onSelectSlot: (slot: SlotState) => void;
   onMove: (offset: -1 | 1) => void;
@@ -35,9 +37,11 @@ export function DocumentInspector(props: {
         componentLabel={props.componentLabel}
         sourceLabel={props.sourceLabel}
         sourceBacked={props.sourceBacked}
+        htmlElement={props.htmlElement}
         onEditDefinition={props.onEditDefinition}
+        onOpenIsolated={props.onOpenIsolated}
       />
-      <ItemEditorActions
+      {!props.htmlElement && <ItemEditorActions
         canMoveUp={props.canMoveUp}
         canMoveDown={props.canMoveDown}
         canDuplicate={props.canDuplicate}
@@ -45,7 +49,7 @@ export function DocumentInspector(props: {
         onMove={props.onMove}
         onDuplicate={props.onDuplicate}
         onDelete={props.onDelete}
-      />
+      />}
       <ItemEditorTools
         mode="desktop"
         controls={props.controls}

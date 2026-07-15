@@ -12,6 +12,7 @@ import {
 } from "../strict-ui/strict-ui-markers";
 import {
   annotateTreeRows,
+  parseHtmlSelection,
   treeSelectionPath,
   visibleTreeRows,
   type HtmlScopeAnnotation,
@@ -231,19 +232,34 @@ function TreeRow(props: {
   }
 
   if (row.kind === "html-close") {
+    const selection = row.closeSelection ?? parseHtmlSelection(row.id);
+    const selected = row.id === props.selectedId;
     return (
-      <div
-        className={`relative flex min-h-11 items-center gap-2 pr-3 font-mono text-[10px] lg:min-h-8 ${props.htmlScope?.boundary === "close" ? "bg-sky-500/10 text-sky-200" : props.htmlScope ? "bg-sky-500/[0.045] text-zinc-500" : "text-zinc-600"}`}
+      <button
+        aria-level={row.depth + props.levelOffset}
+        aria-selected={selected}
+        className={`relative flex min-h-11 w-full items-center gap-2 pr-3 text-left font-mono text-[10px] lg:min-h-8 ${selected || props.htmlScope?.boundary === "close" ? "bg-sky-500/10 text-sky-200" : props.htmlScope ? "bg-sky-500/[0.045] text-zinc-500" : "text-zinc-600 hover:bg-white/[0.03] hover:text-zinc-400"}`}
         data-html-boundary="close"
         data-html-pair-id={props.htmlScope?.pairId}
         data-html-pair-selected={props.htmlScope?.boundary === "close" ? "true" : undefined}
         data-html-scope-selected={props.htmlScope ? "true" : undefined}
+        role="treeitem"
         style={{ paddingLeft: 12 + row.depth * 18 }}
+        tabIndex={-1}
+        type="button"
+        onClick={() => selection && props.onSelect(selection)}
+        onContextMenu={(event) => {
+          if (!selection || !props.onContextMenuRequest) return;
+          event.preventDefault();
+          props.onContextMenuRequest(selection, { x: event.clientX, y: event.clientY });
+        }}
+        onPointerEnter={() => props.onHover?.(selection)}
+        onPointerLeave={() => props.onHover?.(undefined)}
       >
         <HtmlScopeGuide scope={props.htmlScope} />
         <span aria-hidden="true" className="w-3 shrink-0" />
         <span>{`</${row.label}>`}</span>
-      </div>
+      </button>
     );
   }
 

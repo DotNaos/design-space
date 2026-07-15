@@ -57,6 +57,31 @@ const tailwindDocument: DesignDocument = {
   root: { instanceId: "surface.one", adapterId: "surface", props: { className: "p-4" }, slots: {} },
 };
 
+const htmlTarget: TargetModule = {
+  project: { id: "html-item-editor", label: "HTML item editor" },
+  defaultAdapterId: "card",
+  defaultFixture: { instanceId: "card.one", adapterId: "card", slots: {} },
+  files: [],
+  adapters: [{
+    component: {
+      id: "card",
+      label: "Card",
+      group: "Surfaces",
+      slots: [],
+      internalHtml: [{ id: "card.surface", tagName: "article" }],
+    },
+    render: (_props, context) => <article className="p-4" {...context.htmlAttributes["card.surface"]} />,
+  }],
+};
+
+const htmlDocument: DesignDocument = {
+  schemaVersion: 2,
+  id: "screen.card",
+  label: "Card screen",
+  kind: "screen",
+  root: { instanceId: "card.one", adapterId: "card", slots: {} },
+};
+
 it("closes a private item draft when a newer source snapshot arrives with the same ids", () => {
   const onCommit = vi.fn();
   const onSelect = vi.fn();
@@ -131,6 +156,50 @@ it("removes stale compiled CSS when the last Tailwind class is cleared in the sa
   await waitFor(() => expect(screen.getByTestId("compile-state")).toHaveTextContent("plain:ready"));
   expect(screen.getByTestId("item-preview-css")).toBeEmptyDOMElement();
   expect(runLocalOperationMock).toHaveBeenCalledTimes(1);
+});
+
+it("edits an internal HTML element as a real Tailwind-backed selection", async () => {
+  runLocalOperationMock.mockImplementation(async (operation) => {
+    if (operation.type === "compile-tailwind") return { value: operation.value, css: ".p-8{padding:2rem}" } as never;
+    throw new Error(`Unexpected operation ${operation.type}`);
+  });
+  const onCommit = vi.fn();
+  const onSelect = vi.fn();
+  const { result } = renderHook(() => useDocumentItemEditor({
+    target: htmlTarget,
+    document: htmlDocument,
+    library: [],
+    connected: true,
+    sourceSnapshotKey: "source-v1",
+    createId: () => "unused",
+    onCommit,
+    onSelect,
+  }));
+  const selection = {
+    kind: "html" as const,
+    id: "html:card.one:card.surface",
+    componentInstanceId: "card.one",
+    nodeId: "card.surface",
+  };
+
+  act(() => result.current.openHtml(selection, "article", "p-4"));
+  expect(result.current.model).toMatchObject({
+    htmlElement: { tagName: "article", nodeId: "card.surface" },
+    controls: [{ kind: "tailwind", prop: "className" }],
+    controlValues: { className: "p-4" },
+    canDelete: false,
+    canDuplicate: false,
+  });
+
+  act(() => result.current.updateControl("className", "p-8"));
+  await waitFor(() => expect(result.current.model?.compilePending).toBe(false));
+  expect(result.current.model?.session.draft.root?.htmlClassNames).toEqual({ "card.surface": "p-8" });
+
+  act(() => result.current.apply());
+  expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({
+    root: expect.objectContaining({ htmlClassNames: { "card.surface": "p-8" } }),
+  }));
+  expect(onSelect).toHaveBeenCalledWith(selection);
 });
 
 function TailwindEditorHarness() {

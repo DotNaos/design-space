@@ -1,5 +1,5 @@
 import { Button } from "@heroui/react";
-import { AlertTriangle, CheckCircle2, FileDiff, LoaderCircle, Redo2, RotateCcw, Save, Shield, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, FileDiff, LoaderCircle, Redo2, RotateCcw, Save, Shield, Undo2 } from "lucide-react";
 
 import type { StrictUiEvidence } from "../../shared/strict-ui";
 import type { ProductMode } from "../documents/DocumentNavigator";
@@ -7,6 +7,7 @@ import type { ProductMode } from "../documents/DocumentNavigator";
 export function WorkspaceTopBar(props: {
   targetLabel: string;
   documentLabel: string;
+  focusLabel?: string;
   mode: ProductMode;
   connected: boolean;
   strictUi?: StrictUiEvidence;
@@ -25,13 +26,21 @@ export function WorkspaceTopBar(props: {
   onStrictUi: () => void;
   onDiff: () => void;
   onSave: () => void;
+  onExitFocus?: () => void;
 }) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b border-white/10 bg-[#101113] px-2 lg:h-14 lg:gap-3 lg:px-3">
       <div className="flex min-w-0 flex-1 items-center gap-1.5 lg:flex-initial lg:gap-2">
+        {props.focusLabel && props.onExitFocus && (
+          <Button aria-label={`Back to ${props.documentLabel}`} className="size-9 shrink-0 lg:size-8" isIconOnly size="sm" variant="ghost" onPress={props.onExitFocus}>
+            <ArrowLeft size={16} />
+          </Button>
+        )}
         <div className="min-w-0 max-w-36 lg:max-w-60">
-          <span className="hidden truncate text-[9px] font-medium uppercase tracking-[0.12em] text-zinc-600 lg:block">{props.targetLabel}</span>
-          <span className="block truncate text-sm font-semibold tracking-tight text-zinc-100">{props.documentLabel}</span>
+          <span className="hidden truncate text-[9px] font-medium uppercase tracking-[0.12em] text-zinc-600 lg:block">
+            {props.focusLabel ? `${props.documentLabel} · Component` : props.targetLabel}
+          </span>
+          <span className="block truncate text-sm font-semibold tracking-tight text-zinc-100">{props.focusLabel ?? props.documentLabel}</span>
         </div>
         <ConnectionStatus connected={props.connected} />
         <StrictStatusButton disabled={!props.canStrictUi} evidence={props.strictUi} checking={props.checking} onPress={props.onStrictUi} />

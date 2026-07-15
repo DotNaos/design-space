@@ -18,11 +18,11 @@ export function Card(props: {
   htmlAttributes?: Readonly<Record<string, PreviewHtmlAttributes>>;
 }) {
   return (
-    <article {...props.previewAttributes as HTMLAttributes<HTMLElement>} {...props.htmlAttributes?.["card.article"]} className={`${props.className ?? cardSourceClassName} min-h-80 text-zinc-100`} data-ui="Card">
-      <header {...props.slotAttributes?.header} {...props.htmlAttributes?.["card.header"]} className="border-b border-white/10 pb-5" data-ui-slot="header">{props.header}</header>
-      <div {...props.slotAttributes?.body} {...props.htmlAttributes?.["card.body"]} className="py-6" data-ui-slot="body">{props.body}</div>
+    <article {...props.previewAttributes as HTMLAttributes<HTMLElement>} className={props.htmlAttributes?.["card.article"]?.className ?? `${props.className ?? cardSourceClassName} min-h-80 text-zinc-100`} {...props.htmlAttributes?.["card.article"]} data-ui="Card">
+      <header {...props.slotAttributes?.header} className={props.htmlAttributes?.["card.header"]?.className ?? "border-b border-white/10 pb-5"} {...props.htmlAttributes?.["card.header"]} data-ui-slot="header">{props.header}</header>
+      <div {...props.slotAttributes?.body} className={props.htmlAttributes?.["card.body"]?.className ?? "py-6"} {...props.htmlAttributes?.["card.body"]} data-ui-slot="body">{props.body}</div>
       {(props.slotAttributes || props.footer && props.footer.length > 0) && (
-        <footer {...props.slotAttributes?.footer} {...props.htmlAttributes?.["card.footer"]} className="min-h-10 border-t border-white/10 pt-5" data-ui-slot="footer">{props.footer}</footer>
+        <footer {...props.slotAttributes?.footer} className={props.htmlAttributes?.["card.footer"]?.className ?? "min-h-10 border-t border-white/10 pt-5"} {...props.htmlAttributes?.["card.footer"]} data-ui-slot="footer">{props.footer}</footer>
       )}
     </article>
   );

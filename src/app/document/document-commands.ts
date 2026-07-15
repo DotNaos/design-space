@@ -62,6 +62,21 @@ export function updateDesignProps(
   });
 }
 
+export function updateDesignHtmlClassName(
+  document: DesignDocument,
+  instanceId: string,
+  nodeId: string,
+  className: string,
+): DesignDocument {
+  return updateDocumentRoot(document, instanceId, (node) => ({
+    ...node,
+    htmlClassNames: {
+      ...node.htmlClassNames,
+      [nodeId]: className,
+    },
+  }));
+}
+
 export function bindComponentProperty(
   document: DesignDocument,
   propertyId: string,

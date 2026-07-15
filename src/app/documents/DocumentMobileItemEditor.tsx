@@ -10,6 +10,7 @@ export function DocumentMobileItemEditor(props: {
   itemEditor: ItemEditor;
   files: readonly TargetFileEntry[];
   onEditDefinition: () => void;
+  onOpenIsolated: (instanceId: string) => void;
   onSelectSlot: (selection: Extract<SelectionTarget, { kind: "slot" }>, occupied: boolean) => void;
   onClose: () => void;
   onApply: () => void;
@@ -18,9 +19,10 @@ export function DocumentMobileItemEditor(props: {
   if (!model) return null;
   return (
     <MobileItemEditor
-      componentLabel={model.adapter.component.label}
+      componentLabel={model.htmlElement ? `<${model.htmlElement.tagName}>` : model.adapter.component.label}
+      htmlElement={Boolean(model.htmlElement)}
       sourceLabel={model.adapter.sourceFileId ? props.files.find((file) => file.id === model.adapter.sourceFileId)?.label : undefined}
-      controls={model.adapter.controls}
+      controls={model.controls}
       controlValues={model.controlValues}
       previewCss={model.previewCss}
       slots={model.slots}
@@ -32,7 +34,8 @@ export function DocumentMobileItemEditor(props: {
       canDuplicate={model.canDuplicate}
       canDelete={model.canDelete}
       onControlChange={props.itemEditor.updateControl}
-      onEditDefinition={props.onEditDefinition}
+      onEditDefinition={model.htmlElement ? undefined : props.onEditDefinition}
+      onOpenIsolated={() => props.onOpenIsolated(model.instance.instanceId)}
       onSelectSlot={(slot: SlotState) => props.onSelectSlot({
         kind: "slot",
         id: slot.selectionId,

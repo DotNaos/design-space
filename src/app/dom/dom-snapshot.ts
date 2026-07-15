@@ -35,6 +35,7 @@ function observeElement(
     kind: "html",
     id: nodeId,
     tagName: element.tagName.toLocaleLowerCase(),
+    ...(element.className ? { className: element.className } : {}),
     ...(slotId ? { slotId } : {}),
     ...(children.length ? { children } : {}),
   }];

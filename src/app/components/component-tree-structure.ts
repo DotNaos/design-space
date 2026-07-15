@@ -1,4 +1,4 @@
-import type { ComponentTreeRow } from "../../model";
+import type { ComponentTreeRow, SelectionTarget } from "../../model";
 
 export type HtmlScopeAnnotation = {
   readonly pairId: string;
@@ -82,6 +82,21 @@ export function treeSelectionPath(
     if (item.branchKey) stack.push({ key: item.branchKey, depth: item.row.depth });
   }
   return [];
+}
+
+export function parseHtmlSelection(id: string): Extract<SelectionTarget, { kind: "html" }> | undefined {
+  const parts = id.split(":");
+  if (parts.length !== 3 || parts[0] !== "html") return undefined;
+  try {
+    return {
+      kind: "html",
+      id,
+      componentInstanceId: decodeURIComponent(parts[1]),
+      nodeId: decodeURIComponent(parts[2]),
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function treeBranchKey(row: ComponentTreeRow, index: number): string {

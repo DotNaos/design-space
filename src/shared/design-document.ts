@@ -21,6 +21,7 @@ export interface DesignComponentNode {
   adapterId: string;
   label?: string;
   props?: Record<string, DesignValue>;
+  htmlClassNames?: Record<string, string>;
   propertyBindings?: Record<string, string>;
   slots: Record<string, DesignChild[]>;
 }
@@ -109,9 +110,13 @@ export const designComponentNodeSchema: z.ZodType<DesignComponentNode> = z.lazy(
   adapterId: opaqueIdSchema,
   label: z.string().trim().min(1).max(120).optional(),
   props: z.record(opaqueIdSchema, designValueSchema).optional(),
+  htmlClassNames: z.record(opaqueIdSchema, z.string().max(10_000)).optional(),
   propertyBindings: z.record(opaqueIdSchema, opaqueIdSchema).optional(),
   slots: z.record(opaqueIdSchema, z.array(designChildSchema).max(500)),
 }).strict().superRefine((node, context) => {
+  if (Object.keys(node.htmlClassNames ?? {}).length > 200) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["htmlClassNames"], message: "Too many internal HTML style overrides" });
+  }
   if (Object.keys(node.propertyBindings ?? {}).length > 80) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["propertyBindings"], message: "Too many property bindings" });
   }

@@ -42,6 +42,7 @@ export function DocumentWorkspaceDialogs(props: {
     selectSlot: (slot: SlotSelection, occupied: boolean) => void;
     closeItemEditor: () => void;
     applyItemEditor: () => void;
+    openIsolated: (instanceId: string) => void;
   };
 }) {
   const { activeSession, controller, creation, interactions, itemEditor } = props.workspace;
@@ -64,7 +65,7 @@ export function DocumentWorkspaceDialogs(props: {
       <CreateDocumentSheet open={creation.isOpen} mode={props.workspace.mode} recipes={controller.creationRecipes} busy={creation.preparing} error={creation.error} onClose={creation.close} onPrepare={(recipeId, label) => void creation.prepare(recipeId, label)} />
       {creation.prepared && <DiffSheet diff={creation.prepared.diff} saving={creation.saving} onClose={creation.discard} onSave={() => void creation.save()} />}
       <StrictUiSheet open={Boolean(activeSession) && props.workspace.showStrictUi} evidence={activeSession?.strictUi} liveViolations={activeSession ? controller.liveViolations : []} checking={activeSession?.phase === "checking"} onClose={() => props.actions.setShowStrictUi(false)} onSelect={props.actions.openViolation} onRecheck={() => void controller.prepare()} />
-      {props.workspace.modeDocumentAvailable && <DocumentMobileItemEditor itemEditor={itemEditor} files={controller.files} onEditDefinition={props.actions.editDefinition} onSelectSlot={props.actions.selectSlot} onClose={props.actions.closeItemEditor} onApply={props.actions.applyItemEditor} />}
+      {props.workspace.modeDocumentAvailable && <DocumentMobileItemEditor itemEditor={itemEditor} files={controller.files} onEditDefinition={props.actions.editDefinition} onOpenIsolated={props.actions.openIsolated} onSelectSlot={props.actions.selectSlot} onClose={props.actions.closeItemEditor} onApply={props.actions.applyItemEditor} />}
     </>
   );
 }

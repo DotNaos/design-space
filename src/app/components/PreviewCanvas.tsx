@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { StrictUiViolation } from "../../shared/strict-ui";
 import { fitCanvas, zoomCanvasAt, type CanvasCamera } from "../canvas-transform";
@@ -47,6 +47,7 @@ type PreviewCanvasProps = {
   selection?: Selection;
   hoveredSelection?: Selection;
   highlightedInternalHtmlComponentId?: string;
+  htmlClassNames?: Readonly<Record<string, string>>;
   cameraKey?: string;
   strictUiViolations?: readonly StrictUiViolation[];
   compact?: boolean;
@@ -120,6 +121,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     const world = worldRef.current;
     if (!viewport || !world) return;
     const viewportRect = viewport.getBoundingClientRect();
+    applyHtmlClassNames(world, props.htmlClassNames);
     if (props.onDomSnapshot) {
       const snapshot = indexPreviewDom(world);
       const serialized = JSON.stringify(snapshot);
@@ -163,7 +165,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       const rect = measureCanvasSelector(world, selectorForStrictUiTarget(target), viewportRect);
       return rect ? [{ target, rect }] : [];
     }));
-  }, [pointerHoveredSelection, props.highlightedInternalHtmlComponentId, props.hoveredSelection, props.onDomSnapshot, props.rootInstanceId, props.selectedComponentInstanceId, props.selection, props.slots, strictUiTargets]);
+  }, [pointerHoveredSelection, props.highlightedInternalHtmlComponentId, props.hoveredSelection, props.htmlClassNames, props.onDomSnapshot, props.rootInstanceId, props.selectedComponentInstanceId, props.selection, props.slots, strictUiTargets]);
 
   const scheduleMeasure = useCallback(() => {
     if (frame.current !== undefined) cancelAnimationFrame(frame.current);
@@ -326,6 +328,23 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     event.preventDefault();
     props.onNavigate(command);
   };
+
+  useEffect(() => {
+    if (interactionMode !== "select" || !props.selection || !props.onNavigate) return;
+    const navigateToParent = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (
+        target.isContentEditable
+        || target.matches("input, textarea, select")
+        || Boolean(target.closest('[role="dialog"], [role="listbox"], [role="menu"]'))
+      )) return;
+      event.preventDefault();
+      props.onNavigate?.("parent");
+    };
+    window.addEventListener("keydown", navigateToParent);
+    return () => window.removeEventListener("keydown", navigateToParent);
+  }, [interactionMode, props.onNavigate, props.selection]);
 
   const onPointerMove = (event: React.PointerEvent<HTMLElement>) => {
     touchGestures.onPointerMove(event);
@@ -523,4 +542,11 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       )}
     </main>
   );
+}
+
+function applyHtmlClassNames(root: HTMLElement, values: Readonly<Record<string, string>> | undefined): void {
+  for (const [selectionId, className] of Object.entries(values ?? {})) {
+    const element = root.querySelector<HTMLElement>(`[data-design-space-html-id="${CSS.escape(selectionId)}"]`);
+    if (element && element.className !== className) element.className = className;
+  }
 }
