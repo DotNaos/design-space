@@ -68,6 +68,12 @@ export interface SourceWorkspaceLibrary {
   version: string;
   mode: "development" | "release";
   editable: boolean;
+  components: readonly SourceLibraryComponent[];
+}
+
+export interface SourceLibraryComponent {
+  name: string;
+  evidence: "package-export" | "project-import";
 }
 
 export interface RuntimeSourceWorkspaceEntry extends SourceWorkspaceEntry {

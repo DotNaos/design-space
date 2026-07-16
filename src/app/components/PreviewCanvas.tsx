@@ -51,6 +51,7 @@ type PreviewCanvasProps = {
   cameraKey?: string;
   strictUiViolations?: readonly StrictUiViolation[];
   compact?: boolean;
+  worldWidth?: number;
   onSelect: (selection: Selection) => void;
   onDeselect?: () => void;
   onNavigate?: (command: SelectionNavigationCommand) => void;
@@ -59,8 +60,9 @@ type PreviewCanvasProps = {
   onDomSnapshot?: (snapshot: PreviewDomSnapshot) => void;
 };
 type MeasuredStrictUiTarget = { target: StrictUiCanvasTarget; rect: ViewRect };
-const worldWidth = 620;
+const defaultWorldWidth = 620;
 export function PreviewCanvas(props: PreviewCanvasProps) {
+  const worldWidth = props.worldWidth ?? defaultWorldWidth;
   const viewportRef = useRef<HTMLElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(false);
@@ -184,7 +186,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       props.compact ? 12 : 16,
       props.compact ? 42 : 52,
     ));
-  }, [props.compact, setCamera]);
+  }, [props.compact, setCamera, worldWidth]);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -450,8 +452,8 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       <div
         ref={worldRef}
         data-testid="canvas-world"
-        className="absolute left-0 top-0 w-[620px]"
-        style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`, transformOrigin: "0 0" }}
+        className="absolute left-0 top-0"
+        style={{ width: worldWidth, transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`, transformOrigin: "0 0" }}
       >
         {props.preview}
       </div>

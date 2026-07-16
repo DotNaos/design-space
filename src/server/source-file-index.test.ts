@@ -54,6 +54,7 @@ describe("TypeScript-first source index", () => {
       packageName: "@dotnaos/react-ui",
       mode: "release",
       editable: false,
+      components: [{ name: "Scrollable", evidence: "project-import" }],
     });
   });
 
@@ -93,6 +94,7 @@ describe("TypeScript-first source index", () => {
       version: "^0.0.5",
       mode: "release",
       editable: false,
+      components: [],
     });
 
     await writeFile(join(root, "package.json"), JSON.stringify({
@@ -100,5 +102,28 @@ describe("TypeScript-first source index", () => {
     }));
     const development = await indexSourceWorkspace(root, { project: { id: "dev-app", label: "Dev app" } });
     expect(development.manifest.library).toMatchObject({ mode: "development", editable: false });
+  });
+
+  it("uses real installed package exports for the component catalog", async () => {
+    const root = await mkdtemp(join(tmpdir(), "design-space-library-exports-"));
+    roots.push(root);
+    const packageRoot = join(root, "node_modules", "@dotnaos", "react-ui");
+    await mkdir(packageRoot, { recursive: true });
+    await writeFile(join(root, ".designspace.ts"), "export default {};\n");
+    await writeFile(join(root, "package.json"), JSON.stringify({ dependencies: { "@dotnaos/react-ui": "^0.0.5" } }));
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { moduleResolution: "Bundler", module: "ESNext" } }));
+    await writeFile(join(packageRoot, "package.json"), JSON.stringify({ name: "@dotnaos/react-ui", version: "0.0.5", types: "index.d.ts" }));
+    await writeFile(join(packageRoot, "index.d.ts"), [
+      "export declare function Button(): unknown;",
+      "export declare const Scrollable: () => unknown;",
+      "export interface ButtonProps { disabled?: boolean }",
+      "export declare function getCatalog(): unknown;",
+    ].join("\n"));
+
+    const result = await indexSourceWorkspace(root, { project: { id: "catalog-app", label: "Catalog app" } });
+    expect(result.manifest.library?.components).toEqual([
+      { name: "Button", evidence: "package-export" },
+      { name: "Scrollable", evidence: "package-export" },
+    ]);
   });
 });

@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { Button } from "@heroui/react";
-import { Boxes, Library } from "lucide-react";
 
-import type { SourceWorkspaceLibrary } from "../shared/source-workspace";
 import type { TargetModule } from "../shared/target-module";
 import { ProjectFilesWorkspace } from "./documents/ProjectFilesWorkspace";
 import { ResizableWorkspacePanels } from "./shell/ResizableWorkspacePanels";
@@ -16,6 +14,9 @@ import {
   type SourceWorkspaceSelection,
 } from "./source/SourceWorkspaceSidebar";
 import { initialSourceSelection } from "./source/source-workspace-selection";
+import { useSourceFileEditor } from "./source/useSourceFileEditor";
+import { DiffSheet } from "./components/DiffSheet";
+import { SourceLibraryCanvas, SourceLibraryInspector, SourceLibrarySidebar } from "./source/SourceLibraryWorkspace";
 
 const areaLabels = { root: "Root", pages: "Pages", components: "Components" } as const;
 const deviceLabels = { desktop: "Desktop", tablet: "Tablet", mobile: "Mobile" } as const;
@@ -29,7 +30,9 @@ export function SourceWorkspace({ target }: { target: TargetModule }) {
   const [selection, setSelection] = useState<SourceWorkspaceSelection | undefined>(() => (
     initial.entry ? { entryId: initial.entry.id, device: initial.device } : undefined
   ));
+  const [selectedLibraryComponent, setSelectedLibraryComponent] = useState(() => workspace.library?.components[0]?.name);
   const entry = workspace.entries.find((candidate) => candidate.id === selection?.entryId) ?? initial.entry;
+  const editor = useSourceFileEditor(entry?.fileId);
   const requestedDevice = selection?.device ?? initial.device;
   const connected = workspace.runtime === "react" && Boolean(entry);
   const breadcrumb = activity === "files"
@@ -55,9 +58,9 @@ export function SourceWorkspace({ target }: { target: TargetModule }) {
   const fileSidebar = (
     <ProjectFilesWorkspace className="flex h-full w-full border-r-0" files={target.files} />
   );
-  const libraryState = <LibraryConnectionState library={workspace.library} />;
-  const left = activity === "files" ? fileSidebar : activity === "library" ? libraryState : appSidebar;
-  const canvas = activity === "library" ? libraryState : (
+  const librarySidebar = <SourceLibrarySidebar library={workspace.library} selected={selectedLibraryComponent} onSelect={setSelectedLibraryComponent} />;
+  const left = activity === "files" ? fileSidebar : activity === "library" ? librarySidebar : appSidebar;
+  const canvas = activity === "library" ? <SourceLibraryCanvas library={workspace.library} selected={selectedLibraryComponent} /> : (
     <SourcePreviewFrame
       device={requestedDevice}
       entry={entry}
@@ -65,8 +68,8 @@ export function SourceWorkspace({ target }: { target: TargetModule }) {
       styles={workspace.styles}
     />
   );
-  const right = activity === "library" ? <LibraryEvidenceInspector library={workspace.library} /> : (
-    <SourceComponentInspector className="flex h-full w-full border-l-0" entry={entry} />
+  const right = activity === "library" ? <SourceLibraryInspector library={workspace.library} selected={selectedLibraryComponent} /> : (
+    <SourceComponentInspector className="flex h-full w-full border-l-0" editor={editor} entry={entry} />
   );
   const mobile = (
     <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
@@ -109,17 +112,17 @@ export function SourceWorkspace({ target }: { target: TargetModule }) {
           checking={false}
           canUndo={false}
           canRedo={false}
-          canReset={false}
+          canReset={activity === "app" && editor.dirty}
           canStrictUi={false}
-          canDiff={false}
-          canSave={false}
-          saving={false}
+          canDiff={activity === "app" && editor.dirty}
+          canSave={activity === "app" && Boolean(editor.prepared)}
+          saving={editor.saving}
           onUndo={() => undefined}
           onRedo={() => undefined}
-          onReset={() => undefined}
+          onReset={editor.reset}
           onStrictUi={() => undefined}
-          onDiff={() => undefined}
-          onSave={() => undefined}
+          onDiff={() => void editor.prepare()}
+          onSave={() => void editor.save()}
         />
         <ResizableWorkspacePanels
           namespace={{ projectId: target.project.id, documentId: `${entry?.id ?? "empty"}:${requestedDevice}` }}
@@ -131,44 +134,14 @@ export function SourceWorkspace({ target }: { target: TargetModule }) {
           {canvas}
         </ResizableWorkspacePanels>
       </div>
-    </div>
-  );
-}
-
-function LibraryConnectionState(props: { library?: SourceWorkspaceLibrary }) {
-  return (
-    <section aria-label="Component library evidence" className="grid h-full w-full place-items-center bg-[#141518] px-6 text-center">
-      <div className="max-w-64">
-        <Library aria-hidden="true" className="mx-auto text-zinc-600" size={22} />
-        <h2 className="mt-3 text-sm font-semibold text-zinc-200">Component library</h2>
-        {props.library ? (
-          <>
-            <p className="mt-2 font-mono text-[11px] text-zinc-300">{props.library.packageName}</p>
-            <p className={`mt-2 text-[10px] font-medium ${props.library.mode === "development" ? "text-emerald-400" : "text-zinc-500"}`}>
-              {props.library.mode === "development" ? "Development · Connected" : "Release · Read only"}
-            </p>
-          </>
-        ) : (
-          <p className="mt-2 text-[11px] leading-5 text-zinc-500">No development or release library dependency was proven for this target yet.</p>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function LibraryEvidenceInspector(props: { library?: SourceWorkspaceLibrary }) {
-  return (
-    <aside className="h-full w-full bg-[#141518] p-5">
-      <div className="flex items-center gap-2 text-zinc-500"><Boxes size={14} /><span className="text-[10px] font-medium uppercase tracking-[0.14em]">Library evidence</span></div>
-      {props.library ? (
-        <dl className="mt-5 space-y-4 text-xs">
-          <div><dt className="text-zinc-600">Package</dt><dd className="mt-1 font-mono text-zinc-300">{props.library.packageName}</dd></div>
-          <div><dt className="text-zinc-600">Version</dt><dd className="mt-1 font-mono text-zinc-300">{props.library.version}</dd></div>
-          <div><dt className="text-zinc-600">Access</dt><dd className={`mt-1 ${props.library.mode === "development" ? "text-emerald-400" : "text-zinc-300"}`}>{props.library.mode === "development" ? "Connected source · editing not enabled" : "Read-only release"}</dd></div>
-        </dl>
-      ) : (
-        <p className="mt-4 text-xs leading-5 text-zinc-500">Design Space keeps a release library read-only. A development source is shown only when package evidence exists; write access requires a separate trusted registration.</p>
+      {editor.prepared && (
+        <DiffSheet
+          diff={editor.prepared.diff}
+          saving={editor.saving}
+          onClose={editor.clearPrepared}
+          onSave={() => void editor.save()}
+        />
       )}
-    </aside>
+    </div>
   );
 }

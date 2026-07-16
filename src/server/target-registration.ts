@@ -129,6 +129,8 @@ export interface RegisteredTarget {
   targetModulePath: string;
   files: Map<string, RegisteredFile>;
   editTargets: ReadonlyMap<string, RegisteredEditTarget>;
+  /** Opaque IDs for complete source files explicitly approved for editing. */
+  editableFileIds?: ReadonlySet<string>;
   tailwindCompiler?: TrustedTailwindCompiler;
   documentRegistration?: RegisteredDocumentRegistration;
   registrationPath?: string;

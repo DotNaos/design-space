@@ -8,8 +8,10 @@ import {
   browserOperationSchema,
   type BrowserOperation,
   type PreparedEdit,
+  type PreparedProjectFileEdit,
   type ProjectFileSnapshot,
   type SavedEdit,
+  type SavedProjectFileEdit,
   type SourceSnapshot,
   type TailwindIntelligence,
   type TailwindPreview,
@@ -22,6 +24,7 @@ import { readRegisteredFile } from "./registered-file-reader";
 import { locateMarkedString, sourceVersion } from "./source-editor";
 import { TargetTailwindService } from "./target-tailwind-service";
 import { TailwindIntelligenceService } from "./tailwind-intelligence-service";
+import { assertEditedTypeScriptCompiles } from "./typescript-project-compiler";
 import type {
   RegisteredEditTarget,
   RegisteredFile,
@@ -38,6 +41,15 @@ interface StoredChallenge {
   nextSource: string;
   value: string;
   tailwindSourceVersions: Readonly<Record<string, string>>;
+  expiresAt: number;
+}
+
+interface StoredProjectFileChallenge {
+  id: string;
+  file: RegisteredFile;
+  baseVersion: string;
+  nextVersion: string;
+  nextSource: string;
   expiresAt: number;
 }
 
@@ -97,6 +109,7 @@ async function atomicWrite(root: string, path: string, expectedVersion: string, 
 export class EditService {
   readonly #target: RegisteredTarget;
   readonly #challenges: ChallengeStore<StoredChallenge>;
+  readonly #projectFileChallenges: ChallengeStore<StoredProjectFileChallenge>;
   readonly #challengeTtlMs: number;
   readonly #now: () => number;
   readonly #createId: () => string;
@@ -110,11 +123,12 @@ export class EditService {
     this.#now = options.now ?? Date.now;
     this.#createId = options.createId ?? randomUUID;
     this.#challenges = new ChallengeStore({ now: this.#now });
+    this.#projectFileChallenges = new ChallengeStore({ now: this.#now });
     this.#tailwind = new TargetTailwindService(target);
     this.#tailwindIntelligence = new TailwindIntelligenceService(target);
   }
 
-  async execute(input: unknown): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | SavedEdit | TailwindPreview | TailwindIntelligence> {
+  async execute(input: unknown): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | PreparedProjectFileEdit | SavedEdit | SavedProjectFileEdit | TailwindPreview | TailwindIntelligence> {
     const parsed = browserOperationSchema.safeParse(input);
     if (!parsed.success) {
       throw new DesignSpaceError("INVALID_REQUEST", "The browser operation is invalid");
@@ -122,7 +136,7 @@ export class EditService {
     return this.#executeParsed(parsed.data);
   }
 
-  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | SavedEdit | TailwindPreview | TailwindIntelligence> {
+  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | PreparedProjectFileEdit | SavedEdit | SavedProjectFileEdit | TailwindPreview | TailwindIntelligence> {
     switch (operation.type) {
       case "analyze-tailwind":
         return this.#tailwindIntelligence.analyze(operation.value, operation.cursor);
@@ -130,6 +144,10 @@ export class EditService {
         return (await this.#tailwind.compile(operation.value)).preview;
       case "read-project-file":
         return this.readProjectFile(operation.fileId);
+      case "prepare-project-file-edit":
+        return this.prepareProjectFileEdit(operation.fileId, operation.source, operation.baseVersion);
+      case "save-project-file-edit":
+        return this.saveProjectFileEdit(operation.challengeId);
       case "read-source":
         return this.read(operation.editTargetId);
       case "prepare-edit":
@@ -151,6 +169,86 @@ export class EditService {
       unavailableMessage: "The registered file is not available for source browsing",
     });
     return { fileId, label: file.displayName, source, version: sourceVersion(source) };
+  }
+
+  async prepareProjectFileEdit(
+    fileId: string,
+    nextSource: string,
+    baseVersion: string,
+  ): Promise<PreparedProjectFileEdit> {
+    const file = this.#editableProjectFile(fileId);
+    const source = await readRegisteredFile(this.#target.root, file.path, {
+      maximumBytes: maximumBrowsableFileBytes,
+      unavailableMessage: "The registered project source is unavailable for editing",
+    });
+    if (sourceVersion(source) !== baseVersion) {
+      throw new DesignSpaceError("STALE_SOURCE", "The source changed after the editor loaded it");
+    }
+    if (source === nextSource) {
+      throw new DesignSpaceError("INVALID_REQUEST", "The edited source is unchanged");
+    }
+    try {
+      const loader = file.displayName.endsWith(".tsx") ? "tsx" : "ts";
+      await transformWithEsbuild(nextSource, file.displayName, { loader, jsx: "automatic" });
+      if (this.#target.sourceWorkspace) assertEditedTypeScriptCompiles(this.#target.root, file.path, nextSource);
+    } catch {
+      throw new DesignSpaceError("COMPILE_ERROR", "The edited TypeScript source did not compile");
+    }
+    const id = this.#createId();
+    const expiresAt = this.#now() + this.#challengeTtlMs;
+    const nextVersion = sourceVersion(nextSource);
+    this.#projectFileChallenges.set(id, {
+      id,
+      file,
+      baseVersion,
+      nextVersion,
+      nextSource,
+      expiresAt,
+    });
+    return {
+      challengeId: id,
+      fileId,
+      baseVersion,
+      nextVersion,
+      diff: createUnifiedDiff(source, nextSource, file.displayName),
+      expiresAt: new Date(expiresAt).toISOString(),
+    };
+  }
+
+  saveProjectFileEdit(challengeId: string): Promise<SavedProjectFileEdit> {
+    const pending = this.#saveQueue.then(() => this.#saveProjectFileNow(challengeId));
+    this.#saveQueue = pending.then(() => undefined, () => undefined);
+    return pending;
+  }
+
+  async #saveProjectFileNow(challengeId: string): Promise<SavedProjectFileEdit> {
+    const challenge = this.#projectFileChallenges.take(challengeId);
+    if (!challenge) throw new DesignSpaceError("NOT_FOUND", "The prepared source edit does not exist");
+    if (challenge.expiresAt <= this.#now()) {
+      throw new DesignSpaceError("CHALLENGE_EXPIRED", "The prepared source edit expired before it was saved");
+    }
+    const currentSource = await readRegisteredFile(this.#target.root, challenge.file.path);
+    if (sourceVersion(currentSource) !== challenge.baseVersion) {
+      throw new DesignSpaceError("STALE_SOURCE", "The source changed before the edit could be saved");
+    }
+    await atomicWrite(this.#target.root, challenge.file.path, challenge.baseVersion, challenge.nextSource);
+    await assertStillRegistered(this.#target.root, challenge.file.path);
+    return {
+      fileId: challenge.file.id,
+      label: challenge.file.displayName,
+      source: challenge.nextSource,
+      version: challenge.nextVersion,
+      previousVersion: challenge.baseVersion,
+    };
+  }
+
+  #editableProjectFile(fileId: string): RegisteredFile {
+    if (!this.#target.editableFileIds?.has(fileId)) {
+      throw new DesignSpaceError("ACCESS_DENIED", "The project file is not registered for editing");
+    }
+    const file = this.#target.files.get(fileId);
+    if (!file) throw new DesignSpaceError("NOT_FOUND", "The project file is not registered");
+    return file;
   }
 
   async read(editTargetId: string): Promise<SourceSnapshot> {

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstat, opendir, realpath } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve, sep } from "node:path";
+import ts from "typescript";
 
 import {
   designSpaceAreas,
@@ -108,7 +109,7 @@ export async function indexSourceWorkspace(
     sourceRoot: SOURCE_ROOT,
     entries: Object.freeze(entries),
     devices: Object.freeze(deviceStates(entries, config)),
-    library: await detectComponentLibrary(root, fileByPath.get("package.json")),
+    library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
   };
   return {
     manifest: Object.freeze(manifest),
@@ -121,6 +122,7 @@ export async function indexSourceWorkspace(
 async function detectComponentLibrary(
   root: string,
   packageFile: IndexedSourceFile | undefined,
+  files: readonly IndexedSourceFile[],
 ): Promise<SourceWorkspaceLibrary | undefined> {
   if (!packageFile) return undefined;
   let value: unknown;
@@ -151,6 +153,8 @@ async function detectComponentLibrary(
   if (!packageName) return undefined;
   const version = dependencies[packageName];
   const development = /^(?:file|link|workspace):/.test(version);
+  const exported = resolvedLibraryComponents(root, packageName);
+  const components = exported.length ? exported : await importedLibraryComponents(root, files, packageName);
   return {
     packageName,
     version,
@@ -158,7 +162,65 @@ async function detectComponentLibrary(
     // A linked package proves which source is in use, but it is not editable
     // until that second root has its own trusted write registration.
     editable: false,
+    components,
   };
+}
+
+function resolvedLibraryComponents(
+  root: string,
+  packageName: string,
+): SourceWorkspaceLibrary["components"] {
+  const configPath = ts.findConfigFile(root, ts.sys.fileExists, "tsconfig.json");
+  let options: ts.CompilerOptions = {
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+  };
+  if (configPath) {
+    const config = ts.readConfigFile(configPath, ts.sys.readFile);
+    if (!config.error) options = ts.parseJsonConfigFileContent(config.config, ts.sys, root, undefined, configPath).options;
+  }
+  const resolved = ts.resolveModuleName(packageName, resolve(root, "src/design-space-library-catalog.ts"), options, ts.sys).resolvedModule;
+  if (!resolved?.resolvedFileName || !/\.d\.[cm]?ts$/.test(resolved.resolvedFileName)) return [];
+  const program = ts.createProgram([resolved.resolvedFileName], options);
+  const source = program.getSourceFile(resolved.resolvedFileName);
+  const checker = program.getTypeChecker();
+  const moduleSymbol = source && checker.getSymbolAtLocation(source);
+  if (!moduleSymbol) return [];
+  const names = checker.getExportsOfModule(moduleSymbol).flatMap((symbol) => {
+    const name = symbol.getName();
+    if (!/^[A-Z][A-Za-z0-9]*$/.test(name) || name === name.toUpperCase()) return [];
+    const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+    return target.flags & ts.SymbolFlags.Value ? [name] : [];
+  });
+  return Object.freeze([...new Set(names)].sort((left, right) => left.localeCompare(right, "en")).map((name) => ({
+    name,
+    evidence: "package-export" as const,
+  })));
+}
+
+async function importedLibraryComponents(
+  root: string,
+  files: readonly IndexedSourceFile[],
+  packageName: string,
+): Promise<SourceWorkspaceLibrary["components"]> {
+  const names = new Set<string>();
+  const escapedPackage = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const namedImport = new RegExp(`import\\s*\\{([\\s\\S]*?)\\}\\s*from\\s*["']${escapedPackage}["']`, "g");
+  for (const file of files) {
+    if (!/\.[cm]?[jt]sx?$/.test(file.relativePath)) continue;
+    const source = await readRegisteredFile(root, file.absolutePath, { maximumBytes: 512 * 1024 }).catch(() => undefined);
+    if (!source) continue;
+    for (const match of source.matchAll(namedImport)) {
+      for (const imported of (match[1] ?? "").split(",")) {
+        const name = imported.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0]?.trim();
+        if (name && /^[A-Z][A-Za-z0-9_$]*$/.test(name)) names.add(name);
+      }
+    }
+  }
+  return Object.freeze([...names].sort((left, right) => left.localeCompare(right, "en")).map((name) => ({
+    name,
+    evidence: "project-import" as const,
+  })));
 }
 
 async function discoverBrowsableFiles(root: string): Promise<string[]> {

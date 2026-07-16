@@ -10,6 +10,7 @@ export async function registerSourceProject(
   const root = await canonicalRoot(unsafeRoot);
   const registrationPath = await canonicalRegisteredFile(root, ".designspace.ts");
   const sourceWorkspace = await indexSourceWorkspace(root, config);
+  const editableFileIds = new Set(sourceWorkspace.manifest.entries.map((entry) => entry.fileId));
   return {
     project: config.project,
     root,
@@ -21,6 +22,7 @@ export async function registerSourceProject(
       displayName: file.relativePath,
     }])),
     editTargets: new Map(),
+    editableFileIds,
     sourceWorkspace,
   };
 }

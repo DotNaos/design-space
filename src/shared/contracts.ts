@@ -157,6 +157,13 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("compile-tailwind"), value: z.string().max(10_000) }).strict(),
   z.object({ type: z.literal("analyze-tailwind"), value: z.string().max(10_000), cursor: z.number().int().min(0).max(10_000) }).strict(),
   z.object({ type: z.literal("read-project-file"), fileId: opaqueIdSchema }).strict(),
+  z.object({
+    type: z.literal("prepare-project-file-edit"),
+    fileId: opaqueIdSchema,
+    baseVersion: sourceVersionSchema,
+    source: z.string().max(512 * 1024),
+  }).strict(),
+  z.object({ type: z.literal("save-project-file-edit"), challengeId: z.string().uuid() }).strict(),
   z.object({ type: z.literal("read-source"), editTargetId: opaqueIdSchema }).strict(),
   z
     .object({
@@ -186,6 +193,19 @@ export interface ProjectFileSnapshot {
   label: string;
   source: string;
   version: string;
+}
+
+export interface PreparedProjectFileEdit {
+  challengeId: string;
+  fileId: string;
+  baseVersion: string;
+  nextVersion: string;
+  diff: string;
+  expiresAt: string;
+}
+
+export interface SavedProjectFileEdit extends ProjectFileSnapshot {
+  previousVersion: string;
 }
 
 export interface TailwindPreview {
