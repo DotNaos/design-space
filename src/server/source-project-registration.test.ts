@@ -22,4 +22,8 @@ it("allows trusted TypeScript source files to use the code editor", async () => 
   expect(editable("src/styles.css")).toBe(false);
   expect(editable("package.json")).toBe(false);
   expect(editable(".designspace.ts")).toBe(false);
+  expect(target.sourceComponentStore).toMatchObject({
+    directory: { displayName: "src/app/components" },
+    fileName: "desktop.tsx",
+  });
 });

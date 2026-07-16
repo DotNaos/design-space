@@ -93,6 +93,9 @@ export interface SourceWorkspaceManifest {
   entries: readonly SourceWorkspaceEntry[];
   devices: readonly SourceWorkspaceDeviceState[];
   library?: SourceWorkspaceLibrary;
+  capabilities?: {
+    createComponents: boolean;
+  };
 }
 
 export interface SourceWorkspaceLibrary {

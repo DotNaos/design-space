@@ -24,6 +24,8 @@ import { useSourceFileEditor } from "./source/useSourceFileEditor";
 import { useSourceLayerClassEditor } from "./source/useSourceLayerClassEditor";
 import { DiffSheet } from "./components/DiffSheet/DiffSheet";
 import { SourceLibraryCanvas, SourceLibraryInspector, SourceLibrarySidebar } from "./source/SourceLibraryWorkspace";
+import { SourceComponentCreateSheet } from "./source/SourceComponentCreateSheet";
+import { useSourceComponentCreation } from "./source/useSourceComponentCreation";
 
 const areaLabels = { layout: "Layout", pages: "Pages", components: "Components" } as const;
 export function SourceWorkspace({ initialCenterMode = "preview", target }: { initialCenterMode?: "preview" | "code"; target: TargetModule }) {
@@ -37,6 +39,7 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
   const [centerMode, setCenterMode] = useState<"preview" | "code">(initialCenterMode);
   const [selectedProjectFileId, setSelectedProjectFileId] = useState<string>();
   const [selectedLibraryComponent, setSelectedLibraryComponent] = useState(() => workspace.library?.components[0]?.name);
+  const componentCreation = useSourceComponentCreation();
   const selectedNode = nodes.find((candidate) => candidate.id === selection?.nodeId) ?? nodes[0];
   const requestedDevice = selection?.device ?? initial?.device ?? "desktop";
   const entry = selectedNode?.implementations[requestedDevice].entry;
@@ -69,6 +72,7 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
       className="flex h-full w-full border-r-0"
       selected={selection}
       workspace={workspace}
+      onCreateComponent={componentCreation.open}
       onSelect={(next) => {
         setSelection(next);
         setActivity("app");
@@ -209,6 +213,21 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
           saving={activeEditor.saving}
           onClose={activeEditor.clearPrepared}
           onSave={() => void activeEditor.save()}
+        />
+      )}
+      <SourceComponentCreateSheet
+        busy={componentCreation.preparing}
+        error={componentCreation.error}
+        open={componentCreation.isOpen}
+        onClose={componentCreation.close}
+        onPrepare={(name) => void componentCreation.prepare(name)}
+      />
+      {componentCreation.prepared && (
+        <DiffSheet
+          diff={componentCreation.prepared.diff}
+          saving={componentCreation.saving}
+          onClose={componentCreation.discard}
+          onSave={() => void componentCreation.save()}
         />
       )}
     </div>

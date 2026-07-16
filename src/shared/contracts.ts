@@ -164,6 +164,11 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
     source: z.string().max(512 * 1024),
   }).strict(),
   z.object({ type: z.literal("save-project-file-edit"), challengeId: z.string().uuid() }).strict(),
+  z.object({
+    type: z.literal("prepare-source-component-create"),
+    name: z.string().trim().regex(/^[A-Z][A-Za-z0-9]{1,63}$/),
+  }).strict(),
+  z.object({ type: z.literal("save-source-component-create"), challengeId: z.string().uuid() }).strict(),
   z.object({ type: z.literal("read-source"), editTargetId: opaqueIdSchema }).strict(),
   z
     .object({
@@ -206,6 +211,21 @@ export interface PreparedProjectFileEdit {
 
 export interface SavedProjectFileEdit extends ProjectFileSnapshot {
   previousVersion: string;
+}
+
+export interface PreparedSourceComponentCreate {
+  state: "source-component-create-ready";
+  challengeId: string;
+  name: string;
+  relativePath: string;
+  diff: string;
+  expiresAt: string;
+}
+
+export interface SavedSourceComponentCreate {
+  state: "source-component-created";
+  name: string;
+  relativePath: string;
 }
 
 export interface TailwindPreview {

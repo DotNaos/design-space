@@ -98,7 +98,22 @@ const workspace: RuntimeSourceWorkspace = {
   devices: states,
   entries: [desktopLayout, mobileLayout, desktopPage, summaryDesktop, summaryMobile],
   styles: [],
+  capabilities: { createComponents: true },
 };
+
+it("offers target-owned component creation from the app tree", async () => {
+  const onCreateComponent = vi.fn();
+  render(
+    <SourceWorkspaceSidebar
+      workspace={workspace}
+      onCreateComponent={onCreateComponent}
+      onSelect={() => undefined}
+    />,
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: "Create component" }));
+  expect(onCreateComponent).toHaveBeenCalledOnce();
+});
 
 it("shows one static composition tree from the root through pages and components", () => {
   render(<SourceWorkspaceSidebar workspace={workspace} onSelect={() => undefined} />);

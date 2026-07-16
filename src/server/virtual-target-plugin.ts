@@ -108,6 +108,7 @@ function sourceTargetModule(target: RegisteredTarget): string {
     `    sourceRoot: ${JSON.stringify(workspace.manifest.sourceRoot)},`,
     `    devices: ${JSON.stringify(workspace.manifest.devices)},`,
     `    library: ${JSON.stringify(workspace.manifest.library)},`,
+    `    capabilities: ${JSON.stringify({ createComponents: Boolean(target.sourceComponentStore) })},`,
     `    entries: [${runtimeEntries.join(",\n")}],`,
     `    styles: [${styleImports.map((style) => style.variable).join(", ")}],`,
     "  },",

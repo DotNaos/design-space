@@ -72,7 +72,7 @@ export async function indexSourceWorkspace(
   const files = await registerDiscoveredFiles(root, relativePaths);
   const fileByPath = new Map(files.map((file) => [file.relativePath, file]));
   const conventionCandidates = files.filter((file) => sourceLocation(file.relativePath));
-  const inferredCatalog = conventionCandidates.length === 0;
+  const inferredCatalog = Boolean(config.source?.layout) || conventionCandidates.length === 0;
   const componentCandidates = inferredCatalog
     ? files.filter((file) => inferredSourceLocation(file.relativePath, config))
     : conventionCandidates;
@@ -287,8 +287,10 @@ function sourceLocation(relativePath: string): { area: DesignSpaceArea; device: 
   const page = /^src\/app\/(desktop|tablet|mobile)\/pages\/.+\.tsx?$/.exec(relativePath);
   if (page) return { area: "pages", device: page[1] as DesignSpaceDevice };
 
-  const component = /^src\/app\/components\/[^/]+\/(desktop|tablet|mobile)\.tsx?$/.exec(relativePath);
-  if (component) return { area: "components", device: component[1] as DesignSpaceDevice };
+  const component = /^src\/app\/components\/[^/]+\/(desktop|tablet|mobile|index)\.tsx?$/.exec(relativePath);
+  if (component) {
+    return { area: "components", device: component[1] === "index" ? "desktop" : component[1] as DesignSpaceDevice };
+  }
 
   return undefined;
 }

@@ -87,11 +87,13 @@ describe("TypeScript-first source index", () => {
     await mkdir(join(root, "src", "design-space"), { recursive: true });
     await mkdir(join(root, "src", "pages"), { recursive: true });
     await mkdir(join(root, "src", "components"), { recursive: true });
+    await mkdir(join(root, "src", "app", "components", "StatusBadge"), { recursive: true });
     await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
     await writeFile(join(root, "src", "design-space", "app.tsx"), "export function ProjectPreview() { return <main />; }\n");
     await writeFile(join(root, "src", "pages", "SettingsPage.tsx"), "export function SettingsPage() { return <main />; }\n");
     await writeFile(join(root, "src", "components", "Navigation.tsx"), "export function Navigation() { return <nav />; }\n");
     await writeFile(join(root, "src", "components", "Navigation.test.tsx"), "export function TestOnly() { return <nav />; }\n");
+    await writeFile(join(root, "src", "app", "components", "StatusBadge", "index.tsx"), "export function StatusBadge() { return <span />; }\n");
 
     const result = await indexSourceWorkspace(root, {
       project: { id: "real-project", label: "Real project" },
@@ -102,6 +104,7 @@ describe("TypeScript-first source index", () => {
     expect(result.manifest.entries.map(({ area, label, relativePath }) => ({ area, label, relativePath }))).toEqual([
       { area: "layout", label: "ProjectPreview", relativePath: "src/design-space/app.tsx" },
       { area: "pages", label: "SettingsPage", relativePath: "src/pages/SettingsPage.tsx" },
+      { area: "components", label: "StatusBadge", relativePath: "src/app/components/StatusBadge/index.tsx" },
       { area: "components", label: "Navigation", relativePath: "src/components/Navigation.tsx" },
     ]);
     expect(result.manifest.devices).toContainEqual(expect.objectContaining({ device: "mobile", state: "responsive" }));

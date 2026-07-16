@@ -304,6 +304,7 @@ describe("local edit service", () => {
         sourceFileIds: ["file.card"],
       },
       { type: "run-command", command: "echo unsafe" },
+      { type: "prepare-source-component-create", name: "Owned", path: "/tmp/owned.tsx" },
     ];
     for (const attempt of attempts) {
       await expect(service.execute(attempt)).rejects.toMatchObject({ code: "INVALID_REQUEST" });

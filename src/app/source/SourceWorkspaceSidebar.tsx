@@ -6,6 +6,7 @@ import {
   CodeXml,
   Component,
   FileCode2,
+  FilePlus2,
   GitBranch,
   LayoutTemplate,
   Monitor,
@@ -37,6 +38,7 @@ export interface SourceWorkspaceSidebarProps {
   selected?: SourceWorkspaceSelection;
   workspace: RuntimeSourceWorkspace;
   onSelect: (selection: SourceWorkspaceSelection) => void;
+  onCreateComponent?: () => void;
 }
 
 const deviceLabels: Record<DesignSpaceDevice, string> = {
@@ -77,7 +79,18 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
             {props.workspace.sourceRoot} · {props.workspace.runtime === "react-native" ? "React Native" : "React"}
           </p>
         </div>
-        <GitBranch aria-label="Static source composition" className="text-zinc-600" size={14} />
+        {props.workspace.capabilities?.createComponents && props.onCreateComponent ? (
+          <Button
+            aria-label="Create component"
+            className="grid size-8 shrink-0 place-items-center rounded-md text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            onPress={props.onCreateComponent}
+          >
+            <FilePlus2 aria-hidden="true" size={14} />
+          </Button>
+        ) : <GitBranch aria-label="Static source composition" className="text-zinc-600" size={14} />}
       </header>
 
       <div aria-label="App source tree" className="min-h-0 flex-1 overflow-y-auto py-2" role="tree">

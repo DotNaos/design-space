@@ -1,6 +1,7 @@
 import type { DesignSpaceProjectConfig } from "../shared/source-workspace";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { indexSourceWorkspace } from "./source-file-index";
+import { registerSourceComponentStore } from "./source-component-creation";
 import type { RegisteredTarget } from "./target-registration";
 
 export async function registerSourceProject(
@@ -10,6 +11,11 @@ export async function registerSourceProject(
   const root = await canonicalRoot(unsafeRoot);
   const registrationPath = await canonicalRegisteredFile(root, ".designspace.ts");
   const sourceWorkspace = await indexSourceWorkspace(root, config);
+  const sourceComponentStore = await registerSourceComponentStore(
+    root,
+    "src/app/components",
+    config.devices?.mode === "responsive" ? "index.tsx" : "desktop.tsx",
+  );
   const editableFileIds = new Set(
     sourceWorkspace.files
       .filter((file) => isEditableTypeScriptSource(file.relativePath))
@@ -28,6 +34,7 @@ export async function registerSourceProject(
     editTargets: new Map(),
     editableFileIds,
     sourceWorkspace,
+    sourceComponentStore,
   };
 }
 

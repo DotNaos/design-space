@@ -8,4 +8,7 @@ export default defineDesignSpace({
   devices: {
     mode: "responsive",
   },
+  source: {
+    layout: "src/app/App.tsx",
+  },
 });
