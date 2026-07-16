@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace";
 import {
   applySourceLayerClassName,
+  applySourceLayerText,
   projectSourceLayer,
   SourcePreviewFrame,
 } from "./SourcePreviewFrame";
@@ -74,4 +75,15 @@ it("applies a visual class draft only to the isolated element", () => {
   expect(applySourceLayerClassName(output, "p-8 rounded-xl")).toBe(true);
   expect(output.firstElementChild).toHaveClass("p-8", "rounded-xl");
   expect(output.querySelector("span")).not.toHaveAttribute("class");
+});
+
+it("applies a visual text draft without removing nested elements", () => {
+  const output = document.createElement("div");
+  output.innerHTML = '<p>Ready <strong>now</strong></p>';
+  expect(applySourceLayerText(output, "Needs review ")).toBe(true);
+  expect(output.querySelector("p")?.firstChild).toHaveTextContent("Needs review");
+  expect(output.querySelector("strong")).toHaveTextContent("now");
+  expect(applySourceLayerText(output, "")).toBe(true);
+  expect(applySourceLayerText(output, "Ready again ")).toBe(true);
+  expect(output.querySelector("p")?.firstChild).toHaveTextContent("Ready again");
 });

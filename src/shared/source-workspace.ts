@@ -69,6 +69,8 @@ export interface SourceWorkspaceLayer {
   className?: SourceLayerClassNameBinding;
   /** Dynamic className expressions stay code-only until their expression can be preserved. */
   classNameDynamic?: true;
+  /** Exact source binding for one direct static JSX text child. */
+  text?: SourceLayerTextBinding;
 }
 
 export interface SourceLayerClassNameBinding {
@@ -77,6 +79,13 @@ export interface SourceLayerClassNameBinding {
   end: number;
   insert?: true;
   syntax?: "attribute" | "expression";
+}
+
+export interface SourceLayerTextBinding {
+  value: string;
+  start: number;
+  end: number;
+  syntax: "expression" | "text";
 }
 
 export interface SourceWorkspaceDeviceState {

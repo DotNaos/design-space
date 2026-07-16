@@ -20,6 +20,7 @@ export function SourcePreviewFrame(props: {
   selectedLayer?: SourceWorkspaceLayer;
   selectedClassName?: string;
   selectedClassCss?: string;
+  selectedText?: string;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
   onModeChange?: (mode: "preview" | "code") => void;
 }) {
@@ -64,6 +65,17 @@ export function SourcePreviewFrame(props: {
       applySourceLayerClassName(mounts.output, props.selectedClassName);
     }
   }, [mounts, projectedKey, projectionKey, props.selectedClassName]);
+
+  useEffect(() => {
+    if (
+      mounts &&
+      projectionKey &&
+      projectedKey === projectionKey &&
+      props.selectedText !== undefined
+    ) {
+      applySourceLayerText(mounts.output, props.selectedText);
+    }
+  }, [mounts, projectedKey, projectionKey, props.selectedText]);
 
   return (
     <SourceCanvasViewport
@@ -187,6 +199,17 @@ export function applySourceLayerClassName(output: HTMLElement, className: string
   const selected = output.firstElementChild;
   if (!selected) return false;
   selected.setAttribute("class", className);
+  return true;
+}
+
+export function applySourceLayerText(output: HTMLElement, text: string): boolean {
+  const selected = output.firstElementChild;
+  if (!selected) return false;
+  const textNodes = [...selected.childNodes].filter((node) => node.nodeType === 3);
+  const textNode = textNodes.find((node) => Boolean(node.textContent?.trim()))
+    ?? (textNodes.length === 1 ? textNodes[0] : undefined);
+  if (!textNode) return false;
+  textNode.textContent = text;
   return true;
 }
 

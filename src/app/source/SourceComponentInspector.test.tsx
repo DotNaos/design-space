@@ -59,21 +59,27 @@ it("renders an honest empty selection state", () => {
 
 it("edits a selected HTML layer through its source-derived Tailwind binding", () => {
   const change = vi.fn();
+  const changeText = vi.fn();
   const binding = { value: "p-4", start: 40, end: 55 };
+  const textBinding = { value: "Panel", start: 56, end: 61, syntax: "text" as const };
   const styleEditor = {
     binding,
     change,
+    changeText,
     css: "",
     editable: true,
     error: undefined,
     reset: vi.fn(),
+    textBinding,
+    textEditable: true,
+    textValue: "Panel",
     value: "p-4",
   } satisfies SourceLayerClassEditor;
 
   render(
     <SourceComponentInspector
       entry={entry}
-      layer={{ id: "panel-section", label: "section", kind: "html", children: [], className: binding }}
+      layer={{ id: "panel-section", label: "section", kind: "html", children: [], className: binding, text: textBinding }}
       styleEditor={styleEditor}
     />,
   );
@@ -83,4 +89,9 @@ it("edits a selected HTML layer through its source-derived Tailwind binding", ()
   expect(classes).toHaveValue("p-4");
   fireEvent.change(classes, { target: { value: "p-6 rounded-xl" } });
   expect(change).toHaveBeenCalledWith("p-6 rounded-xl");
+
+  const text = within(design).getByRole("textbox", { name: "Static text" });
+  expect(text).toHaveValue("Panel");
+  fireEvent.change(text, { target: { value: "Project panel" } });
+  expect(changeText).toHaveBeenCalledWith("Project panel");
 });

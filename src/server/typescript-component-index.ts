@@ -5,6 +5,7 @@ import ts from "typescript";
 import type {
   SourceComponentProp,
   SourceLayerClassNameBinding,
+  SourceLayerTextBinding,
   SourcePropKind,
   SourceWorkspaceLayer,
 } from "../shared/source-workspace";
@@ -208,6 +209,7 @@ function jsxLayer(
       label,
       kind,
       ...jsxClassName(node.openingElement, kind),
+      ...jsxStaticText(node),
       children: [
         ...localComponentLayers(label, kind, localComponents, path, relativePath),
         ...jsxChildLayers(node.children, localComponents, path, relativePath),
@@ -263,6 +265,41 @@ function jsxClassName(
     syntax: staticValue.syntax,
   };
   return { className };
+}
+
+function jsxStaticText(
+  element: ts.JsxElement,
+): Pick<SourceWorkspaceLayer, "text"> {
+  const bindings = element.children.flatMap((child): SourceLayerTextBinding[] => {
+    if (ts.isJsxText(child)) {
+      const sourceText = child.getText();
+      if (!sourceText.trim() || sourceText !== sourceText.trim() || /[\r\n]/.test(sourceText)) return [];
+      return [{
+        value: decodeJsxText(sourceText),
+        start: child.getStart(),
+        end: child.getEnd(),
+        syntax: "text",
+      }];
+    }
+    if (!ts.isJsxExpression(child) || !child.expression) return [];
+    if (!ts.isStringLiteral(child.expression) && !ts.isNoSubstitutionTemplateLiteral(child.expression)) return [];
+    return [{
+      value: child.expression.text,
+      start: child.getStart(),
+      end: child.getEnd(),
+      syntax: "expression",
+    }];
+  });
+  return bindings.length === 1 ? { text: bindings[0] } : {};
+}
+
+function decodeJsxText(value: string): string {
+  return value
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&#123;", "{")
+    .replaceAll("&#125;", "}")
+    .replaceAll("&amp;", "&");
 }
 
 function staticJsxAttributeValue(

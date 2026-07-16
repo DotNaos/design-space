@@ -74,7 +74,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
       <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
         <FileCode2 aria-hidden="true" className="shrink-0 text-sky-400" size={16} />
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold text-zinc-100">App tree</h2>
+          <h2 className="truncate text-sm font-semibold text-zinc-100">Source tree</h2>
           <p className="mt-0.5 truncate text-[9px] uppercase tracking-[0.14em] text-zinc-600">
             {props.workspace.sourceRoot} · {props.workspace.runtime === "react-native" ? "React Native" : "React"}
           </p>

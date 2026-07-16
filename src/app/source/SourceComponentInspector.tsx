@@ -1,4 +1,5 @@
 import { Braces, Component, FileCode2 } from "lucide-react";
+import { Label, TextArea, TextField } from "@heroui/react";
 
 import type {
   SourceComponentProp,
@@ -45,7 +46,7 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {props.layer?.kind === "html" && (
+        {props.layer && (props.layer.kind === "html" || props.layer.text) && (
           <LayerDesignSection layer={props.layer} styleEditor={props.styleEditor} />
         )}
         <ContractSection
@@ -90,10 +91,26 @@ function LayerDesignSection(props: {
             Changes are applied to this element only. Review the exact source diff before saving.
           </p>
         </>
-      ) : (
+      ) : props.layer.kind === "html" ? (
         <p className="text-[10px] leading-4 text-zinc-600">
           This element computes className in TypeScript. Open its code to preserve that expression.
         </p>
+      ) : null}
+      {props.layer.text && (
+        <TextField
+          fullWidth
+          className={props.layer.kind === "html" ? "mt-4" : undefined}
+          isDisabled={!editor?.textEditable}
+          value={editor?.textValue ?? props.layer.text.value}
+          onChange={(value) => editor?.changeText(value)}
+        >
+          <Label className="text-[10px] text-zinc-500">Static text</Label>
+          <TextArea
+            aria-label="Static text"
+            className="mt-1 min-h-16 w-full resize-y rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none"
+            rows={2}
+          />
+        </TextField>
       )}
     </section>
   );

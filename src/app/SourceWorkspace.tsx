@@ -125,6 +125,7 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
             selectedLayer={selectedLayer}
             selectedClassCss={styleEditor.css}
             selectedClassName={selectedLayer?.className ? styleEditor.value : undefined}
+            selectedText={selectedLayer?.text ? styleEditor.textValue : undefined}
             runtime={workspace.runtime}
             styles={workspace.styles}
             onDeviceChange={(device) => selectedNode && setSelection({ nodeId: selectedNode.id, device })}
@@ -192,7 +193,7 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
           saving={activeEditor.saving}
           onUndo={() => undefined}
           onRedo={() => undefined}
-          onReset={activity === "app" && selectedLayer?.className ? styleEditor.reset : activeEditor.reset}
+          onReset={activity === "app" && (selectedLayer?.className || selectedLayer?.text) ? styleEditor.reset : activeEditor.reset}
           onStrictUi={() => undefined}
           onDiff={() => void activeEditor.prepare()}
           onSave={() => void activeEditor.save()}

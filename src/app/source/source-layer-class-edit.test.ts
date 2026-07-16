@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { sourceWithLayerClassName } from "./source-layer-class-edit";
+import { sourceWithLayerClassName, sourceWithLayerText } from "./source-layer-class-edit";
 
 it("replaces a static JSX className with an exact expression literal", () => {
   const source = 'export const Panel = () => <section className="p-4">Panel</section>;';
@@ -27,5 +27,31 @@ it("adds a missing className without changing an empty draft", () => {
   expect(sourceWithLayerClassName(source, binding, "")).toBe(source);
   expect(sourceWithLayerClassName(source, binding, "grid gap-4")).toBe(
     'export const Panel = () => <section className={"grid gap-4"}>Panel</section>;',
+  );
+});
+
+it("replaces static JSX text while escaping source-significant characters", () => {
+  const source = "export const Badge = () => <span>Ready</span>;";
+  const start = source.indexOf("Ready");
+  expect(sourceWithLayerText(source, {
+    value: "Ready",
+    start,
+    end: start + "Ready".length,
+    syntax: "text",
+  }, "Ready & {safe}")).toBe(
+    "export const Badge = () => <span>Ready &amp; &#123;safe&#125;</span>;",
+  );
+});
+
+it("preserves an authored JSX string expression", () => {
+  const source = 'export const Badge = () => <span>{"Ready"}</span>;';
+  const start = source.indexOf('{"Ready"}');
+  expect(sourceWithLayerText(source, {
+    value: "Ready",
+    start,
+    end: start + '{"Ready"}'.length,
+    syntax: "expression",
+  }, 'Needs "review"')).toBe(
+    'export const Badge = () => <span>{"Needs \\"review\\""}</span>;',
   );
 });

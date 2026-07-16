@@ -34,7 +34,12 @@ describe("TypeScript component index", () => {
         children: [{
           label: "PanelHeader",
           kind: "component",
-          children: [{ label: "header", kind: "html", children: [] }],
+          children: [{
+            label: "header",
+            kind: "html",
+            text: expect.objectContaining({ value: "Summary", syntax: "text" }),
+            children: [],
+          }],
         }],
       }],
     });
@@ -158,7 +163,7 @@ describe("TypeScript component index", () => {
     await writeFile(join(root, "src/components/Panel.tsx"), `
       import type { PanelProps } from "@fixture/panel";
 
-      function PanelHeader() { return <header />; }
+      function PanelHeader() { return <header>Summary</header>; }
       export function Panel(props: PanelProps) {
         return <section className="rounded-xl"><PanelHeader />{props.title}{props.content}{props.children}</section>;
       }
