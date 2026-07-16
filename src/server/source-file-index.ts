@@ -71,7 +71,11 @@ export async function indexSourceWorkspace(
   const relativePaths = await discoverBrowsableFiles(root);
   const files = await registerDiscoveredFiles(root, relativePaths);
   const fileByPath = new Map(files.map((file) => [file.relativePath, file]));
-  const componentCandidates = files.filter((file) => sourceLocation(file.relativePath));
+  const conventionCandidates = files.filter((file) => sourceLocation(file.relativePath));
+  const inferredCatalog = conventionCandidates.length === 0;
+  const componentCandidates = inferredCatalog
+    ? files.filter((file) => inferredSourceLocation(file.relativePath, config))
+    : conventionCandidates;
   const indexedComponents = await indexTypeScriptComponents({
     projectRoot: root,
     filePaths: componentCandidates.map((file) => file.absolutePath),
@@ -83,7 +87,7 @@ export async function indexSourceWorkspace(
     const relativePath = isAbsolute(component.filePath)
       ? portableRelative(root, component.filePath)
       : component.filePath.replaceAll("\\", "/");
-    const location = sourceLocation(relativePath);
+    const location = sourceLocation(relativePath) ?? (inferredCatalog ? inferredSourceLocation(relativePath, config) : undefined);
     const file = fileByPath.get(relativePath);
     if (!location || !file) continue;
     const id = stableId("source.entry", `${relativePath}\0${component.exportName}`);
@@ -99,6 +103,7 @@ export async function indexSourceWorkspace(
       relativePath,
       exportName: component.exportName,
       props: component.props,
+      previewable: true,
     });
     entryFiles.set(id, file.absolutePath);
   }
@@ -106,7 +111,7 @@ export async function indexSourceWorkspace(
 
   const manifest: SourceWorkspaceManifest = {
     runtime: config.runtime ?? "react",
-    sourceRoot: SOURCE_ROOT,
+    sourceRoot: inferredCatalog ? "src" : SOURCE_ROOT,
     entries: Object.freeze(entries),
     devices: Object.freeze(deviceStates(entries, config)),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
@@ -205,7 +210,7 @@ async function importedLibraryComponents(
 ): Promise<SourceWorkspaceLibrary["components"]> {
   const names = new Set<string>();
   const escapedPackage = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const namedImport = new RegExp(`import\\s*\\{([\\s\\S]*?)\\}\\s*from\\s*["']${escapedPackage}["']`, "g");
+  const namedImport = new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*["']${escapedPackage}["']`, "g");
   for (const file of files) {
     if (!/\.[cm]?[jt]sx?$/.test(file.relativePath)) continue;
     const source = await readRegisteredFile(root, file.absolutePath, { maximumBytes: 512 * 1024 }).catch(() => undefined);
@@ -236,6 +241,8 @@ async function discoverBrowsableFiles(root: string): Promise<string[]> {
 
 async function walkDirectory(root: string, relativeDirectory: string, depth: number, result: Set<string>): Promise<void> {
   if (depth > maximumDirectoryDepth || ignoredDirectories.has(relativeDirectory.split("/").at(-1) ?? "")) return;
+  const directoryMetadata = await lstat(resolve(root, relativeDirectory)).catch(() => undefined);
+  if (!directoryMetadata?.isDirectory() || directoryMetadata.isSymbolicLink()) return;
   let directory;
   try {
     directory = await opendir(resolve(root, relativeDirectory));
@@ -284,12 +291,42 @@ function sourceLocation(relativePath: string): { area: DesignSpaceArea; device: 
   return undefined;
 }
 
+function inferredSourceLocation(
+  relativePath: string,
+  config: DesignSpaceProjectConfig,
+): { area: DesignSpaceArea; device: DesignSpaceDevice } | undefined {
+  if (!relativePath.endsWith(".tsx") || /(?:^|\/)[^/]+\.(?:test|spec|stories)\.tsx$/.test(relativePath)) return undefined;
+  const device = inferredDevice(relativePath);
+  const fileName = relativePath.split("/").at(-1) ?? relativePath;
+  const configuredLayout = config.source?.layout;
+  const area: DesignSpaceArea = configuredLayout ? relativePath === configuredLayout
+    ? "layout"
+    : /(?:^|\/)pages(?:\/|$)/i.test(relativePath) || /(?:Page|-page)\.tsx$/.test(fileName)
+      ? "pages"
+      : "components"
+    : /(?:^|\/)app(?:-entry)?\.tsx$/i.test(relativePath)
+    ? "layout"
+    : /(?:^|\/)pages(?:\/|$)/i.test(relativePath) || /(?:Page|-page)\.tsx$/.test(fileName)
+      ? "pages"
+      : "components";
+  return { area, device };
+}
+
+function inferredDevice(relativePath: string): DesignSpaceDevice {
+  if (/(?:^|\/|[.-])mobile(?:\/|[.-]|$)/i.test(relativePath)) return "mobile";
+  if (/(?:^|\/|[.-])tablet(?:\/|[.-]|$)/i.test(relativePath)) return "tablet";
+  return "desktop";
+}
+
 function deviceStates(
   entries: readonly SourceWorkspaceEntry[],
   config: DesignSpaceProjectConfig,
 ): SourceWorkspaceDeviceState[] {
   return designSpaceAreas.flatMap((area) => designSpaceDevices.map((device) => {
     const path = sourcePath(area, device);
+    if (config.devices?.mode === "responsive" && entries.some((entry) => entry.area === area)) {
+      return { area, device, path, state: "responsive" } as const;
+    }
     if (entries.some((entry) => entry.area === area && entry.device === device)) {
       return { area, device, path, state: "configured" } as const;
     }

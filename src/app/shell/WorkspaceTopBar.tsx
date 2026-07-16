@@ -2,6 +2,7 @@ import { Button } from "@heroui/react";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, FileDiff, LoaderCircle, Redo2, RotateCcw, Save, Shield, Undo2 } from "lucide-react";
 
 import type { StrictUiEvidence } from "../../shared/strict-ui";
+import { RunningTargetSwitcher } from "./RunningTargetSwitcher";
 export function WorkspaceTopBar(props: {
   targetLabel: string;
   documentLabel: string;
@@ -33,7 +34,7 @@ export function WorkspaceTopBar(props: {
             <ArrowLeft size={16} />
           </Button>
         )}
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-zinc-100">{props.targetLabel}</span>
+        <div className="min-w-0 flex-1"><RunningTargetSwitcher targetLabel={props.targetLabel} /></div>
         <ConnectionStatus connected={props.connected} />
         <div className="lg:hidden"><StrictStatusButton disabled={!props.canStrictUi} evidence={props.strictUi} checking={props.checking} onPress={props.onStrictUi} /></div>
       </div>

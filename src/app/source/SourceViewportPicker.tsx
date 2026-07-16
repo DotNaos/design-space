@@ -1,16 +1,25 @@
-import { Label, ListBox, Select, Slider } from "@heroui/react";
-import { MonitorSmartphone } from "lucide-react";
+import { Button, Label, ListBox, Select, Slider, Tooltip } from "@heroui/react";
+import { Code2, Eye, MonitorSmartphone } from "lucide-react";
 
+import type { DesignSpaceDevice } from "../../shared/source-workspace";
+import { SourceDeviceTabs } from "./SourceDeviceTabs";
+import type { SourceTreeNode } from "./source-workspace-tree";
 import { sourceViewportPresets } from "./source-viewports";
 
 export function SourceViewportPicker(props: {
+  device: DesignSpaceDevice;
+  node?: SourceTreeNode;
   presetId: string;
   responsiveWidth: number;
+  onDeviceChange: (device: DesignSpaceDevice) => void;
+  onModeChange: (mode: "preview" | "code") => void;
   onPresetChange: (id: string) => void;
   onResponsiveWidthChange: (width: number) => void;
 }) {
   return (
-    <div className="pointer-events-auto absolute left-1/2 top-3 z-30 flex h-8 max-w-[44%] -translate-x-1/2 items-center gap-2 rounded-lg border border-white/10 bg-[#17181b]/95 px-2 shadow-xl">
+    <div className="pointer-events-auto absolute left-1/2 top-3 z-30 flex h-9 max-w-[72%] -translate-x-1/2 items-center gap-1.5 rounded-lg border border-white/10 bg-[#17181b]/95 px-1.5 shadow-xl">
+      <SourceDeviceTabs device={props.device} node={props.node} onChange={props.onDeviceChange} />
+      <span aria-hidden="true" className="h-5 w-px shrink-0 bg-white/10" />
       <MonitorSmartphone aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />
       <Select
         aria-label="Preview dimensions"
@@ -49,6 +58,15 @@ export function SourceViewportPicker(props: {
           </Slider>
         </>
       )}
+      <span aria-hidden="true" className="h-5 w-px shrink-0 bg-white/10" />
+      <Tooltip delay={350}>
+        <Button isIconOnly aria-label="Preview in canvas" className="size-6 min-w-6 bg-white/10 text-sky-200" size="sm" variant="ghost" onPress={() => props.onModeChange("preview")}><Eye size={11} /></Button>
+        <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Preview</Tooltip.Content>
+      </Tooltip>
+      <Tooltip delay={350}>
+        <Button isIconOnly aria-label="Open code in center" className="size-6 min-w-6 text-zinc-500" size="sm" variant="ghost" onPress={() => props.onModeChange("code")}><Code2 size={11} /></Button>
+        <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Code</Tooltip.Content>
+      </Tooltip>
     </div>
   );
 }

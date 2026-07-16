@@ -6,7 +6,7 @@ import {
   type RuntimeSourceWorkspaceEntry,
 } from "../../shared/source-workspace";
 
-export type SourceImplementationState = "direct" | "fallback" | "missing";
+export type SourceImplementationState = "direct" | "fallback" | "missing" | "responsive";
 
 export interface SourceImplementation {
   requestedDevice: DesignSpaceDevice;
@@ -79,6 +79,12 @@ function implementationsFor(
       return [device, { requestedDevice: device, sourceDevice: device, state: "direct", entry: direct }];
     }
     const areaState = workspace.devices.find((candidate) => candidate.area === area && candidate.device === device);
+    if (areaState?.state === "responsive") {
+      const responsive = entries.find((entry) => entry.device === "desktop") ?? entries[0];
+      if (responsive) {
+        return [device, { requestedDevice: device, sourceDevice: responsive.device, state: "responsive", entry: responsive }];
+      }
+    }
     const fallbackDevice = areaState?.state === "fallback" ? areaState.fallback : undefined;
     const fallback = fallbackDevice ? entries.find((entry) => entry.device === fallbackDevice) : undefined;
     if (fallback && fallbackDevice) {
@@ -91,10 +97,17 @@ function implementationsFor(
 function logicalEntryKey(entry: RuntimeSourceWorkspaceEntry): string {
   if (entry.area === "layout") return "layout:app";
   if (entry.area === "components") {
-    const folder = /^src\/app\/components\/([^/]+)\//.exec(entry.relativePath)?.[1] ?? entry.label;
+    const folder = /^src\/app\/components\/([^/]+)\//.exec(entry.relativePath)?.[1]
+      ?? entry.relativePath.replace(/\/(?:desktop|tablet|mobile)\.tsx?$/, "").replace(/\.tsx?$/, "");
     return `components:${folder}:${entry.exportName}`;
   }
-  return `pages:${entry.exportName}`;
+  if (/^src\/app\/(?:desktop|tablet|mobile)\/pages\//.test(entry.relativePath)) {
+    return `pages:${entry.exportName}`;
+  }
+  const pagePath = entry.relativePath
+    .replace(/\/(?:desktop|tablet|mobile)\//, "/")
+    .replace(/\.tsx?$/, "");
+  return `pages:${pagePath}:${entry.exportName}`;
 }
 
 function logicalEntryLabel(entry: RuntimeSourceWorkspaceEntry): string {

@@ -3,6 +3,9 @@ import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 
+import { loadRegisteredProject } from "../src/server/project-loader";
+import { targetRouteName } from "./target-route-name";
+
 const packageRoot = resolve(import.meta.dir, "..");
 const projectRoot = process.cwd();
 const arguments_ = process.argv.slice(2);
@@ -23,7 +26,11 @@ if (
 
 const child = spawn("bun", [resolve(packageRoot, "scripts/dev.ts")], {
   cwd: packageRoot,
-  env: { ...process.env, DESIGN_SPACE_PROJECT_ROOT: projectRoot },
+  env: {
+    ...process.env,
+    DESIGN_SPACE_PROJECT_ROOT: projectRoot,
+    DESIGN_SPACE_PORTLESS_NAME: targetRouteName((await loadRegisteredProject(projectRoot)).project.id),
+  },
   stdio: "inherit",
 });
 child.on("exit", (code, signal) => {

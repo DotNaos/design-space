@@ -80,6 +80,33 @@ describe("TypeScript-first source index", () => {
     ]);
   });
 
+  it("indexes exported React pages and components from a real src tree without a generated manifest", async () => {
+    const root = await mkdtemp(join(tmpdir(), "design-space-inferred-source-"));
+    roots.push(root);
+    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
+    await mkdir(join(root, "src", "design-space"), { recursive: true });
+    await mkdir(join(root, "src", "pages"), { recursive: true });
+    await mkdir(join(root, "src", "components"), { recursive: true });
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
+    await writeFile(join(root, "src", "design-space", "app.tsx"), "export function ProjectPreview() { return <main />; }\n");
+    await writeFile(join(root, "src", "pages", "SettingsPage.tsx"), "export function SettingsPage() { return <main />; }\n");
+    await writeFile(join(root, "src", "components", "Navigation.tsx"), "export function Navigation() { return <nav />; }\n");
+    await writeFile(join(root, "src", "components", "Navigation.test.tsx"), "export function TestOnly() { return <nav />; }\n");
+
+    const result = await indexSourceWorkspace(root, {
+      project: { id: "real-project", label: "Real project" },
+      devices: { mode: "responsive" },
+      source: { layout: "src/design-space/app.tsx" },
+    });
+
+    expect(result.manifest.entries.map(({ area, label, relativePath }) => ({ area, label, relativePath }))).toEqual([
+      { area: "layout", label: "ProjectPreview", relativePath: "src/design-space/app.tsx" },
+      { area: "pages", label: "SettingsPage", relativePath: "src/pages/SettingsPage.tsx" },
+      { area: "components", label: "Navigation", relativePath: "src/components/Navigation.tsx" },
+    ]);
+    expect(result.manifest.devices).toContainEqual(expect.objectContaining({ device: "mobile", state: "responsive" }));
+  });
+
   it("derives release and development connections without claiming unregistered write access", async () => {
     const root = await mkdtemp(join(tmpdir(), "design-space-library-index-"));
     roots.push(root);

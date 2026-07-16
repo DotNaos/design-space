@@ -23,7 +23,7 @@ it("uses a compact canvas switcher and allows selecting missing implementations"
   const onChange = vi.fn();
   render(<SourceDeviceTabs device="desktop" node={node} onChange={onChange} />);
 
-  expect(screen.getByRole("navigation", { name: "Source implementation" })).toHaveClass("h-9");
+  expect(screen.getByRole("group", { name: "Source implementation" })).toHaveClass("h-7");
   expect(screen.getByRole("button", { name: "Desktop implementation" })).toHaveAttribute("aria-current", "page");
   expect(screen.getByRole("button", { name: "Tablet implementation, Uses Desktop" })).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "Mobile implementation, Missing" }));

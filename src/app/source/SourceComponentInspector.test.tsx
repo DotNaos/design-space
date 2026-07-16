@@ -48,7 +48,7 @@ it("shows exact TypeScript prop and slot contracts without editable or invented 
   expect(slots).toHaveTextContent("Multiple");
 
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Code" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Code" })).not.toBeInTheDocument();
 });
 
 it("renders an honest empty selection state", () => {

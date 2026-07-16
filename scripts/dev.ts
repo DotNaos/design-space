@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dir, "..");
 const isRaw = process.argv.includes("--raw");
 const allowDirect = process.env.DESIGN_SPACE_ALLOW_DIRECT === "1";
+const portlessName = process.env.DESIGN_SPACE_PORTLESS_NAME ?? "design-space";
 
 function run(command: string, args: string[], env = process.env) {
   const child = spawn(command, args, { cwd: root, env, stdio: "inherit" });
@@ -20,7 +21,7 @@ if (!isRaw) {
     );
   }
 
-  run("bunx", ["portless", "--name", "design-space", "bun", "./scripts/dev.ts", "--raw"], {
+  run("bunx", ["portless", "--name", portlessName, "bun", "./scripts/dev.ts", "--raw"], {
     ...process.env,
     DESIGN_SPACE_VIA_PORTLESS: "1",
   });

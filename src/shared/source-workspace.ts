@@ -18,6 +18,14 @@ export interface DesignSpaceProjectConfig {
   tablet?: {
     fallback: Extract<DesignSpaceDevice, "desktop" | "mobile">;
   };
+  /** Existing responsive apps may explicitly declare one shared implementation. */
+  devices?: {
+    mode: "responsive";
+  };
+  /** Optional target-owned app preview entry inside the trusted src tree. */
+  source?: {
+    layout: string;
+  };
 }
 
 /** Keeps .designspace.ts type-safe without introducing a generated manifest. */
@@ -45,19 +53,20 @@ export interface SourceWorkspaceEntry {
   relativePath: string;
   exportName: string;
   props: readonly SourceComponentProp[];
+  previewable?: boolean;
 }
 
 export interface SourceWorkspaceDeviceState {
   area: DesignSpaceArea;
   device: DesignSpaceDevice;
   path: string;
-  state: "configured" | "fallback" | "missing";
+  state: "configured" | "fallback" | "missing" | "responsive";
   fallback?: Extract<DesignSpaceDevice, "desktop" | "mobile">;
 }
 
 export interface SourceWorkspaceManifest {
   runtime: DesignSpaceRuntime;
-  sourceRoot: "src/app";
+  sourceRoot: string;
   entries: readonly SourceWorkspaceEntry[];
   devices: readonly SourceWorkspaceDeviceState[];
   library?: SourceWorkspaceLibrary;

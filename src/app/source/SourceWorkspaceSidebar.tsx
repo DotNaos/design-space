@@ -12,6 +12,7 @@ import {
   Monitor,
   Smartphone,
   Tablet,
+  Link2,
 } from "lucide-react";
 
 import {
@@ -189,6 +190,8 @@ function DeviceStatusIcon(props: {
     ? "text-amber-300"
     : props.implementation.state === "missing"
       ? "text-zinc-700"
+      : props.implementation.state === "responsive"
+        ? props.current ? "text-cyan-300" : "text-cyan-400/70"
       : props.current
         ? "text-sky-300"
         : "text-zinc-300";
@@ -201,6 +204,9 @@ function DeviceStatusIcon(props: {
       {props.implementation.state === "missing" && (
         <span aria-hidden="true" className="absolute h-px w-3 -rotate-45 bg-current" />
       )}
+      {props.implementation.state === "responsive" && (
+        <Link2 aria-hidden="true" className="absolute -right-1 -top-1 rounded-sm bg-[#141518]" size={6} strokeWidth={2.2} />
+      )}
     </span>
   );
 }
@@ -209,6 +215,7 @@ function implementationLabel(implementation: SourceImplementation): string {
   const label = deviceLabels[implementation.requestedDevice];
   if (implementation.state === "direct") return `${label} implemented`;
   if (implementation.state === "fallback") return `${label} uses ${implementation.sourceDevice ? deviceLabels[implementation.sourceDevice] : "fallback"}`;
+  if (implementation.state === "responsive") return `${label} uses the declared responsive implementation`;
   return `${label} missing`;
 }
 

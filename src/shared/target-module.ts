@@ -50,6 +50,7 @@ export interface TargetFileEntry {
   label: string;
   kind: "file" | "directory";
   parentId?: string;
+  editable?: boolean;
 }
 
 export interface TargetDocumentEntry {

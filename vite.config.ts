@@ -14,6 +14,8 @@ import {
   resolveServerProjectRoot,
 } from "./src/server";
 import { createViteFileSystemPolicy } from "./src/server/vite-file-system-policy";
+import { targetTypeScriptAliases } from "./src/server/typescript-path-aliases";
+import { runningTargetPlugin } from "./src/server/running-target-plugin";
 
 const root = import.meta.dirname;
 
@@ -41,11 +43,15 @@ export default defineConfig(async () => {
 
   return {
     cacheDir: resolve(root, "node_modules/.vite-design-space", `port-${serverPort}`),
-    resolve: { dedupe: ["react", "react-dom"] },
+    resolve: {
+      alias: targetTypeScriptAliases(registeredTarget.root),
+      dedupe: ["react", "react-dom"],
+    },
     plugins: [
       enforcedPortless(),
       designSpaceTargetPlugin(registeredTarget),
       designSpaceApiPlugin(api),
+      runningTargetPlugin(registeredTarget.project),
       react(),
       tailwindcss(),
     ],

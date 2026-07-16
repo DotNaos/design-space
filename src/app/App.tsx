@@ -31,6 +31,7 @@ import type { SlotState } from "./types";
 import { useItemEditor } from "./use-item-editor";
 import { DocumentWorkspace } from "./DocumentWorkspace";
 import { SourceWorkspace } from "./SourceWorkspace";
+import { useSourcePreviewRuntime } from "./source/SourcePreviewRuntime";
 import { createPortableDraftId } from "./document/design-id";
 import { isLegacyPrepareCompileFailure } from "./legacy-prepare-error";
 import { usesDocumentWorkspace } from "./workspace-selection";
@@ -41,7 +42,8 @@ type SlotSelection = Extract<SelectionTarget, { kind: "slot" }>;
 type FixtureUndo = { fixture: ComponentFixture; compositionCss: Readonly<Record<string, string>>; undoRootEdit: boolean };
 
 export function App() {
-  if (target.sourceWorkspace) return <SourceWorkspace target={target} />;
+  const previewRuntime = useSourcePreviewRuntime();
+  if (target.sourceWorkspace) return <SourceWorkspace initialCenterMode={previewRuntime ? "code" : "preview"} target={target} />;
   return usesDocumentWorkspace(target) ? <DocumentWorkspace target={target} /> : <LegacyWorkspace />;
 }
 

@@ -34,7 +34,7 @@ export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
         });
       }
       if (sourceWorkspace) {
-        const appRoot = normalizePath(`${target.root}/src/app/`);
+        const appRoot = normalizePath(`${target.root}/${sourceWorkspace.manifest.sourceRoot}/`);
         server.watcher.add(sourceWorkspace.files.map((file) => file.absolutePath));
         const restartForSourceShape = (changedPath: string) => {
           const normalized = normalizePath(changedPath);
@@ -64,13 +64,14 @@ function sourceTargetModule(target: RegisteredTarget): string {
   const workspace = target.sourceWorkspace;
   if (!workspace) throw new Error("Missing source workspace");
   const web = workspace.manifest.runtime === "react";
-  const componentImports: string[] = [];
-  const runtimeEntries = workspace.manifest.entries.map((entry, index) => {
-    const variable = `SourceComponentModule${index}`;
+  const runtimeEntries = workspace.manifest.entries.map((entry) => {
     const absolutePath = workspace.entryFiles.get(entry.id);
     if (!absolutePath) throw new Error(`Missing source module for ${entry.id}`);
-    if (web) componentImports.push(`import * as ${variable} from ${JSON.stringify(normalizePath(absolutePath))};`);
-    const component = web ? `${variable}[${JSON.stringify(entry.exportName)}]` : "NativePreviewUnavailable";
+    const modulePath = JSON.stringify(normalizePath(absolutePath));
+    const exportName = JSON.stringify(entry.exportName);
+    const component = web && entry.previewable !== false
+      ? `lazy(() => import(${modulePath}).then((module) => ({ default: module[${exportName}] })))`
+      : "NativePreviewUnavailable";
     return `{ ...${JSON.stringify(entry)}, component: ${component} }`;
   });
   const styleImports = web ? workspace.stylePaths.map((path, index) => ({
@@ -78,9 +79,9 @@ function sourceTargetModule(target: RegisteredTarget): string {
     variable: `SourceStyle${index}`,
   })) : [];
   const files = registeredFileCatalog(target);
-  const sourceRootLabel = relative(target.root, `${target.root}/src/app`) || "src/app";
+  const sourceRootLabel = relative(target.root, `${target.root}/${workspace.manifest.sourceRoot}`) || workspace.manifest.sourceRoot;
   return [
-    ...componentImports,
+    'import { lazy } from "react";',
     ...styleImports.map((style) => style.statement),
     "const NativePreviewUnavailable = () => null;",
     "const sourceHostAdapter = {",

@@ -96,7 +96,10 @@ function readCompilerOptions(projectRoot: string): ts.CompilerOptions {
     strict: true,
     target: ts.ScriptTarget.ES2022,
   };
-  const configPath = join(projectRoot, "tsconfig.json");
+  const applicationConfigPath = join(projectRoot, "tsconfig.app.json");
+  const configPath = ts.sys.fileExists(applicationConfigPath)
+    ? applicationConfigPath
+    : join(projectRoot, "tsconfig.json");
   if (!ts.sys.fileExists(configPath)) return defaults;
 
   const diagnostics: ts.Diagnostic[] = [];

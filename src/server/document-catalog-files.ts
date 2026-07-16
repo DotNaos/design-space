@@ -31,6 +31,7 @@ export function registeredFileCatalog(target: RegisteredTarget): readonly Docume
       label: segments.at(-1) ?? file.displayName,
       kind: "file",
       parentId,
+      editable: target.editableFileIds?.has(file.id) ?? false,
     });
   }
   return entries;

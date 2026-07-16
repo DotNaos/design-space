@@ -11,6 +11,10 @@ const sourceProjectConfigSchema = z.object({
   }).strict(),
   runtime: z.enum(["react", "react-native"]).optional(),
   tablet: z.object({ fallback: z.enum(["desktop", "mobile"]) }).strict().optional(),
+  devices: z.object({ mode: z.literal("responsive") }).strict().optional(),
+  source: z.object({
+    layout: z.string().regex(/^src\/(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+\.tsx$/),
+  }).strict().optional(),
 }).strict();
 
 export function parseSourceProjectConfig(value: unknown): DesignSpaceProjectConfig {

@@ -4,14 +4,20 @@ import { createPortal } from "react-dom";
 import type { DesignSpaceDevice, RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace";
 import { PreviewBoundary } from "../PreviewBoundary";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
+import { SourcePreviewRuntimeContext } from "./SourcePreviewRuntime";
+import type { SourceTreeNode } from "./source-workspace-tree";
 
 export function SourcePreviewFrame(props: {
   device: DesignSpaceDevice;
   entry?: RuntimeSourceWorkspaceEntry;
   runtime: "react" | "react-native";
   styles: readonly string[];
+  node?: SourceTreeNode;
+  onDeviceChange?: (device: DesignSpaceDevice) => void;
+  onModeChange?: (mode: "preview" | "code") => void;
 }) {
   const [mount, setMount] = useState<HTMLElement>();
+  const previewState = unavailablePreviewState(props);
   const loadFrame = useCallback((node: HTMLIFrameElement | null) => {
     if (!node) {
       setMount(undefined);
@@ -22,59 +28,43 @@ export function SourcePreviewFrame(props: {
     update();
   }, []);
 
-  if (props.runtime === "react-native") {
-    return (
-      <PreviewState
-        title="React Native target indexed"
-        message="The native source tree and TypeScript contracts are available. A simulator renderer must connect before this target can claim preview readiness."
-      />
-    );
-  }
-  if (!props.entry) {
-    return (
-      <PreviewState
-        title={`No ${props.device} implementation`}
-        message="Add an exported React component at the shown fixed path, or configure the explicit Tablet fallback."
-      />
-    );
-  }
-  const entry = props.entry;
-
-  const Component = entry.component;
-  const requiredProps = entry.props.filter((property) => property.required);
-  if (requiredProps.length > 0) {
-    return (
-      <PreviewState
-        title="Preview arguments required"
-        message={`Design Space will not invent values or execute this component with an invalid contract. Required props: ${requiredProps.map((property) => property.name).join(", ")}.`}
-      />
-    );
-  }
-
   return (
-    <SourceCanvasViewport device={props.device}>
+    <SourceCanvasViewport device={props.device} node={props.node} onDeviceChange={props.onDeviceChange ?? (() => undefined)} onModeChange={props.onModeChange ?? (() => undefined)}>
       {(frame) => (
         <div className="h-full w-full" style={{ width: frame.width, height: frame.height }}>
-          <iframe
-            ref={loadFrame}
-            className="h-full w-full border-0"
-            srcDoc={'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="design-space-preview-root"></div></body></html>'}
-            title={`${entry.label} ${props.device} preview`}
-          />
-          {mount && createPortal(
-            <PreviewBoundary
-              resetKey={entry.id}
-              errorTitle="Target preview crashed"
-              errorMessage="Fix the target source or its required runtime context to recover."
-            >
-              <style>{props.styles.join("\n")}</style>
-              <Component />
-            </PreviewBoundary>,
-            mount,
+          {previewState ?? (
+            <>
+              <iframe
+                ref={loadFrame}
+                className="h-full w-full border-0"
+                srcDoc={'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="design-space-preview-root"></div></body></html>'}
+                title={`${props.entry?.label ?? props.node?.label ?? "Source"} ${props.device} preview`}
+              />
+              {mount && createPortal(<PreviewContent entry={props.entry!} styles={props.styles} />, mount)}
+            </>
           )}
         </div>
       )}
     </SourceCanvasViewport>
+  );
+}
+
+function unavailablePreviewState(props: Pick<Parameters<typeof SourcePreviewFrame>[0], "device" | "entry" | "runtime">) {
+  if (props.runtime === "react-native") return <PreviewState title="React Native target indexed" message="The native source tree and TypeScript contracts are available. A simulator renderer must connect before this target can claim preview readiness." />;
+  if (!props.entry) return <PreviewState title={`No ${props.device} implementation`} message="Add an exported React component at the shown fixed path, or configure the explicit Tablet fallback." />;
+  const requiredProps = props.entry.props.filter((property) => property.required);
+  if (requiredProps.length > 0) return <PreviewState title="Preview arguments required" message={`Design Space will not invent values or execute this component with an invalid contract. Required props: ${requiredProps.map((property) => property.name).join(", ")}.`} />;
+  return undefined;
+}
+
+function PreviewContent(props: { entry: RuntimeSourceWorkspaceEntry; styles: readonly string[] }) {
+  const entry = props.entry;
+  const Component = entry.component;
+  return (
+    <PreviewBoundary resetKey={entry.id} errorTitle="Target preview crashed" errorMessage="Fix the target source or its required runtime context to recover.">
+      <style>{props.styles.join("\n")}</style>
+      <SourcePreviewRuntimeContext.Provider value><Component /></SourcePreviewRuntimeContext.Provider>
+    </PreviewBoundary>
   );
 }
 

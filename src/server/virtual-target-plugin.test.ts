@@ -41,7 +41,8 @@ it("generates a runtime from server-indexed TypeScript exports without a target 
   const plugin = designSpaceTargetPlugin(target);
   const source = await (plugin.load as Function)(`\0${DESIGN_SPACE_TARGET_MODULE_ID}`) as string;
 
-  expect(source).toContain("SourceComponentModule0");
+  expect(source).toContain('import { lazy } from "react"');
+  expect(source).toContain("lazy(() => import(");
   expect(source).toContain("src/app/desktop/layout.tsx");
   expect(source).toContain("src/styles.css?inline");
   expect(source).toContain('"exportName":"default"');

@@ -15,7 +15,7 @@
     "./source-workspace": "./src/shared/source-workspace.ts"
   },
   "scripts": {
-    "dev": "bun ./scripts/dev.ts",
+    "dev": "bun ./scripts/cli.ts",
     "dev:raw": "bun ./scripts/dev.ts --raw",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
