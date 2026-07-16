@@ -4,6 +4,7 @@ import ts from "typescript";
 
 import type {
   SourceComponentProp,
+  SourceLayerClassNameBinding,
   SourcePropKind,
   SourceWorkspaceLayer,
 } from "../shared/source-workspace";
@@ -206,6 +207,7 @@ function jsxLayer(
       id: sourceWorkspaceLayerId(relativePath, node.getStart()),
       label,
       kind,
+      ...jsxClassName(node.openingElement, kind),
       children: [
         ...localComponentLayers(label, kind, localComponents, path, relativePath),
         ...jsxChildLayers(node.children, localComponents, path, relativePath),
@@ -219,6 +221,7 @@ function jsxLayer(
       id: sourceWorkspaceLayerId(relativePath, node.getStart()),
       label,
       kind,
+      ...jsxClassName(node, kind),
       children: localComponentLayers(label, kind, localComponents, path, relativePath),
     };
   }
@@ -229,6 +232,47 @@ function jsxLayer(
       kind: "fragment",
       children: jsxChildLayers(node.children, localComponents, path, relativePath),
     };
+  }
+  return undefined;
+}
+
+function jsxClassName(
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  kind: SourceWorkspaceLayer["kind"],
+): Pick<SourceWorkspaceLayer, "className" | "classNameDynamic"> {
+  if (kind !== "html") return {};
+  const attribute = opening.attributes.properties.find((property): property is ts.JsxAttribute => (
+    ts.isJsxAttribute(property) && property.name.getText() === "className"
+  ));
+  if (!attribute) {
+    return {
+      className: {
+        value: "",
+        start: opening.tagName.end,
+        end: opening.tagName.end,
+        insert: true,
+      },
+    };
+  }
+  const staticValue = staticJsxAttributeValue(attribute.initializer);
+  if (!staticValue) return { classNameDynamic: true };
+  const className: SourceLayerClassNameBinding = {
+    value: staticValue.value,
+    start: attribute.getStart(),
+    end: attribute.getEnd(),
+    syntax: staticValue.syntax,
+  };
+  return { className };
+}
+
+function staticJsxAttributeValue(
+  initializer: ts.JsxAttributeValue | undefined,
+): Pick<SourceLayerClassNameBinding, "value" | "syntax"> | undefined {
+  if (!initializer) return undefined;
+  if (ts.isStringLiteral(initializer)) return { value: initializer.text, syntax: "attribute" };
+  if (!ts.isJsxExpression(initializer) || !initializer.expression) return undefined;
+  if (ts.isStringLiteral(initializer.expression) || ts.isNoSubstitutionTemplateLiteral(initializer.expression)) {
+    return { value: initializer.expression.text, syntax: "expression" };
   }
   return undefined;
 }

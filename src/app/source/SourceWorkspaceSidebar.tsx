@@ -69,7 +69,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
       aria-label="Source workspace"
       className={`${props.className ?? "flex w-72"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}
     >
-      <header className="flex min-h-14 shrink-0 items-center gap-2 border-b border-white/10 px-3">
+      <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
         <FileCode2 aria-hidden="true" className="shrink-0 text-sky-400" size={16} />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold text-zinc-100">App tree</h2>

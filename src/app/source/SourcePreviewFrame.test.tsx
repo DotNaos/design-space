@@ -2,7 +2,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import type { RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace";
-import { projectSourceLayer, SourcePreviewFrame } from "./SourcePreviewFrame";
+import {
+  applySourceLayerClassName,
+  projectSourceLayer,
+  SourcePreviewFrame,
+} from "./SourcePreviewFrame";
 
 afterEach(cleanup);
 
@@ -62,4 +66,12 @@ it("projects only the selected authored HTML element", () => {
   expect(output.querySelector(":scope > section")).toHaveTextContent("Selected section");
   expect(output.querySelector("aside")).not.toBeInTheDocument();
   expect(projectSourceLayer(staging, output, "missing-layer")).toBe(false);
+});
+
+it("applies a visual class draft only to the isolated element", () => {
+  const output = document.createElement("div");
+  output.innerHTML = '<section class="p-4"><span>Child</span></section>';
+  expect(applySourceLayerClassName(output, "p-8 rounded-xl")).toBe(true);
+  expect(output.firstElementChild).toHaveClass("p-8", "rounded-xl");
+  expect(output.querySelector("span")).not.toHaveAttribute("class");
 });

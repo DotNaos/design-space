@@ -21,6 +21,7 @@ import {
   sourceTreeNodes,
 } from "./source/source-workspace-tree";
 import { useSourceFileEditor } from "./source/useSourceFileEditor";
+import { useSourceLayerClassEditor } from "./source/useSourceLayerClassEditor";
 import { DiffSheet } from "./components/DiffSheet/DiffSheet";
 import { SourceLibraryCanvas, SourceLibraryInspector, SourceLibrarySidebar } from "./source/SourceLibraryWorkspace";
 
@@ -45,6 +46,11 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
     : entry;
   const selectedLabel = selectedLayer?.kind === "html" ? `<${selectedLayer.label}>` : selectedNode?.label;
   const editor = useSourceFileEditor(entry?.fileId);
+  const styleEditor = useSourceLayerClassEditor({
+    connected: workspace.runtime === "react",
+    editor,
+    layer: selectedLayer,
+  });
   const fileEditor = useSourceFileEditor(selectedProjectFileId);
   const selectedProjectFile = target.files.find((file) => file.id === selectedProjectFileId && file.kind === "file");
   const activeEditor = activity === "files" ? fileEditor : editor;
@@ -113,6 +119,8 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
             entry={previewEntry}
             node={selectedNode}
             selectedLayer={selectedLayer}
+            selectedClassCss={styleEditor.css}
+            selectedClassName={selectedLayer?.className ? styleEditor.value : undefined}
             runtime={workspace.runtime}
             styles={workspace.styles}
             onDeviceChange={(device) => selectedNode && setSelection({ nodeId: selectedNode.id, device })}
@@ -126,7 +134,12 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
     ? <SourceLibraryInspector library={workspace.library} selected={selectedLibraryComponent} />
     : activity === "files"
       ? <FileEvidencePanel editable={Boolean(selectedProjectFile?.editable)} label={selectedProjectFile?.label} />
-      : <SourceComponentInspector className="flex h-full w-full border-l-0" entry={entry} />;
+      : <SourceComponentInspector
+          className="flex h-full w-full border-l-0"
+          entry={entry}
+          layer={selectedLayer}
+          styleEditor={styleEditor}
+        />;
   const mobile = (
     <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
       <div className="absolute inset-0 flex min-h-0 min-w-0">{canvas}</div>
@@ -170,12 +183,12 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
           canRedo={false}
           canReset={activeEditable && activeEditor.dirty}
           canStrictUi={false}
-          canDiff={activeEditable && activeEditor.dirty}
+          canDiff={activeEditable && activeEditor.dirty && !(activity === "app" && styleEditor.error)}
           canSave={activeEditable && Boolean(activeEditor.prepared)}
           saving={activeEditor.saving}
           onUndo={() => undefined}
           onRedo={() => undefined}
-          onReset={activeEditor.reset}
+          onReset={activity === "app" && selectedLayer?.className ? styleEditor.reset : activeEditor.reset}
           onStrictUi={() => undefined}
           onDiff={() => void activeEditor.prepare()}
           onSave={() => void activeEditor.save()}

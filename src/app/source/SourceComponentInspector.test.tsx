@@ -1,8 +1,9 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
 
 import type { SourceWorkspaceEntry } from "../../shared/source-workspace";
 import { SourceComponentInspector } from "./SourceComponentInspector";
+import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
 
 afterEach(cleanup);
 
@@ -54,4 +55,32 @@ it("shows exact TypeScript prop and slot contracts without editable or invented 
 it("renders an honest empty selection state", () => {
   render(<SourceComponentInspector />);
   expect(screen.getByText("Select an exported component to inspect its TypeScript contract.")).toBeVisible();
+});
+
+it("edits a selected HTML layer through its source-derived Tailwind binding", () => {
+  const change = vi.fn();
+  const binding = { value: "p-4", start: 40, end: 55 };
+  const styleEditor = {
+    binding,
+    change,
+    css: "",
+    editable: true,
+    error: undefined,
+    reset: vi.fn(),
+    value: "p-4",
+  } satisfies SourceLayerClassEditor;
+
+  render(
+    <SourceComponentInspector
+      entry={entry}
+      layer={{ id: "panel-section", label: "section", kind: "html", children: [], className: binding }}
+      styleEditor={styleEditor}
+    />,
+  );
+
+  const design = screen.getByRole("region", { name: "Design" });
+  const classes = within(design).getByRole("combobox", { name: "Tailwind classes" });
+  expect(classes).toHaveValue("p-4");
+  fireEvent.change(classes, { target: { value: "p-6 rounded-xl" } });
+  expect(change).toHaveBeenCalledWith("p-6 rounded-xl");
 });

@@ -1,10 +1,18 @@
 import { Braces, Component, FileCode2 } from "lucide-react";
 
-import type { SourceComponentProp, SourceWorkspaceEntry } from "../../shared/source-workspace";
+import type {
+  SourceComponentProp,
+  SourceWorkspaceEntry,
+  SourceWorkspaceLayer,
+} from "../../shared/source-workspace";
+import { TailwindClassField } from "../inspector/TailwindClassField";
+import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
 
 export interface SourceComponentInspectorProps {
   className?: string;
   entry?: SourceWorkspaceEntry;
+  layer?: SourceWorkspaceLayer;
+  styleEditor?: SourceLayerClassEditor;
 }
 
 export function SourceComponentInspector(props: SourceComponentInspectorProps) {
@@ -37,6 +45,9 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {props.layer?.kind === "html" && (
+          <LayerDesignSection layer={props.layer} styleEditor={props.styleEditor} />
+        )}
         <ContractSection
           emptyMessage="No non-slot props are declared."
           icon={<Braces aria-hidden="true" size={14} />}
@@ -51,6 +62,40 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
         />
       </div>
     </aside>
+  );
+}
+
+function LayerDesignSection(props: {
+  layer: SourceWorkspaceLayer;
+  styleEditor?: SourceLayerClassEditor;
+}) {
+  const editor = props.styleEditor;
+  return (
+    <section aria-labelledby="source-layer-design" className="border-b border-white/10 px-4 pb-4">
+      <header className="flex min-h-10 items-center gap-2 text-zinc-500">
+        <Braces aria-hidden="true" size={14} />
+        <h3 id="source-layer-design" className="text-[10px] font-medium uppercase tracking-[0.14em]">Design</h3>
+        <code className="ml-auto font-mono text-[9px] text-zinc-700">&lt;{props.layer.label}&gt;</code>
+      </header>
+      {props.layer.className ? (
+        <>
+          <TailwindClassField
+            compileError={editor?.error}
+            disabled={!editor?.editable}
+            label="Tailwind classes"
+            value={editor?.value ?? props.layer.className.value}
+            onChange={(value) => editor?.change(value)}
+          />
+          <p className="mt-2 text-[9px] leading-4 text-zinc-600">
+            Changes are applied to this element only. Review the exact source diff before saving.
+          </p>
+        </>
+      ) : (
+        <p className="text-[10px] leading-4 text-zinc-600">
+          This element computes className in TypeScript. Open its code to preserve that expression.
+        </p>
+      )}
+    </section>
   );
 }
 

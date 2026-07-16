@@ -18,6 +18,8 @@ export function SourcePreviewFrame(props: {
   styles: readonly string[];
   node?: SourceTreeNode;
   selectedLayer?: SourceWorkspaceLayer;
+  selectedClassName?: string;
+  selectedClassCss?: string;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
   onModeChange?: (mode: "preview" | "code") => void;
 }) {
@@ -49,8 +51,19 @@ export function SourcePreviewFrame(props: {
   }, []);
 
   useEffect(() => {
-    if (mounts) mounts.styles.textContent = props.styles.join("\n");
-  }, [mounts, props.styles]);
+    if (mounts) mounts.styles.textContent = [props.styles.join("\n"), props.selectedClassCss ?? ""].join("\n");
+  }, [mounts, props.selectedClassCss, props.styles]);
+
+  useEffect(() => {
+    if (
+      mounts &&
+      projectionKey &&
+      projectedKey === projectionKey &&
+      props.selectedClassName !== undefined
+    ) {
+      applySourceLayerClassName(mounts.output, props.selectedClassName);
+    }
+  }, [mounts, projectedKey, projectionKey, props.selectedClassName]);
 
   return (
     <SourceCanvasViewport
@@ -167,6 +180,13 @@ export function projectSourceLayer(staging: HTMLElement, output: HTMLElement, la
     .find((element) => element.dataset.designSpaceSourceLayerId === layerId);
   if (!target) return false;
   output.replaceChildren(target.cloneNode(true));
+  return true;
+}
+
+export function applySourceLayerClassName(output: HTMLElement, className: string): boolean {
+  const selected = output.firstElementChild;
+  if (!selected) return false;
+  selected.setAttribute("class", className);
   return true;
 }
 

@@ -30,6 +30,7 @@ describe("TypeScript component index", () => {
       layers: [{
         label: "section",
         kind: "html",
+        className: expect.objectContaining({ value: "rounded-xl" }),
         children: [{
           label: "PanelHeader",
           kind: "component",
@@ -159,7 +160,7 @@ describe("TypeScript component index", () => {
 
       function PanelHeader() { return <header />; }
       export function Panel(props: PanelProps) {
-        return <section><PanelHeader />{props.title}{props.content}{props.children}</section>;
+        return <section className="rounded-xl"><PanelHeader />{props.title}{props.content}{props.children}</section>;
       }
     `);
     await writeFile(join(root, "src/components/Other.tsx"), `

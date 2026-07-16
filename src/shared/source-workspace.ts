@@ -65,6 +65,18 @@ export interface SourceWorkspaceLayer {
   label: string;
   kind: "component" | "fragment" | "html";
   children: readonly SourceWorkspaceLayer[];
+  /** Exact source binding for a static or currently absent JSX className. */
+  className?: SourceLayerClassNameBinding;
+  /** Dynamic className expressions stay code-only until their expression can be preserved. */
+  classNameDynamic?: true;
+}
+
+export interface SourceLayerClassNameBinding {
+  value: string;
+  start: number;
+  end: number;
+  insert?: true;
+  syntax?: "attribute" | "expression";
 }
 
 export interface SourceWorkspaceDeviceState {
