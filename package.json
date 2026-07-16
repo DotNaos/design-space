@@ -11,7 +11,8 @@
     "./server": "./src/server/index.ts",
     "./contracts": "./src/shared/contracts.ts",
     "./documents": "./src/shared/documents.ts",
-    "./target": "./src/shared/target-module.ts"
+    "./target": "./src/shared/target-module.ts",
+    "./source-workspace": "./src/shared/source-workspace.ts"
   },
   "scripts": {
     "dev": "bun ./scripts/dev.ts",

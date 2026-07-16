@@ -1,9 +1,9 @@
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { loadRegisteredProject, TARGET_REGISTRATION_FILE } from "./project-loader";
+import { DESIGN_SPACE_CONFIG_FILE, loadRegisteredProject, TARGET_REGISTRATION_FILE } from "./project-loader";
 
 describe("target project discovery", () => {
   const roots: string[] = [];
@@ -48,5 +48,26 @@ describe("target project discovery", () => {
     const root = await mkdtemp(join(process.cwd(), ".design-space-test-unregistered-"));
     roots.push(root);
     await expect(loadRegisteredProject(root)).rejects.toBeDefined();
+  });
+
+  it("prefers the minimal frontend-root config and derives the target from TypeScript", async () => {
+    const root = resolve(import.meta.dirname, "../../examples/source-target");
+    const target = await loadRegisteredProject(root);
+
+    expect(target.registrationPath).toBe(join(root, DESIGN_SPACE_CONFIG_FILE));
+    expect(target.project.label).toBe("Generated Project Template Web");
+    expect(target.sourceWorkspace?.manifest.entries.map((entry) => entry.label)).toEqual([
+      "DesktopRoot",
+      "MobileRoot",
+      "GeneratedHome",
+      "MobileHome",
+      "ProjectSummary",
+    ]);
+    expect([...target.files.values()].map((file) => file.displayName)).toEqual(expect.arrayContaining([
+      "Dockerfile",
+      "src/app.tsx",
+      "src/app/pages/mobile/MobileHome.tsx",
+    ]));
+    expect(target.documentRegistration).toBeUndefined();
   });
 });

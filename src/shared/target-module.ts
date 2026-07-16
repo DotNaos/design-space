@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 
 import type { ComponentControl, ComponentDescriptor } from "./contracts";
+import type { RuntimeSourceWorkspace } from "./source-workspace";
 
 export type PreviewElementAttributes = Readonly<{
   "data-design-space-instance-id": string;
@@ -88,4 +89,6 @@ export interface TargetModule {
   defaultEditTargetId?: string;
   defaultFixture: ComponentFixture;
   files: readonly TargetFileEntry[];
+  /** Present for TypeScript-first targets discovered from the fixed src/app tree. */
+  sourceWorkspace?: RuntimeSourceWorkspace;
 }

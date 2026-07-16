@@ -12,6 +12,7 @@ import {
 } from "./managed-document-registration";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { readRegisteredFile } from "./registered-file-reader";
+import type { IndexedSourceWorkspace } from "./source-file-index";
 
 export interface EditValidationContext {
   fileId: string;
@@ -131,6 +132,7 @@ export interface RegisteredTarget {
   tailwindCompiler?: TrustedTailwindCompiler;
   documentRegistration?: RegisteredDocumentRegistration;
   registrationPath?: string;
+  sourceWorkspace?: IndexedSourceWorkspace;
 }
 
 const trustedConfigShape = z

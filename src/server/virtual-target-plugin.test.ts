@@ -1,10 +1,11 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { expect, it } from "vitest";
 
 import { registerTrustedTarget } from "./target-registration";
+import { registerSourceProject } from "./source-project-registration";
 import { DESIGN_SPACE_TARGET_MODULE_ID, designSpaceTargetPlugin } from "./virtual-target-plugin";
 
 it("binds the virtual runtime to the server-registered target module", async () => {
@@ -29,4 +30,21 @@ it("binds the virtual runtime to the server-registered target module", async () 
   );
   expect(source).not.toContain(root);
   expect(source).not.toContain("browser/chosen");
+});
+
+it("generates a runtime from server-indexed TypeScript exports without a target manifest", async () => {
+  const root = resolve(import.meta.dirname, "../../examples/source-target");
+  const target = await registerSourceProject(root, {
+    project: { id: "generated-project-template-web", label: "Generated Project Template Web" },
+    tablet: { fallback: "desktop" },
+  });
+  const plugin = designSpaceTargetPlugin(target);
+  const source = await (plugin.load as Function)(`\0${DESIGN_SPACE_TARGET_MODULE_ID}`) as string;
+
+  expect(source).toContain("SourceComponentModule0");
+  expect(source).toContain("src/app/root/desktop/index.tsx");
+  expect(source).toContain("src/styles.css?inline");
+  expect(source).toContain('"exportName":"default"');
+  expect(source).not.toContain("design.json");
+  expect(await (plugin.resolveId as Function)("virtual:design-space-target/registered")).toBeUndefined();
 });

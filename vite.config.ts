@@ -32,7 +32,7 @@ function enforcedPortless(): Plugin {
 export default defineConfig(async () => {
   const serverPort = process.env.PORT ? Number(process.env.PORT) : 4173;
   const registeredTarget = await loadRegisteredProject(
-    resolveServerProjectRoot(resolve(root, "examples/demo-target")),
+    resolveServerProjectRoot(resolve(root, "examples/source-target")),
   );
   const api = new LocalOperationService(
     new EditService(registeredTarget),
@@ -53,7 +53,7 @@ export default defineConfig(async () => {
       host: "127.0.0.1",
       port: serverPort,
       strictPort: true,
-      fs: createViteFileSystemPolicy(root, registeredTarget.targetModulePath),
+      fs: createViteFileSystemPolicy(root, registeredTarget.targetModulePath, registeredTarget.root),
     },
     build: { sourcemap: true },
   };

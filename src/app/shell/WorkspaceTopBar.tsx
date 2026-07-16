@@ -55,7 +55,7 @@ export function WorkspaceTopBar(props: {
         <Button aria-label="Redo" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canRedo} onPress={props.onRedo}><Redo2 size={15} /></Button>
         <Button aria-label="Reset document" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canReset} onPress={props.onReset}><RotateCcw size={14} /></Button>
         <Button aria-label="Prepare exact diff" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canDiff} onPress={props.onDiff}><FileDiff size={15} /></Button>
-        <Button aria-label={props.saving ? "Saving" : "Save"} isIconOnly className="size-9 bg-sky-500 text-white hover:bg-sky-400 lg:size-8" size="sm" isDisabled={!props.canSave} onPress={props.onSave}>{props.saving ? <LoaderCircle className="animate-spin" size={15} /> : <Save size={15} />}</Button>
+        <Button aria-label={props.saving ? "Saving" : "Save"} isIconOnly className={`size-9 lg:size-8 ${props.canSave ? "bg-sky-500 text-white hover:bg-sky-400" : "bg-white/[0.04] text-zinc-600"}`} size="sm" isDisabled={!props.canSave} onPress={props.onSave}>{props.saving ? <LoaderCircle className="animate-spin" size={15} /> : <Save size={15} />}</Button>
       </div>
     </header>
   );

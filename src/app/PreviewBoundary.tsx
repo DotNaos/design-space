@@ -1,6 +1,11 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
-type PreviewBoundaryProps = { children: ReactNode; resetKey: string };
+type PreviewBoundaryProps = {
+  children: ReactNode;
+  resetKey: string;
+  errorTitle?: string;
+  errorMessage?: string;
+};
 type PreviewBoundaryState = { error?: Error };
 
 export class PreviewBoundary extends Component<PreviewBoundaryProps, PreviewBoundaryState> {
@@ -22,7 +27,7 @@ export class PreviewBoundary extends Component<PreviewBoundaryProps, PreviewBoun
     if (this.state.error) {
       return (
         <div className="grid min-h-80 place-items-center rounded-2xl border border-rose-400/30 bg-rose-400/5 p-8 text-center">
-          <div><p className="text-sm font-medium text-rose-300">Preview could not compile</p><p className="mt-2 text-xs text-zinc-500">Correct the class edit or Reset to recover.</p></div>
+          <div><p className="text-sm font-medium text-rose-300">{this.props.errorTitle ?? "Preview could not compile"}</p><p className="mt-2 text-xs text-zinc-500">{this.props.errorMessage ?? "Correct the class edit or Reset to recover."}</p></div>
         </div>
       );
     }

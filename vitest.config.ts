@@ -4,8 +4,8 @@ const tailwindIntegrationTest = "src/server/tailwind-intelligence-official.integ
 
 export default defineConfig({
   test: {
-    // Keep the real Tailwind language server responsive while the UI and
-    // server projects run together on laptops and smaller CI machines.
+    // Bound ordinary test parallelism on laptops and smaller CI machines.
+    // Compiler-heavy server tests use a smaller execution group below.
     maxWorkers: 4,
     setupFiles: ["./src/test/setup.ts"],
     projects: [
@@ -16,6 +16,11 @@ export default defineConfig({
           environment: "node",
           include: ["src/server/**/*.test.ts"],
           exclude: [tailwindIntegrationTest],
+          // TypeScript component-index suites build real compiler programs.
+          // Run them first with two workers; the UI group still gets four.
+          // The normal five-second test timeout deliberately remains intact.
+          maxWorkers: 2,
+          sequence: { groupOrder: 0 },
         },
       },
       {
@@ -25,6 +30,7 @@ export default defineConfig({
           environment: "jsdom",
           include: ["src/**/*.test.{ts,tsx}", "examples/**/*.test.{ts,tsx}"],
           exclude: ["src/server/**/*.test.ts"],
+          sequence: { groupOrder: 1 },
         },
       },
       {
@@ -35,6 +41,7 @@ export default defineConfig({
           include: [tailwindIntegrationTest],
           fileParallelism: false,
           maxWorkers: 1,
+          sequence: { groupOrder: 2 },
         },
       },
     ],
