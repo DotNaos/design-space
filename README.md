@@ -4,6 +4,8 @@ Design Space is a standalone, local-first UI IDE for React projects. Its default
 
 It is deliberately not part of a target application's production build and has no deployment configuration.
 
+[`STRICT_UI.md`](./STRICT_UI.md) is the canonical product and architecture contract for the source model, component ownership, typed named slots, validation, and IDE behavior. Current legacy adapters and incomplete source-workspace behavior are transitional when they disagree with that contract.
+
 ## Try the included target
 
 Requirements: Bun and Portless.
@@ -54,7 +56,7 @@ src/app/
       mobile.tsx
 ```
 
-Only real exported React components make a device path configured. Tablet may explicitly reuse Desktop or Mobile; no other device fallback is inferred. The editor lists each reusable component once and switches between its available device implementations. Component props and child slots come from the exported component's TypeScript props type. The preview never persists a parallel JSON description of that contract.
+Only real exported React components make a device path configured. Tablet may explicitly reuse Desktop or Mobile; no other device fallback is inferred. The editor lists each reusable component once and switches between its available device implementations. Component props and explicitly named Strict UI slots come from the exported component's TypeScript props type. `children` is forbidden, broad `ReactNode` props are not slot evidence, and the preview never persists a parallel JSON description of that contract.
 
 The TypeScript-first workspace provides indexing, rendering, navigation, contract inspection, and guarded whole-file TypeScript editing with an exact diff before save. Components with required props are not executed until source-owned preview arguments exist.
 
