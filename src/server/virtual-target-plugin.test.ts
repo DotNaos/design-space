@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -48,4 +48,12 @@ it("generates a runtime from server-indexed TypeScript exports without a target 
   expect(source).toContain('"exportName":"default"');
   expect(source).not.toContain("design.json");
   expect(await (plugin.resolveId as Function)("virtual:design-space-target/registered")).toBeUndefined();
+
+  const page = target.sourceWorkspace?.files.find((file) => file.relativePath === "src/app/desktop/pages/GeneratedHome.tsx");
+  expect(page).toBeDefined();
+  const transformed = await (plugin.transform as Function)(
+    await readFile(page!.absolutePath, "utf8"),
+    page!.absolutePath,
+  );
+  expect(transformed.code).toContain("data-design-space-source-layer-id");
 });

@@ -13,6 +13,7 @@ import {
   canonicalRegisteredFile,
   canonicalRoot,
 } from "./path-security";
+import { sourceWorkspaceLayerId } from "./source-layer-annotation";
 
 export interface IndexedTypeScriptComponent {
   filePath: string;
@@ -138,6 +139,7 @@ function indexSourceFile(
 
   const components: IndexedTypeScriptComponent[] = [];
   const localComponents = localJsxDeclarations(sourceFile);
+  const relativePath = relative(projectRoot, sourceFile.fileName).split(sep).join("/");
   for (const exportedSymbol of checker.getExportsOfModule(moduleSymbol)) {
     const resolvedSymbol = resolveAlias(exportedSymbol, checker);
     const declaration = resolvedSymbol.declarations?.find(
@@ -161,12 +163,12 @@ function indexSourceFile(
     const props = extractProps(signature, declaration, checker);
     components.push({
       exportName,
-      filePath: relative(projectRoot, sourceFile.fileName).split(sep).join("/"),
+      filePath: relativePath,
       label,
       props: props.items,
       propsTypeText: props.typeText,
       uses: jsxComponentNames(declaration),
-      layers: jsxLayers(declaration, localComponents, new Set([label])),
+      layers: jsxLayers(declaration, localComponents, new Set([label]), relativePath),
     });
   }
   return components;
@@ -176,10 +178,11 @@ function jsxLayers(
   declaration: ts.Declaration,
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
+  relativePath: string,
 ): readonly SourceWorkspaceLayer[] {
   const layers: SourceWorkspaceLayer[] = [];
   const visit = (node: ts.Node): void => {
-    const layer = jsxLayer(node, localComponents, path);
+    const layer = jsxLayer(node, localComponents, path, relativePath);
     if (layer) {
       layers.push(layer);
       return;
@@ -194,17 +197,18 @@ function jsxLayer(
   node: ts.Node,
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
+  relativePath: string,
 ): SourceWorkspaceLayer | undefined {
   if (ts.isJsxElement(node)) {
     const label = node.openingElement.tagName.getText();
     const kind = jsxLayerKind(label);
     return {
-      id: `jsx:${node.getStart()}`,
+      id: sourceWorkspaceLayerId(relativePath, node.getStart()),
       label,
       kind,
       children: [
-        ...localComponentLayers(label, kind, localComponents, path),
-        ...jsxChildLayers(node.children, localComponents, path),
+        ...localComponentLayers(label, kind, localComponents, path, relativePath),
+        ...jsxChildLayers(node.children, localComponents, path, relativePath),
       ],
     };
   }
@@ -212,18 +216,18 @@ function jsxLayer(
     const label = node.tagName.getText();
     const kind = jsxLayerKind(label);
     return {
-      id: `jsx:${node.getStart()}`,
+      id: sourceWorkspaceLayerId(relativePath, node.getStart()),
       label,
       kind,
-      children: localComponentLayers(label, kind, localComponents, path),
+      children: localComponentLayers(label, kind, localComponents, path, relativePath),
     };
   }
   if (ts.isJsxFragment(node)) {
     return {
-      id: `jsx:${node.getStart()}`,
+      id: sourceWorkspaceLayerId(relativePath, node.getStart()),
       label: "Fragment",
       kind: "fragment",
-      children: jsxChildLayers(node.children, localComponents, path),
+      children: jsxChildLayers(node.children, localComponents, path, relativePath),
     };
   }
   return undefined;
@@ -233,14 +237,15 @@ function jsxChildLayers(
   children: ts.NodeArray<ts.JsxChild>,
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
+  relativePath: string,
 ): readonly SourceWorkspaceLayer[] {
   return children.flatMap((child) => {
-    const direct = jsxLayer(child, localComponents, path);
+    const direct = jsxLayer(child, localComponents, path, relativePath);
     if (direct) return [direct];
     if (!ts.isJsxExpression(child) || !child.expression) return [];
     const nested: SourceWorkspaceLayer[] = [];
     const visit = (node: ts.Node): void => {
-      const layer = jsxLayer(node, localComponents, path);
+      const layer = jsxLayer(node, localComponents, path, relativePath);
       if (layer) {
         nested.push(layer);
         return;
@@ -257,11 +262,12 @@ function localComponentLayers(
   kind: SourceWorkspaceLayer["kind"],
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
+  relativePath: string,
 ): readonly SourceWorkspaceLayer[] {
   if (kind !== "component" || path.has(label)) return [];
   const declaration = localComponents.get(label);
   if (!declaration) return [];
-  return jsxLayers(declaration, localComponents, new Set(path).add(label));
+  return jsxLayers(declaration, localComponents, new Set(path).add(label), relativePath);
 }
 
 function localJsxDeclarations(sourceFile: ts.SourceFile): ReadonlyMap<string, ts.Declaration> {

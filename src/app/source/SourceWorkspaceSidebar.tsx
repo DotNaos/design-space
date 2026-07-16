@@ -9,6 +9,7 @@ import {
   GitBranch,
   LayoutTemplate,
   Monitor,
+  PanelTop,
   Smartphone,
   Tablet,
 } from "lucide-react";
@@ -83,12 +84,15 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
         {visibleRows.map((row) => (
           <SourceNodeRow
             key={row.key}
-            active={Boolean(row.node && props.selected?.nodeId === row.node.id)}
+            active={row.layer?.kind === "html"
+              ? props.selected?.nodeId === row.selectionNode.id && props.selected.layerId === row.layer.id
+              : Boolean(row.node && props.selected?.nodeId === row.node.id && !props.selected.layerId)}
             collapsed={collapsed.has(row.key)}
             row={row}
             onPress={() => props.onSelect({
               nodeId: row.selectionNode.id,
               device,
+              ...(row.layer?.kind === "html" ? { layerId: row.layer.id } : {}),
             })}
             onToggle={() => toggleBranch(row.key)}
           />
@@ -111,7 +115,7 @@ function SourceNodeRow(props: {
     ? row.node.area === "layout"
       ? LayoutTemplate
       : row.node.area === "pages"
-        ? FileCode2
+        ? PanelTop
         : Component
     : row.layer?.kind === "html"
       ? CodeXml
@@ -125,7 +129,7 @@ function SourceNodeRow(props: {
       aria-label={label}
       aria-level={row.depth + 1}
       aria-selected={props.active}
-      className="relative flex min-h-9 items-center pr-2"
+      className="relative flex min-h-10 items-center pr-2"
       role="treeitem"
       style={{ paddingLeft: 4 + row.depth * 18 }}
     >

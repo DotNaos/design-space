@@ -15,7 +15,11 @@ import {
   SourceWorkspaceSidebar,
   type SourceWorkspaceSelection,
 } from "./source/SourceWorkspaceSidebar";
-import { initialSourceTreeSelection, sourceTreeNodes } from "./source/source-workspace-tree";
+import {
+  findSourceTreeLayer,
+  initialSourceTreeSelection,
+  sourceTreeNodes,
+} from "./source/source-workspace-tree";
 import { useSourceFileEditor } from "./source/useSourceFileEditor";
 import { DiffSheet } from "./components/DiffSheet/DiffSheet";
 import { SourceLibraryCanvas, SourceLibraryInspector, SourceLibrarySidebar } from "./source/SourceLibraryWorkspace";
@@ -35,6 +39,11 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
   const selectedNode = nodes.find((candidate) => candidate.id === selection?.nodeId) ?? nodes[0];
   const requestedDevice = selection?.device ?? initial?.device ?? "desktop";
   const entry = selectedNode?.implementations[requestedDevice].entry;
+  const selectedLayer = findSourceTreeLayer(entry?.layers, selection?.layerId);
+  const previewEntry = selectedLayer
+    ? nodes.find((candidate) => candidate.area === "layout")?.implementations[requestedDevice].entry ?? entry
+    : entry;
+  const selectedLabel = selectedLayer?.kind === "html" ? `<${selectedLayer.label}>` : selectedNode?.label;
   const editor = useSourceFileEditor(entry?.fileId);
   const fileEditor = useSourceFileEditor(selectedProjectFileId);
   const selectedProjectFile = target.files.find((file) => file.id === selectedProjectFileId && file.kind === "file");
@@ -46,7 +55,7 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
     : activity === "library"
       ? ["Library"]
       : selectedNode
-        ? ["App", areaLabels[selectedNode.area], selectedNode.label]
+        ? ["App", areaLabels[selectedNode.area], selectedNode.label, ...(selectedLayer ? [`<${selectedLayer.label}>`] : [])]
         : ["App"];
 
   const appSidebar = (
@@ -101,8 +110,9 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
         ) : (
           <SourcePreviewFrame
             device={requestedDevice}
-            entry={entry}
+            entry={previewEntry}
             node={selectedNode}
+            selectedLayer={selectedLayer}
             runtime={workspace.runtime}
             styles={workspace.styles}
             onDeviceChange={(device) => selectedNode && setSelection({ nodeId: selectedNode.id, device })}
@@ -152,7 +162,7 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
       <div className="flex min-w-0 flex-1 flex-col">
         <WorkspaceTopBar
           targetLabel={target.project.label}
-          documentLabel={activity === "files" ? selectedProjectFile?.label ?? "Project files" : selectedNode?.label ?? "No source entry"}
+          documentLabel={activity === "files" ? selectedProjectFile?.label ?? "Project files" : selectedLabel ?? "No source entry"}
           breadcrumb={breadcrumb}
           connected={connected}
           checking={false}
@@ -171,7 +181,7 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
           onSave={() => void activeEditor.save()}
         />
         <ResizableWorkspacePanels
-          namespace={{ projectId: target.project.id, documentId: `${selectedNode?.id ?? "empty"}:${requestedDevice}` }}
+          namespace={{ projectId: target.project.id, documentId: `${selectedNode?.id ?? "empty"}:${requestedDevice}:${selectedLayer?.id ?? "component"}` }}
           left={{ label: "TypeScript app structure", content: left, defaultWidth: 300, minWidth: 260, maxWidth: 480 }}
           right={{ label: "TypeScript component contract", content: right, defaultWidth: 340, minWidth: 280, maxWidth: 560 }}
           mobile={mobile}

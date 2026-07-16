@@ -157,3 +157,20 @@ it("selects a logical node without changing the active canvas device", async () 
   await userEvent.click(screen.getByRole("button", { name: "Dashboard" }));
   expect(onSelect).toHaveBeenCalledWith({ device: "tablet", nodeId: "pages:Dashboard" });
 });
+
+it("selects an authored HTML layer and distinguishes page rows", async () => {
+  const onSelect = vi.fn();
+  render(<SourceWorkspaceSidebar workspace={workspace} onSelect={onSelect} />);
+
+  const pageButton = screen.getByRole("button", { name: "Dashboard" });
+  expect(pageButton.querySelector("svg.lucide-panel-top")).toBeInTheDocument();
+  expect(pageButton.closest('[role="treeitem"]')).toHaveClass("min-h-10");
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  await userEvent.click(screen.getByRole("button", { name: "<section>" }));
+  expect(onSelect).toHaveBeenLastCalledWith({
+    device: "desktop",
+    layerId: "dashboard-section",
+    nodeId: "pages:Dashboard",
+  });
+});

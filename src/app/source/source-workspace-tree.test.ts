@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 
 import type { RuntimeSourceWorkspace, RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace";
 import {
+  findSourceTreeLayer,
   initialSourceTreeSelection,
   sourceTreeNodes,
   sourceTreeRows,
@@ -122,4 +123,14 @@ it("hides descendants of collapsed source and HTML branches", () => {
   expect(visibleSourceTreeRows(rows, new Set([main!.key])).map((row) => (
     row.node?.label ?? row.layer?.label
   ))).toEqual(["App layout", "main"]);
+});
+
+it("finds a nested authored HTML layer by its stable source id", () => {
+  const dashboard = workspace.entries.find((candidate) => candidate.id === "Dashboard");
+  expect(findSourceTreeLayer(dashboard?.layers, "dashboard-section")).toMatchObject({
+    id: "dashboard-section",
+    kind: "html",
+    label: "section",
+  });
+  expect(findSourceTreeLayer(dashboard?.layers, "missing-layer")).toBeUndefined();
 });

@@ -37,6 +37,20 @@ export interface SourceTreeRow {
 export interface SourceTreeSelection {
   device: DesignSpaceDevice;
   nodeId: string;
+  layerId?: string;
+}
+
+export function findSourceTreeLayer(
+  layers: readonly SourceWorkspaceLayer[] | undefined,
+  id: string | undefined,
+): SourceWorkspaceLayer | undefined {
+  if (!id) return undefined;
+  for (const layer of layers ?? []) {
+    if (layer.id === id) return layer;
+    const nested = findSourceTreeLayer(layer.children, id);
+    if (nested) return nested;
+  }
+  return undefined;
 }
 
 export function sourceTreeNodes(workspace: RuntimeSourceWorkspace): readonly SourceTreeNode[] {

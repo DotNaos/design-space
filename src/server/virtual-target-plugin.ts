@@ -3,6 +3,7 @@ import { relative } from "node:path";
 import { normalizePath, type Plugin } from "vite";
 
 import { registeredFileCatalog } from "./document-catalog-files";
+import { annotateSourceHtmlLayers } from "./source-layer-annotation";
 import type { RegisteredTarget } from "./target-registration";
 import { validateTargetModule } from "./target-registration";
 
@@ -12,6 +13,9 @@ const registeredTargetModuleId = `${DESIGN_SPACE_TARGET_MODULE_ID}/registered`;
 
 export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
   const sourceWorkspace = target.sourceWorkspace;
+  const sourceLayerPaths = new Map(sourceWorkspace?.files
+    .filter((file) => file.relativePath.endsWith(".tsx"))
+    .map((file) => [normalizePath(file.absolutePath), file.relativePath]) ?? []);
   return {
     name: "design-space-target",
     enforce: "pre",
@@ -56,6 +60,11 @@ export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
         "export const target = registeredTarget;",
         "export default registeredTarget;",
       ].join("\n");
+    },
+    transform(code, id) {
+      const relativePath = sourceLayerPaths.get(normalizePath(id.split("?", 1)[0] ?? id));
+      if (!relativePath) return undefined;
+      return { code: annotateSourceHtmlLayers(code, relativePath), map: null };
     },
   };
 }

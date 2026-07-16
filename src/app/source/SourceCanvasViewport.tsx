@@ -12,6 +12,8 @@ export function SourceCanvasViewport(props: {
   children: (frame: { width: number; height: number }) => React.ReactNode;
   device: DesignSpaceDevice;
   node?: SourceTreeNode;
+  selectionKey?: string;
+  selectionLabel?: string;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onModeChange: (mode: "preview" | "code") => void;
 }) {
@@ -41,7 +43,7 @@ export function SourceCanvasViewport(props: {
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-1">
       <PreviewCanvas
-        cameraKey={`${props.device}:${presetId}`}
+        cameraKey={`${props.device}:${presetId}:${props.selectionKey ?? props.node?.id ?? "source"}`}
         preview={(
           <div
             data-design-space-instance-id={sourcePreviewId}
@@ -54,7 +56,7 @@ export function SourceCanvasViewport(props: {
         rootInstanceId={sourcePreviewId}
         selectedComponentInstanceId={sourcePreviewId}
         selection={{ kind: "component", id: sourcePreviewId }}
-        selectionLabel={`${preset.label.replace("Responsive", `Responsive · ${responsiveWidth} × ${preset.height}`)}`}
+        selectionLabel={props.selectionLabel ?? `${preset.label.replace("Responsive", `Responsive · ${responsiveWidth} × ${preset.height}`)}`}
         slots={[]}
         staticPreview
         worldWidth={frame.width}
