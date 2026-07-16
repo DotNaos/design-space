@@ -57,8 +57,8 @@ describe("target project discovery", () => {
     expect(target.registrationPath).toBe(join(root, DESIGN_SPACE_CONFIG_FILE));
     expect(target.project.label).toBe("Generated Project Template Web");
     expect(target.sourceWorkspace?.manifest.entries.map((entry) => entry.label)).toEqual([
-      "DesktopRoot",
-      "MobileRoot",
+      "DesktopLayout",
+      "MobileLayout",
       "GeneratedHome",
       "MobileHome",
       "ProjectSummary",
@@ -66,7 +66,7 @@ describe("target project discovery", () => {
     expect([...target.files.values()].map((file) => file.displayName)).toEqual(expect.arrayContaining([
       "Dockerfile",
       "src/app.tsx",
-      "src/app/pages/mobile/MobileHome.tsx",
+      "src/app/mobile/pages/MobileHome.tsx",
     ]));
     expect(target.documentRegistration).toBeUndefined();
   });

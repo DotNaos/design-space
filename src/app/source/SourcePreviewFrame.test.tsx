@@ -12,7 +12,7 @@ it("states that required TypeScript props are unset instead of inventing preview
     area: "components",
     device: "desktop",
     fileId: "panel-file",
-    relativePath: "src/app/components/desktop/Panel.tsx",
+    relativePath: "src/app/components/Panel/desktop.tsx",
     exportName: "Panel",
     props: [
       { name: "title", type: "string", required: true, kind: "string", slot: false },

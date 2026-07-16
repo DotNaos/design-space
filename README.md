@@ -34,18 +34,29 @@ export default defineDesignSpace({
 });
 ```
 
-Source implementations live below category first and device second:
+App implementations are device-first. Each device owns its layout and pages, while reusable components are grouped once by component name:
 
 ```text
 src/app/
-  root/{desktop,tablet,mobile}/
-  pages/{desktop,tablet,mobile}/
-  components/{desktop,tablet,mobile}/
+  desktop/
+    layout.tsx
+    pages/
+  tablet/
+    layout.tsx
+    pages/
+  mobile/
+    layout.tsx
+    pages/
+  components/
+    ComponentName/
+      desktop.tsx
+      tablet.tsx
+      mobile.tsx
 ```
 
-Only real exported React components make a device path configured. Tablet may explicitly reuse Desktop or Mobile; no other device fallback is inferred. Component props and child slots come from the exported component's TypeScript props type. The preview never persists a parallel JSON description of that contract.
+Only real exported React components make a device path configured. Tablet may explicitly reuse Desktop or Mobile; no other device fallback is inferred. The editor lists each reusable component once and switches between its available device implementations. Component props and child slots come from the exported component's TypeScript props type. The preview never persists a parallel JSON description of that contract.
 
-The TypeScript-first workspace currently provides indexing, rendering, navigation, file reading, and contract inspection. Source Diff and Save stay disabled until a conservative TypeScript edit path can preserve the real source without inventing a second model. Components with required props are likewise not executed until source-owned preview arguments exist.
+The TypeScript-first workspace provides indexing, rendering, navigation, contract inspection, and guarded whole-file TypeScript editing with an exact diff before save. Components with required props are not executed until source-owned preview arguments exist.
 
 The same contract can be placed at a React Native project root with `runtime: "react-native"`. Design Space currently indexes its source tree and TypeScript contracts separately; a simulator renderer is still required before native preview can be marked ready.
 

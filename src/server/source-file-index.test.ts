@@ -10,7 +10,7 @@ describe("TypeScript-first source index", () => {
   const roots: string[] = [];
   afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-  it("discovers real exports below category then device and derives truthful fallbacks", async () => {
+  it("discovers device-first app paths and component-first variants with truthful fallbacks", async () => {
     const root = resolve(import.meta.dirname, "../../examples/source-target");
     const result = await indexSourceWorkspace(root, {
       project: { id: "generated-project-template-web", label: "Generated Project Template Web" },
@@ -23,16 +23,16 @@ describe("TypeScript-first source index", () => {
       device: entry.device,
       path: entry.relativePath,
     }))).toEqual([
-      { label: "DesktopRoot", area: "root", device: "desktop", path: "src/app/root/desktop/index.tsx" },
-      { label: "MobileRoot", area: "root", device: "mobile", path: "src/app/root/mobile/index.tsx" },
-      { label: "GeneratedHome", area: "pages", device: "desktop", path: "src/app/pages/desktop/GeneratedHome.tsx" },
-      { label: "MobileHome", area: "pages", device: "mobile", path: "src/app/pages/mobile/MobileHome.tsx" },
-      { label: "ProjectSummary", area: "components", device: "desktop", path: "src/app/components/desktop/ProjectSummary.tsx" },
+      { label: "DesktopLayout", area: "layout", device: "desktop", path: "src/app/desktop/layout.tsx" },
+      { label: "MobileLayout", area: "layout", device: "mobile", path: "src/app/mobile/layout.tsx" },
+      { label: "GeneratedHome", area: "pages", device: "desktop", path: "src/app/desktop/pages/GeneratedHome.tsx" },
+      { label: "MobileHome", area: "pages", device: "mobile", path: "src/app/mobile/pages/MobileHome.tsx" },
+      { label: "ProjectSummary", area: "components", device: "desktop", path: "src/app/components/ProjectSummary/desktop.tsx" },
     ]);
     expect(result.manifest.devices).toContainEqual({
       area: "pages",
       device: "tablet",
-      path: "src/app/pages/tablet",
+      path: "src/app/tablet/pages",
       state: "fallback",
       fallback: "desktop",
     });

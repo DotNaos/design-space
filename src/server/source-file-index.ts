@@ -272,9 +272,16 @@ async function registerDiscoveredFiles(root: string, relativePaths: readonly str
 }
 
 function sourceLocation(relativePath: string): { area: DesignSpaceArea; device: DesignSpaceDevice } | undefined {
-  const match = /^src\/app\/(root|pages|components)\/(desktop|tablet|mobile)\/.+\.tsx?$/.exec(relativePath);
-  if (!match) return undefined;
-  return { area: match[1] as DesignSpaceArea, device: match[2] as DesignSpaceDevice };
+  const layout = /^src\/app\/(desktop|tablet|mobile)\/layout\.tsx?$/.exec(relativePath);
+  if (layout) return { area: "layout", device: layout[1] as DesignSpaceDevice };
+
+  const page = /^src\/app\/(desktop|tablet|mobile)\/pages\/.+\.tsx?$/.exec(relativePath);
+  if (page) return { area: "pages", device: page[1] as DesignSpaceDevice };
+
+  const component = /^src\/app\/components\/[^/]+\/(desktop|tablet|mobile)\.tsx?$/.exec(relativePath);
+  if (component) return { area: "components", device: component[1] as DesignSpaceDevice };
+
+  return undefined;
 }
 
 function deviceStates(
@@ -282,7 +289,7 @@ function deviceStates(
   config: DesignSpaceProjectConfig,
 ): SourceWorkspaceDeviceState[] {
   return designSpaceAreas.flatMap((area) => designSpaceDevices.map((device) => {
-    const path = `${SOURCE_ROOT}/${area}/${device}`;
+    const path = sourcePath(area, device);
     if (entries.some((entry) => entry.area === area && entry.device === device)) {
       return { area, device, path, state: "configured" } as const;
     }
@@ -292,6 +299,12 @@ function deviceStates(
     }
     return { area, device, path, state: "missing" } as const;
   }));
+}
+
+function sourcePath(area: DesignSpaceArea, device: DesignSpaceDevice): string {
+  if (area === "layout") return `${SOURCE_ROOT}/${device}/layout.tsx`;
+  if (area === "pages") return `${SOURCE_ROOT}/${device}/pages`;
+  return `${SOURCE_ROOT}/components/*/${device}.tsx`;
 }
 
 async function isSafeFile(path: string): Promise<boolean> {

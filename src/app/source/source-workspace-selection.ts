@@ -32,9 +32,9 @@ export function initialSourceSelection(workspace: RuntimeSourceWorkspace): {
   device: DesignSpaceDevice;
 } {
   const priorities: readonly [DesignSpaceArea, DesignSpaceDevice][] = [
-    ["root", "desktop"],
+    ["layout", "desktop"],
     ["pages", "desktop"],
-    ["root", "mobile"],
+    ["layout", "mobile"],
     ["pages", "mobile"],
     ["components", "desktop"],
   ];

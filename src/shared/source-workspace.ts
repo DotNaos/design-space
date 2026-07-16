@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 
-export const designSpaceAreas = ["root", "pages", "components"] as const;
+export const designSpaceAreas = ["layout", "pages", "components"] as const;
 export const designSpaceDevices = ["desktop", "tablet", "mobile"] as const;
 
 export type DesignSpaceArea = (typeof designSpaceAreas)[number];

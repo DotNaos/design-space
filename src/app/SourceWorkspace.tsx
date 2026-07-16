@@ -18,7 +18,7 @@ import { useSourceFileEditor } from "./source/useSourceFileEditor";
 import { DiffSheet } from "./components/DiffSheet";
 import { SourceLibraryCanvas, SourceLibraryInspector, SourceLibrarySidebar } from "./source/SourceLibraryWorkspace";
 
-const areaLabels = { root: "Root", pages: "Pages", components: "Components" } as const;
+const areaLabels = { layout: "Layout", pages: "Pages", components: "Components" } as const;
 const deviceLabels = { desktop: "Desktop", tablet: "Tablet", mobile: "Mobile" } as const;
 
 export function SourceWorkspace({ target }: { target: TargetModule }) {

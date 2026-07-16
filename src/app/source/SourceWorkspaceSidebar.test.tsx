@@ -11,78 +11,109 @@ import { SourceWorkspaceSidebar } from "./SourceWorkspaceSidebar";
 
 afterEach(cleanup);
 
-const pageDesktop: RuntimeSourceWorkspaceEntry = {
-  id: "page-dashboard-desktop",
-  label: "Dashboard",
-  area: "pages",
+const desktopLayout: RuntimeSourceWorkspaceEntry = {
+  id: "layout-desktop",
+  label: "DesktopLayout",
+  area: "layout",
   device: "desktop",
-  fileId: "file-dashboard-desktop",
-  relativePath: "src/app/pages/desktop/Dashboard.tsx",
-  exportName: "Dashboard",
+  fileId: "file-layout-desktop",
+  relativePath: "src/app/desktop/layout.tsx",
+  exportName: "default",
   props: [],
   component: () => null,
 };
 
-const rootMobile: RuntimeSourceWorkspaceEntry = {
-  ...pageDesktop,
-  id: "root-mobile",
-  label: "Mobile app root",
-  area: "root",
+const desktopPage: RuntimeSourceWorkspaceEntry = {
+  ...desktopLayout,
+  id: "page-dashboard-desktop",
+  label: "Dashboard",
+  area: "pages",
+  fileId: "file-dashboard-desktop",
+  relativePath: "src/app/desktop/pages/Dashboard.tsx",
+  exportName: "Dashboard",
+};
+
+const mobileLayout: RuntimeSourceWorkspaceEntry = {
+  ...desktopLayout,
+  id: "layout-mobile",
+  label: "MobileLayout",
   device: "mobile",
-  fileId: "file-root-mobile",
-  relativePath: "src/app/root/mobile/AppRoot.tsx",
-  exportName: "AppRoot",
+  fileId: "file-layout-mobile",
+  relativePath: "src/app/mobile/layout.tsx",
+};
+
+const summaryDesktop: RuntimeSourceWorkspaceEntry = {
+  ...desktopLayout,
+  id: "summary-desktop",
+  label: "ProjectSummary",
+  area: "components",
+  fileId: "file-summary-desktop",
+  relativePath: "src/app/components/ProjectSummary/desktop.tsx",
+  exportName: "ProjectSummary",
+};
+
+const summaryMobile: RuntimeSourceWorkspaceEntry = {
+  ...summaryDesktop,
+  id: "summary-mobile",
+  device: "mobile",
+  fileId: "file-summary-mobile",
+  relativePath: "src/app/components/ProjectSummary/mobile.tsx",
 };
 
 const states: readonly SourceWorkspaceDeviceState[] = [
-  { area: "root", device: "desktop", path: "src/app/root/desktop", state: "missing" },
-  { area: "root", device: "tablet", path: "src/app/root/tablet", state: "missing" },
-  { area: "root", device: "mobile", path: "src/app/root/mobile", state: "configured" },
-  { area: "pages", device: "desktop", path: "src/app/pages/desktop", state: "configured" },
-  { area: "pages", device: "tablet", path: "src/app/pages/tablet", state: "fallback", fallback: "desktop" },
-  { area: "pages", device: "mobile", path: "src/app/pages/mobile", state: "missing" },
-  { area: "components", device: "desktop", path: "src/app/components/desktop", state: "missing" },
-  { area: "components", device: "tablet", path: "src/app/components/tablet", state: "missing" },
-  { area: "components", device: "mobile", path: "src/app/components/mobile", state: "missing" },
+  { area: "layout", device: "desktop", path: "src/app/desktop/layout.tsx", state: "configured" },
+  { area: "layout", device: "tablet", path: "src/app/tablet/layout.tsx", state: "fallback", fallback: "desktop" },
+  { area: "layout", device: "mobile", path: "src/app/mobile/layout.tsx", state: "configured" },
+  { area: "pages", device: "desktop", path: "src/app/desktop/pages", state: "configured" },
+  { area: "pages", device: "tablet", path: "src/app/tablet/pages", state: "fallback", fallback: "desktop" },
+  { area: "pages", device: "mobile", path: "src/app/mobile/pages", state: "missing" },
+  { area: "components", device: "desktop", path: "src/app/components/*/desktop.tsx", state: "configured" },
+  { area: "components", device: "tablet", path: "src/app/components/*/tablet.tsx", state: "fallback", fallback: "desktop" },
+  { area: "components", device: "mobile", path: "src/app/components/*/mobile.tsx", state: "configured" },
 ];
 
 const workspace: RuntimeSourceWorkspace = {
   runtime: "react",
   sourceRoot: "src/app",
   devices: states,
-  entries: [rootMobile, pageDesktop],
+  entries: [desktopLayout, mobileLayout, desktopPage, summaryDesktop, summaryMobile],
   styles: [],
 };
 
-it("shows the fixed area and device hierarchy with truthful configured, fallback, and missing states", () => {
+it("shows device roots with their layout and nested pages instead of a separate Root area", () => {
   render(<SourceWorkspaceSidebar workspace={workspace} onSelect={() => undefined} />);
 
-  expect(screen.getByRole("region", { name: "Root source" })).toBeVisible();
-  expect(screen.getByRole("region", { name: "Pages source" })).toBeVisible();
-  expect(screen.getByRole("region", { name: "Components source" })).toBeVisible();
+  expect(screen.queryByRole("region", { name: "Root source" })).not.toBeInTheDocument();
+  const desktop = screen.getByRole("region", { name: "Desktop app" });
+  expect(desktop).toHaveTextContent("src/app/desktop");
+  expect(within(desktop).getByRole("button", { name: "DesktopLayout for Desktop" })).toBeVisible();
+  expect(within(desktop).getByLabelText("Pages Desktop")).toHaveTextContent("src/app/desktop/pages");
 
-  const mobileRoot = screen.getByRole("region", { name: "Root Mobile" });
-  expect(mobileRoot).toHaveTextContent("Configured");
-  expect(mobileRoot).toHaveTextContent("src/app/root/mobile");
-
-  const tabletPages = screen.getByRole("region", { name: "Pages Tablet" });
-  expect(tabletPages).toHaveTextContent("Uses Desktop");
-  expect(tabletPages).toHaveTextContent("src/app/pages/tablet");
-  expect(within(tabletPages).getByRole("button", { name: "Dashboard for Tablet" })).toBeVisible();
-
-  const mobilePages = screen.getByRole("region", { name: "Pages Mobile" });
-  expect(mobilePages).toHaveTextContent("Not configured");
-  expect(mobilePages).toHaveTextContent("src/app/pages/mobile");
-  expect(screen.getAllByText("Not configured")).toHaveLength(6);
+  const tablet = screen.getByRole("region", { name: "Tablet app" });
+  expect(tablet).toHaveTextContent("Uses Desktop");
+  expect(tablet).toHaveTextContent("src/app/tablet/pages");
+  expect(within(tablet).getByRole("button", { name: "Dashboard for Tablet" })).toBeVisible();
 });
 
-it("selects the real source entry together with the requested device, including Tablet fallback", async () => {
+it("lists each component once and switches between direct and fallback implementations", async () => {
+  const onSelect = vi.fn();
+  render(<SourceWorkspaceSidebar workspace={workspace} onSelect={onSelect} />);
+
+  expect(screen.getAllByText("ProjectSummary")).toHaveLength(1);
+  const component = screen.getByRole("region", { name: "Component ProjectSummary" });
+  await userEvent.click(within(component).getByRole("button", {
+    name: "ProjectSummary Tablet implementation, uses Desktop",
+  }));
+  expect(onSelect).toHaveBeenCalledWith({ device: "tablet", entryId: "summary-desktop" });
+
+  await userEvent.click(within(component).getByRole("button", { name: "ProjectSummary Mobile implementation" }));
+  expect(onSelect).toHaveBeenLastCalledWith({ device: "mobile", entryId: "summary-mobile" });
+});
+
+it("selects a nested page together with the requested fallback device", async () => {
   const onSelect = vi.fn();
   render(<SourceWorkspaceSidebar workspace={workspace} onSelect={onSelect} />);
 
   await userEvent.click(screen.getByRole("button", { name: "Dashboard for Tablet" }));
   expect(onSelect).toHaveBeenCalledWith({ device: "tablet", entryId: "page-dashboard-desktop" });
-
-  await userEvent.click(screen.getByRole("button", { name: "Mobile app root for Mobile" }));
-  expect(onSelect).toHaveBeenLastCalledWith({ device: "mobile", entryId: "root-mobile" });
 });

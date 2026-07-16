@@ -9,24 +9,24 @@ const workspace = {
   sourceRoot: "src/app",
   styles: [],
   entries: [
-    { id: "root-desktop", label: "Root", area: "root", device: "desktop", fileId: "root-file", relativePath: "src/app/root/desktop/index.tsx", exportName: "Root", props: [], component },
-    { id: "home-mobile", label: "Home", area: "pages", device: "mobile", fileId: "home-file", relativePath: "src/app/pages/mobile/home.tsx", exportName: "Home", props: [], component },
+    { id: "layout-desktop", label: "Layout", area: "layout", device: "desktop", fileId: "layout-file", relativePath: "src/app/desktop/layout.tsx", exportName: "Layout", props: [], component },
+    { id: "home-mobile", label: "Home", area: "pages", device: "mobile", fileId: "home-file", relativePath: "src/app/mobile/pages/home.tsx", exportName: "Home", props: [], component },
   ],
   devices: [
-    { area: "root", device: "desktop", path: "src/app/root/desktop", state: "configured" },
-    { area: "root", device: "tablet", path: "src/app/root/tablet", state: "fallback", fallback: "desktop" },
-    { area: "root", device: "mobile", path: "src/app/root/mobile", state: "missing" },
+    { area: "layout", device: "desktop", path: "src/app/desktop/layout.tsx", state: "configured" },
+    { area: "layout", device: "tablet", path: "src/app/tablet/layout.tsx", state: "fallback", fallback: "desktop" },
+    { area: "layout", device: "mobile", path: "src/app/mobile/layout.tsx", state: "missing" },
   ],
 } satisfies RuntimeSourceWorkspace;
 
 describe("source workspace selection", () => {
   it("resolves an explicit Tablet fallback without relabelling the implementation", () => {
-    const result = resolveSourceEntries(workspace, "root", "tablet");
+    const result = resolveSourceEntries(workspace, "layout", "tablet");
     expect(result).toMatchObject({ requestedDevice: "tablet", sourceDevice: "desktop", fallback: true });
-    expect(result.entries.map((entry) => entry.id)).toEqual(["root-desktop"]);
+    expect(result.entries.map((entry) => entry.id)).toEqual(["layout-desktop"]);
   });
 
   it("prefers the real desktop root for the initial preview", () => {
-    expect(initialSourceSelection(workspace)).toMatchObject({ entry: { id: "root-desktop" }, device: "desktop" });
+    expect(initialSourceSelection(workspace)).toMatchObject({ entry: { id: "layout-desktop" }, device: "desktop" });
   });
 });
