@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Label, Modal, TextField } from "@heroui/react";
 import { Component, LoaderCircle, X } from "lucide-react";
+import { SelfHostingBadge } from "../components/SelfHostingBadge";
 
 const validComponentName = /^[A-Z][A-Za-z0-9]{1,63}$/;
 
@@ -26,7 +27,7 @@ export function SourceComponentCreateSheet(props: {
             <div className="flex w-full items-center gap-3">
               <span className="grid size-9 place-items-center rounded-lg bg-sky-500/10 text-sky-300"><Component size={17} /></span>
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] uppercase tracking-[0.16em] text-zinc-500">TypeScript source</p>
+                <SelfHostingBadge label="TypeScript source" />
                 <Modal.Heading className="mt-0.5 text-base font-semibold">Create component</Modal.Heading>
               </div>
               <Button aria-label="Close create component" isIconOnly className="size-11" isDisabled={props.busy} size="sm" variant="ghost" onPress={props.onClose}><X size={16} /></Button>
