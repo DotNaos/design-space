@@ -40,8 +40,25 @@ export interface SourceComponentProp {
   type: string;
   required: boolean;
   kind: SourcePropKind;
-  slot: boolean;
-  multiple?: boolean;
+}
+
+export interface SourceComponentSlot {
+  name: string;
+  type: string;
+  required: boolean;
+  multiple: boolean;
+  accepts: readonly string[];
+  min: number;
+  max?: number;
+}
+
+export interface SourceStrictUiFinding {
+  ruleId:
+    | "strict-ui.children-forbidden"
+    | "strict-ui.invalid-slot-contract"
+    | "strict-ui.slot-not-rendered";
+  severity: "error";
+  message: string;
 }
 
 export interface SourceWorkspaceEntry {
@@ -53,6 +70,9 @@ export interface SourceWorkspaceEntry {
   relativePath: string;
   exportName: string;
   props: readonly SourceComponentProp[];
+  slots: readonly SourceComponentSlot[];
+  findings: readonly SourceStrictUiFinding[];
+  source: SourceLayerBinding;
   /** React component names referenced by this export's JSX. */
   uses?: readonly string[];
   /** JSX structure authored inside this export, including intrinsic HTML. */
@@ -63,14 +83,20 @@ export interface SourceWorkspaceEntry {
 export interface SourceWorkspaceLayer {
   id: string;
   label: string;
-  kind: "component" | "fragment" | "html";
+  kind: "component" | "html" | "slot";
   children: readonly SourceWorkspaceLayer[];
+  source: SourceLayerBinding;
   /** Exact source binding for a static or currently absent JSX className. */
   className?: SourceLayerClassNameBinding;
   /** Dynamic className expressions stay code-only until their expression can be preserved. */
   classNameDynamic?: true;
   /** Exact source binding for one direct static JSX text child. */
   text?: SourceLayerTextBinding;
+}
+
+export interface SourceLayerBinding {
+  start: number;
+  end: number;
 }
 
 export interface SourceLayerClassNameBinding {

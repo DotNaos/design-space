@@ -258,15 +258,13 @@ async function assertAbsent(path: string): Promise<void> {
 
 function componentSource(name: string): string {
   return [
-    'import type { ReactNode } from "react";',
-    "",
     `export interface ${name}Props {`,
-    "  children?: ReactNode;",
+    "  children?: never;",
     "  label?: string;",
     "}",
     "",
-    `export function ${name}({ children, label = ${JSON.stringify(name)} }: ${name}Props) {`,
-    "  return <div>{children ?? label}</div>;",
+    `export function ${name}({ label = ${JSON.stringify(name)} }: ${name}Props) {`,
+    "  return <div>{label}</div>;",
     "}",
     "",
   ].join("\n");

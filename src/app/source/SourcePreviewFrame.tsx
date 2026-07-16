@@ -22,7 +22,6 @@ export function SourcePreviewFrame(props: {
   selectedClassCss?: string;
   selectedText?: string;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
-  onModeChange?: (mode: "preview" | "code") => void;
 }) {
   const [mounts, setMounts] = useState<PreviewMounts>();
   const [projectedKey, setProjectedKey] = useState<string>();
@@ -84,7 +83,6 @@ export function SourcePreviewFrame(props: {
       selectionKey={props.selectedLayer?.id ?? props.entry?.id}
       selectionLabel={props.selectedLayer?.kind === "html" ? `<${props.selectedLayer.label}>` : props.node?.label}
       onDeviceChange={props.onDeviceChange ?? (() => undefined)}
-      onModeChange={props.onModeChange ?? (() => undefined)}
     >
       {(frame) => (
         <div className="h-full w-full" style={{ width: frame.width, height: frame.height }}>
@@ -124,7 +122,14 @@ function unavailablePreviewState(props: Pick<Parameters<typeof SourcePreviewFram
   if (props.runtime === "react-native") return <PreviewState title="React Native target indexed" message="The native source tree and TypeScript contracts are available. A simulator renderer must connect before this target can claim preview readiness." />;
   if (!props.entry) return <PreviewState title={`No ${props.device} implementation`} message="Add an exported React component at the shown fixed path, or configure the explicit Tablet fallback." />;
   const requiredProps = props.entry.props.filter((property) => property.required);
-  if (requiredProps.length > 0) return <PreviewState title="Preview arguments required" message={`Design Space will not invent values or execute this component with an invalid contract. Required props: ${requiredProps.map((property) => property.name).join(", ")}.`} />;
+  const requiredSlots = props.entry.slots.filter((slot) => slot.required || slot.min > 0);
+  if (requiredProps.length > 0 || requiredSlots.length > 0) {
+    const requirements = [
+      requiredProps.length ? `Required props: ${requiredProps.map((property) => property.name).join(", ")}` : undefined,
+      requiredSlots.length ? `Required slots: ${requiredSlots.map((slot) => slot.name).join(", ")}` : undefined,
+    ].filter(Boolean).join(". ");
+    return <PreviewState title="Preview arguments required" message={`Design Space will not invent values or execute this component with an invalid contract. ${requirements}.`} />;
+  }
   return undefined;
 }
 

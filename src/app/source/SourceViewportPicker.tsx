@@ -1,5 +1,5 @@
-import { Button, Label, ListBox, Select, Slider, Tooltip } from "@heroui/react";
-import { Code2, Eye, MonitorSmartphone } from "lucide-react";
+import { Label, ListBox, Select, Slider } from "@heroui/react";
+import { MonitorSmartphone } from "lucide-react";
 
 import type { DesignSpaceDevice } from "../../shared/source-workspace";
 import { SourceDeviceTabs } from "./SourceDeviceTabs";
@@ -12,7 +12,6 @@ export function SourceViewportPicker(props: {
   presetId: string;
   responsiveWidth: number;
   onDeviceChange: (device: DesignSpaceDevice) => void;
-  onModeChange: (mode: "preview" | "code") => void;
   onPresetChange: (id: string) => void;
   onResponsiveWidthChange: (width: number) => void;
 }) {
@@ -58,15 +57,6 @@ export function SourceViewportPicker(props: {
           </Slider>
         </>
       )}
-      <span aria-hidden="true" className="h-5 w-px shrink-0 bg-white/10" />
-      <Tooltip delay={350}>
-        <Button isIconOnly aria-label="Preview in canvas" className="size-6 min-w-6 bg-white/10 text-sky-200" size="sm" variant="ghost" onPress={() => props.onModeChange("preview")}><Eye size={11} /></Button>
-        <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Preview</Tooltip.Content>
-      </Tooltip>
-      <Tooltip delay={350}>
-        <Button isIconOnly aria-label="Open code in center" className="size-6 min-w-6 text-zinc-500" size="sm" variant="ghost" onPress={() => props.onModeChange("code")}><Code2 size={11} /></Button>
-        <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Code</Tooltip.Content>
-      </Tooltip>
     </div>
   );
 }

@@ -34,7 +34,7 @@ describe("source component creation", () => {
     });
     expect(prepared.diff).toContain("--- /dev/null");
     expect(prepared.diff).toContain("+export interface StatusBadgeProps {");
-    expect(prepared.diff).toContain("+  children?: ReactNode;");
+    expect(prepared.diff).toContain("+  children?: never;");
 
     await expect(service.save(prepared.challengeId)).resolves.toEqual({
       state: "source-component-created",
@@ -43,7 +43,7 @@ describe("source component creation", () => {
     });
     const source = await readFile(join(root, "src/app/components/StatusBadge/index.tsx"), "utf8");
     expect(source).toContain("export function StatusBadge");
-    expect(source).toContain("return <div>{children ?? label}</div>;");
+    expect(source).toContain("return <div>{label}</div>;");
   });
 
   it("rejects names and destinations that are not server-owned and absent", async () => {

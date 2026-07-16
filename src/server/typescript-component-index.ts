@@ -3,10 +3,10 @@ import { isAbsolute, join, relative, sep } from "node:path";
 import ts from "typescript";
 
 import type {
-  SourceComponentProp,
   SourceLayerClassNameBinding,
   SourceLayerTextBinding,
-  SourcePropKind,
+  SourceComponentSlot,
+  SourceStrictUiFinding,
   SourceWorkspaceLayer,
 } from "../shared/source-workspace";
 import { DesignSpaceError } from "./errors";
@@ -16,13 +16,17 @@ import {
   canonicalRoot,
 } from "./path-security";
 import { sourceWorkspaceLayerId } from "./source-layer-annotation";
+import { extractComponentContract } from "./typescript-component-contract";
 
 export interface IndexedTypeScriptComponent {
   filePath: string;
   exportName: string;
   label: string;
   propsTypeText: string;
-  props: readonly SourceComponentProp[];
+  props: ReturnType<typeof extractComponentContract>["props"];
+  slots: readonly SourceComponentSlot[];
+  findings: readonly SourceStrictUiFinding[];
+  source: { start: number; end: number };
   uses: readonly string[];
   layers: readonly SourceWorkspaceLayer[];
 }
@@ -30,20 +34,8 @@ export interface IndexedTypeScriptComponent {
 export interface TypeScriptComponentIndexOptions {
   projectRoot: string;
   filePaths: readonly string[];
+  sourceOverrides?: ReadonlyMap<string, string>;
 }
-
-interface SlotShape {
-  slot: boolean;
-  single: boolean;
-  multiple: boolean;
-}
-
-const noSlot: SlotShape = { slot: false, single: false, multiple: false };
-const singleSlot: SlotShape = { slot: true, single: true, multiple: false };
-const flexibleSlot: SlotShape = { slot: true, single: true, multiple: true };
-const typeFormatFlags =
-  ts.TypeFormatFlags.NoTruncation |
-  ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope;
 
 /**
  * Reads component props from the project's TypeScript source. It deliberately
@@ -56,7 +48,14 @@ export async function indexTypeScriptComponents(
   const projectRoot = await canonicalRoot(options.projectRoot);
   const filePaths = await canonicalSourceFiles(projectRoot, options.filePaths);
   const compilerOptions = readCompilerOptions(projectRoot);
-  const program = ts.createProgram({ rootNames: filePaths, options: compilerOptions });
+  const host = ts.createCompilerHost(compilerOptions, true);
+  if (options.sourceOverrides?.size) {
+    const readFile = host.readFile.bind(host);
+    host.readFile = (candidate) => options.sourceOverrides?.get(candidate)
+      ?? options.sourceOverrides?.get(candidate.replaceAll("\\", "/"))
+      ?? readFile(candidate);
+  }
+  const program = ts.createProgram({ rootNames: filePaths, options: compilerOptions, host });
   const checker = program.getTypeChecker();
   const components: IndexedTypeScriptComponent[] = [];
 
@@ -162,15 +161,36 @@ function indexSourceFile(
     );
     if (!signature) continue;
 
-    const props = extractProps(signature, declaration, checker);
+    const contract = extractComponentContract(signature, declaration, checker);
+    const layers = jsxLayers(
+      declaration,
+      localComponents,
+      new Set([label]),
+      relativePath,
+      new Set(contract.slots.map((slot) => slot.name)),
+    );
+    const renderedSlots = collectRenderedSlots(layers);
+    const findings = [...contract.findings];
+    for (const slot of contract.slots) {
+      if (!renderedSlots.has(slot.name)) {
+        findings.push({
+          ruleId: "strict-ui.slot-not-rendered",
+          severity: "error",
+          message: `Slot ${slot.name} is declared but is not rendered by ${label}.`,
+        });
+      }
+    }
     components.push({
       exportName,
       filePath: relativePath,
       label,
-      props: props.items,
-      propsTypeText: props.typeText,
+      props: contract.props,
+      slots: contract.slots,
+      findings,
+      propsTypeText: contract.typeText,
+      source: { start: declaration.getStart(), end: declaration.getEnd() },
       uses: jsxComponentNames(declaration),
-      layers: jsxLayers(declaration, localComponents, new Set([label]), relativePath),
+      layers,
     });
   }
   return components;
@@ -181,10 +201,16 @@ function jsxLayers(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  slotNames: ReadonlySet<string>,
 ): readonly SourceWorkspaceLayer[] {
   const layers: SourceWorkspaceLayer[] = [];
   const visit = (node: ts.Node): void => {
-    const layer = jsxLayer(node, localComponents, path, relativePath);
+    if (ts.isJsxElement(node) && isFragmentTag(node.openingElement.tagName.getText())) {
+      node.children.forEach(visit);
+      return;
+    }
+    if (ts.isJsxSelfClosingElement(node) && isFragmentTag(node.tagName.getText())) return;
+    const layer = jsxLayer(node, localComponents, path, relativePath, slotNames);
     if (layer) {
       layers.push(layer);
       return;
@@ -200,6 +226,7 @@ function jsxLayer(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  slotNames: ReadonlySet<string>,
 ): SourceWorkspaceLayer | undefined {
   if (ts.isJsxElement(node)) {
     const label = node.openingElement.tagName.getText();
@@ -208,11 +235,12 @@ function jsxLayer(
       id: sourceWorkspaceLayerId(relativePath, node.getStart()),
       label,
       kind,
+      source: { start: node.getStart(), end: node.getEnd() },
       ...jsxClassName(node.openingElement, kind),
       ...jsxStaticText(node),
       children: [
         ...localComponentLayers(label, kind, localComponents, path, relativePath),
-        ...jsxChildLayers(node.children, localComponents, path, relativePath),
+        ...jsxChildLayers(node.children, localComponents, path, relativePath, slotNames),
       ],
     };
   }
@@ -223,16 +251,9 @@ function jsxLayer(
       id: sourceWorkspaceLayerId(relativePath, node.getStart()),
       label,
       kind,
+      source: { start: node.getStart(), end: node.getEnd() },
       ...jsxClassName(node, kind),
       children: localComponentLayers(label, kind, localComponents, path, relativePath),
-    };
-  }
-  if (ts.isJsxFragment(node)) {
-    return {
-      id: sourceWorkspaceLayerId(relativePath, node.getStart()),
-      label: "Fragment",
-      kind: "fragment",
-      children: jsxChildLayers(node.children, localComponents, path, relativePath),
     };
   }
   return undefined;
@@ -319,14 +340,24 @@ function jsxChildLayers(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  slotNames: ReadonlySet<string>,
 ): readonly SourceWorkspaceLayer[] {
   return children.flatMap((child) => {
-    const direct = jsxLayer(child, localComponents, path, relativePath);
+    if (ts.isJsxFragment(child)) {
+      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames);
+    }
+    if (ts.isJsxElement(child) && isFragmentTag(child.openingElement.tagName.getText())) {
+      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames);
+    }
+    if (ts.isJsxSelfClosingElement(child) && isFragmentTag(child.tagName.getText())) return [];
+    const slot = sourceSlotLayer(child, slotNames, relativePath);
+    if (slot) return [slot];
+    const direct = jsxLayer(child, localComponents, path, relativePath, slotNames);
     if (direct) return [direct];
     if (!ts.isJsxExpression(child) || !child.expression) return [];
     const nested: SourceWorkspaceLayer[] = [];
     const visit = (node: ts.Node): void => {
-      const layer = jsxLayer(node, localComponents, path, relativePath);
+      const layer = jsxLayer(node, localComponents, path, relativePath, slotNames);
       if (layer) {
         nested.push(layer);
         return;
@@ -336,6 +367,46 @@ function jsxChildLayers(
     visit(child.expression);
     return nested;
   });
+}
+
+function sourceSlotLayer(
+  child: ts.JsxChild,
+  slotNames: ReadonlySet<string>,
+  relativePath: string,
+): SourceWorkspaceLayer | undefined {
+  if (!ts.isJsxExpression(child) || !child.expression) return undefined;
+  const name = sourceSlotName(child.expression);
+  if (!name || !slotNames.has(name)) return undefined;
+  return {
+    id: sourceWorkspaceLayerId(relativePath, child.getStart()),
+    label: name,
+    kind: "slot",
+    source: { start: child.getStart(), end: child.getEnd() },
+    children: [],
+  };
+}
+
+function sourceSlotName(expression: ts.Expression): string | undefined {
+  if (!ts.isPropertyAccessExpression(expression)) return undefined;
+  const owner = expression.expression;
+  if (ts.isIdentifier(owner) && owner.text === "slots") return expression.name.text;
+  if (
+    ts.isPropertyAccessExpression(owner) &&
+    owner.name.text === "slots"
+  ) {
+    return expression.name.text;
+  }
+  return undefined;
+}
+
+function collectRenderedSlots(layers: readonly SourceWorkspaceLayer[]): ReadonlySet<string> {
+  const result = new Set<string>();
+  const visit = (layer: SourceWorkspaceLayer): void => {
+    if (layer.kind === "slot") result.add(layer.label);
+    layer.children.forEach(visit);
+  };
+  layers.forEach(visit);
+  return result;
 }
 
 function localComponentLayers(
@@ -348,7 +419,7 @@ function localComponentLayers(
   if (kind !== "component" || path.has(label)) return [];
   const declaration = localComponents.get(label);
   if (!declaration) return [];
-  return jsxLayers(declaration, localComponents, new Set(path).add(label), relativePath);
+  return jsxLayers(declaration, localComponents, new Set(path).add(label), relativePath, new Set());
 }
 
 function localJsxDeclarations(sourceFile: ts.SourceFile): ReadonlyMap<string, ts.Declaration> {
@@ -370,6 +441,10 @@ function localJsxDeclarations(sourceFile: ts.SourceFile): ReadonlyMap<string, ts
 
 function jsxLayerKind(label: string): SourceWorkspaceLayer["kind"] {
   return /^[a-z]/.test(label) || label.includes("-") ? "html" : "component";
+}
+
+function isFragmentTag(label: string): boolean {
+  return label === "Fragment" || label === "React.Fragment";
 }
 
 function jsxComponentNames(declaration: ts.Declaration): readonly string[] {
@@ -425,7 +500,7 @@ function isReactComponentSignature(
   checker: ts.TypeChecker,
 ): boolean {
   if (containsJsx(declaration)) return true;
-  return reactSlotShape(signature.getReturnType(), checker, new Set()).slot;
+  return isReactRenderableType(signature.getReturnType(), checker, new Set());
 }
 
 function containsJsx(node: ts.Node): boolean {
@@ -445,201 +520,20 @@ function containsJsx(node: ts.Node): boolean {
   return found;
 }
 
-function extractProps(
-  signature: ts.Signature,
-  fallbackDeclaration: ts.Declaration,
-  checker: ts.TypeChecker,
-): { items: SourceComponentProp[]; typeText: string } {
-  const parameter = signature.parameters[0];
-  if (!parameter) return { items: [], typeText: "Record<string, never>" };
-
-  const location = parameter.valueDeclaration ?? signature.getDeclaration() ?? fallbackDeclaration;
-  const propsType = checker.getTypeOfSymbolAtLocation(parameter, location);
-  const items = checker.getPropertiesOfType(propsType).map((property) => {
-    const declaration = property.valueDeclaration ?? property.declarations?.[0] ?? location;
-    const type = checker.getTypeOfSymbolAtLocation(property, declaration);
-    const slotShape = reactSlotShape(type, checker, new Set());
-    const required =
-      !(property.flags & ts.SymbolFlags.Optional) && !includesUndefined(type, new Set());
-    const prop: SourceComponentProp = {
-      kind: slotShape.slot ? "unknown" : primitiveKind(type),
-      name: property.getName(),
-      required,
-      slot: slotShape.slot,
-      type: checker.typeToString(type, declaration, typeFormatFlags),
-    };
-    if (slotShape.multiple) prop.multiple = true;
-    return prop;
-  });
-
-  return {
-    items,
-    typeText: checker.typeToString(propsType, location, typeFormatFlags),
-  };
-}
-
-function primitiveKind(type: ts.Type): SourcePropKind {
-  const relevantTypes = type.isUnion()
-    ? type.types.filter((part) => !(part.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)))
-    : [type];
-  if (relevantTypes.length === 0) return "unknown";
-  if (relevantTypes.every((part) => Boolean(part.flags & ts.TypeFlags.StringLike))) return "string";
-  if (relevantTypes.every((part) => Boolean(part.flags & ts.TypeFlags.NumberLike))) return "number";
-  if (relevantTypes.every((part) => Boolean(part.flags & ts.TypeFlags.BooleanLike))) return "boolean";
-  return "unknown";
-}
-
-function includesUndefined(type: ts.Type, seen: Set<ts.Type>): boolean {
-  if (seen.has(type)) return false;
-  seen.add(type);
-  if (type.flags & ts.TypeFlags.Undefined) return true;
-  return type.isUnion() && type.types.some((part) => includesUndefined(part, seen));
-}
-
-function reactSlotShape(
+function isReactRenderableType(
   type: ts.Type,
   checker: ts.TypeChecker,
-  seen: Set<ts.Type | ts.Symbol>,
-): SlotShape {
-  if (seen.has(type)) return noSlot;
+  seen: Set<ts.Type>,
+): boolean {
+  if (seen.has(type)) return false;
   seen.add(type);
-
-  const knownShape = knownReactTypeShape(type.aliasSymbol ?? type.getSymbol(), checker);
-  if (knownShape.slot) return knownShape;
-
-  if (checker.isArrayType(type) || checker.isTupleType(type)) {
-    const elementShapes = checker.getTypeArguments(type as ts.TypeReference)
-      .map((elementType) => reactSlotShape(elementType, checker, new Set(seen)));
-    return elementShapes.some((shape) => shape.slot)
-      ? { slot: true, single: false, multiple: true }
-      : noSlot;
-  }
-
-  if (type.isUnion()) {
-    return mergeSlotShapes(
-      type.types.map((part) => reactSlotShape(part, checker, new Set(seen))),
-    );
-  }
-
-  const reference = type as ts.TypeReference;
-  const symbolName = (type.aliasSymbol ?? type.getSymbol())?.getName();
-  if (symbolName && ["Array", "Iterable", "ReadonlyArray", "ReadonlySet", "Set"].includes(symbolName)) {
-    const elementShapes = checker.getTypeArguments(reference)
-      .map((elementType) => reactSlotShape(elementType, checker, new Set(seen)));
-    return elementShapes.some((shape) => shape.slot)
-      ? { slot: true, single: false, multiple: true }
-      : noSlot;
-  }
-
-  const alias = type.aliasSymbol;
-  if (alias && !seen.has(alias)) {
-    seen.add(alias);
-    const aliasShapes = (alias.declarations ?? [])
-      .filter(ts.isTypeAliasDeclaration)
-      .map((declaration) => reactSlotNodeShape(declaration.type, checker, new Set(seen)));
-    const merged = mergeSlotShapes(aliasShapes);
-    if (merged.slot) return merged;
-  }
-
-  if (type.isClassOrInterface()) {
-    return mergeSlotShapes(
-      checker.getBaseTypes(type).map((baseType) =>
-        reactSlotShape(baseType, checker, new Set(seen))),
-    );
-  }
-  return noSlot;
-}
-
-function reactSlotNodeShape(
-  node: ts.TypeNode,
-  checker: ts.TypeChecker,
-  seen: Set<ts.Type | ts.Symbol>,
-): SlotShape {
-  if (ts.isParenthesizedTypeNode(node) || ts.isTypeOperatorNode(node)) {
-    return reactSlotNodeShape(node.type, checker, seen);
-  }
-  if (ts.isArrayTypeNode(node)) {
-    const elementShape = reactSlotNodeShape(node.elementType, checker, seen);
-    return elementShape.slot ? { slot: true, single: false, multiple: true } : noSlot;
-  }
-  if (ts.isTupleTypeNode(node)) {
-    const elementShapes = node.elements.map((element) =>
-      reactSlotNodeShape(
-        ts.isNamedTupleMember(element) ? element.type : element,
-        checker,
-        new Set(seen),
-      ));
-    return elementShapes.some((shape) => shape.slot)
-      ? { slot: true, single: false, multiple: true }
-      : noSlot;
-  }
-  if (ts.isUnionTypeNode(node)) {
-    return mergeSlotShapes(
-      node.types.map((part) => reactSlotNodeShape(part, checker, new Set(seen))),
-    );
-  }
-  if (!ts.isTypeReferenceNode(node)) return noSlot;
-
-  const symbol = resolveAliasAtLocation(node.typeName, checker);
-  const knownShape = knownReactTypeShape(symbol, checker);
-  if (knownShape.slot) return knownShape;
-
-  const name = symbol?.getName() ?? node.typeName.getText();
-  if (["Array", "Iterable", "ReadonlyArray", "ReadonlySet", "Set"].includes(name)) {
-    const elementShapes = (node.typeArguments ?? [])
-      .map((argument) => reactSlotNodeShape(argument, checker, new Set(seen)));
-    return elementShapes.some((shape) => shape.slot)
-      ? { slot: true, single: false, multiple: true }
-      : noSlot;
-  }
-  if (!symbol || seen.has(symbol)) return noSlot;
-
-  seen.add(symbol);
-  const aliasShapes = (symbol.declarations ?? [])
-    .filter(ts.isTypeAliasDeclaration)
-    .map((declaration) => reactSlotNodeShape(declaration.type, checker, new Set(seen)));
-  return mergeSlotShapes(aliasShapes);
-}
-
-function knownReactTypeShape(symbol: ts.Symbol | undefined, checker: ts.TypeChecker): SlotShape {
-  if (!symbol) return noSlot;
-  const resolved = resolveAlias(symbol, checker);
-  if (resolved.getName() === "ReactNode") return flexibleSlot;
-  if (resolved.getName() === "ReactElement") return singleSlot;
-  if (
-    resolved.getName() === "Element" &&
-    (checker.getFullyQualifiedName(resolved).includes("JSX.Element") ||
-      resolved.declarations?.some(isDeclaredInJsxNamespace))
-  ) {
-    return singleSlot;
-  }
-  return noSlot;
-}
-
-function isDeclaredInJsxNamespace(declaration: ts.Declaration): boolean {
-  let parent: ts.Node | undefined = declaration.parent;
-  while (parent) {
-    if (ts.isModuleDeclaration(parent) && parent.name.getText().replaceAll('"', "") === "JSX") {
-      return true;
-    }
-    parent = parent.parent;
+  const symbol = type.aliasSymbol ?? type.getSymbol();
+  const name = symbol ? resolveAlias(symbol, checker).getName() : undefined;
+  if (name === "ReactNode" || name === "ReactElement" || name === "Element") return true;
+  if (type.isUnionOrIntersection()) {
+    return type.types.some((part) => isReactRenderableType(part, checker, new Set(seen)));
   }
   return false;
-}
-
-function mergeSlotShapes(shapes: readonly SlotShape[]): SlotShape {
-  const slotShapes = shapes.filter((shape) => shape.slot);
-  if (slotShapes.length === 0) return noSlot;
-  return {
-    slot: true,
-    single: slotShapes.some((shape) => shape.single),
-    multiple: slotShapes.some((shape) => shape.multiple),
-  };
-}
-
-function resolveAliasAtLocation(node: ts.Node, checker: ts.TypeChecker): ts.Symbol | undefined {
-  const symbol = checker.getSymbolAtLocation(node);
-  return symbol ? resolveAlias(symbol, checker) : undefined;
 }
 
 function resolveAlias(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Symbol {

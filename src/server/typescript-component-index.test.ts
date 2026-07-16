@@ -48,31 +48,25 @@ describe("TypeScript component index", () => {
     expect(props.title).toMatchObject({
       kind: "string",
       required: false,
-      slot: false,
     });
     expect(props.mode).toMatchObject({
       kind: "string",
       required: true,
-      slot: false,
       type: '"compact" | "comfortable"',
     });
-    expect(props.count).toMatchObject({ kind: "number", required: true, slot: false });
-    expect(props.disabled).toMatchObject({ kind: "boolean", required: false, slot: false });
-
-    expect(props.content).toMatchObject({
-      kind: "unknown",
-      multiple: true,
-      required: false,
-      slot: true,
-      type: "ReactNode",
-    });
-    expect(props.children).toMatchObject({ multiple: true, required: false, slot: true });
-    expect(props.element).toMatchObject({ required: true, slot: true });
-    expect(props.element).not.toHaveProperty("multiple");
-    expect(props.elements).toMatchObject({ multiple: true, required: true, slot: true });
-    expect(props.strict).toMatchObject({ multiple: true, required: true, slot: true });
+    expect(props.count).toMatchObject({ kind: "number", required: true });
+    expect(props.disabled).toMatchObject({ kind: "boolean", required: false });
+    expect(props.content).toMatchObject({ kind: "unknown", required: false, type: "ReactNode" });
+    expect(props.children).toBeUndefined();
+    expect(props.element).toMatchObject({ kind: "unknown", required: true });
+    expect(props.elements).toMatchObject({ kind: "unknown", required: true });
+    expect(props.strict).toMatchObject({ kind: "unknown", required: true });
     expect(props.strict.type).toContain('StrictUiChildren<"slot.header" | "slot.main">');
-    expect(props.onPress).toMatchObject({ kind: "unknown", required: true, slot: false });
+    expect(props.onPress).toMatchObject({ kind: "unknown", required: true });
+    expect(components[0]!.slots).toEqual([]);
+    expect(components[0]!.findings).toEqual([
+      expect.objectContaining({ ruleId: "strict-ui.children-forbidden" }),
+    ]);
   });
 
   it("does not treat non-components or non-exported declarations as components", async () => {
@@ -98,9 +92,111 @@ describe("TypeScript component index", () => {
       propsTypeText: "PanelProps",
     });
     expect(components[0]!.props.find((prop) => prop.name === "strict")).toMatchObject({
-      multiple: true,
-      slot: true,
+      kind: "unknown",
+      required: true,
     });
+  });
+
+  it("indexes only explicit typed slots and flattens fragments", async () => {
+    const root = await createProject();
+    await writeFile(join(root, "src/components/StrictPanel.tsx"), `
+      import { Fragment, type ReactElement } from "react";
+
+      type ComponentSlot<T> = ReactElement & { readonly __accepts?: T };
+      type ComponentSlotList<T, Min extends number = 0, Max extends number = number> =
+        readonly ComponentSlot<T>[] & { readonly __cardinality?: readonly [Min, Max] };
+
+      export function Heading() { return <h2>Heading</h2>; }
+      export function Card() { return <article>Card</article>; }
+      export function Button() { return <button>Save</button>; }
+
+      export interface StrictPanelSlots {
+        header: ComponentSlot<typeof Heading>;
+        content: ComponentSlotList<typeof Card, 1, 3>;
+        actions?: ComponentSlotList<typeof Button>;
+      }
+
+      export interface StrictPanelProps {
+        label: string;
+        slots: StrictPanelSlots;
+        children?: never;
+      }
+
+      export function StrictPanel(props: StrictPanelProps) {
+        return <Fragment>
+          <section>
+            <header>{props.slots.header}{props.slots.actions}</header>
+            <main>{props.slots.content}</main>
+          </section>
+        </Fragment>;
+      }
+    `);
+
+    const components = await indexTypeScriptComponents({
+      filePaths: ["src/components/StrictPanel.tsx"],
+      projectRoot: root,
+    });
+    const panel = components.find((component) => component.exportName === "StrictPanel");
+
+    expect(panel).toBeDefined();
+    expect(panel?.props).toEqual([
+      expect.objectContaining({ name: "label", kind: "string", required: true }),
+    ]);
+    expect((panel as unknown as { slots: unknown }).slots).toEqual([
+      expect.objectContaining({ name: "header", accepts: ["Heading"], min: 1, max: 1, multiple: false }),
+      expect.objectContaining({ name: "content", accepts: ["Card"], min: 1, max: 3, multiple: true }),
+      expect.objectContaining({ name: "actions", accepts: ["Button"], min: 0, multiple: true }),
+    ]);
+    expect((panel as unknown as { findings: unknown[] }).findings).toEqual([]);
+    expect(panel?.layers).toEqual([{
+      id: expect.any(String),
+      label: "section",
+      kind: "html",
+      source: expect.any(Object),
+      className: expect.any(Object),
+      children: [{
+        id: expect.any(String),
+        label: "header",
+        kind: "html",
+        source: expect.any(Object),
+        className: expect.any(Object),
+        children: [
+          expect.objectContaining({ label: "header", kind: "slot" }),
+          expect.objectContaining({ label: "actions", kind: "slot" }),
+        ],
+      }, {
+        id: expect.any(String),
+        label: "main",
+        kind: "html",
+        source: expect.any(Object),
+        className: expect.any(Object),
+        children: [expect.objectContaining({ label: "content", kind: "slot" })],
+      }],
+    }]);
+  });
+
+  it("reports children instead of treating broad React content as a slot", async () => {
+    const root = await createProject();
+    await writeFile(join(root, "src/components/InvalidPanel.tsx"), `
+      import type { ReactNode } from "react";
+      export interface InvalidPanelProps { content?: ReactNode; children?: ReactNode; }
+      export function InvalidPanel(props: InvalidPanelProps) {
+        return <section>{props.content}{props.children}</section>;
+      }
+    `);
+
+    const [panel] = await indexTypeScriptComponents({
+      filePaths: ["src/components/InvalidPanel.tsx"],
+      projectRoot: root,
+    });
+
+    expect(panel?.props).toEqual([
+      expect.objectContaining({ name: "content", kind: "unknown" }),
+    ]);
+    expect((panel as unknown as { slots: unknown[] }).slots).toEqual([]);
+    expect((panel as unknown as { findings: unknown[] }).findings).toEqual([
+      expect.objectContaining({ ruleId: "strict-ui.children-forbidden", severity: "error" }),
+    ]);
   });
 
   it("rejects explicit paths outside the trusted root, including symlinks", async () => {

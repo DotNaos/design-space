@@ -22,9 +22,11 @@ it("states that required TypeScript props are unset instead of inventing preview
     relativePath: "src/app/components/Panel/desktop.tsx",
     exportName: "Panel",
     props: [
-      { name: "title", type: "string", required: true, kind: "string", slot: false },
-      { name: "children", type: "ReactNode", required: false, kind: "unknown", slot: true, multiple: true },
+      { name: "title", type: "string", required: true, kind: "string" },
     ],
+    slots: [],
+    findings: [],
+    source: { start: 0, end: 1 },
     component,
   } satisfies RuntimeSourceWorkspaceEntry;
 
@@ -44,6 +46,9 @@ it("renders source previews as static, non-focusable UI", () => {
     relativePath: "src/app/desktop/pages/Dashboard.tsx",
     exportName: "Dashboard",
     props: [],
+    slots: [],
+    findings: [],
+    source: { start: 0, end: 1 },
     component: () => <button type="button">Target action</button>,
   } satisfies RuntimeSourceWorkspaceEntry;
 

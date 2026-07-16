@@ -43,7 +43,7 @@ type FixtureUndo = { fixture: ComponentFixture; compositionCss: Readonly<Record<
 
 export function App() {
   const previewRuntime = useSourcePreviewRuntime();
-  if (target.sourceWorkspace) return <SourceWorkspace initialCenterMode={previewRuntime ? "code" : "preview"} target={target} />;
+  if (target.sourceWorkspace) return <SourceWorkspace nestedPreview={previewRuntime} target={target} />;
   return usesDocumentWorkspace(target) ? <DocumentWorkspace target={target} /> : <LegacyWorkspace />;
 }
 

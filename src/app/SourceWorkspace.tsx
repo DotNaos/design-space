@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Button } from "@heroui/react";
+import { Code2, SlidersHorizontal } from "lucide-react";
 
 import type { TargetModule } from "../shared/target-module";
 import { ProjectFileBrowser } from "./documents/ProjectFileBrowser";
@@ -9,7 +10,6 @@ import { WorkspaceActivityRail, type WorkspaceActivity } from "./shell/Workspace
 import { WorkspaceTopBar } from "./shell/WorkspaceTopBar";
 import { SourceComponentInspector } from "./source/SourceComponentInspector";
 import { SourceCodeCanvas } from "./source/SourceCodeCanvas";
-import { SourceDeviceTabs } from "./source/SourceDeviceTabs";
 import { SourcePreviewFrame } from "./source/SourcePreviewFrame";
 import {
   SourceWorkspaceSidebar,
@@ -27,8 +27,7 @@ import { SourceLibraryCanvas, SourceLibraryInspector, SourceLibrarySidebar } fro
 import { SourceComponentCreateSheet } from "./source/SourceComponentCreateSheet";
 import { useSourceComponentCreation } from "./source/useSourceComponentCreation";
 
-const areaLabels = { layout: "Layout", pages: "Pages", components: "Components" } as const;
-export function SourceWorkspace({ initialCenterMode = "preview", target }: { initialCenterMode?: "preview" | "code"; target: TargetModule }) {
+export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
   const workspace = target.sourceWorkspace;
   if (!workspace) return null;
   const nodes = useMemo(() => sourceTreeNodes(workspace), [workspace]);
@@ -36,7 +35,7 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
   const [activity, setActivity] = useState<WorkspaceActivity>("app");
   const [mobilePane, setMobilePane] = useState<MobilePane>("canvas");
   const [selection, setSelection] = useState<SourceWorkspaceSelection | undefined>(initial);
-  const [centerMode, setCenterMode] = useState<"preview" | "code">(initialCenterMode);
+  const [rightMode, setRightMode] = useState<"code" | "design">("code");
   const [selectedProjectFileId, setSelectedProjectFileId] = useState<string>();
   const [selectedLibraryComponent, setSelectedLibraryComponent] = useState(() => workspace.library?.components[0]?.name);
   const componentCreation = useSourceComponentCreation();
@@ -44,10 +43,14 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
   const requestedDevice = selection?.device ?? initial?.device ?? "desktop";
   const entry = selectedNode?.implementations[requestedDevice].entry;
   const selectedLayer = findSourceTreeLayer(entry?.layers, selection?.layerId);
-  const previewEntry = selectedLayer
+  const previewEntry = selectedLayer?.kind === "html"
     ? nodes.find((candidate) => candidate.area === "layout")?.implementations[requestedDevice].entry ?? entry
     : entry;
-  const selectedLabel = selectedLayer?.kind === "html" ? `<${selectedLayer.label}>` : selectedNode?.label;
+  const selectedLabel = selectedLayer?.kind === "html"
+    ? `<${selectedLayer.label}>`
+    : selectedLayer?.kind === "slot"
+      ? `slot:${selectedLayer.label}`
+      : selectedNode?.label;
   const editor = useSourceFileEditor(entry?.fileId);
   const styleEditor = useSourceLayerClassEditor({
     connected: workspace.runtime === "react",
@@ -64,7 +67,7 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
     : activity === "library"
       ? ["Library"]
       : selectedNode
-        ? ["App", areaLabels[selectedNode.area], selectedNode.label, ...(selectedLayer ? [`<${selectedLayer.label}>`] : [])]
+        ? ["App", selectedNode.label, ...(selectedLayer ? [selectedLabel ?? selectedLayer.label] : [])]
         : ["App"];
 
   const appSidebar = (
@@ -75,6 +78,7 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
       onCreateComponent={componentCreation.open}
       onSelect={(next) => {
         setSelection(next);
+        setRightMode("code");
         setActivity("app");
         setMobilePane("canvas");
       }}
@@ -88,7 +92,6 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
       onSelect={(fileId) => {
         setSelectedProjectFileId(fileId);
         setActivity("files");
-        setCenterMode("code");
         setMobilePane("canvas");
       }}
     />
@@ -104,34 +107,26 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
   ) : (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       <div className="relative flex min-h-0 min-w-0 flex-1">
-        {centerMode === "code" ? (
+        {nestedPreview ? (
           <SourceCodeCanvas
-            editable={Boolean(entry)}
+            editable={false}
             editor={editor}
             label={entry?.label ?? selectedNode?.label ?? "Source"}
             path={entry?.relativePath}
-            toolbar={<SourceDeviceTabs
-              device={requestedDevice}
-              node={selectedNode}
-              onChange={(device) => selectedNode && setSelection({ nodeId: selectedNode.id, device })}
-            />}
-            onPreview={() => setCenterMode("preview")}
+            selection={selectedLayer?.source ?? entry?.source}
           />
-        ) : (
-          <SourcePreviewFrame
-            device={requestedDevice}
-            entry={previewEntry}
-            node={selectedNode}
-            selectedLayer={selectedLayer}
-            selectedClassCss={styleEditor.css}
-            selectedClassName={selectedLayer?.className ? styleEditor.value : undefined}
-            selectedText={selectedLayer?.text ? styleEditor.textValue : undefined}
-            runtime={workspace.runtime}
-            styles={workspace.styles}
-            onDeviceChange={(device) => selectedNode && setSelection({ nodeId: selectedNode.id, device })}
-            onModeChange={setCenterMode}
-          />
-        )}
+        ) : <SourcePreviewFrame
+          device={requestedDevice}
+          entry={previewEntry}
+          node={selectedNode}
+          selectedLayer={selectedLayer?.kind === "html" ? selectedLayer : undefined}
+          selectedClassCss={styleEditor.css}
+          selectedClassName={selectedLayer?.className ? styleEditor.value : undefined}
+          selectedText={selectedLayer?.text ? styleEditor.textValue : undefined}
+          runtime={workspace.runtime}
+          styles={workspace.styles}
+          onDeviceChange={(device) => selectedNode && setSelection({ nodeId: selectedNode.id, device })}
+        />}
       </div>
     </div>
   );
@@ -139,12 +134,32 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
     ? <SourceLibraryInspector library={workspace.library} selected={selectedLibraryComponent} />
     : activity === "files"
       ? <FileEvidencePanel editable={Boolean(selectedProjectFile?.editable)} label={selectedProjectFile?.label} />
-      : <SourceComponentInspector
-          className="flex h-full w-full border-l-0"
-          entry={entry}
-          layer={selectedLayer}
-          styleEditor={styleEditor}
-        />;
+      : (
+        <div className="flex h-full min-h-0 w-full flex-col bg-[#141518]">
+          <nav aria-label="Source detail" className="flex h-10 shrink-0 items-center gap-1 border-b border-white/10 px-2">
+            <Button className={`h-7 min-w-0 gap-1.5 rounded-md px-2.5 text-[10px] ${rightMode === "code" ? "bg-sky-400/10 text-sky-200" : "text-zinc-500"}`} size="sm" variant="ghost" onPress={() => setRightMode("code")}><Code2 aria-hidden="true" size={12} />Code</Button>
+            <Button className={`h-7 min-w-0 gap-1.5 rounded-md px-2.5 text-[10px] ${rightMode === "design" ? "bg-sky-400/10 text-sky-200" : "text-zinc-500"}`} size="sm" variant="ghost" onPress={() => setRightMode("design")}><SlidersHorizontal aria-hidden="true" size={12} />Design</Button>
+          </nav>
+          <div className="min-h-0 flex-1">
+            {rightMode === "code" ? (
+              <SourceCodeCanvas
+                editable={Boolean(entry)}
+                editor={editor}
+                label={entry?.label ?? selectedNode?.label ?? "Source"}
+                path={entry?.relativePath}
+                selection={selectedLayer?.source ?? entry?.source}
+              />
+            ) : (
+              <SourceComponentInspector
+                className="flex h-full w-full border-l-0"
+                entry={entry}
+                layer={selectedLayer}
+                styleEditor={styleEditor}
+              />
+            )}
+          </div>
+        </div>
+      );
   const mobile = (
     <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
       <div className="absolute inset-0 flex min-h-0 min-w-0">{canvas}</div>
@@ -201,7 +216,7 @@ export function SourceWorkspace({ initialCenterMode = "preview", target }: { ini
         <ResizableWorkspacePanels
           namespace={{ projectId: target.project.id, documentId: `${selectedNode?.id ?? "empty"}:${requestedDevice}:${selectedLayer?.id ?? "component"}` }}
           left={{ label: "TypeScript app structure", content: left, defaultWidth: 300, minWidth: 260, maxWidth: 480 }}
-          right={{ label: "TypeScript component contract", content: right, defaultWidth: 340, minWidth: 280, maxWidth: 560 }}
+          right={{ label: "Source code and component design", content: right, defaultWidth: 480, minWidth: 360, maxWidth: 760 }}
           mobile={mobile}
           contentClassName="flex"
         >

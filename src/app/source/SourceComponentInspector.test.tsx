@@ -16,18 +16,21 @@ const entry: SourceWorkspaceEntry = {
   relativePath: "src/app/components/Panel/desktop.tsx",
   exportName: "Panel",
   props: [
-    { name: "title", type: "string", required: true, kind: "string", slot: false },
-    { name: "tone", type: '"quiet" | "strong"', required: false, kind: "string", slot: false },
-    { name: "children", type: "React.ReactNode", required: false, kind: "unknown", slot: true },
+    { name: "title", type: "string", required: true, kind: "string" },
+    { name: "tone", type: '"quiet" | "strong"', required: false, kind: "string" },
+  ],
+  slots: [
     {
       name: "actions",
-      type: "readonly React.ReactElement<ActionProps>[]",
+      type: "ComponentSlotList<typeof Action>",
       required: true,
-      kind: "unknown",
-      slot: true,
       multiple: true,
+      accepts: ["Action"],
+      min: 1,
     },
   ],
+  findings: [],
+  source: { start: 0, end: 200 },
 };
 
 it("shows exact TypeScript prop and slot contracts without editable or invented values", () => {
@@ -42,11 +45,10 @@ it("shows exact TypeScript prop and slot contracts without editable or invented 
   expect(props).toHaveTextContent("Optional");
 
   const slots = screen.getByRole("region", { name: "Slots" });
-  expect(within(slots).getByText("children")).toBeVisible();
-  expect(slots).toHaveTextContent("React.ReactNode");
   expect(within(slots).getByText("actions")).toBeVisible();
-  expect(slots).toHaveTextContent("readonly React.ReactElement<ActionProps>[]");
+  expect(slots).toHaveTextContent("ComponentSlotList<typeof Action>");
   expect(slots).toHaveTextContent("Multiple");
+  expect(slots).toHaveTextContent("Accepts Action · 1–∞");
 
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Code" })).not.toBeInTheDocument();
@@ -79,7 +81,7 @@ it("edits a selected HTML layer through its source-derived Tailwind binding", ()
   render(
     <SourceComponentInspector
       entry={entry}
-      layer={{ id: "panel-section", label: "section", kind: "html", children: [], className: binding, text: textBinding }}
+      layer={{ id: "panel-section", label: "section", kind: "html", source: { start: 20, end: 80 }, children: [], className: binding, text: textBinding }}
       styleEditor={styleEditor}
     />,
   );

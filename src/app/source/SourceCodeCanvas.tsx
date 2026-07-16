@@ -3,6 +3,7 @@ import { Code2, Eye, LoaderCircle, LockKeyhole } from "lucide-react";
 import { lazy, Suspense } from "react";
 
 import type { SourceFileEditor } from "./useSourceFileEditor";
+import type { SourceLayerBinding } from "../../shared/source-workspace";
 
 const MonacoSourceEditor = lazy(async () => {
   const module = await import("./MonacoSourceEditor");
@@ -14,6 +15,7 @@ export function SourceCodeCanvas(props: {
   editable: boolean;
   label: string;
   path?: string;
+  selection?: SourceLayerBinding;
   toolbar?: React.ReactNode;
   onPreview?: () => void;
 }) {
@@ -43,6 +45,7 @@ export function SourceCodeCanvas(props: {
                 key={editor.snapshot.fileId}
                 path={props.path ?? editor.snapshot.label}
                 readOnly={!props.editable}
+                selection={props.selection}
                 value={editor.draft}
                 onChange={editor.setDraft}
               />

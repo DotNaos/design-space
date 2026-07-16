@@ -11,6 +11,7 @@
     "./server": "./src/server/index.ts",
     "./contracts": "./src/shared/contracts.ts",
     "./documents": "./src/shared/documents.ts",
+    "./strict-ui": "./src/shared/strict-ui.ts",
     "./target": "./src/shared/target-module.ts",
     "./source-workspace": "./src/shared/source-workspace.ts"
   },

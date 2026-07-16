@@ -1,8 +1,9 @@
-import { Braces, Component, FileCode2 } from "lucide-react";
+import { Braces, CircleAlert, Component, FileCode2 } from "lucide-react";
 import { Label, TextArea, TextField } from "@heroui/react";
 
 import type {
   SourceComponentProp,
+  SourceComponentSlot,
   SourceWorkspaceEntry,
   SourceWorkspaceLayer,
 } from "../../shared/source-workspace";
@@ -28,8 +29,8 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
     );
   }
 
-  const regularProps = props.entry.props.filter((property) => !property.slot);
-  const slots = props.entry.props.filter((property) => property.slot);
+  const regularProps = props.entry.props;
+  const slots = props.entry.slots;
 
   return (
     <aside
@@ -46,6 +47,22 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {props.entry.findings.length > 0 && (
+          <section aria-label="Strict UI findings" className="border-b border-red-400/20 bg-red-400/[0.04] px-4 py-3">
+            <header className="flex items-center gap-2 text-red-300">
+              <CircleAlert aria-hidden="true" size={14} />
+              <h3 className="text-[10px] font-medium uppercase tracking-[0.14em]">Strict UI</h3>
+              <span className="ml-auto text-[9px] tabular-nums">{props.entry.findings.length}</span>
+            </header>
+            <ul className="mt-2 space-y-2">
+              {props.entry.findings.map((finding) => (
+                <li key={`${finding.ruleId}:${finding.message}`} className="text-[10px] leading-4 text-red-200/80">
+                  {finding.message}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {props.layer && (props.layer.kind === "html" || props.layer.text) && (
           <LayerDesignSection layer={props.layer} styleEditor={props.styleEditor} />
         )}
@@ -119,7 +136,7 @@ function LayerDesignSection(props: {
 function ContractSection(props: {
   emptyMessage: string;
   icon: React.ReactNode;
-  properties: readonly SourceComponentProp[];
+  properties: readonly (SourceComponentProp | SourceComponentSlot)[];
   title: "Props" | "Slots";
 }) {
   return (
@@ -142,12 +159,13 @@ function ContractSection(props: {
   );
 }
 
-function ContractProperty(props: { property: SourceComponentProp }) {
+function ContractProperty(props: { property: SourceComponentProp | SourceComponentSlot }) {
+  const slot = "accepts" in props.property ? props.property : undefined;
   return (
     <div className="border-t border-white/[0.06] px-4 py-3">
       <dt className="flex min-w-0 items-center gap-2">
         <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-zinc-300">{props.property.name}</span>
-        {props.property.multiple && (
+        {slot?.multiple && (
           <span className="rounded-full border border-white/10 px-1.5 py-0.5 text-[8px] uppercase tracking-wide text-zinc-500">Multiple</span>
         )}
         <span className={`text-[9px] font-medium ${props.property.required ? "text-amber-300" : "text-zinc-600"}`}>
@@ -158,6 +176,11 @@ function ContractProperty(props: { property: SourceComponentProp }) {
         <code className="block whitespace-pre-wrap break-words font-mono text-[10px] leading-4 text-sky-300/80">
           {props.property.type}
         </code>
+        {slot && (
+          <p className="mt-1 text-[9px] leading-4 text-zinc-600">
+            Accepts {slot.accepts.join(", ")} · {slot.min}–{slot.max ?? "∞"}
+          </p>
+        )}
       </dd>
     </div>
   );

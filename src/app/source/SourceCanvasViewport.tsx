@@ -15,7 +15,6 @@ export function SourceCanvasViewport(props: {
   selectionKey?: string;
   selectionLabel?: string;
   onDeviceChange: (device: DesignSpaceDevice) => void;
-  onModeChange: (mode: "preview" | "code") => void;
 }) {
   const [presetId, setPresetId] = useState(() => defaultSourceViewport(props.device).id);
   const [responsiveWidth, setResponsiveWidth] = useState(960);
@@ -68,7 +67,6 @@ export function SourceCanvasViewport(props: {
         presetId={presetId}
         responsiveWidth={responsiveWidth}
         onDeviceChange={changeDevice}
-        onModeChange={props.onModeChange}
         onPresetChange={changePreset}
         onResponsiveWidthChange={(width) => setResponsiveWidth(Math.max(320, Math.min(1440, width)))}
       />

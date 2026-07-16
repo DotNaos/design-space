@@ -6,6 +6,7 @@ import {
   initialSourceTreeSelection,
   sourceTreeNodes,
   sourceTreeRows,
+  sharedSourceTreeRows,
   visibleSourceTreeRows,
 } from "./source-workspace-tree";
 
@@ -14,6 +15,9 @@ const entry = (values: Partial<RuntimeSourceWorkspaceEntry> & Pick<RuntimeSource
   fileId: `file-${values.id}`,
   exportName: values.id,
   props: [],
+  slots: [],
+  findings: [],
+  source: { start: 0, end: 1 },
   component: () => null,
   ...values,
 });
@@ -33,7 +37,8 @@ const workspace: RuntimeSourceWorkspace = {
         id: "layout-main",
         label: "main",
         kind: "html",
-        children: [{ id: "layout-dashboard", label: "Dashboard", kind: "component", children: [] }],
+        source: { start: 1, end: 2 },
+        children: [{ id: "layout-dashboard", label: "Dashboard", kind: "component", source: { start: 2, end: 3 }, children: [] }],
       }],
     }),
     entry({ id: "MobileLayout", area: "layout", device: "mobile", relativePath: "src/app/mobile/layout.tsx" }),
@@ -47,7 +52,8 @@ const workspace: RuntimeSourceWorkspace = {
         id: "dashboard-section",
         label: "section",
         kind: "html",
-        children: [{ id: "dashboard-summary", label: "ProjectSummary", kind: "component", children: [] }],
+        source: { start: 1, end: 2 },
+        children: [{ id: "dashboard-summary", label: "ProjectSummary", kind: "component", source: { start: 2, end: 3 }, children: [] }],
       }],
     }),
     entry({
@@ -61,7 +67,8 @@ const workspace: RuntimeSourceWorkspace = {
         id: "summary-article",
         label: "article",
         kind: "html",
-        children: [{ id: "summary-heading", label: "h2", kind: "html", children: [] }],
+        source: { start: 1, end: 2 },
+        children: [{ id: "summary-heading", label: "h2", kind: "html", source: { start: 2, end: 3 }, children: [] }],
       }],
     }),
   ],
@@ -100,13 +107,19 @@ it("orders one composition tree from layout to page to referenced component", ()
     row.depth,
     row.node?.label ?? `<${row.layer?.label}>`,
   ])).toEqual([
-    [0, "App layout"],
+    [0, "DesktopLayout"],
     [1, "<main>"],
     [2, "Dashboard"],
     [3, "<section>"],
     [4, "ProjectSummary"],
-    [5, "<article>"],
-    [6, "<h2>"],
+  ]);
+  expect(sharedSourceTreeRows(sourceTreeNodes(workspace)).map((row) => [
+    row.depth,
+    row.node?.label ?? `<${row.layer?.label}>`,
+  ])).toEqual([
+    [0, "ProjectSummary"],
+    [1, "<article>"],
+    [2, "<h2>"],
   ]);
 });
 
@@ -119,10 +132,10 @@ it("hides descendants of collapsed source and HTML branches", () => {
 
   expect(visibleSourceTreeRows(rows, new Set([dashboard!.key])).map((row) => (
     row.node?.label ?? row.layer?.label
-  ))).toEqual(["App layout", "main", "Dashboard"]);
+  ))).toEqual(["DesktopLayout", "main", "Dashboard"]);
   expect(visibleSourceTreeRows(rows, new Set([main!.key])).map((row) => (
     row.node?.label ?? row.layer?.label
-  ))).toEqual(["App layout", "main"]);
+  ))).toEqual(["DesktopLayout", "main"]);
 });
 
 it("finds a nested authored HTML layer by its stable source id", () => {

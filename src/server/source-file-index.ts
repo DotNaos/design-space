@@ -103,6 +103,9 @@ export async function indexSourceWorkspace(
       relativePath,
       exportName: component.exportName,
       props: component.props,
+      slots: component.slots,
+      findings: component.findings,
+      source: component.source,
       uses: component.uses,
       layers: component.layers,
       previewable: true,
@@ -305,9 +308,9 @@ function inferredSourceLocation(
   const configuredLayout = config.source?.layout;
   const area: DesignSpaceArea = configuredLayout ? relativePath === configuredLayout
     ? "layout"
-    : /(?:^|\/)pages(?:\/|$)/i.test(relativePath) || /(?:Page|-page)\.tsx$/.test(fileName)
-      ? "pages"
-      : "components"
+    : /(?:^|\/)components(?:\/|$)/i.test(relativePath)
+      ? "components"
+      : "pages"
     : /(?:^|\/)app(?:-entry)?\.tsx$/i.test(relativePath)
     ? "layout"
     : /(?:^|\/)pages(?:\/|$)/i.test(relativePath) || /(?:Page|-page)\.tsx$/.test(fileName)

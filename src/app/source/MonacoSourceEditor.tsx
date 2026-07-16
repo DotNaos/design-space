@@ -1,21 +1,25 @@
 import "./monaco-environment";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import * as monaco from "monaco-editor";
+import type { SourceLayerBinding } from "../../shared/source-workspace";
 
 type MonacoSourceEditorProps = {
   path: string;
   readOnly: boolean;
   value: string;
+  selection?: SourceLayerBinding;
   onChange: (value: string) => void;
 };
 
 export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
+  const modelId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined);
   const modelRef = useRef<monaco.editor.ITextModel | undefined>(undefined);
   const onChangeRef = useRef(props.onChange);
   const synchronizing = useRef(false);
+  const decorationsRef = useRef<string[]>([]);
 
   useEffect(() => {
     onChangeRef.current = props.onChange;
@@ -25,7 +29,7 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
     const container = containerRef.current;
     if (!container) return;
 
-    const uri = monaco.Uri.file(`/${props.path.replace(/^\/+/, "")}`);
+    const uri = monaco.Uri.file(`/${props.path.replace(/^\/+/, "")}`).with({ query: modelId });
     const model = monaco.editor.createModel(props.value, languageFor(props.path), uri);
     const editor = monaco.editor.create(container, {
       model,
@@ -57,7 +61,7 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
       editorRef.current = undefined;
       modelRef.current = undefined;
     };
-  }, [props.path]);
+  }, [modelId, props.path]);
 
   useEffect(() => {
     editorRef.current?.updateOptions({ readOnly: props.readOnly });
@@ -72,6 +76,28 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
     synchronizing.current = false;
     if (position) editorRef.current?.setPosition(position);
   }, [props.value]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const model = modelRef.current;
+    if (!editor || !model) return;
+    const selection = props.selection;
+    decorationsRef.current = editor.deltaDecorations(decorationsRef.current, selection ? [{
+      range: monaco.Range.fromPositions(
+        model.getPositionAt(selection.start),
+        model.getPositionAt(Math.max(selection.start + 1, selection.end)),
+      ),
+      options: {
+        className: "bg-sky-400/10",
+        isWholeLine: true,
+        linesDecorationsClassName: "border-l-2 border-sky-400",
+      },
+    }] : []);
+    if (selection) editor.revealRangeInCenterIfOutsideViewport(monaco.Range.fromPositions(
+      model.getPositionAt(selection.start),
+      model.getPositionAt(Math.max(selection.start + 1, selection.end)),
+    ));
+  }, [props.selection, props.value]);
 
   return <div ref={containerRef} className="h-full min-h-0 w-full" />;
 }

@@ -20,12 +20,16 @@ const desktopLayout: RuntimeSourceWorkspaceEntry = {
   relativePath: "src/app/desktop/layout.tsx",
   exportName: "default",
   props: [],
+  slots: [],
+  findings: [],
+  source: { start: 0, end: 1 },
   uses: ["Dashboard"],
   layers: [{
     id: "layout-main",
     label: "main",
     kind: "html",
-    children: [{ id: "layout-dashboard", label: "Dashboard", kind: "component", children: [] }],
+    source: { start: 1, end: 2 },
+    children: [{ id: "layout-dashboard", label: "Dashboard", kind: "component", source: { start: 2, end: 3 }, children: [] }],
   }],
   component: () => null,
 };
@@ -43,7 +47,8 @@ const desktopPage: RuntimeSourceWorkspaceEntry = {
     id: "dashboard-section",
     label: "section",
     kind: "html",
-    children: [{ id: "dashboard-summary", label: "ProjectSummary", kind: "component", children: [] }],
+    source: { start: 1, end: 2 },
+    children: [{ id: "dashboard-summary", label: "ProjectSummary", kind: "component", source: { start: 2, end: 3 }, children: [] }],
   }],
 };
 
@@ -68,7 +73,8 @@ const summaryDesktop: RuntimeSourceWorkspaceEntry = {
     id: "summary-article",
     label: "article",
     kind: "html",
-    children: [{ id: "summary-title", label: "h2", kind: "html", children: [] }],
+    source: { start: 1, end: 2 },
+    children: [{ id: "summary-title", label: "h2", kind: "html", source: { start: 2, end: 3 }, children: [] }],
   }],
 };
 
@@ -122,12 +128,13 @@ it("shows one static composition tree from the root through pages and components
   expect(within(tree).queryByRole("region", { name: "Layout source" })).not.toBeInTheDocument();
   expect(within(tree).queryByRole("region", { name: "Pages source" })).not.toBeInTheDocument();
   expect(within(tree).queryByRole("region", { name: "Components source" })).not.toBeInTheDocument();
-  expect(within(tree).getByRole("treeitem", { name: "App layout" })).toHaveAttribute("aria-level", "1");
+  expect(within(tree).getByRole("treeitem", { name: "DesktopLayout" })).toHaveAttribute("aria-level", "1");
   expect(within(tree).getByRole("treeitem", { name: "<main>" })).toHaveAttribute("aria-level", "2");
   expect(within(tree).getByRole("treeitem", { name: "Dashboard" })).toHaveAttribute("aria-level", "3");
   expect(within(tree).queryByRole("treeitem", { name: "ProjectSummary" })).not.toBeInTheDocument();
-  expect(within(tree).getByRole("button", { name: "App layout" })).toBeVisible();
+  expect(within(tree).getByRole("button", { name: "DesktopLayout" })).toBeVisible();
   expect(within(tree).getByRole("button", { name: "Dashboard" })).toBeVisible();
+  expect(within(screen.getByRole("tree", { name: "Shared components" })).getByRole("treeitem", { name: "ProjectSummary" })).toHaveAttribute("aria-level", "1");
 });
 
 it("expands component branches and reveals their authored HTML layers", async () => {
@@ -136,13 +143,15 @@ it("expands component branches and reveals their authored HTML layers", async ()
   expect(screen.queryByRole("treeitem", { name: "<section>" })).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
   expect(screen.getByRole("treeitem", { name: "<section>" })).toBeVisible();
-  expect(screen.getByRole("treeitem", { name: "ProjectSummary" })).toBeVisible();
-
-  await userEvent.click(screen.getByRole("button", { name: "Expand ProjectSummary" }));
-  expect(screen.getByRole("treeitem", { name: "<article>" })).toBeVisible();
-  expect(screen.getByRole("treeitem", { name: "<h2>" })).toBeVisible();
-  await userEvent.click(screen.getByRole("button", { name: "Collapse ProjectSummary" }));
-  expect(screen.queryByRole("treeitem", { name: "<article>" })).not.toBeInTheDocument();
+  const appTree = screen.getByRole("tree", { name: "App source tree" });
+  const sharedTree = screen.getByRole("tree", { name: "Shared components" });
+  expect(within(appTree).getByRole("treeitem", { name: "ProjectSummary" })).toBeVisible();
+  expect(within(sharedTree).queryByRole("treeitem", { name: "<article>" })).not.toBeInTheDocument();
+  await userEvent.click(within(sharedTree).getByRole("button", { name: "Expand ProjectSummary" }));
+  expect(within(sharedTree).getByRole("treeitem", { name: "<article>" })).toBeVisible();
+  expect(within(sharedTree).getByRole("treeitem", { name: "<h2>" })).toBeVisible();
+  await userEvent.click(within(sharedTree).getByRole("button", { name: "Collapse ProjectSummary" }));
+  expect(within(sharedTree).queryByRole("treeitem", { name: "<article>" })).not.toBeInTheDocument();
 });
 
 it("shows only missing dedicated platform implementations", async () => {
@@ -150,8 +159,7 @@ it("shows only missing dedicated platform implementations", async () => {
   render(<SourceWorkspaceSidebar workspace={workspace} onSelect={onSelect} />);
 
   await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
-  expect(screen.getAllByText("ProjectSummary")).toHaveLength(1);
-  const component = screen.getByRole("button", { name: "ProjectSummary" });
+  const component = within(screen.getByRole("tree", { name: "App source tree" })).getByRole("button", { name: "ProjectSummary" });
   expect(within(component).getByRole("img", {
     name: "Tablet has no dedicated implementation and uses Desktop",
   })).toBeVisible();
@@ -173,12 +181,12 @@ it("selects a logical node without changing the active canvas device", async () 
   expect(onSelect).toHaveBeenCalledWith({ device: "tablet", nodeId: "pages:Dashboard" });
 });
 
-it("selects an authored HTML layer and distinguishes page rows", async () => {
+it("selects an authored HTML layer and keeps every JSX component on the same node kind", async () => {
   const onSelect = vi.fn();
   render(<SourceWorkspaceSidebar workspace={workspace} onSelect={onSelect} />);
 
   const pageButton = screen.getByRole("button", { name: "Dashboard" });
-  expect(pageButton.querySelector("svg.lucide-panel-top")).toBeInTheDocument();
+  expect(pageButton.querySelector("svg.lucide-component")).toBeInTheDocument();
   expect(pageButton.closest('[role="treeitem"]')).toHaveClass("min-h-10");
 
   await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));

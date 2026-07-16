@@ -38,10 +38,11 @@ describe("TypeScript-first source index", () => {
     });
     const summary = result.manifest.entries.find((entry) => entry.label === "ProjectSummary");
     expect(summary?.props).toEqual([
-      expect.objectContaining({ name: "label", type: "string", required: true, slot: false, kind: "string" }),
-      expect.objectContaining({ name: "ready", required: false, slot: false, kind: "boolean" }),
-      expect.objectContaining({ name: "children", required: false, slot: true }),
+      expect.objectContaining({ name: "label", type: "string", required: true, kind: "string" }),
+      expect.objectContaining({ name: "ready", required: false, kind: "boolean" }),
     ]);
+    expect(summary?.slots).toEqual([]);
+    expect(summary?.findings).toEqual([]);
     expect(result.files.map((file) => file.relativePath)).toEqual(expect.arrayContaining([
       "Dockerfile",
       "nginx.conf",

@@ -1,6 +1,5 @@
 import { Button } from "@heroui/react";
 import {
-  Braces,
   ChevronDown,
   ChevronRight,
   CodeXml,
@@ -8,7 +7,6 @@ import {
   FileCode2,
   FilePlus2,
   GitBranch,
-  LayoutTemplate,
   Monitor,
   PanelTop,
   Smartphone,
@@ -24,6 +22,7 @@ import {
 import {
   sourceTreeNodes,
   sourceTreeRows,
+  sharedSourceTreeRows,
   type SourceImplementation,
   type SourceTreeRow,
   type SourceTreeNode,
@@ -49,17 +48,25 @@ const deviceLabels: Record<DesignSpaceDevice, string> = {
 
 export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   const device = props.selected?.device ?? "desktop";
-  const rows = useMemo(
-    () => sourceTreeRows(sourceTreeNodes(props.workspace), device),
+  const trees = useMemo(
+    () => {
+      const nodes = sourceTreeNodes(props.workspace);
+      return {
+        app: sourceTreeRows(nodes, device),
+        shared: sharedSourceTreeRows(nodes, device),
+      };
+    },
     [device, props.workspace],
   );
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => defaultCollapsedRows(rows));
+  const rows = useMemo(() => [...trees.app, ...trees.shared], [trees]);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => defaultCollapsedRows(rows, trees.shared));
 
   useEffect(() => {
-    setCollapsed(defaultCollapsedRows(rows));
-  }, [rows]);
+    setCollapsed(defaultCollapsedRows(rows, trees.shared));
+  }, [rows, trees.shared]);
 
-  const visibleRows = visibleSourceTreeRows(rows, collapsed);
+  const visibleAppRows = visibleSourceTreeRows(trees.app, collapsed);
+  const visibleSharedRows = visibleSourceTreeRows(trees.shared, collapsed);
   const toggleBranch = (key: string) => setCollapsed((current) => {
     const next = new Set(current);
     if (next.has(key)) next.delete(key);
@@ -93,11 +100,12 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
         ) : <GitBranch aria-label="Static source composition" className="text-zinc-600" size={14} />}
       </header>
 
-      <div aria-label="App source tree" className="min-h-0 flex-1 overflow-y-auto py-2" role="tree">
-        {visibleRows.map((row) => (
+      <div className="min-h-0 flex-1 overflow-y-auto py-2">
+        <div aria-label="App source tree" role="tree">
+        {visibleAppRows.map((row) => (
           <SourceNodeRow
             key={row.key}
-            active={row.layer?.kind === "html"
+            active={row.layer
               ? props.selected?.nodeId === row.selectionNode.id && props.selected.layerId === row.layer.id
               : Boolean(row.node && props.selected?.nodeId === row.node.id && !props.selected.layerId)}
             collapsed={collapsed.has(row.key)}
@@ -105,12 +113,36 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
             onPress={() => props.onSelect({
               nodeId: row.selectionNode.id,
               device,
-              ...(row.layer?.kind === "html" ? { layerId: row.layer.id } : {}),
+              ...(row.layer ? { layerId: row.layer.id } : {}),
             })}
             onToggle={() => toggleBranch(row.key)}
           />
         ))}
-        {!rows.length && <p className="px-4 py-3 text-[10px] leading-4 text-zinc-700">No exported app tree was found.</p>}
+        {!trees.app.length && <p className="px-4 py-3 text-[10px] leading-4 text-zinc-700">No exported app tree was found.</p>}
+        </div>
+        {trees.shared.length > 0 && (
+          <section className="mt-4 border-t border-white/[0.07] pt-3">
+            <h3 className="px-4 pb-2 text-[9px] font-medium uppercase tracking-[0.16em] text-zinc-600">Shared components</h3>
+            <div aria-label="Shared components" role="tree">
+              {visibleSharedRows.map((row) => (
+                <SourceNodeRow
+                  key={`shared:${row.key}`}
+                  active={row.layer
+                    ? props.selected?.nodeId === row.selectionNode.id && props.selected.layerId === row.layer.id
+                    : Boolean(row.node && props.selected?.nodeId === row.node.id && !props.selected.layerId)}
+                  collapsed={collapsed.has(row.key)}
+                  row={row}
+                  onPress={() => props.onSelect({
+                    nodeId: row.selectionNode.id,
+                    device,
+                    ...(row.layer ? { layerId: row.layer.id } : {}),
+                  })}
+                  onToggle={() => toggleBranch(row.key)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </aside>
   );
@@ -125,17 +157,14 @@ function SourceNodeRow(props: {
 }) {
   const { row } = props;
   const NodeIcon = row.node
-    ? row.node.area === "layout"
-      ? LayoutTemplate
-      : row.node.area === "pages"
-        ? PanelTop
-        : Component
+    ? Component
     : row.layer?.kind === "html"
       ? CodeXml
-      : row.layer?.kind === "fragment"
-        ? Braces
+      : row.layer?.kind === "slot"
+        ? PanelTop
         : Component;
-  const label = row.node?.label ?? (row.layer?.kind === "html" ? `<${row.layer.label}>` : row.layer?.label ?? "Layer");
+  const label = row.node?.label
+    ?? (row.layer?.kind === "html" ? `<${row.layer.label}>` : row.layer?.kind === "slot" ? `slot:${row.layer.label}` : row.layer?.label ?? "Layer");
   return (
     <div
       aria-expanded={row.hasChildren ? !props.collapsed : undefined}
@@ -182,9 +211,14 @@ function SourceNodeRow(props: {
   );
 }
 
-function defaultCollapsedRows(rows: readonly SourceTreeRow[]): ReadonlySet<string> {
+function defaultCollapsedRows(
+  rows: readonly SourceTreeRow[],
+  sharedRows: readonly SourceTreeRow[],
+): ReadonlySet<string> {
+  const sharedRoots = new Set(sharedRows.filter((row) => row.depth === 0).map((row) => row.key));
   return new Set(rows.filter((row) => (
     row.hasChildren && row.depth > 0 && (row.node || row.layer?.kind === "component")
+    || row.hasChildren && sharedRoots.has(row.key)
   )).map((row) => row.key));
 }
 

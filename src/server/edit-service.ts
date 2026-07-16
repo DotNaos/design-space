@@ -28,6 +28,7 @@ import { locateMarkedString, sourceVersion } from "./source-editor";
 import { TargetTailwindService } from "./target-tailwind-service";
 import { TailwindIntelligenceService } from "./tailwind-intelligence-service";
 import { assertEditedTypeScriptCompiles } from "./typescript-project-compiler";
+import { indexTypeScriptComponents } from "./typescript-component-index";
 import type {
   RegisteredEditTarget,
   RegisteredFile,
@@ -209,6 +210,9 @@ export class EditService {
     } catch {
       throw new DesignSpaceError("COMPILE_ERROR", "The edited TypeScript source did not compile");
     }
+    if (this.#target.sourceWorkspace && /\.tsx?$/.test(file.path)) {
+      await assertStrictUiEditDoesNotRegress(this.#target.root, file.path, nextSource);
+    }
     const id = this.#createId();
     const expiresAt = this.#now() + this.#challengeTtlMs;
     const nextVersion = sourceVersion(nextSource);
@@ -378,4 +382,28 @@ export class EditService {
     return { editTarget, file };
   }
 
+}
+
+async function assertStrictUiEditDoesNotRegress(
+  root: string,
+  filePath: string,
+  nextSource: string,
+): Promise<void> {
+  const current = await indexTypeScriptComponents({ projectRoot: root, filePaths: [filePath] });
+  const edited = await indexTypeScriptComponents({
+    projectRoot: root,
+    filePaths: [filePath],
+    sourceOverrides: new Map([[filePath, nextSource], [filePath.replaceAll("\\", "/"), nextSource]]),
+  });
+  const baseline = new Set(current.flatMap((component) => component.findings.map((finding) => (
+    `${component.exportName}:${finding.ruleId}:${finding.message}`
+  ))));
+  const regression = edited.flatMap((component) => component.findings.map((finding) => ({ component, finding })))
+    .find(({ component, finding }) => !baseline.has(`${component.exportName}:${finding.ruleId}:${finding.message}`));
+  if (regression) {
+    throw new DesignSpaceError(
+      "COMPILE_ERROR",
+      `Strict UI rejected ${regression.component.label}: ${regression.finding.message}`,
+    );
+  }
 }
