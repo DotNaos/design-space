@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { EditorSelectField, type EditorSelectOption } from "../components/EditorSelectField";
+import { EditorSelectField, type EditorSelectOption } from "../components/EditorSelectField/EditorSelectField";
 
 type UtilityOption = { label: string; value: string; icon?: LucideIcon };
 type UtilityGroup = {

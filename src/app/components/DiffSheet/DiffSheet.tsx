@@ -1,8 +1,8 @@
 import { Button, Modal } from "@heroui/react";
 import { CheckCircle2, LoaderCircle, Save, X } from "lucide-react";
 
-import { RenderedDiff } from "./RenderedDiff";
-import { useMobileViewport } from "./use-mobile-viewport";
+import { RenderedDiff } from "../RenderedDiff/RenderedDiff";
+import { useMobileViewport } from "../MobileNavigation/use-mobile-viewport";
 
 type DiffSheetProps = {
   desktopHidden?: boolean;

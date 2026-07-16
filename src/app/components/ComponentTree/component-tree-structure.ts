@@ -1,4 +1,4 @@
-import type { ComponentTreeRow } from "../../model";
+import type { ComponentTreeRow } from "../../../model";
 
 export type HtmlScopeAnnotation = {
   readonly pairId: string;

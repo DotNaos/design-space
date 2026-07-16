@@ -10,7 +10,11 @@ export async function registerSourceProject(
   const root = await canonicalRoot(unsafeRoot);
   const registrationPath = await canonicalRegisteredFile(root, ".designspace.ts");
   const sourceWorkspace = await indexSourceWorkspace(root, config);
-  const editableFileIds = new Set(sourceWorkspace.manifest.entries.map((entry) => entry.fileId));
+  const editableFileIds = new Set(
+    sourceWorkspace.files
+      .filter((file) => isEditableTypeScriptSource(file.relativePath))
+      .map((file) => file.id),
+  );
   return {
     project: config.project,
     root,
@@ -25,4 +29,8 @@ export async function registerSourceProject(
     editableFileIds,
     sourceWorkspace,
   };
+}
+
+function isEditableTypeScriptSource(relativePath: string): boolean {
+  return relativePath.startsWith("src/") && /\.(?:ts|tsx)$/.test(relativePath);
 }

@@ -2,13 +2,13 @@ import { Button, Tabs, Tooltip } from "@heroui/react";
 import { Braces, ChevronDown, CircleDot, LayoutPanelTop, Plus, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { ComponentControl } from "../../shared/contracts";
-import type { DesignValue } from "../../shared/design-document";
-import type { SlotState } from "../types";
-import { TailwindClassField } from "../inspector/TailwindClassField";
-import { TailwindMappedControls } from "../inspector/TailwindMappedControls";
-import { EditorSelectField } from "./EditorSelectField";
-import { PropertyControlField } from "./PropertyControlField";
+import type { ComponentControl } from "../../../shared/contracts";
+import type { DesignValue } from "../../../shared/design-document";
+import type { SlotState } from "../../types";
+import { TailwindClassField } from "../../inspector/TailwindClassField";
+import { TailwindMappedControls } from "../../inspector/TailwindMappedControls";
+import { EditorSelectField } from "../EditorSelectField/EditorSelectField";
+import { PropertyControlField } from "../PropertyControlField/PropertyControlField";
 
 type ToolId = "design" | "properties" | "slots" | "classes";
 type Tool = { id: ToolId; label: string; icon: React.ReactNode };

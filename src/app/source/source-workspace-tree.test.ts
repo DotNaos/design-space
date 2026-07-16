@@ -1,7 +1,12 @@
 import { expect, it } from "vitest";
 
 import type { RuntimeSourceWorkspace, RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace";
-import { initialSourceTreeSelection, sourceTreeNodes } from "./source-workspace-tree";
+import {
+  initialSourceTreeSelection,
+  sourceTreeNodes,
+  sourceTreeRows,
+  visibleSourceTreeRows,
+} from "./source-workspace-tree";
 
 const entry = (values: Partial<RuntimeSourceWorkspaceEntry> & Pick<RuntimeSourceWorkspaceEntry, "id" | "area" | "device" | "relativePath">): RuntimeSourceWorkspaceEntry => ({
   label: values.id,
@@ -17,10 +22,47 @@ const workspace: RuntimeSourceWorkspace = {
   sourceRoot: "src/app",
   styles: [],
   entries: [
-    entry({ id: "DesktopLayout", area: "layout", device: "desktop", relativePath: "src/app/desktop/layout.tsx" }),
+    entry({
+      id: "DesktopLayout",
+      area: "layout",
+      device: "desktop",
+      relativePath: "src/app/desktop/layout.tsx",
+      uses: ["Dashboard"],
+      layers: [{
+        id: "layout-main",
+        label: "main",
+        kind: "html",
+        children: [{ id: "layout-dashboard", label: "Dashboard", kind: "component", children: [] }],
+      }],
+    }),
     entry({ id: "MobileLayout", area: "layout", device: "mobile", relativePath: "src/app/mobile/layout.tsx" }),
-    entry({ id: "Dashboard", area: "pages", device: "desktop", relativePath: "src/app/desktop/pages/Dashboard.tsx" }),
-    entry({ id: "SummaryDesktop", label: "ProjectSummary", exportName: "ProjectSummary", area: "components", device: "desktop", relativePath: "src/app/components/ProjectSummary/desktop.tsx" }),
+    entry({
+      id: "Dashboard",
+      area: "pages",
+      device: "desktop",
+      relativePath: "src/app/desktop/pages/Dashboard.tsx",
+      uses: ["ProjectSummary"],
+      layers: [{
+        id: "dashboard-section",
+        label: "section",
+        kind: "html",
+        children: [{ id: "dashboard-summary", label: "ProjectSummary", kind: "component", children: [] }],
+      }],
+    }),
+    entry({
+      id: "SummaryDesktop",
+      label: "ProjectSummary",
+      exportName: "ProjectSummary",
+      area: "components",
+      device: "desktop",
+      relativePath: "src/app/components/ProjectSummary/desktop.tsx",
+      layers: [{
+        id: "summary-article",
+        label: "article",
+        kind: "html",
+        children: [{ id: "summary-heading", label: "h2", kind: "html", children: [] }],
+      }],
+    }),
   ],
   devices: [
     { area: "layout", device: "desktop", path: "src/app/desktop/layout.tsx", state: "configured" },
@@ -50,4 +92,34 @@ it("overlays device implementations on one logical node", () => {
 
 it("starts with the desktop app layout when it exists", () => {
   expect(initialSourceTreeSelection(sourceTreeNodes(workspace))).toEqual({ nodeId: "layout:app", device: "desktop" });
+});
+
+it("orders one composition tree from layout to page to referenced component", () => {
+  expect(sourceTreeRows(sourceTreeNodes(workspace)).map((row) => [
+    row.depth,
+    row.node?.label ?? `<${row.layer?.label}>`,
+  ])).toEqual([
+    [0, "App layout"],
+    [1, "<main>"],
+    [2, "Dashboard"],
+    [3, "<section>"],
+    [4, "ProjectSummary"],
+    [5, "<article>"],
+    [6, "<h2>"],
+  ]);
+});
+
+it("hides descendants of collapsed source and HTML branches", () => {
+  const rows = sourceTreeRows(sourceTreeNodes(workspace));
+  const dashboard = rows.find((row) => row.node?.label === "Dashboard");
+  const main = rows.find((row) => row.layer?.label === "main");
+  expect(dashboard).toBeDefined();
+  expect(main).toBeDefined();
+
+  expect(visibleSourceTreeRows(rows, new Set([dashboard!.key])).map((row) => (
+    row.node?.label ?? row.layer?.label
+  ))).toEqual(["App layout", "main", "Dashboard"]);
+  expect(visibleSourceTreeRows(rows, new Set([main!.key])).map((row) => (
+    row.node?.label ?? row.layer?.label
+  ))).toEqual(["App layout", "main"]);
 });

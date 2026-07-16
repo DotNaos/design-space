@@ -1,5 +1,5 @@
-import type { Selection } from "../types";
-import type { StrictUiCanvasTarget } from "../strict-ui/strict-ui-markers";
+import type { Selection } from "../../types";
+import type { StrictUiCanvasTarget } from "../../strict-ui/strict-ui-markers";
 
 export type ViewRect = { left: number; top: number; width: number; height: number };
 

@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { canvasGridPresentation } from "./canvas-overlay-geometry";
+import { canvasGridPresentation } from "../PreviewCanvas/canvas-overlay-geometry";
 import { CanvasGridLayer } from "./CanvasGridLayer";
 
 afterEach(cleanup);

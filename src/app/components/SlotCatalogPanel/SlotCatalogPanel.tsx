@@ -2,7 +2,7 @@ import { Button, CloseButton, SearchField } from "@heroui/react";
 import { Component } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { CatalogEntry } from "./CatalogPanel";
+import type { CatalogEntry } from "../CatalogPanel/CatalogPanel";
 
 export function SlotCatalogPanel(props: {
   className?: string;

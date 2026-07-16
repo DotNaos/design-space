@@ -2,9 +2,9 @@ import { Button, Drawer } from "@heroui/react";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import type { CatalogEntry } from "./CatalogPanel";
-import { SlotCatalogPanel } from "./SlotCatalogPanel";
-import { useMobileViewport } from "./use-mobile-viewport";
+import type { CatalogEntry } from "../CatalogPanel/CatalogPanel";
+import { SlotCatalogPanel } from "../SlotCatalogPanel/SlotCatalogPanel";
+import { useMobileViewport } from "../MobileNavigation/use-mobile-viewport";
 
 export function SlotCatalogDialog(props: {
   open: boolean;

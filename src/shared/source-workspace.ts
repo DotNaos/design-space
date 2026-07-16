@@ -53,7 +53,18 @@ export interface SourceWorkspaceEntry {
   relativePath: string;
   exportName: string;
   props: readonly SourceComponentProp[];
+  /** React component names referenced by this export's JSX. */
+  uses?: readonly string[];
+  /** JSX structure authored inside this export, including intrinsic HTML. */
+  layers?: readonly SourceWorkspaceLayer[];
   previewable?: boolean;
+}
+
+export interface SourceWorkspaceLayer {
+  id: string;
+  label: string;
+  kind: "component" | "fragment" | "html";
+  children: readonly SourceWorkspaceLayer[];
 }
 
 export interface SourceWorkspaceDeviceState {

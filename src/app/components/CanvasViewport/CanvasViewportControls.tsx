@@ -1,11 +1,12 @@
 import { Button, ToggleButton, Tooltip } from "@heroui/react";
 import { Hand, Maximize2, Minus, MousePointer2, Plus, RotateCcw } from "lucide-react";
 
-import { CanvasGridControls } from "./CanvasGridControls";
-import type { CanvasGridMode, CanvasLayoutGridSettings } from "./canvas-grid-types";
+import { CanvasGridControls } from "../CanvasGrid/CanvasGridControls";
+import type { CanvasGridMode, CanvasLayoutGridSettings } from "../CanvasGrid/canvas-grid-types";
 
 type CanvasViewportControlsProps = {
   compact?: boolean;
+  showInteractionToggle?: boolean;
   gridMode: CanvasGridMode;
   gridVisible: boolean;
   interactionMode: "select" | "interact";
@@ -24,7 +25,7 @@ type CanvasViewportControlsProps = {
 export function CanvasViewportControls(props: CanvasViewportControlsProps) {
   return (
     <>
-      {!props.compact && (
+      {!props.compact && props.showInteractionToggle !== false && (
         <Tooltip delay={350}>
         <ToggleButton
           isIconOnly

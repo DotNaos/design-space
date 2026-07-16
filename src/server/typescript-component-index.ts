@@ -2,7 +2,11 @@ import { isAbsolute, join, relative, sep } from "node:path";
 
 import ts from "typescript";
 
-import type { SourceComponentProp, SourcePropKind } from "../shared/source-workspace";
+import type {
+  SourceComponentProp,
+  SourcePropKind,
+  SourceWorkspaceLayer,
+} from "../shared/source-workspace";
 import { DesignSpaceError } from "./errors";
 import {
   assertStillRegistered,
@@ -16,6 +20,8 @@ export interface IndexedTypeScriptComponent {
   label: string;
   propsTypeText: string;
   props: readonly SourceComponentProp[];
+  uses: readonly string[];
+  layers: readonly SourceWorkspaceLayer[];
 }
 
 export interface TypeScriptComponentIndexOptions {
@@ -131,6 +137,7 @@ function indexSourceFile(
   if (!moduleSymbol) return [];
 
   const components: IndexedTypeScriptComponent[] = [];
+  const localComponents = localJsxDeclarations(sourceFile);
   for (const exportedSymbol of checker.getExportsOfModule(moduleSymbol)) {
     const resolvedSymbol = resolveAlias(exportedSymbol, checker);
     const declaration = resolvedSymbol.declarations?.find(
@@ -158,9 +165,139 @@ function indexSourceFile(
       label,
       props: props.items,
       propsTypeText: props.typeText,
+      uses: jsxComponentNames(declaration),
+      layers: jsxLayers(declaration, localComponents, new Set([label])),
     });
   }
   return components;
+}
+
+function jsxLayers(
+  declaration: ts.Declaration,
+  localComponents: ReadonlyMap<string, ts.Declaration>,
+  path: ReadonlySet<string>,
+): readonly SourceWorkspaceLayer[] {
+  const layers: SourceWorkspaceLayer[] = [];
+  const visit = (node: ts.Node): void => {
+    const layer = jsxLayer(node, localComponents, path);
+    if (layer) {
+      layers.push(layer);
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(declaration);
+  return layers;
+}
+
+function jsxLayer(
+  node: ts.Node,
+  localComponents: ReadonlyMap<string, ts.Declaration>,
+  path: ReadonlySet<string>,
+): SourceWorkspaceLayer | undefined {
+  if (ts.isJsxElement(node)) {
+    const label = node.openingElement.tagName.getText();
+    const kind = jsxLayerKind(label);
+    return {
+      id: `jsx:${node.getStart()}`,
+      label,
+      kind,
+      children: [
+        ...localComponentLayers(label, kind, localComponents, path),
+        ...jsxChildLayers(node.children, localComponents, path),
+      ],
+    };
+  }
+  if (ts.isJsxSelfClosingElement(node)) {
+    const label = node.tagName.getText();
+    const kind = jsxLayerKind(label);
+    return {
+      id: `jsx:${node.getStart()}`,
+      label,
+      kind,
+      children: localComponentLayers(label, kind, localComponents, path),
+    };
+  }
+  if (ts.isJsxFragment(node)) {
+    return {
+      id: `jsx:${node.getStart()}`,
+      label: "Fragment",
+      kind: "fragment",
+      children: jsxChildLayers(node.children, localComponents, path),
+    };
+  }
+  return undefined;
+}
+
+function jsxChildLayers(
+  children: ts.NodeArray<ts.JsxChild>,
+  localComponents: ReadonlyMap<string, ts.Declaration>,
+  path: ReadonlySet<string>,
+): readonly SourceWorkspaceLayer[] {
+  return children.flatMap((child) => {
+    const direct = jsxLayer(child, localComponents, path);
+    if (direct) return [direct];
+    if (!ts.isJsxExpression(child) || !child.expression) return [];
+    const nested: SourceWorkspaceLayer[] = [];
+    const visit = (node: ts.Node): void => {
+      const layer = jsxLayer(node, localComponents, path);
+      if (layer) {
+        nested.push(layer);
+        return;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(child.expression);
+    return nested;
+  });
+}
+
+function localComponentLayers(
+  label: string,
+  kind: SourceWorkspaceLayer["kind"],
+  localComponents: ReadonlyMap<string, ts.Declaration>,
+  path: ReadonlySet<string>,
+): readonly SourceWorkspaceLayer[] {
+  if (kind !== "component" || path.has(label)) return [];
+  const declaration = localComponents.get(label);
+  if (!declaration) return [];
+  return jsxLayers(declaration, localComponents, new Set(path).add(label));
+}
+
+function localJsxDeclarations(sourceFile: ts.SourceFile): ReadonlyMap<string, ts.Declaration> {
+  const declarations = new Map<string, ts.Declaration>();
+  for (const statement of sourceFile.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name && containsJsx(statement)) {
+      declarations.set(statement.name.text, statement);
+      continue;
+    }
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.initializer && containsJsx(declaration.initializer)) {
+        declarations.set(declaration.name.text, declaration);
+      }
+    }
+  }
+  return declarations;
+}
+
+function jsxLayerKind(label: string): SourceWorkspaceLayer["kind"] {
+  return /^[a-z]/.test(label) || label.includes("-") ? "html" : "component";
+}
+
+function jsxComponentNames(declaration: ts.Declaration): readonly string[] {
+  const names = new Set<string>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const tag = node.tagName;
+      if (ts.isIdentifier(tag) && /^[A-Z]/.test(tag.text) && tag.text !== "Fragment") {
+        names.add(tag.text);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(declaration);
+  return [...names].sort((left, right) => left.localeCompare(right, "en"));
 }
 
 function findReactComponentSignature(

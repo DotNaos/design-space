@@ -12,6 +12,7 @@ const node: SourceTreeNode = {
   area: "components",
   label: "ProjectSummary",
   entries: [],
+  uses: [],
   implementations: {
     desktop: { requestedDevice: "desktop", sourceDevice: "desktop", state: "direct" },
     tablet: { requestedDevice: "tablet", sourceDevice: "desktop", state: "fallback" },

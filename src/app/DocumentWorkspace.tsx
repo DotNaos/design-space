@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { SelectionTarget } from "../model";
 import type { DesignDocument } from "../shared/design-document";
 import type { TargetModule } from "../shared/target-module";
-import { DiffPanel } from "./components/DiffPanel";
+import { DiffPanel } from "./components/DiffPanel/DiffPanel";
 import type { ProductMode } from "./documents/DocumentNavigator";
 import { DesktopDocumentEditingPanel } from "./documents/DesktopDocumentEditingPanel";
 import { DocumentDefinitionPanel } from "./documents/DocumentDefinitionPanel";

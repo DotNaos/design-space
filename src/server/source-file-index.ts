@@ -103,6 +103,8 @@ export async function indexSourceWorkspace(
       relativePath,
       exportName: component.exportName,
       props: component.props,
+      uses: component.uses,
+      layers: component.layers,
       previewable: true,
     });
     entryFiles.set(id, file.absolutePath);

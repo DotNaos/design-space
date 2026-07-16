@@ -1,6 +1,6 @@
 import { Button, Input, Label, ListBox, TextField } from "@heroui/react";
 import { ChevronDown, CircleDot, Plus } from "lucide-react";
-import type { Selection, SlotState } from "../types";
+import type { Selection, SlotState } from "../../types";
 
 type InspectorProps = {
   className?: string;

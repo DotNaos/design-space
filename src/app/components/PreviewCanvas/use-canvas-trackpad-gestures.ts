@@ -1,6 +1,6 @@
 import { useEffect, useRef, type RefObject } from "react";
 
-import { zoomCanvasAt, type CanvasCamera, type Point } from "../canvas-transform";
+import { zoomCanvasAt, type CanvasCamera, type Point } from "../../canvas-transform";
 
 type CanvasTrackpadGestureOptions = {
   enabled: boolean;

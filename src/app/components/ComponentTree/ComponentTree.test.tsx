@@ -2,8 +2,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ComponentTreeRow } from "../../model";
-import type { StrictUiViolation } from "../../shared/strict-ui";
+import type { ComponentTreeRow } from "../../../model";
+import type { StrictUiViolation } from "../../../shared/strict-ui";
 import { ComponentTree } from "./ComponentTree";
 
 afterEach(cleanup);

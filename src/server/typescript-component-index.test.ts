@@ -26,6 +26,16 @@ describe("TypeScript component index", () => {
       filePath: "src/components/Panel.tsx",
       label: "Panel",
       propsTypeText: "PanelProps",
+      uses: ["PanelHeader"],
+      layers: [{
+        label: "section",
+        kind: "html",
+        children: [{
+          label: "PanelHeader",
+          kind: "component",
+          children: [{ label: "header", kind: "html", children: [] }],
+        }],
+      }],
     });
 
     const props = Object.fromEntries(components[0]!.props.map((prop) => [prop.name, prop]));
@@ -147,8 +157,9 @@ describe("TypeScript component index", () => {
     await writeFile(join(root, "src/components/Panel.tsx"), `
       import type { PanelProps } from "@fixture/panel";
 
+      function PanelHeader() { return <header />; }
       export function Panel(props: PanelProps) {
-        return <section>{props.title}{props.content}{props.children}</section>;
+        return <section><PanelHeader />{props.title}{props.content}{props.children}</section>;
       }
     `);
     await writeFile(join(root, "src/components/Other.tsx"), `

@@ -1,10 +1,10 @@
 import { Button, Input, Label, NumberField, Switch, TextField } from "@heroui/react";
 import { Minus, Plus } from "lucide-react";
 
-import type { ComponentControl } from "../../shared/contracts";
-import type { DesignValue } from "../../shared/design-document";
-import { TailwindClassField } from "../inspector/TailwindClassField";
-import { EditorSelectField } from "./EditorSelectField";
+import type { ComponentControl } from "../../../shared/contracts";
+import type { DesignValue } from "../../../shared/design-document";
+import { TailwindClassField } from "../../inspector/TailwindClassField";
+import { EditorSelectField } from "../EditorSelectField/EditorSelectField";
 
 export function PropertyControlField(props: {
   control: ComponentControl;

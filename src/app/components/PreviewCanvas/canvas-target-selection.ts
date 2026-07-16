@@ -1,6 +1,6 @@
-import type { Point } from "../canvas-transform";
-import type { StrictUiCanvasTarget } from "../strict-ui/strict-ui-markers";
-import type { Selection, SlotState } from "../types";
+import type { Point } from "../../canvas-transform";
+import type { StrictUiCanvasTarget } from "../../strict-ui/strict-ui-markers";
+import type { Selection, SlotState } from "../../types";
 
 export type CanvasContextMenuRequest = {
   selection: Selection;

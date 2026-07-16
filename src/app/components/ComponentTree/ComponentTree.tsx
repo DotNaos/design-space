@@ -2,14 +2,14 @@ import { Button, Switch, ToggleButton, Tooltip } from "@heroui/react";
 import { Box, ChevronDown, ChevronRight, CircleDot, Code2, Component, Eye, EyeOff, FileBox, Image, Layers3, List, ListCollapse, MousePointerClick, Plug, Plus, Type, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
-import type { ComponentTreeRow, SelectionTarget } from "../../model";
-import type { StrictUiViolation } from "../../shared/strict-ui";
-import { StrictUiIndicator } from "../strict-ui/StrictUiIndicator";
+import type { ComponentTreeRow, SelectionTarget } from "../../../model";
+import type { StrictUiViolation } from "../../../shared/strict-ui";
+import { StrictUiIndicator } from "../../strict-ui/StrictUiIndicator";
 import {
   buildStrictUiSelectionMarkers,
   strictUiMarkerForTreeRow,
   type StrictUiMarker,
-} from "../strict-ui/strict-ui-markers";
+} from "../../strict-ui/strict-ui-markers";
 import {
   annotateTreeRows,
   treeSelectionPath,

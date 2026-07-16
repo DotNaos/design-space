@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import type { StrictUiViolation } from "../../shared/strict-ui";
-import { fitCanvas, zoomCanvasAt, type CanvasCamera } from "../canvas-transform";
-import { indexPreviewDom, type PreviewDomSnapshot } from "../dom/dom-snapshot";
-import { StrictUiIndicator, strictUiOutlineTone } from "../strict-ui/StrictUiIndicator";
+import type { StrictUiViolation } from "../../../shared/strict-ui";
+import { fitCanvas, zoomCanvasAt, type CanvasCamera } from "../../canvas-transform";
+import { indexPreviewDom, type PreviewDomSnapshot } from "../../dom/dom-snapshot";
+import { StrictUiIndicator, strictUiOutlineTone } from "../../strict-ui/StrictUiIndicator";
 import {
   buildStrictUiCanvasTargets,
   describeStrictUiMarker,
   type StrictUiCanvasTarget,
-} from "../strict-ui/strict-ui-markers";
-import type { Selection, SlotState } from "../types";
-import type { SelectionNavigationCommand } from "../document/selection-navigation";
+} from "../../strict-ui/strict-ui-markers";
+import type { Selection, SlotState } from "../../types";
+import type { SelectionNavigationCommand } from "../../document/selection-navigation";
 import {
   canvasGridPresentation,
   layoutEmptySlotOverlays,
@@ -29,9 +29,9 @@ import {
   selectionForCanvasTarget,
   type CanvasContextMenuRequest,
 } from "./canvas-target-selection";
-import { CanvasGridLayer } from "./CanvasGridLayer";
-import { CanvasViewportControls } from "./CanvasViewportControls";
-import { defaultCanvasLayoutGrid, type CanvasGridMode } from "./canvas-grid-types";
+import { CanvasGridLayer } from "../CanvasGrid/CanvasGridLayer";
+import { CanvasViewportControls } from "../CanvasViewport/CanvasViewportControls";
+import { defaultCanvasLayoutGrid, type CanvasGridMode } from "../CanvasGrid/canvas-grid-types";
 import { useCanvasTrackpadGestures } from "./use-canvas-trackpad-gestures";
 import { useCanvasTouchGestures } from "./use-canvas-touch-gestures";
 
@@ -51,6 +51,7 @@ type PreviewCanvasProps = {
   cameraKey?: string;
   strictUiViolations?: readonly StrictUiViolation[];
   compact?: boolean;
+  staticPreview?: boolean;
   worldWidth?: number;
   onSelect: (selection: Selection) => void;
   onDeselect?: () => void;
@@ -430,6 +431,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 
       <CanvasViewportControls
         compact={props.compact}
+        showInteractionToggle={!props.staticPreview}
         gridMode={gridMode}
         gridVisible={gridVisible}
         interactionMode={interactionMode}
@@ -446,7 +448,9 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         onLayoutGridChange={setLayoutGrid}
         onZoomIn={() => zoomBy(1.2)}
         onZoomOut={() => zoomBy(1 / 1.2)}
-        onToggleInteractionMode={() => setInteractionMode((current) => current === "select" ? "interact" : "select")}
+        onToggleInteractionMode={() => {
+          if (!props.staticPreview) setInteractionMode((current) => current === "select" ? "interact" : "select");
+        }}
       />
 
       <div

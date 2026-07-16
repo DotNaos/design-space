@@ -1,7 +1,7 @@
 import { Button } from "@heroui/react";
 import { ChevronDown, FileCode2, FolderOpen } from "lucide-react";
 
-import type { TargetFileEntry } from "../../shared/target-module";
+import type { TargetFileEntry } from "../../../shared/target-module";
 
 export function FileBrowser(props: {
   className?: string;

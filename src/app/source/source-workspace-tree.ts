@@ -4,6 +4,7 @@ import {
   type DesignSpaceDevice,
   type RuntimeSourceWorkspace,
   type RuntimeSourceWorkspaceEntry,
+  type SourceWorkspaceLayer,
 } from "../../shared/source-workspace";
 
 export type SourceImplementationState = "direct" | "fallback" | "missing" | "responsive";
@@ -20,7 +21,17 @@ export interface SourceTreeNode {
   area: DesignSpaceArea;
   label: string;
   entries: readonly RuntimeSourceWorkspaceEntry[];
+  uses: readonly string[];
   implementations: Readonly<Record<DesignSpaceDevice, SourceImplementation>>;
+}
+
+export interface SourceTreeRow {
+  key: string;
+  depth: number;
+  hasChildren: boolean;
+  node?: SourceTreeNode;
+  layer?: SourceWorkspaceLayer;
+  selectionNode: SourceTreeNode;
 }
 
 export interface SourceTreeSelection {
@@ -48,9 +59,116 @@ export function sourceTreeNodes(workspace: RuntimeSourceWorkspace): readonly Sou
       area: group.area,
       label: group.label,
       entries: group.entries,
+      uses: [...new Set(group.entries.flatMap((entry) => entry.uses ?? []))],
       implementations: implementationsFor(workspace, group.area, group.entries),
     }))
     .sort(compareNodes);
+}
+
+export function sourceTreeRows(
+  nodes: readonly SourceTreeNode[],
+  device: DesignSpaceDevice = "desktop",
+): readonly SourceTreeRow[] {
+  const references = new Map<string, SourceTreeNode>();
+  for (const node of nodes) {
+    references.set(node.label, node);
+    for (const entry of node.entries) references.set(entry.exportName, node);
+  }
+
+  const rows: SourceTreeRow[] = [];
+  const represented = new Set<string>();
+  const appendNode = (
+    node: SourceTreeNode,
+    depth: number,
+    path: ReadonlySet<string>,
+    occurrence: string,
+  ): void => {
+    if (path.has(node.id)) return;
+    represented.add(node.id);
+    const nextPath = new Set(path).add(node.id);
+    const entry = node.implementations[device].entry;
+    const layers = entry?.layers ?? [];
+    const referencedPages = new Set<string>();
+    layers.forEach((layer) => collectReferencedNodes(layer, references, referencedPages));
+    const pageChildren = node.area === "layout"
+      ? nodes.filter((candidate) => candidate.area === "pages" && !referencedPages.has(candidate.id))
+      : [];
+    const hasChildren = layers.length > 0 || pageChildren.length > 0;
+    rows.push({
+      key: `${occurrence}:${node.id}`,
+      node,
+      selectionNode: node,
+      depth,
+      hasChildren,
+    });
+    layers.forEach((layer, index) => appendLayer(
+      layer,
+      node,
+      depth + 1,
+      nextPath,
+      `${occurrence}.layer.${index}`,
+    ));
+    pageChildren.forEach((page, index) => appendNode(
+      page,
+      depth + 1,
+      nextPath,
+      `${occurrence}.page.${index}`,
+    ));
+  };
+
+  const appendLayer = (
+    layer: SourceWorkspaceLayer,
+    owner: SourceTreeNode,
+    depth: number,
+    path: ReadonlySet<string>,
+    occurrence: string,
+  ): void => {
+    const referenced = layer.kind === "component" ? references.get(layer.label) : undefined;
+    if (referenced && !path.has(referenced.id)) {
+      appendNode(referenced, depth, path, occurrence);
+      return;
+    }
+    rows.push({
+      key: `${occurrence}:${layer.id}`,
+      layer,
+      selectionNode: owner,
+      depth,
+      hasChildren: layer.children.length > 0,
+    });
+    layer.children.forEach((child, index) => appendLayer(
+      child,
+      owner,
+      depth + 1,
+      path,
+      `${occurrence}.${index}`,
+    ));
+  };
+
+  const roots = nodes.filter((node) => node.area === "layout");
+  const initialRoots = roots.length ? roots : nodes.filter((node) => node.area === "pages");
+  initialRoots.forEach((root, index) => appendNode(root, 0, new Set(), `root.${index}`));
+  nodes.filter((node) => !represented.has(node.id)).forEach((node, index) => appendNode(
+    node,
+    initialRoots.length ? 1 : 0,
+    new Set(),
+    `unlinked.${index}`,
+  ));
+  return rows;
+}
+
+export function visibleSourceTreeRows(
+  rows: readonly SourceTreeRow[],
+  collapsed: ReadonlySet<string>,
+): readonly SourceTreeRow[] {
+  const visible: SourceTreeRow[] = [];
+  let hiddenBelowDepth: number | undefined;
+  for (const row of rows) {
+    if (hiddenBelowDepth !== undefined && row.depth > hiddenBelowDepth) continue;
+    hiddenBelowDepth = undefined;
+    visible.push(row);
+    if (row.hasChildren && collapsed.has(row.key)) hiddenBelowDepth = row.depth;
+  }
+  return visible;
 }
 
 export function initialSourceTreeSelection(nodes: readonly SourceTreeNode[]): SourceTreeSelection | undefined {
@@ -118,4 +236,14 @@ function logicalEntryLabel(entry: RuntimeSourceWorkspaceEntry): string {
 function compareNodes(left: SourceTreeNode, right: SourceTreeNode): number {
   const areaOrder: Record<DesignSpaceArea, number> = { layout: 0, pages: 1, components: 2 };
   return areaOrder[left.area] - areaOrder[right.area] || left.label.localeCompare(right.label, "en");
+}
+
+function collectReferencedNodes(
+  layer: SourceWorkspaceLayer,
+  references: ReadonlyMap<string, SourceTreeNode>,
+  result: Set<string>,
+): void {
+  const referenced = layer.kind === "component" ? references.get(layer.label) : undefined;
+  if (referenced) result.add(referenced.id);
+  layer.children.forEach((child) => collectReferencedNodes(child, references, result));
 }

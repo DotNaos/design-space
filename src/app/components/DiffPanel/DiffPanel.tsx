@@ -1,7 +1,7 @@
 import { Button } from "@heroui/react";
 import { FileDiff, LoaderCircle, Save, X } from "lucide-react";
 
-import { RenderedDiff } from "./RenderedDiff";
+import { RenderedDiff } from "../RenderedDiff/RenderedDiff";
 
 export type DiffPanelProps = {
   diff: string;

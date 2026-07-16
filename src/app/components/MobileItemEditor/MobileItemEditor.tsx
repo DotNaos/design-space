@@ -2,12 +2,12 @@ import { Button, Drawer } from "@heroui/react";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { useState } from "react";
 
-import type { ComponentControl } from "../../shared/contracts";
-import type { DesignValue } from "../../shared/design-document";
-import type { SlotState } from "../types";
-import { ItemEditorActions, ItemEditorIdentity } from "./ItemEditorChrome";
-import { ItemEditorTools } from "./ItemEditorTools";
-import { useMobileViewport } from "./use-mobile-viewport";
+import type { ComponentControl } from "../../../shared/contracts";
+import type { DesignValue } from "../../../shared/design-document";
+import type { SlotState } from "../../types";
+import { ItemEditorActions, ItemEditorIdentity } from "../ItemEditor/ItemEditorChrome";
+import { ItemEditorTools } from "../ItemEditor/ItemEditorTools";
+import { useMobileViewport } from "../MobileNavigation/use-mobile-viewport";
 
 type MobileItemEditorProps = {
   componentLabel: string;

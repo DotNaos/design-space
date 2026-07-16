@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { DesignSpaceDevice } from "../../shared/source-workspace";
-import { PreviewCanvas } from "../components/PreviewCanvas";
+import { PreviewCanvas } from "../components/PreviewCanvas/PreviewCanvas";
 import { SourceViewportPicker } from "./SourceViewportPicker";
 import type { SourceTreeNode } from "./source-workspace-tree";
 import { defaultSourceViewport, sourceViewportPresets } from "./source-viewports";
@@ -56,6 +56,7 @@ export function SourceCanvasViewport(props: {
         selection={{ kind: "component", id: sourcePreviewId }}
         selectionLabel={`${preset.label.replace("Responsive", `Responsive · ${responsiveWidth} × ${preset.height}`)}`}
         slots={[]}
+        staticPreview
         worldWidth={frame.width}
         onSelect={() => undefined}
       />

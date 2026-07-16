@@ -23,6 +23,8 @@ export function SourcePreviewFrame(props: {
       setMount(undefined);
       return;
     }
+    node.inert = true;
+    node.setAttribute("inert", "");
     const update = () => setMount(node.contentDocument?.getElementById("design-space-preview-root") ?? undefined);
     node.addEventListener("load", update, { once: true });
     update();
@@ -36,8 +38,10 @@ export function SourcePreviewFrame(props: {
             <>
               <iframe
                 ref={loadFrame}
-                className="h-full w-full border-0"
+                aria-label={`${props.entry?.label ?? props.node?.label ?? "Source"} static preview`}
+                className="pointer-events-none h-full w-full select-none border-0"
                 srcDoc={'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="design-space-preview-root"></div></body></html>'}
+                tabIndex={-1}
                 title={`${props.entry?.label ?? props.node?.label ?? "Source"} ${props.device} preview`}
               />
               {mount && createPortal(<PreviewContent entry={props.entry!} styles={props.styles} />, mount)}

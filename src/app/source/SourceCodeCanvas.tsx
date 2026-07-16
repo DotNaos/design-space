@@ -1,7 +1,13 @@
-import { Button, Label, TextArea, TextField } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { Code2, Eye, LoaderCircle, LockKeyhole } from "lucide-react";
+import { lazy, Suspense } from "react";
 
 import type { SourceFileEditor } from "./useSourceFileEditor";
+
+const MonacoSourceEditor = lazy(async () => {
+  const module = await import("./MonacoSourceEditor");
+  return { default: module.MonacoSourceEditor };
+});
 
 export function SourceCodeCanvas(props: {
   editor: SourceFileEditor;
@@ -31,15 +37,17 @@ export function SourceCodeCanvas(props: {
         <div className="min-h-0 flex-1 p-5 text-xs leading-5 text-amber-300">{editor.error ?? "Select a source file to open it here."}</div>
       ) : (
         <>
-          <TextField className="flex min-h-0 flex-1" value={editor.draft} onChange={props.editable ? editor.setDraft : undefined}>
-            <Label className="sr-only">Source code</Label>
-            <TextArea
-              aria-label="Source code"
-              className="min-h-0 flex-1 resize-none rounded-none border-0 bg-[#0d0e10] p-5 font-mono text-[12px] leading-5 text-zinc-300 outline-none selection:bg-sky-500/30"
-              readOnly={!props.editable}
-              spellCheck={false}
-            />
-          </TextField>
+          <div className="min-h-0 flex-1">
+            <Suspense fallback={<div className="grid h-full place-items-center text-xs text-zinc-600"><LoaderCircle className="animate-spin" size={14} /> Loading editor…</div>}>
+              <MonacoSourceEditor
+                key={editor.snapshot.fileId}
+                path={props.path ?? editor.snapshot.label}
+                readOnly={!props.editable}
+                value={editor.draft}
+                onChange={editor.setDraft}
+              />
+            </Suspense>
+          </div>
           {editor.error && <p className="shrink-0 border-t border-amber-400/20 bg-amber-400/5 px-4 py-2 text-[10px] leading-4 text-amber-300">{editor.error}</p>}
         </>
       )}

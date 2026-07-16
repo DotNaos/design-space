@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, type MutableRefObject, type PointerEvent, type RefObject } from "react";
 
-import { pinchCanvas, type CanvasCamera, type Point } from "../canvas-transform";
-import type { Selection, SlotState } from "../types";
+import { pinchCanvas, type CanvasCamera, type Point } from "../../canvas-transform";
+import type { Selection, SlotState } from "../../types";
 import { selectionForCanvasTarget, type CanvasContextMenuRequest } from "./canvas-target-selection";
 
 type GestureStart = {

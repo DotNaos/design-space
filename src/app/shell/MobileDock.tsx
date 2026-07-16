@@ -1,7 +1,7 @@
 import { Button } from "@heroui/react";
 import { FolderKanban, Layers3, SlidersHorizontal } from "lucide-react";
 
-import { useMobileViewport } from "../components/use-mobile-viewport";
+import { useMobileViewport } from "../components/MobileNavigation/use-mobile-viewport";
 
 export type MobilePane = "documents" | "files" | "tree" | "canvas" | "catalog" | "inspect";
 export type MobileDestination = "project" | "tree" | "canvas" | "inspect";

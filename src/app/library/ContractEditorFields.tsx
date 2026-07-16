@@ -1,6 +1,6 @@
 import { Input, Label, NumberField, Switch, TextArea, TextField } from "@heroui/react";
 
-import { EditorSelectField } from "../components/EditorSelectField";
+import { EditorSelectField } from "../components/EditorSelectField/EditorSelectField";
 
 const inputClassName = "mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-base text-zinc-200 outline-none placeholder:text-zinc-700 lg:text-sm";
 

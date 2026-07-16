@@ -1,5 +1,5 @@
 import { Button, Tooltip } from "@heroui/react";
-import { CornerUpRight, Link2, Monitor, Smartphone, Tablet } from "lucide-react";
+import { Monitor, Smartphone, Tablet } from "lucide-react";
 
 import { designSpaceDevices, type DesignSpaceDevice } from "../../shared/source-workspace";
 import type { SourceImplementation, SourceTreeNode } from "./source-workspace-tree";
@@ -55,10 +55,8 @@ function DeviceTab(props: {
       onPress={props.onPress}
     >
       <span className="relative grid size-3.5 shrink-0 place-items-center">
-        <DeviceIcon aria-hidden="true" className={props.implementation.state === "missing" ? "text-zinc-700" : props.implementation.state === "fallback" ? "text-amber-300" : props.implementation.state === "responsive" ? "text-cyan-300" : undefined} size={12} />
-        {props.implementation.state === "fallback" && <CornerUpRight aria-hidden="true" className="absolute -right-1 -top-1" size={6} />}
-        {props.implementation.state === "missing" && <span aria-hidden="true" className="absolute h-px w-3 -rotate-45 bg-current" />}
-        {props.implementation.state === "responsive" && <Link2 aria-hidden="true" className="absolute -right-1 -top-1" size={6} />}
+        <DeviceIcon aria-hidden="true" className={props.implementation.state === "missing" ? "text-zinc-700" : props.implementation.state === "fallback" ? "text-amber-300" : undefined} size={12} />
+        {(props.implementation.state === "missing" || props.implementation.state === "fallback") && <span aria-hidden="true" className="absolute h-px w-3 -rotate-45 bg-current" />}
       </span>
       <span className="hidden lg:inline">{deviceLabels[props.device]}</span>
     </Button>

@@ -2,7 +2,7 @@ import { Link2 } from "lucide-react";
 
 import type { ComponentControl } from "../../shared/contracts";
 import type { ComponentPropertyDraft, DesignComponentNode, DesignDocument } from "../../shared/design-document";
-import { EditorSelectField } from "../components/EditorSelectField";
+import { EditorSelectField } from "../components/EditorSelectField/EditorSelectField";
 import { bindComponentProperty } from "../document/document-commands";
 import type { AcceptedComponentOption } from "./ComponentSlotEditor";
 

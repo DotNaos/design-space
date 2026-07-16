@@ -3,7 +3,7 @@ import { Copy, FileCode2, MousePointer2, Plus, SlidersHorizontal, Trash2, Unplug
 import type { SelectionTarget } from "../../model";
 import type { DesignDocument } from "../../shared/design-document";
 import type { TargetModule } from "../../shared/target-module";
-import type { WorkspaceContextAction } from "../components/WorkspaceContextMenu";
+import type { WorkspaceContextAction } from "../components/WorkspaceContextMenu/WorkspaceContextMenu";
 import type { SlotState } from "../types";
 import { resolveDocumentAdapter } from "./document-adapters";
 import { findDesignNode } from "./document-commands";

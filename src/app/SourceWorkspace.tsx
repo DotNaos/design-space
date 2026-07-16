@@ -17,7 +17,7 @@ import {
 } from "./source/SourceWorkspaceSidebar";
 import { initialSourceTreeSelection, sourceTreeNodes } from "./source/source-workspace-tree";
 import { useSourceFileEditor } from "./source/useSourceFileEditor";
-import { DiffSheet } from "./components/DiffSheet";
+import { DiffSheet } from "./components/DiffSheet/DiffSheet";
 import { SourceLibraryCanvas, SourceLibraryInspector, SourceLibrarySidebar } from "./source/SourceLibraryWorkspace";
 
 const areaLabels = { layout: "Layout", pages: "Pages", components: "Components" } as const;

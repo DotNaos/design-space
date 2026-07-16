@@ -2,7 +2,7 @@ import { Button } from "@heroui/react";
 import { Boxes, Code2, Library, LockKeyhole, PackageCheck } from "lucide-react";
 
 import type { SourceWorkspaceLibrary } from "../../shared/source-workspace";
-import { PreviewCanvas } from "../components/PreviewCanvas";
+import { PreviewCanvas } from "../components/PreviewCanvas/PreviewCanvas";
 
 const libraryPreviewId = "library-component-preview";
 

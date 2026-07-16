@@ -1,4 +1,4 @@
-import type { ViewRect } from "./canvas-overlay-geometry";
+import type { ViewRect } from "../PreviewCanvas/canvas-overlay-geometry";
 import type { CanvasGridMode, CanvasLayoutGridSettings } from "./canvas-grid-types";
 
 type GridPresentation = {
