@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@heroui/react";
 
 import type { TargetModule } from "../shared/target-module";
@@ -8,39 +8,38 @@ import { MobileDock, type MobilePane } from "./shell/MobileDock";
 import { WorkspaceActivityRail, type WorkspaceActivity } from "./shell/WorkspaceActivityRail";
 import { WorkspaceTopBar } from "./shell/WorkspaceTopBar";
 import { SourceComponentInspector } from "./source/SourceComponentInspector";
+import { SourceDeviceTabs } from "./source/SourceDeviceTabs";
 import { SourcePreviewFrame } from "./source/SourcePreviewFrame";
 import {
   SourceWorkspaceSidebar,
   type SourceWorkspaceSelection,
 } from "./source/SourceWorkspaceSidebar";
-import { initialSourceSelection } from "./source/source-workspace-selection";
+import { initialSourceTreeSelection, sourceTreeNodes } from "./source/source-workspace-tree";
 import { useSourceFileEditor } from "./source/useSourceFileEditor";
 import { DiffSheet } from "./components/DiffSheet";
 import { SourceLibraryCanvas, SourceLibraryInspector, SourceLibrarySidebar } from "./source/SourceLibraryWorkspace";
 
 const areaLabels = { layout: "Layout", pages: "Pages", components: "Components" } as const;
-const deviceLabels = { desktop: "Desktop", tablet: "Tablet", mobile: "Mobile" } as const;
-
 export function SourceWorkspace({ target }: { target: TargetModule }) {
   const workspace = target.sourceWorkspace;
   if (!workspace) return null;
-  const initial = initialSourceSelection(workspace);
+  const nodes = useMemo(() => sourceTreeNodes(workspace), [workspace]);
+  const initial = initialSourceTreeSelection(nodes);
   const [activity, setActivity] = useState<WorkspaceActivity>("app");
   const [mobilePane, setMobilePane] = useState<MobilePane>("canvas");
-  const [selection, setSelection] = useState<SourceWorkspaceSelection | undefined>(() => (
-    initial.entry ? { entryId: initial.entry.id, device: initial.device } : undefined
-  ));
+  const [selection, setSelection] = useState<SourceWorkspaceSelection | undefined>(initial);
   const [selectedLibraryComponent, setSelectedLibraryComponent] = useState(() => workspace.library?.components[0]?.name);
-  const entry = workspace.entries.find((candidate) => candidate.id === selection?.entryId) ?? initial.entry;
+  const selectedNode = nodes.find((candidate) => candidate.id === selection?.nodeId) ?? nodes[0];
+  const requestedDevice = selection?.device ?? initial?.device ?? "desktop";
+  const entry = selectedNode?.implementations[requestedDevice].entry;
   const editor = useSourceFileEditor(entry?.fileId);
-  const requestedDevice = selection?.device ?? initial.device;
-  const connected = workspace.runtime === "react" && Boolean(entry);
+  const connected = workspace.runtime === "react";
   const breadcrumb = activity === "files"
     ? ["Files"]
     : activity === "library"
       ? ["Library"]
-      : entry
-        ? ["App", areaLabels[entry.area], deviceLabels[requestedDevice], entry.label]
+      : selectedNode
+        ? ["App", areaLabels[selectedNode.area], selectedNode.label]
         : ["App"];
 
   const appSidebar = (
@@ -61,12 +60,21 @@ export function SourceWorkspace({ target }: { target: TargetModule }) {
   const librarySidebar = <SourceLibrarySidebar library={workspace.library} selected={selectedLibraryComponent} onSelect={setSelectedLibraryComponent} />;
   const left = activity === "files" ? fileSidebar : activity === "library" ? librarySidebar : appSidebar;
   const canvas = activity === "library" ? <SourceLibraryCanvas library={workspace.library} selected={selectedLibraryComponent} /> : (
-    <SourcePreviewFrame
-      device={requestedDevice}
-      entry={entry}
-      runtime={workspace.runtime}
-      styles={workspace.styles}
-    />
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+      <SourceDeviceTabs
+        device={requestedDevice}
+        node={selectedNode}
+        onChange={(device) => selectedNode && setSelection({ nodeId: selectedNode.id, device })}
+      />
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <SourcePreviewFrame
+          device={requestedDevice}
+          entry={entry}
+          runtime={workspace.runtime}
+          styles={workspace.styles}
+        />
+      </div>
+    </div>
   );
   const right = activity === "library" ? <SourceLibraryInspector library={workspace.library} selected={selectedLibraryComponent} /> : (
     <SourceComponentInspector className="flex h-full w-full border-l-0" editor={editor} entry={entry} />
@@ -106,7 +114,7 @@ export function SourceWorkspace({ target }: { target: TargetModule }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <WorkspaceTopBar
           targetLabel={target.project.label}
-          documentLabel={entry?.label ?? "No source entry"}
+          documentLabel={selectedNode?.label ?? "No source entry"}
           breadcrumb={breadcrumb}
           connected={connected}
           checking={false}
@@ -125,7 +133,7 @@ export function SourceWorkspace({ target }: { target: TargetModule }) {
           onSave={() => void editor.save()}
         />
         <ResizableWorkspacePanels
-          namespace={{ projectId: target.project.id, documentId: `${entry?.id ?? "empty"}:${requestedDevice}` }}
+          namespace={{ projectId: target.project.id, documentId: `${selectedNode?.id ?? "empty"}:${requestedDevice}` }}
           left={{ label: "TypeScript app structure", content: left, defaultWidth: 300, minWidth: 260, maxWidth: 480 }}
           right={{ label: "TypeScript component contract", content: right, defaultWidth: 340, minWidth: 280, maxWidth: 560 }}
           mobile={mobile}

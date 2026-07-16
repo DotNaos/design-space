@@ -80,40 +80,41 @@ const workspace: RuntimeSourceWorkspace = {
   styles: [],
 };
 
-it("shows device roots with their layout and nested pages instead of a separate Root area", () => {
+it("shows one logical tree with layout, pages, and components", () => {
   render(<SourceWorkspaceSidebar workspace={workspace} onSelect={() => undefined} />);
 
-  expect(screen.queryByRole("region", { name: "Root source" })).not.toBeInTheDocument();
-  const desktop = screen.getByRole("region", { name: "Desktop app" });
-  expect(desktop).toHaveTextContent("src/app/desktop");
-  expect(within(desktop).getByRole("button", { name: "DesktopLayout for Desktop" })).toBeVisible();
-  expect(within(desktop).getByLabelText("Pages Desktop")).toHaveTextContent("src/app/desktop/pages");
-
-  const tablet = screen.getByRole("region", { name: "Tablet app" });
-  expect(tablet).toHaveTextContent("Uses Desktop");
-  expect(tablet).toHaveTextContent("src/app/tablet/pages");
-  expect(within(tablet).getByRole("button", { name: "Dashboard for Tablet" })).toBeVisible();
+  const tree = screen.getByRole("tree", { name: "App source tree" });
+  expect(within(tree).getByRole("region", { name: "Layout source" })).toBeVisible();
+  expect(within(tree).getByRole("region", { name: "Pages source" })).toBeVisible();
+  expect(within(tree).getByRole("region", { name: "Components source" })).toBeVisible();
+  expect(screen.queryByRole("region", { name: "Desktop app" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Tablet app" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Mobile app" })).not.toBeInTheDocument();
+  expect(within(tree).getByRole("button", { name: "App layout" })).toBeVisible();
+  expect(within(tree).getByRole("button", { name: "Dashboard" })).toBeVisible();
 });
 
-it("lists each component once and switches between direct and fallback implementations", async () => {
+it("lists every component once and keeps all implementation states visible", () => {
   const onSelect = vi.fn();
   render(<SourceWorkspaceSidebar workspace={workspace} onSelect={onSelect} />);
 
   expect(screen.getAllByText("ProjectSummary")).toHaveLength(1);
-  const component = screen.getByRole("region", { name: "Component ProjectSummary" });
-  await userEvent.click(within(component).getByRole("button", {
-    name: "ProjectSummary Tablet implementation, uses Desktop",
-  }));
-  expect(onSelect).toHaveBeenCalledWith({ device: "tablet", entryId: "summary-desktop" });
-
-  await userEvent.click(within(component).getByRole("button", { name: "ProjectSummary Mobile implementation" }));
-  expect(onSelect).toHaveBeenLastCalledWith({ device: "mobile", entryId: "summary-mobile" });
+  const component = screen.getByRole("button", { name: "ProjectSummary" });
+  expect(within(component).getByRole("img", {
+    name: "Desktop implemented; Tablet uses Desktop; Mobile implemented",
+  })).toBeVisible();
 });
 
-it("selects a nested page together with the requested fallback device", async () => {
+it("selects a logical node without changing the active canvas device", async () => {
   const onSelect = vi.fn();
-  render(<SourceWorkspaceSidebar workspace={workspace} onSelect={onSelect} />);
+  render(
+    <SourceWorkspaceSidebar
+      selected={{ device: "tablet", nodeId: "layout:app" }}
+      workspace={workspace}
+      onSelect={onSelect}
+    />,
+  );
 
-  await userEvent.click(screen.getByRole("button", { name: "Dashboard for Tablet" }));
-  expect(onSelect).toHaveBeenCalledWith({ device: "tablet", entryId: "page-dashboard-desktop" });
+  await userEvent.click(screen.getByRole("button", { name: "Dashboard" }));
+  expect(onSelect).toHaveBeenCalledWith({ device: "tablet", nodeId: "pages:Dashboard" });
 });
