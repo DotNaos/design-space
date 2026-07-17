@@ -1,8 +1,6 @@
 import type { DesignSpaceDevice, RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import type { SourceTreeNode } from "./source-workspace-tree";
 
-export type SourceExplorerMode = "focus" | "layers";
-
 export interface SourceOccurrence {
   id: string;
   node: SourceTreeNode;
@@ -25,6 +23,8 @@ export interface SourceFocusRow {
   kind: "component" | "html" | "slot";
   label: string;
   occurrence?: SourceOccurrence;
+  targetOccurrence?: SourceOccurrence;
+  sourceOwnerId?: string;
   layer?: SourceWorkspaceLayer;
   role?: "parent" | "focus";
   collapsible?: boolean;
@@ -115,11 +115,9 @@ export function initialFocusOccurrence(graph: SourceFocusGraph): string | undefi
 export function sourceFocusRows(
   graph: SourceFocusGraph,
   focusId: string,
-  mode: SourceExplorerMode,
 ): readonly SourceFocusRow[] {
   const focus = graph.occurrences.get(focusId);
   if (!focus) return [];
-  if (mode === "layers") return layerRows(focus);
   return compositionRows(graph, focus);
 }
 
@@ -135,7 +133,8 @@ function compositionRows(
     const onPath = pathIds.has(occurrence.id);
     const children = compositionChildren(graph, occurrence, pathIds);
     const slots = occurrenceSlots(occurrence);
-    const collapsible = slots.length > 0 || children.length > 0;
+    const localLayers = occurrence.id === focus.id ? occurrence.entry?.layers ?? [] : [];
+    const collapsible = slots.length > 0 || children.length > 0 || localLayers.length > 0;
     const expanded = onPath;
 
     rows.push(componentRow(
@@ -148,12 +147,13 @@ function compositionRows(
     if (!expanded) return;
 
     for (const slot of slots) {
-      rows.push(layerRow(slot, depth + 1, occurrence));
+      rows.push(layerRow(slot, depth + 1, occurrence, occurrence.usageOwnerId ?? occurrence.node.id));
       for (const child of childrenForSlot(graph, occurrence, slot)) {
         visit(child, depth + 2);
       }
     }
-    for (const child of children.filter((candidate) => !candidate.usageSlot)) {
+    appendLocalLayers(rows, graph, occurrence, localLayers, depth + 1);
+    for (const child of children.filter((candidate) => !candidate.usageSlot && occurrence.id !== focus.id)) {
       visit(child, depth + 1);
     }
   };
@@ -194,14 +194,22 @@ function compositionChildren(
   });
 }
 
-function layerRows(focus: SourceOccurrence): readonly SourceFocusRow[] {
-  const rows: SourceFocusRow[] = [componentRow(focus, 0, "focus")];
-  const append = (layers: readonly SourceWorkspaceLayer[], depth: number) => layers.forEach((layer) => {
-    rows.push(layerRow(layer, depth, focus));
-    append(layer.children, depth + 1);
-  });
-  append(focus.entry?.layers ?? [], 1);
-  return rows;
+function appendLocalLayers(
+  rows: SourceFocusRow[],
+  graph: SourceFocusGraph,
+  owner: SourceOccurrence,
+  layers: readonly SourceWorkspaceLayer[],
+  depth: number,
+): void {
+  for (const layer of layers) {
+    const targetOccurrence = layer.kind === "component"
+      ? owner.children
+        .map((id) => graph.occurrences.get(id))
+        .find((candidate) => candidate?.usageLayer?.id === layer.id)
+      : undefined;
+    rows.push(layerRow(layer, depth, owner, owner.node.id, targetOccurrence));
+    appendLocalLayers(rows, graph, owner, layer.children, depth + 1);
+  }
 }
 
 function childrenForSlot(graph: SourceFocusGraph, owner: SourceOccurrence, slot: SourceWorkspaceLayer) {
@@ -221,7 +229,13 @@ function componentRow(
   return { key: occurrence.id, depth, kind: "component", label: occurrence.node.label, occurrence, role, collapsible, expanded };
 }
 
-function layerRow(layer: SourceWorkspaceLayer, depth: number, occurrence?: SourceOccurrence): SourceFocusRow {
+function layerRow(
+  layer: SourceWorkspaceLayer,
+  depth: number,
+  occurrence?: SourceOccurrence,
+  sourceOwnerId?: string,
+  targetOccurrence?: SourceOccurrence,
+): SourceFocusRow {
   return {
     key: layer.id,
     depth,
@@ -229,5 +243,7 @@ function layerRow(layer: SourceWorkspaceLayer, depth: number, occurrence?: Sourc
     label: layer.kind === "html" ? `<${layer.label}>` : layer.label,
     layer,
     occurrence,
+    targetOccurrence,
+    sourceOwnerId,
   };
 }

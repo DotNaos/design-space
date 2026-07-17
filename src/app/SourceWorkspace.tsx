@@ -20,7 +20,7 @@ import {
   initialSourceTreeSelection,
   sourceTreeNodes,
 } from "./source/source-workspace-tree";
-import { initialFocusOccurrence, sourceFocusGraph, type SourceExplorerMode } from "./source/source-focus-tree";
+import { initialFocusOccurrence, sourceFocusGraph } from "./source/source-focus-tree";
 import { applySourceSlotCandidate, moveSourceSlotChild, removeSourceSlotChild, type SourceComponentCandidate } from "./source/source-slot-composition";
 import { useSourceDraftAnalysis } from "./source/useSourceDraftAnalysis";
 import { useSourceFileEditor } from "./source/useSourceFileEditor";
@@ -47,7 +47,6 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     kind: "component",
   } : initial);
   const [focusId, setFocusId] = useState<string | undefined>(initialFocusId);
-  const [explorerMode, setExplorerMode] = useState<SourceExplorerMode>("focus");
   const [draftSelection, setDraftSelection] = useState<{ start: number; end: number }>();
   const [rightMode, setRightMode] = useState<"code" | "design">("code");
   const [selectedProjectFileId, setSelectedProjectFileId] = useState<string>();
@@ -102,30 +101,16 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     <SourceWorkspaceSidebar
       className="flex h-full w-full border-r-0"
       focusId={resolvedFocusId}
-      mode={explorerMode}
       selected={selection}
       workspace={workspace}
       onCreateComponent={componentCreation.open}
       onFocus={(occurrenceId, next) => {
         setFocusId(occurrenceId);
-        setExplorerMode("focus");
         setSelection(next);
         setDraftSelection(undefined);
         setRightMode("code");
         setActivity("app");
         setMobilePane("canvas");
-      }}
-      onModeChange={(nextMode) => {
-        setExplorerMode(nextMode);
-        if (!focusedOccurrence) return;
-        setSelection({
-          nodeId: focusedOccurrence.node.id,
-          device: requestedDevice,
-          occurrenceId: focusedOccurrence.id,
-          kind: "component",
-        });
-        setDraftSelection(undefined);
-        setRightMode("code");
       }}
       onApplySlot={(slot, _occurrence, candidate: SourceComponentCandidate, action) => {
         if (!entry || !editor.snapshot || editor.snapshot.fileId !== entry.fileId) return;

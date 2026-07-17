@@ -13,7 +13,7 @@ describe("focused source tree", () => {
     const graph = sourceFocusGraph([app, panel, heading], "desktop");
     const panelOccurrence = [...graph.occurrences.values()].find((occurrence) => occurrence.node.label === "Panel")!;
 
-    expect(sourceFocusRows(graph, panelOccurrence.id, "focus").map((row) => [row.depth, row.kind, row.label, row.role])).toEqual([
+    expect(sourceFocusRows(graph, panelOccurrence.id).map((row) => [row.depth, row.kind, row.label, row.role])).toEqual([
       [0, "component", "App", "parent"],
       [1, "component", "Panel", "focus"],
       [2, "slot", "header", undefined],
@@ -36,7 +36,7 @@ describe("focused source tree", () => {
     const graph = sourceFocusGraph([app, shell, panel, aside, heading, text], "desktop");
     const focus = [...graph.occurrences.values()].find((occurrence) => occurrence.node.label === "Heading")!;
 
-    expect(sourceFocusRows(graph, focus.id, "focus").map((row) => [row.label, row.expanded])).toEqual([
+    expect(sourceFocusRows(graph, focus.id).map((row) => [row.label, row.expanded])).toEqual([
       ["App", true],
       ["Shell", true],
       ["content", undefined],
@@ -47,24 +47,26 @@ describe("focused source tree", () => {
     ]);
   });
 
-  it("keeps HTML out of focus but reveals it for Layers", () => {
+  it("shows HTML in the same tree as the focused component", () => {
     const app = node("App", entry("App", [{
       id: "html.main", label: "main", kind: "html", source: { start: 0, end: 10 }, children: [],
     }]));
     const graph = sourceFocusGraph([app], "desktop");
     const focus = graph.roots[0]!;
 
-    expect(sourceFocusRows(graph, focus, "focus").map((row) => row.kind)).toEqual(["component"]);
-    expect(sourceFocusRows(graph, focus, "layers").map((row) => row.kind)).toEqual(["component", "html"]);
+    expect(sourceFocusRows(graph, focus).map((row) => row.kind)).toEqual(["component", "html"]);
   });
 
-  it("never substitutes internal component references for explicit typed slots", () => {
+  it("shows internal component layers without inventing slot nodes", () => {
     const internal = node("InternalPanel", entry("InternalPanel"));
     const app = node("App", entry("App", [component("InternalPanel")]));
     const graph = sourceFocusGraph([app, internal], "desktop");
     const focus = graph.roots[0]!;
 
-    expect(sourceFocusRows(graph, focus, "focus").map((row) => row.label)).toEqual(["App"]);
+    expect(sourceFocusRows(graph, focus).map((row) => [row.kind, row.label])).toEqual([
+      ["component", "App"],
+      ["component", "InternalPanel"],
+    ]);
   });
 
   it("starts at the first component with an explicit slot composition", () => {

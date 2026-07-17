@@ -7,7 +7,6 @@ import {
   Component,
   FileCode2,
   FilePlus2,
-  Layers3,
   Monitor,
   PanelTop,
   Smartphone,
@@ -21,7 +20,6 @@ import {
   initialFocusOccurrence,
   sourceFocusGraph,
   sourceFocusRows,
-  type SourceExplorerMode,
   type SourceFocusGraph,
   type SourceFocusRow,
   type SourceOccurrence,
@@ -41,10 +39,8 @@ export interface SourceWorkspaceSidebarProps {
   selected?: SourceWorkspaceSelection;
   workspace: RuntimeSourceWorkspace;
   focusId?: string;
-  mode: SourceExplorerMode;
   onSelect: (selection: SourceWorkspaceSelection) => void;
   onFocus: (occurrenceId: string, selection: SourceWorkspaceSelection) => void;
-  onModeChange: (mode: SourceExplorerMode) => void;
   onApplySlot: (
     slot: SourceWorkspaceLayer,
     occurrence: SourceOccurrence,
@@ -59,7 +55,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   const nodes = sourceTreeNodes(props.workspace);
   const graph = sourceFocusGraph(nodes, device);
   const focusId = graph.occurrences.has(props.focusId ?? "") ? props.focusId! : initialFocusOccurrence(graph);
-  const rows = focusId ? sourceFocusRows(graph, focusId, props.mode) : [];
+  const rows = focusId ? sourceFocusRows(graph, focusId) : [];
   return (
     <aside aria-label="Source workspace" className={`${props.className ?? "flex w-80"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
       <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
@@ -68,14 +64,6 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           <h2 className="truncate text-sm font-semibold text-zinc-100">Source tree</h2>
           <p className="mt-0.5 truncate text-[9px] uppercase tracking-[0.14em] text-zinc-600">{props.workspace.sourceRoot} · {props.workspace.runtime === "react-native" ? "React Native" : "React"}</p>
         </div>
-        <nav aria-label="Source tree views" className="flex items-center gap-0.5">
-          <SecondaryModeButton
-            active={props.mode === "layers"}
-            icon={props.mode === "layers" ? <Component size={13} /> : <Layers3 size={13} />}
-            label={props.mode === "layers" ? "Tree" : "Layers"}
-            onPress={() => props.onModeChange(props.mode === "layers" ? "focus" : "layers")}
-          />
-        </nav>
         {props.workspace.capabilities?.createComponents && props.onCreateComponent && (
           <Button aria-label="Create component" className="grid size-8 place-items-center rounded-md text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>
             <FilePlus2 aria-hidden="true" size={14} />
@@ -83,10 +71,10 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
         )}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
-        <div aria-label={props.mode === "layers" ? "Focused component layers" : "Focused source tree"} role="tree">
+        <div aria-label="Source tree" role="tree">
           {rows.map((row) => (
             <FocusTreeRow
-              key={`${props.mode}:${row.key}:${row.depth}`}
+              key={`${row.key}:${row.depth}`}
               device={device}
               graph={graph}
               nodes={nodes}
@@ -105,22 +93,6 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   );
 }
 
-function SecondaryModeButton(props: { active: boolean; icon: React.ReactNode; label: string; onPress: () => void }) {
-  return (
-    <Button
-      aria-label={props.active ? "Show composition tree" : "Show component layers"}
-      aria-pressed={props.active}
-      className={`h-8 min-w-0 gap-1.5 rounded-md px-2.5 text-[10px] ${props.active ? "bg-white/[0.08] text-sky-200" : "text-zinc-500 hover:text-zinc-200"}`}
-      size="sm"
-      variant="ghost"
-      onPress={props.onPress}
-    >
-      {props.icon}
-      {props.label}
-    </Button>
-  );
-}
-
 function FocusTreeRow(props: {
   device: DesignSpaceDevice;
   graph: SourceFocusGraph;
@@ -134,6 +106,7 @@ function FocusTreeRow(props: {
 }) {
   const { row } = props;
   const occurrenceRow = row.kind === "component" && !row.layer;
+  const focusTarget = row.targetOccurrence ?? (occurrenceRow ? row.occurrence : undefined);
   const active = occurrenceRow
     ? props.selected?.occurrenceId === row.occurrence?.id && props.selected?.kind === "component"
     : props.selected?.kind === row.kind && (
@@ -143,18 +116,19 @@ function FocusTreeRow(props: {
   const Icon = row.kind === "component" ? Component : row.kind === "html" ? CodeXml : PanelTop;
   const slot = row.kind === "slot" ? row.layer : undefined;
   const status = slot?.slot;
-  const sourceOwner = row.occurrence?.usageOwnerId
-    ? props.nodes.find((node) => node.id === row.occurrence?.usageOwnerId)
+  const sourceOwnerId = row.sourceOwnerId ?? row.occurrence?.usageOwnerId;
+  const sourceOwner = sourceOwnerId
+    ? props.nodes.find((node) => node.id === sourceOwnerId)
     : row.occurrence?.node;
   const ownerPath = sourceOwner?.implementations[props.device].entry?.relativePath ?? row.occurrence?.entry?.relativePath ?? "";
   const candidates = slot ? sourceSlotCandidates(props.workspace, props.nodes, slot, props.device, ownerPath) : [];
   const triggerId = slot ? `source-slot-picker-${safeId(slot.id)}` : undefined;
   const select = () => {
-    if (occurrenceRow && row.occurrence) {
-      props.onFocus(row.occurrence.id, {
-        nodeId: row.occurrence.node.id,
+    if (focusTarget) {
+      props.onFocus(focusTarget.id, {
+        nodeId: focusTarget.node.id,
         device: props.device,
-        occurrenceId: row.occurrence.id,
+        occurrenceId: focusTarget.id,
         kind: "component",
       });
       return;
@@ -162,7 +136,7 @@ function FocusTreeRow(props: {
     if (row.layer && row.occurrence) {
       props.onSelect({
         nodeId: row.occurrence.node.id,
-        sourceNodeId: row.kind === "slot" ? row.occurrence.usageOwnerId : row.occurrence.node.id,
+        sourceNodeId: row.sourceOwnerId ?? (row.kind === "slot" ? row.occurrence.usageOwnerId : row.occurrence.node.id),
         device: props.device,
         occurrenceId: row.occurrence.id,
         layerId: row.layer.id,

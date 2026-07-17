@@ -126,9 +126,7 @@ const workspace: RuntimeSourceWorkspace = {
 };
 
 const callbacks = {
-  mode: "focus" as const,
   onFocus: vi.fn(),
-  onModeChange: vi.fn(),
   onApplySlot: vi.fn(),
   onSelect: vi.fn(),
 };
@@ -147,15 +145,15 @@ it("offers target-owned component creation from the focused tree", async () => {
   expect(onCreateComponent).toHaveBeenCalledOnce();
 });
 
-it("keeps the default view focused and hides internal HTML", () => {
+it("shows composition, typed slots, components, and HTML in one tree", () => {
   render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
 
-  const tree = screen.getByRole("tree", { name: "Focused source tree" });
+  const tree = screen.getByRole("tree", { name: "Source tree" });
   expect(within(tree).getByRole("treeitem", { name: "DesktopLayout" })).toHaveAttribute("aria-level", "1");
   expect(within(tree).getByRole("button", { name: "Dashboard, focused" })).toBeVisible();
   expect(within(tree).getByRole("treeitem", { name: "content" })).toHaveAttribute("aria-level", "3");
-  expect(within(tree).getByRole("treeitem", { name: "ProjectSummary" })).toHaveAttribute("aria-level", "4");
-  expect(within(tree).queryByRole("treeitem", { name: "<main>" })).not.toBeInTheDocument();
+  expect(within(tree).getAllByRole("treeitem", { name: "ProjectSummary" })).toHaveLength(2);
+  expect(within(tree).getByRole("treeitem", { name: "<section>" })).toHaveAttribute("aria-level", "3");
   expect(screen.queryByText("Shared components")).not.toBeInTheDocument();
 });
 
@@ -163,7 +161,7 @@ it("moves focus to a child and preserves the direct parent path", async () => {
   const onFocus = vi.fn();
   render(<SourceWorkspaceSidebar {...callbacks} onFocus={onFocus} workspace={workspace} />);
 
-  await userEvent.click(screen.getByRole("button", { name: "ProjectSummary" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "ProjectSummary" })[0]!);
   expect(onFocus).toHaveBeenCalledWith(expect.stringContaining("pages:Dashboard"), expect.objectContaining({
     device: "desktop",
     nodeId: expect.stringContaining("ProjectSummary"),
@@ -173,40 +171,31 @@ it("moves focus to a child and preserves the direct parent path", async () => {
   expect(onFocus.mock.calls[0]?.[1]).not.toHaveProperty("sourceNodeId");
 });
 
-it("uses one explicit control to switch between Tree and Layers", async () => {
-  const onModeChange = vi.fn();
-  const { rerender } = render(<SourceWorkspaceSidebar {...callbacks} onModeChange={onModeChange} workspace={workspace} />);
+it("does not expose a separate Layers mode", () => {
+  render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-  expect(screen.getAllByRole("button", { name: /Show (component layers|composition tree)/ })).toHaveLength(1);
-  await userEvent.click(screen.getByRole("button", { name: "Show component layers" }));
-  expect(onModeChange).toHaveBeenCalledWith("layers");
-
-  rerender(<SourceWorkspaceSidebar {...callbacks} mode="layers" workspace={workspace} />);
-  const layers = screen.getByRole("tree", { name: "Focused component layers" });
-  expect(within(layers).getByRole("treeitem", { name: "<section>" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Show composition tree" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.queryByRole("navigation", { name: "Source tree views" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Show (component layers|composition tree)/ })).not.toBeInTheDocument();
 });
 
-it("selects local component and HTML layers without changing component focus", async () => {
+it("drills into local components and selects HTML in the same tree", async () => {
   const onFocus = vi.fn();
   const onSelect = vi.fn();
   render(
     <SourceWorkspaceSidebar
       {...callbacks}
-      mode="layers"
       onFocus={onFocus}
       onSelect={onSelect}
       workspace={workspace}
     />,
   );
 
-  await userEvent.click(screen.getByRole("button", { name: "ProjectSummary" }));
-  expect(onFocus).not.toHaveBeenCalled();
-  expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({
+  await userEvent.click(screen.getAllByRole("button", { name: "ProjectSummary" })[1]!);
+  expect(onFocus).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({
     kind: "component",
-    layerId: "dashboard-summary",
-    sourceNodeId: expect.stringContaining("Dashboard"),
+    nodeId: expect.stringContaining("ProjectSummary"),
   }));
+  expect(onSelect).not.toHaveBeenCalled();
 
   await userEvent.click(screen.getByRole("button", { name: "<section>" }));
   expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({
