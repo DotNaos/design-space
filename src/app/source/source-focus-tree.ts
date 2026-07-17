@@ -27,6 +27,8 @@ export interface SourceFocusRow {
   occurrence?: SourceOccurrence;
   layer?: SourceWorkspaceLayer;
   role?: "parent" | "focus";
+  collapsible?: boolean;
+  expanded?: boolean;
 }
 
 export function sourceFocusGraph(
@@ -114,30 +116,85 @@ export function sourceFocusRows(
   graph: SourceFocusGraph,
   focusId: string,
   mode: SourceExplorerMode,
+  autoCollapse = true,
 ): readonly SourceFocusRow[] {
   const focus = graph.occurrences.get(focusId);
   if (!focus) return [];
   if (mode === "overview") return overviewRows(graph);
   if (mode === "layers") return layerRows(focus);
+  return compositionRows(graph, focus, autoCollapse);
+}
 
+function compositionRows(
+  graph: SourceFocusGraph,
+  focus: SourceOccurrence,
+  autoCollapse: boolean,
+): readonly SourceFocusRow[] {
   const rows: SourceFocusRow[] = [];
-  let focusDepth = 0;
-  const parent = focus.parentId ? graph.occurrences.get(focus.parentId) : undefined;
-  if (parent) {
-    rows.push(componentRow(parent, 0, "parent"));
-    focusDepth = 1;
-    if (focus.usageSlot) {
-      rows.push(layerRow(focus.usageSlot, 1, focus));
-      focusDepth = 2;
+  const path = occurrencePath(graph, focus);
+  const pathIds = new Set(path.map((occurrence) => occurrence.id));
+
+  const visit = (occurrence: SourceOccurrence, depth: number) => {
+    const onPath = pathIds.has(occurrence.id);
+    const children = compositionChildren(graph, occurrence, pathIds);
+    const slots = occurrenceSlots(occurrence);
+    const collapsible = slots.length > 0 || children.length > 0;
+    const expanded = !autoCollapse || onPath;
+
+    rows.push(componentRow(
+      occurrence,
+      depth,
+      occurrence.id === focus.id ? "focus" : onPath ? "parent" : undefined,
+      collapsible,
+      expanded,
+    ));
+    if (!expanded) return;
+
+    for (const slot of slots) {
+      rows.push(layerRow(slot, depth + 1, occurrence));
+      for (const child of childrenForSlot(graph, occurrence, slot)) {
+        visit(child, depth + 2);
+      }
     }
-  }
-  rows.push(componentRow(focus, focusDepth, "focus"));
-  const usageSlots = focus.usageLayer?.children.filter((layer) => layer.kind === "slot" && layer.slot) ?? [];
-  for (const slot of usageSlots) {
-    rows.push(layerRow(slot, focusDepth + 1, focus));
-    childrenForSlot(graph, focus, slot).forEach((child) => rows.push(componentRow(child, focusDepth + 2)));
+    for (const child of children.filter((candidate) => !candidate.usageSlot)) {
+      visit(child, depth + 1);
+    }
+  };
+
+  for (const rootId of graph.roots) {
+    const root = graph.occurrences.get(rootId);
+    if (root) visit(root, 0);
   }
   return rows;
+}
+
+function occurrencePath(graph: SourceFocusGraph, focus: SourceOccurrence): readonly SourceOccurrence[] {
+  const path: SourceOccurrence[] = [focus];
+  let current = focus;
+  while (current.parentId) {
+    const parent = graph.occurrences.get(current.parentId);
+    if (!parent) break;
+    path.unshift(parent);
+    current = parent;
+  }
+  return path;
+}
+
+function occurrenceSlots(occurrence: SourceOccurrence): readonly SourceWorkspaceLayer[] {
+  return occurrence.usageLayer?.children.filter((layer) => layer.kind === "slot" && layer.slot) ?? [];
+}
+
+function compositionChildren(
+  graph: SourceFocusGraph,
+  occurrence: SourceOccurrence,
+  pathIds: ReadonlySet<string>,
+): readonly SourceOccurrence[] {
+  return occurrence.children.flatMap((id) => {
+    const child = graph.occurrences.get(id);
+    if (!child) return [];
+    if (child.usageSlot || pathIds.has(child.id) || occurrenceSlots(child).length > 0) return [child];
+    return [];
+  });
 }
 
 function overviewRows(graph: SourceFocusGraph): readonly SourceFocusRow[] {
@@ -174,8 +231,14 @@ function childrenForSlot(graph: SourceFocusGraph, owner: SourceOccurrence, slot:
   });
 }
 
-function componentRow(occurrence: SourceOccurrence, depth: number, role?: SourceFocusRow["role"]): SourceFocusRow {
-  return { key: occurrence.id, depth, kind: "component", label: occurrence.node.label, occurrence, role };
+function componentRow(
+  occurrence: SourceOccurrence,
+  depth: number,
+  role?: SourceFocusRow["role"],
+  collapsible?: boolean,
+  expanded?: boolean,
+): SourceFocusRow {
+  return { key: occurrence.id, depth, kind: "component", label: occurrence.node.label, occurrence, role, collapsible, expanded };
 }
 
 function layerRow(layer: SourceWorkspaceLayer, depth: number, occurrence?: SourceOccurrence): SourceFocusRow {

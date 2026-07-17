@@ -1,6 +1,7 @@
-import { Button } from "@heroui/react";
+import { Button, Checkbox } from "@heroui/react";
 import {
   Boxes,
+  ChevronDown,
   ChevronRight,
   CircleDot,
   CodeXml,
@@ -42,9 +43,11 @@ export interface SourceWorkspaceSidebarProps {
   workspace: RuntimeSourceWorkspace;
   focusId?: string;
   mode: SourceExplorerMode;
+  autoCollapse: boolean;
   onSelect: (selection: SourceWorkspaceSelection) => void;
   onFocus: (occurrenceId: string, selection: SourceWorkspaceSelection) => void;
   onModeChange: (mode: SourceExplorerMode) => void;
+  onAutoCollapseChange: (autoCollapse: boolean) => void;
   onApplySlot: (
     slot: SourceWorkspaceLayer,
     occurrence: SourceOccurrence,
@@ -59,7 +62,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   const nodes = sourceTreeNodes(props.workspace);
   const graph = sourceFocusGraph(nodes, device);
   const focusId = graph.occurrences.has(props.focusId ?? "") ? props.focusId! : initialFocusOccurrence(graph);
-  const rows = focusId ? sourceFocusRows(graph, focusId, props.mode) : [];
+  const rows = focusId ? sourceFocusRows(graph, focusId, props.mode, props.autoCollapse) : [];
   const shared = nodes.filter((node) => node.area === "components");
   return (
     <aside aria-label="Source workspace" className={`${props.className ?? "flex w-80"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
@@ -89,6 +92,23 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           </Button>
         )}
       </header>
+      {props.mode === "focus" && (
+        <div className="flex h-9 shrink-0 items-center border-b border-white/[0.07] px-4">
+          <Checkbox
+            aria-label="Automatically collapse branches outside the current focus"
+            className="text-zinc-500"
+            isSelected={props.autoCollapse}
+            onChange={props.onAutoCollapseChange}
+          >
+            <Checkbox.Content className="gap-2 text-[10px]">
+              <Checkbox.Control className="size-3.5 rounded border border-white/15 bg-black/20">
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              Collapse around focus
+            </Checkbox.Content>
+          </Checkbox>
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
         <div aria-label={props.mode === "overview" ? "Complete app overview" : props.mode === "layers" ? "Focused component layers" : "Focused source tree"} role="tree">
           {rows.map((row) => (
@@ -199,7 +219,11 @@ function FocusTreeRow(props: {
     <div aria-label={row.label} className="relative flex min-h-10 items-center pr-2 transition-[padding,opacity,transform] duration-150 ease-out motion-reduce:transition-none" role="treeitem" aria-level={row.depth + 1} aria-selected={active} style={{ paddingLeft: 8 + row.depth * 18 }}>
       {row.depth > 0 && <span aria-hidden="true" className="absolute bottom-0 top-0 border-l border-white/[0.07]" style={{ left: 20 + (row.depth - 1) * 18 }} />}
       <span className="relative z-10 grid size-6 shrink-0 place-items-center text-zinc-700">
-        {row.role === "parent" ? <ChevronRight size={11} /> : row.role === "focus" ? <CircleDot size={11} className="text-sky-400" /> : null}
+        {row.role === "focus"
+          ? <CircleDot size={11} className="text-sky-400" />
+          : row.collapsible
+            ? row.expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />
+            : null}
       </span>
       <Button
         aria-label={`${row.label}${row.role === "focus" ? ", focused" : ""}`}

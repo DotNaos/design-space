@@ -5,7 +5,7 @@ import { initialFocusOccurrence, sourceFocusGraph, sourceFocusRows } from "./sou
 import type { SourceTreeNode } from "./source-workspace-tree";
 
 describe("focused source tree", () => {
-  it("shows only the parent path, focused component, occupied slots, and direct content", () => {
+  it("keeps the composition context around the focused component", () => {
     const heading = node("Heading", entry("Heading"));
     const panelUsage = component("Panel", [slot("header", [component("Heading")])]);
     const app = node("App", entry("App", [panelUsage]));
@@ -18,6 +18,43 @@ describe("focused source tree", () => {
       [1, "component", "Panel", "focus"],
       [2, "slot", "header", undefined],
       [3, "component", "Heading", undefined],
+    ]);
+  });
+
+  it("collapses unrelated branches instead of removing them and can expand the whole composition", () => {
+    const heading = node("Heading", entry("Heading"));
+    const text = node("Text", entry("Text"));
+    const panel = node("Panel", entry("Panel"));
+    const aside = node("Aside", entry("Aside"));
+    const shell = node("Shell", entry("Shell"));
+    const app = node("App", entry("App", [component("Shell", [
+      slot("content", [
+        component("Panel", [slot("header", [component("Heading")])]),
+        component("Aside", [slot("body", [component("Text")])]),
+      ]),
+    ])]));
+    const graph = sourceFocusGraph([app, shell, panel, aside, heading, text], "desktop");
+    const focus = [...graph.occurrences.values()].find((occurrence) => occurrence.node.label === "Heading")!;
+
+    expect(sourceFocusRows(graph, focus.id, "focus", true).map((row) => [row.label, row.expanded])).toEqual([
+      ["App", true],
+      ["Shell", true],
+      ["content", undefined],
+      ["Panel", true],
+      ["header", undefined],
+      ["Heading", true],
+      ["Aside", false],
+    ]);
+    expect(sourceFocusRows(graph, focus.id, "focus", false).map((row) => row.label)).toEqual([
+      "App",
+      "Shell",
+      "content",
+      "Panel",
+      "header",
+      "Heading",
+      "Aside",
+      "body",
+      "Text",
     ]);
   });
 

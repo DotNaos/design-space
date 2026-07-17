@@ -127,8 +127,10 @@ const workspace: RuntimeSourceWorkspace = {
 
 const callbacks = {
   mode: "focus" as const,
+  autoCollapse: true,
   onFocus: vi.fn(),
   onModeChange: vi.fn(),
+  onAutoCollapseChange: vi.fn(),
   onApplySlot: vi.fn(),
   onSelect: vi.fn(),
 };
@@ -157,6 +159,16 @@ it("keeps the default view focused and hides internal HTML", () => {
   expect(within(tree).getByRole("treeitem", { name: "ProjectSummary" })).toHaveAttribute("aria-level", "4");
   expect(within(tree).queryByRole("treeitem", { name: "<main>" })).not.toBeInTheDocument();
   expect(screen.queryByText("Shared components")).not.toBeInTheDocument();
+});
+
+it("lets the user disable automatic branch collapsing", async () => {
+  const onAutoCollapseChange = vi.fn();
+  render(<SourceWorkspaceSidebar {...callbacks} onAutoCollapseChange={onAutoCollapseChange} workspace={workspace} />);
+
+  const checkbox = screen.getByRole("checkbox", { name: "Automatically collapse branches outside the current focus" });
+  expect(checkbox).toBeChecked();
+  await userEvent.click(checkbox);
+  expect(onAutoCollapseChange).toHaveBeenCalledWith(false);
 });
 
 it("moves focus to a child and preserves the direct parent path", async () => {

@@ -48,6 +48,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   } : initial);
   const [focusId, setFocusId] = useState<string | undefined>(initialFocusId);
   const [explorerMode, setExplorerMode] = useState<SourceExplorerMode>("focus");
+  const [autoCollapseFocus, setAutoCollapseFocus] = useState(true);
   const [draftSelection, setDraftSelection] = useState<{ start: number; end: number }>();
   const [rightMode, setRightMode] = useState<"code" | "design">("code");
   const [selectedProjectFileId, setSelectedProjectFileId] = useState<string>();
@@ -103,6 +104,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       className="flex h-full w-full border-r-0"
       focusId={resolvedFocusId}
       mode={explorerMode}
+      autoCollapse={autoCollapseFocus}
       selected={selection}
       workspace={workspace}
       onCreateComponent={componentCreation.open}
@@ -127,6 +129,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         setDraftSelection(undefined);
         setRightMode("code");
       }}
+      onAutoCollapseChange={setAutoCollapseFocus}
       onApplySlot={(slot, _occurrence, candidate: SourceComponentCandidate, action) => {
         if (!entry || !editor.snapshot || editor.snapshot.fileId !== entry.fileId) return;
         try {
