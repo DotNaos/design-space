@@ -16,13 +16,13 @@ export function SourceViewportPicker(props: {
   onResponsiveWidthChange: (width: number) => void;
 }) {
   return (
-    <div className="pointer-events-auto absolute left-1/2 top-3 z-30 flex h-9 max-w-[72%] -translate-x-1/2 items-center gap-1.5 rounded-lg border border-white/10 bg-[#17181b]/95 px-1.5 shadow-xl">
+    <div className="pointer-events-auto flex h-9 min-w-0 items-center gap-1 px-0.5 lg:h-7">
       <SourceDeviceTabs device={props.device} node={props.node} onChange={props.onDeviceChange} />
       <span aria-hidden="true" className="h-5 w-px shrink-0 bg-white/10" />
-      <MonitorSmartphone aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />
+      <MonitorSmartphone aria-hidden="true" className="hidden shrink-0 text-zinc-500 sm:block" size={13} />
       <Select
         aria-label="Preview dimensions"
-        className="min-w-0 flex-1"
+        className="w-28 min-w-0 shrink sm:w-36 lg:w-44"
         selectedKey={props.presetId}
         onSelectionChange={(key) => props.onPresetChange(String(key))}
       >

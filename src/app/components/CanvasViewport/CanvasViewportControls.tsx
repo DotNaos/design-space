@@ -6,6 +6,7 @@ import type { CanvasGridMode, CanvasLayoutGridSettings } from "../CanvasGrid/can
 
 type CanvasViewportControlsProps = {
   compact?: boolean;
+  leadingContent?: React.ReactNode;
   showInteractionToggle?: boolean;
   gridMode: CanvasGridMode;
   gridVisible: boolean;
@@ -44,22 +45,27 @@ export function CanvasViewportControls(props: CanvasViewportControlsProps) {
         </Tooltip>
       )}
       <div
-        className="absolute right-3 top-3 z-20 flex h-11 items-center rounded-lg border border-white/10 bg-[#17181b]/95 px-1 shadow-xl lg:h-8"
+        data-testid="canvas-viewport-toolbar"
+        className={`absolute top-3 z-20 flex h-11 max-w-[calc(100%-1.5rem)] items-center rounded-lg border border-white/10 bg-[#17181b]/95 px-1 shadow-xl lg:h-8 ${props.leadingContent ? "left-1/2 -translate-x-1/2" : "right-3"}`}
         onPointerDown={(event) => event.stopPropagation()}
         onPointerMove={(event) => event.stopPropagation()}
         onPointerUp={(event) => event.stopPropagation()}
       >
-        <CanvasGridControls
-          gridVisible={props.gridVisible}
-          layoutGrid={props.layoutGrid}
-          mode={props.gridMode}
-          onGridVisibleChange={props.onGridVisibleChange}
-          onLayoutGridChange={props.onLayoutGridChange}
-          onModeChange={props.onGridModeChange}
-        />
-        <Button isIconOnly aria-label="Zoom out" className="size-9 min-w-9 text-zinc-400 lg:size-7 lg:min-w-7" size="sm" variant="ghost" onPress={props.onZoomOut}><Minus size={14} /></Button>
-        <span className="min-w-10 text-center text-[10px] tabular-nums text-zinc-300">{Math.round(props.scale * 100)}%</span>
-        <Button isIconOnly aria-label="Zoom in" className="size-9 min-w-9 text-zinc-400 lg:size-7 lg:min-w-7" size="sm" variant="ghost" onPress={props.onZoomIn}><Plus size={14} /></Button>
+        {props.leadingContent && <div className="min-w-0 shrink">{props.leadingContent}</div>}
+        {props.leadingContent && <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-white/10" />}
+        <div className="hidden shrink-0 sm:block">
+          <CanvasGridControls
+            gridVisible={props.gridVisible}
+            layoutGrid={props.layoutGrid}
+            mode={props.gridMode}
+            onGridVisibleChange={props.onGridVisibleChange}
+            onLayoutGridChange={props.onLayoutGridChange}
+            onModeChange={props.onGridModeChange}
+          />
+        </div>
+        <Button isIconOnly aria-label="Zoom out" className="hidden size-9 min-w-9 text-zinc-400 sm:inline-flex lg:size-7 lg:min-w-7" size="sm" variant="ghost" onPress={props.onZoomOut}><Minus size={14} /></Button>
+        <span className="hidden min-w-10 text-center text-[10px] tabular-nums text-zinc-300 sm:block">{Math.round(props.scale * 100)}%</span>
+        <Button isIconOnly aria-label="Zoom in" className="hidden size-9 min-w-9 text-zinc-400 sm:inline-flex lg:size-7 lg:min-w-7" size="sm" variant="ghost" onPress={props.onZoomIn}><Plus size={14} /></Button>
         <Button aria-label="Fit canvas" className="h-9 min-w-11 border-l border-white/10 px-2 text-[10px] text-zinc-300 lg:h-7" size="sm" variant="ghost" onPress={props.onFit}><Maximize2 size={12} /> Fit</Button>
         <Button isIconOnly aria-label="Reset zoom to 100%" className="size-9 min-w-9 border-l border-white/10 text-zinc-400 lg:size-7 lg:min-w-7" size="sm" variant="ghost" onPress={props.onReset}><RotateCcw size={13} /></Button>
       </div>

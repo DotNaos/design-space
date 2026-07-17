@@ -6,6 +6,27 @@ import { PreviewCanvas } from "./PreviewCanvas";
 afterEach(cleanup);
 
 describe("preview canvas", () => {
+  it("keeps supplied viewport controls and canvas controls in one toolbar", () => {
+    render(
+      <PreviewCanvas
+        compact
+        toolbar={<span>Viewport picker</span>}
+        preview={<div data-design-space-instance-id="one">One</div>}
+        rootInstanceId="one"
+        selectedComponentInstanceId="one"
+        selection={{ kind: "component", id: "one" }}
+        selectionLabel="One"
+        slots={[]}
+        onSelect={() => undefined}
+      />,
+    );
+
+    const toolbar = screen.getByTestId("canvas-viewport-toolbar");
+    expect(toolbar).toContainElement(screen.getByText("Viewport picker"));
+    expect(toolbar).toContainElement(screen.getByRole("button", { name: "Fit canvas" }));
+    expect(toolbar).toContainElement(screen.getByRole("button", { name: "Reset zoom to 100%" }));
+  });
+
   it("draws the selection from the measured target DOM rectangle", async () => {
     const onSelect = vi.fn();
     const result = render(

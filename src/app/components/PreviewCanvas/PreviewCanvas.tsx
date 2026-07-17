@@ -39,6 +39,7 @@ export type { CanvasContextMenuRequest } from "./canvas-target-selection";
 
 type PreviewCanvasProps = {
   className?: string;
+  toolbar?: React.ReactNode;
   preview: React.ReactNode;
   rootInstanceId: string;
   selectedComponentInstanceId: string;
@@ -431,6 +432,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 
       <CanvasViewportControls
         compact={props.compact}
+        leadingContent={props.toolbar}
         showInteractionToggle={!props.staticPreview}
         gridMode={gridMode}
         gridVisible={gridVisible}

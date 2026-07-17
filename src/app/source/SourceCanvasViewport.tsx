@@ -43,6 +43,17 @@ export function SourceCanvasViewport(props: {
     <div className="relative flex h-full min-h-0 min-w-0 flex-1">
       <PreviewCanvas
         cameraKey={`${props.device}:${presetId}:${props.selectionKey ?? props.node?.id ?? "source"}`}
+        toolbar={(
+          <SourceViewportPicker
+            device={props.device}
+            node={props.node}
+            presetId={presetId}
+            responsiveWidth={responsiveWidth}
+            onDeviceChange={changeDevice}
+            onPresetChange={changePreset}
+            onResponsiveWidthChange={(width) => setResponsiveWidth(Math.max(320, Math.min(1440, width)))}
+          />
+        )}
         preview={(
           <div
             data-design-space-instance-id={sourcePreviewId}
@@ -60,15 +71,6 @@ export function SourceCanvasViewport(props: {
         staticPreview
         worldWidth={frame.width}
         onSelect={() => undefined}
-      />
-      <SourceViewportPicker
-        device={props.device}
-        node={props.node}
-        presetId={presetId}
-        responsiveWidth={responsiveWidth}
-        onDeviceChange={changeDevice}
-        onPresetChange={changePreset}
-        onResponsiveWidthChange={(width) => setResponsiveWidth(Math.max(320, Math.min(1440, width)))}
       />
     </div>
   );

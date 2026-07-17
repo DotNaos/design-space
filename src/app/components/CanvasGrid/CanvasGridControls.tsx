@@ -50,7 +50,7 @@ export function CanvasGridControls(props: {
       </ToggleButton>
       <ToggleButtonGroup
         aria-label="Canvas grid style"
-        className={props.gridVisible ? "" : "opacity-45"}
+        className={`hidden lg:flex ${props.gridVisible ? "" : "opacity-45"}`}
         disallowEmptySelection
         selectedKeys={[props.mode]}
         selectionMode="single"
