@@ -133,6 +133,13 @@ function unavailablePreviewState(props: Pick<Parameters<typeof SourcePreviewFram
   return undefined;
 }
 
+export function hasRequiredPreviewArguments(entry: RuntimeSourceWorkspaceEntry | undefined): boolean {
+  return Boolean(entry && (
+    entry.props.some((property) => property.required)
+    || entry.slots.some((slot) => slot.required || slot.min > 0)
+  ));
+}
+
 type PreviewMounts = {
   output: HTMLElement;
   staging: HTMLElement;

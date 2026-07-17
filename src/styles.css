@@ -4,3 +4,12 @@
 @source "./app";
 @source "../examples/demo-target";
 @source inline("rounded-none rounded-xl rounded-2xl rounded-3xl p-4 p-6 p-8 shadow-none shadow-lg shadow-2xl bg-slate-900 bg-zinc-950 border border-zinc-700");
+
+.monaco-editor .design-space-source-selection {
+  background: rgb(14 165 233 / 0.1) !important;
+}
+
+.monaco-editor .design-space-source-selection-gutter {
+  border-left: 2px solid rgb(56 189 248 / 0.8);
+  box-sizing: border-box;
+}

@@ -25,7 +25,13 @@ it("uses a compact canvas switcher and allows selecting missing implementations"
   render(<SourceDeviceTabs device="desktop" node={node} onChange={onChange} />);
 
   expect(screen.getByRole("group", { name: "Source implementation" })).toHaveClass("h-7");
-  expect(screen.getByRole("button", { name: "Desktop implementation" })).toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("button", { name: "Desktop implementation" }))
+    .toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("button", { name: "Desktop implementation" }))
+    .toHaveClass("items-center", "justify-center", "p-0");
+  expect(screen.queryByText("Desktop")).not.toBeInTheDocument();
+  expect(screen.queryByText("Tablet")).not.toBeInTheDocument();
+  expect(screen.queryByText("Mobile")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Tablet implementation, Uses Desktop" })).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "Mobile implementation, Missing" }));
   expect(onChange).toHaveBeenCalledWith("mobile");

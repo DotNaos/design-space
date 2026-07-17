@@ -47,18 +47,18 @@ function DeviceTab(props: {
       : undefined;
   const button = (
     <Button
+      isIconOnly
       aria-current={props.active ? "page" : undefined}
       aria-label={`${deviceLabels[props.device]} implementation${status ? `, ${status}` : ""}`}
-      className={`relative min-h-0 h-6 min-w-0 gap-1 rounded px-1.5 text-[9px] transition-colors ${props.active ? "bg-white/10 text-sky-200" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}
+      className={`relative flex size-6 min-h-0 min-w-6 items-center justify-center rounded p-0 leading-none transition-colors ${props.active ? "bg-white/10 text-sky-200" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}
       size="sm"
       variant="ghost"
       onPress={props.onPress}
     >
-      <span className="relative grid size-3.5 shrink-0 place-items-center">
-        <DeviceIcon aria-hidden="true" className={props.implementation.state === "missing" ? "text-zinc-700" : props.implementation.state === "fallback" ? "text-amber-300" : undefined} size={12} />
+      <span className="relative flex size-4 shrink-0 items-center justify-center">
+        <DeviceIcon aria-hidden="true" className={`block ${props.implementation.state === "missing" ? "text-zinc-700" : props.implementation.state === "fallback" ? "text-amber-300" : ""}`} size={13} />
         {(props.implementation.state === "missing" || props.implementation.state === "fallback") && <span aria-hidden="true" className="absolute h-px w-3 -rotate-45 bg-current" />}
       </span>
-      <span className="hidden lg:inline">{deviceLabels[props.device]}</span>
     </Button>
   );
   return status ? (

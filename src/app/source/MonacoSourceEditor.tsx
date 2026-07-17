@@ -2,7 +2,11 @@ import "./monaco-environment";
 
 import { useEffect, useId, useRef } from "react";
 import * as monaco from "monaco-editor";
+import * as typeScriptContribution from "monaco-editor/esm/vs/language/typescript/monaco.contribution.js";
 import type { SourceLayerBinding } from "../../shared/source-workspace";
+import { monacoModelPath } from "./monaco-model-path";
+
+configureMonacoTypeScript();
 
 type MonacoSourceEditorProps = {
   path: string;
@@ -29,7 +33,7 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
     const container = containerRef.current;
     if (!container) return;
 
-    const uri = monaco.Uri.file(`/${props.path.replace(/^\/+/, "")}`).with({ query: modelId });
+    const uri = monaco.Uri.file(monacoModelPath(props.path, modelId));
     const model = monaco.editor.createModel(props.value, languageFor(props.path), uri);
     const editor = monaco.editor.create(container, {
       model,
@@ -88,9 +92,9 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
         model.getPositionAt(Math.max(selection.start + 1, selection.end)),
       ),
       options: {
-        className: "bg-sky-400/10",
+        className: "design-space-source-selection",
         isWholeLine: true,
-        linesDecorationsClassName: "border-l-2 border-sky-400",
+        linesDecorationsClassName: "design-space-source-selection-gutter",
       },
     }] : []);
     if (selection) editor.revealRangeInCenterIfOutsideViewport(monaco.Range.fromPositions(
@@ -100,6 +104,33 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
   }, [props.selection, props.value]);
 
   return <div ref={containerRef} className="h-full min-h-0 w-full" />;
+}
+
+function configureMonacoTypeScript() {
+  const diagnostics = {
+    // The editor intentionally opens one trusted file at a time. Project-wide
+    // semantic validation remains the server compiler's responsibility.
+    noSemanticValidation: true,
+    noSyntaxValidation: false,
+  };
+  type LanguageDefaults = {
+    getCompilerOptions: () => Record<string, unknown>;
+    setCompilerOptions: (options: Record<string, unknown>) => void;
+    setDiagnosticsOptions: (options: typeof diagnostics) => void;
+  };
+  const contribution = typeScriptContribution as unknown as {
+    JsxEmit: { ReactJSX: number };
+    javascriptDefaults: LanguageDefaults;
+    typescriptDefaults: LanguageDefaults;
+  };
+  for (const language of [contribution.typescriptDefaults, contribution.javascriptDefaults]) {
+    language.setCompilerOptions({
+      ...language.getCompilerOptions(),
+      allowNonTsExtensions: true,
+      jsx: contribution.JsxEmit.ReactJSX,
+    });
+    language.setDiagnosticsOptions(diagnostics);
+  }
 }
 
 function languageFor(path: string): string {

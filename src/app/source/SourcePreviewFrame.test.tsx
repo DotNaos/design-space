@@ -5,6 +5,7 @@ import type { RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace"
 import {
   applySourceLayerClassName,
   applySourceLayerText,
+  hasRequiredPreviewArguments,
   projectSourceLayer,
   SourcePreviewFrame,
 } from "./SourcePreviewFrame";
@@ -60,6 +61,31 @@ it("renders source previews as static, non-focusable UI", () => {
   expect(frame).toHaveProperty("inert", true);
   expect(screen.queryByRole("button", { name: "Switch to interact mode" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Zoom in" })).toBeVisible();
+});
+
+it("distinguishes components that can render directly from contracts that need a host", () => {
+  const direct = {
+    id: "prompt",
+    label: "Prompt",
+    area: "components",
+    device: "desktop",
+    fileId: "prompt-file",
+    relativePath: "src/app/components/Prompt/index.tsx",
+    exportName: "Prompt",
+    props: [{ name: "label", type: "string", required: false, kind: "string" }],
+    slots: [],
+    findings: [],
+    source: { start: 0, end: 1 },
+    component: () => null,
+  } satisfies RuntimeSourceWorkspaceEntry;
+  const hosted = {
+    ...direct,
+    id: "hosted",
+    props: [{ name: "label", type: "string", required: true, kind: "string" }],
+  } satisfies RuntimeSourceWorkspaceEntry;
+
+  expect(hasRequiredPreviewArguments(direct)).toBe(false);
+  expect(hasRequiredPreviewArguments(hosted)).toBe(true);
 });
 
 it("projects only the selected authored HTML element", () => {

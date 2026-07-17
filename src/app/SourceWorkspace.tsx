@@ -10,7 +10,7 @@ import { WorkspaceActivityRail, type WorkspaceActivity } from "./shell/Workspace
 import { WorkspaceTopBar } from "./shell/WorkspaceTopBar";
 import { SourceComponentInspector } from "./source/SourceComponentInspector";
 import { SourceCodeCanvas } from "./source/SourceCodeCanvas";
-import { SourcePreviewFrame } from "./source/SourcePreviewFrame";
+import { hasRequiredPreviewArguments, SourcePreviewFrame } from "./source/SourcePreviewFrame";
 import {
   SourceWorkspaceSidebar,
   type SourceWorkspaceSelection,
@@ -43,7 +43,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const requestedDevice = selection?.device ?? initial?.device ?? "desktop";
   const entry = selectedNode?.implementations[requestedDevice].entry;
   const selectedLayer = findSourceTreeLayer(entry?.layers, selection?.layerId);
-  const previewEntry = selectedLayer?.kind === "html"
+  const previewEntry = selectedLayer?.kind === "html" && hasRequiredPreviewArguments(entry)
     ? nodes.find((candidate) => candidate.area === "layout")?.implementations[requestedDevice].entry ?? entry
     : entry;
   const selectedLabel = selectedLayer?.kind === "html"
