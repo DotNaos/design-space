@@ -37,10 +37,12 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const initial = initialSourceTreeSelection(registeredNodes);
   const initialGraph = useMemo(() => sourceFocusGraph(registeredNodes, initial?.device ?? "desktop"), [initial?.device, registeredNodes]);
   const initialFocusId = initialFocusOccurrence(initialGraph);
+  const initialFocus = initialFocusId ? initialGraph.occurrences.get(initialFocusId) : undefined;
   const [activity, setActivity] = useState<WorkspaceActivity>("app");
   const [mobilePane, setMobilePane] = useState<MobilePane>("canvas");
   const [selection, setSelection] = useState<SourceWorkspaceSelection | undefined>(() => initial && initialFocusId ? {
     ...initial,
+    nodeId: initialFocus?.node.id ?? initial.nodeId,
     occurrenceId: initialFocusId,
     kind: "component",
   } : initial);
@@ -113,7 +115,18 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         setActivity("app");
         setMobilePane("canvas");
       }}
-      onModeChange={setExplorerMode}
+      onModeChange={(nextMode) => {
+        setExplorerMode(nextMode);
+        if (!focusedOccurrence) return;
+        setSelection({
+          nodeId: focusedOccurrence.node.id,
+          device: requestedDevice,
+          occurrenceId: focusedOccurrence.id,
+          kind: "component",
+        });
+        setDraftSelection(undefined);
+        setRightMode("code");
+      }}
       onApplySlot={(slot, _occurrence, candidate: SourceComponentCandidate, action) => {
         if (!entry || !editor.snapshot || editor.snapshot.fileId !== entry.fileId) return;
         try {

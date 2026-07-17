@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
-import { sourceFocusGraph, sourceFocusRows } from "./source-focus-tree";
+import { initialFocusOccurrence, sourceFocusGraph, sourceFocusRows } from "./source-focus-tree";
 import type { SourceTreeNode } from "./source-workspace-tree";
 
 describe("focused source tree", () => {
@@ -31,6 +31,25 @@ describe("focused source tree", () => {
     expect(sourceFocusRows(graph, focus, "focus").map((row) => row.kind)).toEqual(["component"]);
     expect(sourceFocusRows(graph, focus, "overview").map((row) => row.kind)).toEqual(["component"]);
     expect(sourceFocusRows(graph, focus, "layers").map((row) => row.kind)).toEqual(["component", "html"]);
+  });
+
+  it("never substitutes internal component references for explicit typed slots", () => {
+    const internal = node("InternalPanel", entry("InternalPanel"));
+    const app = node("App", entry("App", [component("InternalPanel")]));
+    const graph = sourceFocusGraph([app, internal], "desktop");
+    const focus = graph.roots[0]!;
+
+    expect(sourceFocusRows(graph, focus, "focus").map((row) => row.label)).toEqual(["App"]);
+    expect(sourceFocusRows(graph, focus, "overview").map((row) => row.label)).toEqual(["App", "InternalPanel"]);
+  });
+
+  it("starts at the first component with an explicit slot composition", () => {
+    const heading = node("Heading", entry("Heading"));
+    const panel = node("Panel", entry("Panel"));
+    const app = node("App", entry("App", [component("Panel", [slot("header", [component("Heading")])])]));
+    const graph = sourceFocusGraph([app, panel, heading], "desktop");
+
+    expect(graph.occurrences.get(initialFocusOccurrence(graph)!)?.node.label).toBe("Panel");
   });
 });
 

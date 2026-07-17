@@ -7,7 +7,6 @@ import {
   Component,
   FileCode2,
   FilePlus2,
-  Focus,
   Layers3,
   Monitor,
   PanelTop,
@@ -70,17 +69,26 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           <h2 className="truncate text-sm font-semibold text-zinc-100">Source tree</h2>
           <p className="mt-0.5 truncate text-[9px] uppercase tracking-[0.14em] text-zinc-600">{props.workspace.sourceRoot} · {props.workspace.runtime === "react-native" ? "React Native" : "React"}</p>
         </div>
+        <nav aria-label="Source tree views" className="flex items-center gap-0.5">
+          <SecondaryModeButton
+            active={props.mode === "overview"}
+            icon={<Boxes size={14} />}
+            label="Overview"
+            onPress={() => props.onModeChange(props.mode === "overview" ? "focus" : "overview")}
+          />
+          <SecondaryModeButton
+            active={props.mode === "layers"}
+            icon={<Layers3 size={14} />}
+            label="Layers"
+            onPress={() => props.onModeChange(props.mode === "layers" ? "focus" : "layers")}
+          />
+        </nav>
         {props.workspace.capabilities?.createComponents && props.onCreateComponent && (
           <Button aria-label="Create component" className="grid size-8 place-items-center rounded-md text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>
             <FilePlus2 aria-hidden="true" size={14} />
           </Button>
         )}
       </header>
-      <nav aria-label="Source tree view" className="grid h-10 shrink-0 grid-cols-3 border-b border-white/[0.08] p-1">
-        <ModeButton active={props.mode === "focus"} icon={<Focus size={12} />} label="Focus" onPress={() => props.onModeChange("focus")} />
-        <ModeButton active={props.mode === "overview"} icon={<Boxes size={12} />} label="Overview" onPress={() => props.onModeChange("overview")} />
-        <ModeButton active={props.mode === "layers"} icon={<Layers3 size={12} />} label="Layers" onPress={() => props.onModeChange("layers")} />
-      </nav>
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
         <div aria-label={props.mode === "overview" ? "Complete app overview" : props.mode === "layers" ? "Focused component layers" : "Focused source tree"} role="tree">
           {rows.map((row) => (
@@ -99,7 +107,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           ))}
           {!rows.length && <p className="px-4 py-4 text-[10px] text-zinc-600">No configured entry component was found.</p>}
         </div>
-        {shared.length > 0 && props.mode !== "layers" && (
+        {shared.length > 0 && props.mode === "overview" && (
           <section className="mt-4 border-t border-white/[0.07] pt-3">
             <h3 className="px-4 pb-1 text-[9px] font-medium uppercase tracking-[0.16em] text-zinc-600">Shared components</h3>
             <p className="px-4 pb-2 text-[9px] leading-4 text-zinc-700">Reusable definitions above the app shell.</p>
@@ -121,8 +129,20 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   );
 }
 
-function ModeButton(props: { active: boolean; icon: React.ReactNode; label: string; onPress: () => void }) {
-  return <Button aria-label={`${props.label} source tree`} className={`h-8 min-w-0 gap-1.5 rounded-md px-2 text-[9px] ${props.active ? "bg-white/[0.08] text-zinc-100" : "text-zinc-600"}`} size="sm" variant="ghost" onPress={props.onPress}>{props.icon}{props.label}</Button>;
+function SecondaryModeButton(props: { active: boolean; icon: React.ReactNode; label: string; onPress: () => void }) {
+  return (
+    <Button
+      aria-label={props.active ? `Return to focused source tree from ${props.label}` : `Open ${props.label.toLowerCase()} source tree`}
+      aria-pressed={props.active}
+      className={`grid size-8 min-w-0 place-items-center rounded-md p-0 ${props.active ? "bg-white/[0.08] text-sky-200" : "text-zinc-600 hover:text-zinc-300"}`}
+      isIconOnly
+      size="sm"
+      variant="ghost"
+      onPress={props.onPress}
+    >
+      {props.icon}
+    </Button>
+  );
 }
 
 function FocusTreeRow(props: {
@@ -137,7 +157,8 @@ function FocusTreeRow(props: {
   onSelect: SourceWorkspaceSidebarProps["onSelect"];
 }) {
   const { row } = props;
-  const active = row.kind === "component"
+  const occurrenceRow = row.kind === "component" && !row.layer;
+  const active = occurrenceRow
     ? props.selected?.occurrenceId === row.occurrence?.id && props.selected?.kind === "component"
     : props.selected?.kind === row.kind && (
       props.selected?.layerId === row.layer?.id
@@ -153,14 +174,12 @@ function FocusTreeRow(props: {
   const candidates = slot ? sourceSlotCandidates(props.workspace, props.nodes, slot, props.device, ownerPath) : [];
   const triggerId = slot ? `source-slot-picker-${safeId(slot.id)}` : undefined;
   const select = () => {
-    if (row.kind === "component" && row.occurrence) {
-      const sourceNodeId = row.occurrence.usageOwnerId;
+    if (occurrenceRow && row.occurrence) {
       props.onFocus(row.occurrence.id, {
         nodeId: row.occurrence.node.id,
         device: props.device,
         occurrenceId: row.occurrence.id,
         kind: "component",
-        ...(sourceNodeId ? { sourceNodeId, layerId: row.occurrence.usageLayer?.id } : {}),
       });
       return;
     }

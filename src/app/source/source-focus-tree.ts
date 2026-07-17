@@ -100,6 +100,13 @@ export function sourceFocusGraph(
 }
 
 export function initialFocusOccurrence(graph: SourceFocusGraph): string | undefined {
+  for (const rootId of graph.roots) {
+    const root = graph.occurrences.get(rootId);
+    const composed = root?.children
+      .map((id) => graph.occurrences.get(id))
+      .find((occurrence) => occurrence?.usageLayer?.children.some((layer) => layer.kind === "slot" && layer.slot));
+    if (composed) return composed.id;
+  }
   return graph.roots[0] ?? graph.occurrences.keys().next().value;
 }
 
@@ -126,16 +133,9 @@ export function sourceFocusRows(
   }
   rows.push(componentRow(focus, focusDepth, "focus"));
   const usageSlots = focus.usageLayer?.children.filter((layer) => layer.kind === "slot" && layer.slot) ?? [];
-  if (usageSlots.length) {
-    for (const slot of usageSlots) {
-      rows.push(layerRow(slot, focusDepth + 1, focus));
-      childrenForSlot(graph, focus, slot).forEach((child) => rows.push(componentRow(child, focusDepth + 2)));
-    }
-  } else {
-    focus.children.forEach((id) => {
-      const child = graph.occurrences.get(id);
-      if (child && !child.usageSlot) rows.push(componentRow(child, focusDepth + 1));
-    });
+  for (const slot of usageSlots) {
+    rows.push(layerRow(slot, focusDepth + 1, focus));
+    childrenForSlot(graph, focus, slot).forEach((child) => rows.push(componentRow(child, focusDepth + 2)));
   }
   return rows;
 }
