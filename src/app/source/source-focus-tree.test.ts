@@ -21,7 +21,7 @@ describe("focused source tree", () => {
     ]);
   });
 
-  it("collapses unrelated branches instead of removing them and can expand the whole composition", () => {
+  it("collapses unrelated branches instead of removing them", () => {
     const heading = node("Heading", entry("Heading"));
     const text = node("Text", entry("Text"));
     const panel = node("Panel", entry("Panel"));
@@ -36,7 +36,7 @@ describe("focused source tree", () => {
     const graph = sourceFocusGraph([app, shell, panel, aside, heading, text], "desktop");
     const focus = [...graph.occurrences.values()].find((occurrence) => occurrence.node.label === "Heading")!;
 
-    expect(sourceFocusRows(graph, focus.id, "focus", true).map((row) => [row.label, row.expanded])).toEqual([
+    expect(sourceFocusRows(graph, focus.id, "focus").map((row) => [row.label, row.expanded])).toEqual([
       ["App", true],
       ["Shell", true],
       ["content", undefined],
@@ -45,20 +45,9 @@ describe("focused source tree", () => {
       ["Heading", true],
       ["Aside", false],
     ]);
-    expect(sourceFocusRows(graph, focus.id, "focus", false).map((row) => row.label)).toEqual([
-      "App",
-      "Shell",
-      "content",
-      "Panel",
-      "header",
-      "Heading",
-      "Aside",
-      "body",
-      "Text",
-    ]);
   });
 
-  it("keeps HTML out of focus and overview but reveals it for Layers", () => {
+  it("keeps HTML out of focus but reveals it for Layers", () => {
     const app = node("App", entry("App", [{
       id: "html.main", label: "main", kind: "html", source: { start: 0, end: 10 }, children: [],
     }]));
@@ -66,7 +55,6 @@ describe("focused source tree", () => {
     const focus = graph.roots[0]!;
 
     expect(sourceFocusRows(graph, focus, "focus").map((row) => row.kind)).toEqual(["component"]);
-    expect(sourceFocusRows(graph, focus, "overview").map((row) => row.kind)).toEqual(["component"]);
     expect(sourceFocusRows(graph, focus, "layers").map((row) => row.kind)).toEqual(["component", "html"]);
   });
 
@@ -77,7 +65,6 @@ describe("focused source tree", () => {
     const focus = graph.roots[0]!;
 
     expect(sourceFocusRows(graph, focus, "focus").map((row) => row.label)).toEqual(["App"]);
-    expect(sourceFocusRows(graph, focus, "overview").map((row) => row.label)).toEqual(["App", "InternalPanel"]);
   });
 
   it("starts at the first component with an explicit slot composition", () => {

@@ -127,10 +127,8 @@ const workspace: RuntimeSourceWorkspace = {
 
 const callbacks = {
   mode: "focus" as const,
-  autoCollapse: true,
   onFocus: vi.fn(),
   onModeChange: vi.fn(),
-  onAutoCollapseChange: vi.fn(),
   onApplySlot: vi.fn(),
   onSelect: vi.fn(),
 };
@@ -161,16 +159,6 @@ it("keeps the default view focused and hides internal HTML", () => {
   expect(screen.queryByText("Shared components")).not.toBeInTheDocument();
 });
 
-it("lets the user disable automatic branch collapsing", async () => {
-  const onAutoCollapseChange = vi.fn();
-  render(<SourceWorkspaceSidebar {...callbacks} onAutoCollapseChange={onAutoCollapseChange} workspace={workspace} />);
-
-  const checkbox = screen.getByRole("checkbox", { name: "Automatically collapse branches outside the current focus" });
-  expect(checkbox).toBeChecked();
-  await userEvent.click(checkbox);
-  expect(onAutoCollapseChange).toHaveBeenCalledWith(false);
-});
-
 it("moves focus to a child and preserves the direct parent path", async () => {
   const onFocus = vi.fn();
   render(<SourceWorkspaceSidebar {...callbacks} onFocus={onFocus} workspace={workspace} />);
@@ -185,16 +173,18 @@ it("moves focus to a child and preserves the direct parent path", async () => {
   expect(onFocus.mock.calls[0]?.[1]).not.toHaveProperty("sourceNodeId");
 });
 
-it("switches explicitly to Overview and Layers", async () => {
+it("uses one explicit control to switch between Tree and Layers", async () => {
   const onModeChange = vi.fn();
   const { rerender } = render(<SourceWorkspaceSidebar {...callbacks} onModeChange={onModeChange} workspace={workspace} />);
-  await userEvent.click(screen.getByRole("button", { name: "Open overview source tree" }));
-  expect(onModeChange).toHaveBeenCalledWith("overview");
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: /Show (component layers|composition tree)/ })).toHaveLength(1);
+  await userEvent.click(screen.getByRole("button", { name: "Show component layers" }));
+  expect(onModeChange).toHaveBeenCalledWith("layers");
 
   rerender(<SourceWorkspaceSidebar {...callbacks} mode="layers" workspace={workspace} />);
   const layers = screen.getByRole("tree", { name: "Focused component layers" });
   expect(within(layers).getByRole("treeitem", { name: "<section>" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Return to focused source tree from Layers" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "Show composition tree" })).toHaveAttribute("aria-pressed", "true");
 });
 
 it("selects local component and HTML layers without changing component focus", async () => {

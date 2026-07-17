@@ -1,6 +1,5 @@
-import { Button, Checkbox } from "@heroui/react";
+import { Button } from "@heroui/react";
 import {
-  Boxes,
   ChevronDown,
   ChevronRight,
   CircleDot,
@@ -43,11 +42,9 @@ export interface SourceWorkspaceSidebarProps {
   workspace: RuntimeSourceWorkspace;
   focusId?: string;
   mode: SourceExplorerMode;
-  autoCollapse: boolean;
   onSelect: (selection: SourceWorkspaceSelection) => void;
   onFocus: (occurrenceId: string, selection: SourceWorkspaceSelection) => void;
   onModeChange: (mode: SourceExplorerMode) => void;
-  onAutoCollapseChange: (autoCollapse: boolean) => void;
   onApplySlot: (
     slot: SourceWorkspaceLayer,
     occurrence: SourceOccurrence,
@@ -62,8 +59,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   const nodes = sourceTreeNodes(props.workspace);
   const graph = sourceFocusGraph(nodes, device);
   const focusId = graph.occurrences.has(props.focusId ?? "") ? props.focusId! : initialFocusOccurrence(graph);
-  const rows = focusId ? sourceFocusRows(graph, focusId, props.mode, props.autoCollapse) : [];
-  const shared = nodes.filter((node) => node.area === "components");
+  const rows = focusId ? sourceFocusRows(graph, focusId, props.mode) : [];
   return (
     <aside aria-label="Source workspace" className={`${props.className ?? "flex w-80"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
       <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
@@ -74,15 +70,9 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
         </div>
         <nav aria-label="Source tree views" className="flex items-center gap-0.5">
           <SecondaryModeButton
-            active={props.mode === "overview"}
-            icon={<Boxes size={14} />}
-            label="Overview"
-            onPress={() => props.onModeChange(props.mode === "overview" ? "focus" : "overview")}
-          />
-          <SecondaryModeButton
             active={props.mode === "layers"}
-            icon={<Layers3 size={14} />}
-            label="Layers"
+            icon={props.mode === "layers" ? <Component size={13} /> : <Layers3 size={13} />}
+            label={props.mode === "layers" ? "Tree" : "Layers"}
             onPress={() => props.onModeChange(props.mode === "layers" ? "focus" : "layers")}
           />
         </nav>
@@ -92,25 +82,8 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           </Button>
         )}
       </header>
-      {props.mode === "focus" && (
-        <div className="flex h-9 shrink-0 items-center border-b border-white/[0.07] px-4">
-          <Checkbox
-            aria-label="Automatically collapse branches outside the current focus"
-            className="text-zinc-500"
-            isSelected={props.autoCollapse}
-            onChange={props.onAutoCollapseChange}
-          >
-            <Checkbox.Content className="gap-2 text-[10px]">
-              <Checkbox.Control className="size-3.5 rounded border border-white/15 bg-black/20">
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              Collapse around focus
-            </Checkbox.Content>
-          </Checkbox>
-        </div>
-      )}
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
-        <div aria-label={props.mode === "overview" ? "Complete app overview" : props.mode === "layers" ? "Focused component layers" : "Focused source tree"} role="tree">
+        <div aria-label={props.mode === "layers" ? "Focused component layers" : "Focused source tree"} role="tree">
           {rows.map((row) => (
             <FocusTreeRow
               key={`${props.mode}:${row.key}:${row.depth}`}
@@ -127,23 +100,6 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           ))}
           {!rows.length && <p className="px-4 py-4 text-[10px] text-zinc-600">No configured entry component was found.</p>}
         </div>
-        {shared.length > 0 && props.mode === "overview" && (
-          <section className="mt-4 border-t border-white/[0.07] pt-3">
-            <h3 className="px-4 pb-1 text-[9px] font-medium uppercase tracking-[0.16em] text-zinc-600">Shared components</h3>
-            <p className="px-4 pb-2 text-[9px] leading-4 text-zinc-700">Reusable definitions above the app shell.</p>
-            {shared.map((node) => {
-              const occurrence = [...graph.occurrences.values()].find((candidate) => candidate.node.id === node.id);
-              return (
-                <Button key={node.id} className="h-9 w-full justify-start gap-2 rounded-none px-4 text-xs text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200" fullWidth variant="ghost" onPress={() => {
-                  if (occurrence) props.onFocus(occurrence.id, { nodeId: node.id, device, occurrenceId: occurrence.id, kind: "component" });
-                  else props.onSelect({ nodeId: node.id, device, kind: "component" });
-                }}>
-                  <Component aria-hidden="true" size={13} /><span className="min-w-0 flex-1 truncate">{node.label}</span><MissingDeviceCluster implementations={node.implementations} />
-                </Button>
-              );
-            })}
-          </section>
-        )}
       </div>
     </aside>
   );
@@ -152,15 +108,15 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
 function SecondaryModeButton(props: { active: boolean; icon: React.ReactNode; label: string; onPress: () => void }) {
   return (
     <Button
-      aria-label={props.active ? `Return to focused source tree from ${props.label}` : `Open ${props.label.toLowerCase()} source tree`}
+      aria-label={props.active ? "Show composition tree" : "Show component layers"}
       aria-pressed={props.active}
-      className={`grid size-8 min-w-0 place-items-center rounded-md p-0 ${props.active ? "bg-white/[0.08] text-sky-200" : "text-zinc-600 hover:text-zinc-300"}`}
-      isIconOnly
+      className={`h-8 min-w-0 gap-1.5 rounded-md px-2.5 text-[10px] ${props.active ? "bg-white/[0.08] text-sky-200" : "text-zinc-500 hover:text-zinc-200"}`}
       size="sm"
       variant="ghost"
       onPress={props.onPress}
     >
       {props.icon}
+      {props.label}
     </Button>
   );
 }
