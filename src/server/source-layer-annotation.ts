@@ -2,8 +2,8 @@ import ts from "typescript";
 
 const sourceLayerAttribute = "data-design-space-source-layer-id";
 
-export function sourceWorkspaceLayerId(relativePath: string, start: number): string {
-  return `jsx:${relativePath}:${start}`;
+export function sourceWorkspaceLayerId(relativePath: string, start: number, suffix?: string): string {
+  return `jsx:${relativePath}:${start}${suffix ? `:${suffix}` : ""}`;
 }
 
 export function annotateSourceHtmlLayers(source: string, relativePath: string): string {

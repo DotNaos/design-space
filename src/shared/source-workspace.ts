@@ -56,7 +56,9 @@ export interface SourceStrictUiFinding {
   ruleId:
     | "strict-ui.children-forbidden"
     | "strict-ui.invalid-slot-contract"
-    | "strict-ui.slot-not-rendered";
+    | "strict-ui.slot-not-rendered"
+    | "strict-ui.slot-content-missing"
+    | "strict-ui.slot-content-incompatible";
   severity: "error";
   message: string;
 }
@@ -92,6 +94,25 @@ export interface SourceWorkspaceLayer {
   classNameDynamic?: true;
   /** Exact source binding for one direct static JSX text child. */
   text?: SourceLayerTextBinding;
+  /** Compiler-derived slot state for a component use. Present only on slot nodes. */
+  slot?: SourceSlotUsage;
+}
+
+export type SourceSlotValidity = "valid" | "missing" | "incompatible" | "full" | "optional";
+
+export interface SourceSlotUsage {
+  contract: SourceComponentSlot;
+  validity: SourceSlotValidity;
+  received: readonly string[];
+  edit: SourceSlotEditBinding;
+}
+
+export interface SourceSlotEditBinding {
+  kind: "missing-attribute" | "missing-property" | "single" | "list";
+  insertAt: number;
+  property?: SourceLayerBinding;
+  value?: SourceLayerBinding;
+  list?: SourceLayerBinding;
 }
 
 export interface SourceLayerBinding {

@@ -61,7 +61,10 @@ describe("target project discovery", () => {
       "MobileLayout",
       "GeneratedHome",
       "MobileHome",
+      "AppShell",
       "ProjectSummary",
+      "StatusNotice",
+      "ToolbarAction",
     ]);
     expect([...target.files.values()].map((file) => file.displayName)).toEqual(expect.arrayContaining([
       "Dockerfile",

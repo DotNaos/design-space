@@ -107,13 +107,21 @@ const workspace: RuntimeSourceWorkspace = {
   capabilities: { createComponents: true },
 };
 
-it("offers target-owned component creation from the app tree", async () => {
+const callbacks = {
+  mode: "focus" as const,
+  onFocus: vi.fn(),
+  onModeChange: vi.fn(),
+  onApplySlot: vi.fn(),
+  onSelect: vi.fn(),
+};
+
+it("offers target-owned component creation from the focused tree", async () => {
   const onCreateComponent = vi.fn();
   render(
     <SourceWorkspaceSidebar
+      {...callbacks}
       workspace={workspace}
       onCreateComponent={onCreateComponent}
-      onSelect={() => undefined}
     />,
   );
 
@@ -121,79 +129,36 @@ it("offers target-owned component creation from the app tree", async () => {
   expect(onCreateComponent).toHaveBeenCalledOnce();
 });
 
-it("shows one static composition tree from the root through pages and components", () => {
-  render(<SourceWorkspaceSidebar workspace={workspace} onSelect={() => undefined} />);
+it("keeps the default view focused and hides internal HTML", () => {
+  render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
 
-  const tree = screen.getByRole("tree", { name: "App source tree" });
-  expect(within(tree).queryByRole("region", { name: "Layout source" })).not.toBeInTheDocument();
-  expect(within(tree).queryByRole("region", { name: "Pages source" })).not.toBeInTheDocument();
-  expect(within(tree).queryByRole("region", { name: "Components source" })).not.toBeInTheDocument();
+  const tree = screen.getByRole("tree", { name: "Focused source tree" });
   expect(within(tree).getByRole("treeitem", { name: "DesktopLayout" })).toHaveAttribute("aria-level", "1");
-  expect(within(tree).getByRole("treeitem", { name: "<main>" })).toHaveAttribute("aria-level", "2");
-  expect(within(tree).getByRole("treeitem", { name: "Dashboard" })).toHaveAttribute("aria-level", "3");
-  expect(within(tree).queryByRole("treeitem", { name: "ProjectSummary" })).not.toBeInTheDocument();
-  expect(within(tree).getByRole("button", { name: "DesktopLayout" })).toBeVisible();
-  expect(within(tree).getByRole("button", { name: "Dashboard" })).toBeVisible();
-  expect(within(screen.getByRole("tree", { name: "Shared components" })).getByRole("treeitem", { name: "ProjectSummary" })).toHaveAttribute("aria-level", "1");
+  expect(within(tree).getByRole("button", { name: "DesktopLayout, focused" })).toBeVisible();
+  expect(within(tree).getByRole("treeitem", { name: "Dashboard" })).toHaveAttribute("aria-level", "2");
+  expect(within(tree).queryByRole("treeitem", { name: "<main>" })).not.toBeInTheDocument();
+  expect(screen.getByText("Shared components")).toBeVisible();
 });
 
-it("expands component branches and reveals their authored HTML layers", async () => {
-  render(<SourceWorkspaceSidebar workspace={workspace} onSelect={() => undefined} />);
+it("moves focus to a child and preserves the direct parent path", async () => {
+  const onFocus = vi.fn();
+  render(<SourceWorkspaceSidebar {...callbacks} onFocus={onFocus} workspace={workspace} />);
 
-  expect(screen.queryByRole("treeitem", { name: "<section>" })).not.toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
-  expect(screen.getByRole("treeitem", { name: "<section>" })).toBeVisible();
-  const appTree = screen.getByRole("tree", { name: "App source tree" });
-  const sharedTree = screen.getByRole("tree", { name: "Shared components" });
-  expect(within(appTree).getByRole("treeitem", { name: "ProjectSummary" })).toBeVisible();
-  expect(within(sharedTree).queryByRole("treeitem", { name: "<article>" })).not.toBeInTheDocument();
-  await userEvent.click(within(sharedTree).getByRole("button", { name: "Expand ProjectSummary" }));
-  expect(within(sharedTree).getByRole("treeitem", { name: "<article>" })).toBeVisible();
-  expect(within(sharedTree).getByRole("treeitem", { name: "<h2>" })).toBeVisible();
-  await userEvent.click(within(sharedTree).getByRole("button", { name: "Collapse ProjectSummary" }));
-  expect(within(sharedTree).queryByRole("treeitem", { name: "<article>" })).not.toBeInTheDocument();
-});
-
-it("shows only missing dedicated platform implementations", async () => {
-  const onSelect = vi.fn();
-  render(<SourceWorkspaceSidebar workspace={workspace} onSelect={onSelect} />);
-
-  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
-  const component = within(screen.getByRole("tree", { name: "App source tree" })).getByRole("button", { name: "ProjectSummary" });
-  expect(within(component).getByRole("img", {
-    name: "Tablet has no dedicated implementation and uses Desktop",
-  })).toBeVisible();
-  expect(within(component).getByRole("img").querySelectorAll("svg")).toHaveLength(1);
-});
-
-it("selects a logical node without changing the active canvas device", async () => {
-  const onSelect = vi.fn();
-  render(
-    <SourceWorkspaceSidebar
-      selected={{ device: "tablet", nodeId: "layout:app" }}
-      workspace={workspace}
-      onSelect={onSelect}
-    />,
-  );
-
-  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
   await userEvent.click(screen.getByRole("button", { name: "Dashboard" }));
-  expect(onSelect).toHaveBeenCalledWith({ device: "tablet", nodeId: "pages:Dashboard" });
+  expect(onFocus).toHaveBeenCalledWith(expect.stringContaining("pages:Dashboard"), expect.objectContaining({
+    device: "desktop",
+    nodeId: "pages:Dashboard",
+    kind: "component",
+  }));
 });
 
-it("selects an authored HTML layer and keeps every JSX component on the same node kind", async () => {
-  const onSelect = vi.fn();
-  render(<SourceWorkspaceSidebar workspace={workspace} onSelect={onSelect} />);
+it("switches explicitly to Overview and Layers", async () => {
+  const onModeChange = vi.fn();
+  const { rerender } = render(<SourceWorkspaceSidebar {...callbacks} onModeChange={onModeChange} workspace={workspace} />);
+  await userEvent.click(screen.getByRole("button", { name: "Overview source tree" }));
+  expect(onModeChange).toHaveBeenCalledWith("overview");
 
-  const pageButton = screen.getByRole("button", { name: "Dashboard" });
-  expect(pageButton.querySelector("svg.lucide-component")).toBeInTheDocument();
-  expect(pageButton.closest('[role="treeitem"]')).toHaveClass("min-h-10");
-
-  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
-  await userEvent.click(screen.getByRole("button", { name: "<section>" }));
-  expect(onSelect).toHaveBeenLastCalledWith({
-    device: "desktop",
-    layerId: "dashboard-section",
-    nodeId: "pages:Dashboard",
-  });
+  rerender(<SourceWorkspaceSidebar {...callbacks} mode="layers" workspace={workspace} />);
+  const layers = screen.getByRole("tree", { name: "Focused component layers" });
+  expect(within(layers).getByRole("treeitem", { name: "<main>" })).toBeVisible();
 });

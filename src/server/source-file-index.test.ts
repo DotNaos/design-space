@@ -27,7 +27,10 @@ describe("TypeScript-first source index", () => {
       { label: "MobileLayout", area: "layout", device: "mobile", path: "src/app/mobile/layout.tsx" },
       { label: "GeneratedHome", area: "pages", device: "desktop", path: "src/app/desktop/pages/GeneratedHome.tsx" },
       { label: "MobileHome", area: "pages", device: "mobile", path: "src/app/mobile/pages/MobileHome.tsx" },
+      { label: "AppShell", area: "components", device: "desktop", path: "src/app/components/AppShell/desktop.tsx" },
       { label: "ProjectSummary", area: "components", device: "desktop", path: "src/app/components/ProjectSummary/desktop.tsx" },
+      { label: "StatusNotice", area: "components", device: "desktop", path: "src/app/components/StatusNotice/desktop.tsx" },
+      { label: "ToolbarAction", area: "components", device: "desktop", path: "src/app/components/ToolbarAction/desktop.tsx" },
     ]);
     expect(result.manifest.devices).toContainEqual({
       area: "pages",
@@ -43,6 +46,12 @@ describe("TypeScript-first source index", () => {
     ]);
     expect(summary?.slots).toEqual([]);
     expect(summary?.findings).toEqual([]);
+    const shell = result.manifest.entries.find((entry) => entry.label === "AppShell");
+    expect(shell?.slots).toEqual([
+      expect.objectContaining({ name: "notice", accepts: ["StatusNotice"], min: 1, max: 1 }),
+      expect.objectContaining({ name: "content", accepts: ["GeneratedHome"], min: 1, max: 1 }),
+      expect.objectContaining({ name: "actions", accepts: ["ToolbarAction"], min: 0, max: 2 }),
+    ]);
     expect(result.files.map((file) => file.relativePath)).toEqual(expect.arrayContaining([
       "Dockerfile",
       "nginx.conf",

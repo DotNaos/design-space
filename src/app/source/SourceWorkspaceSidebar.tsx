@@ -1,146 +1,119 @@
 import { Button } from "@heroui/react";
 import {
-  ChevronDown,
+  Boxes,
   ChevronRight,
+  CircleDot,
   CodeXml,
   Component,
   FileCode2,
   FilePlus2,
-  GitBranch,
+  Focus,
+  Layers3,
   Monitor,
   PanelTop,
   Smartphone,
   Tablet,
+  TriangleAlert,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 
+import { designSpaceDevices, type DesignSpaceDevice, type RuntimeSourceWorkspace, type SourceWorkspaceLayer } from "../../shared/source-workspace";
+import { SourceComponentPicker } from "./SourceComponentPicker";
 import {
-  designSpaceDevices,
-  type DesignSpaceDevice,
-  type RuntimeSourceWorkspace,
-} from "../../shared/source-workspace";
-import {
-  sourceTreeNodes,
-  sourceTreeRows,
-  sharedSourceTreeRows,
-  type SourceImplementation,
-  type SourceTreeRow,
-  type SourceTreeNode,
-  type SourceTreeSelection,
-  visibleSourceTreeRows,
-} from "./source-workspace-tree";
+  initialFocusOccurrence,
+  sourceFocusGraph,
+  sourceFocusRows,
+  type SourceExplorerMode,
+  type SourceFocusGraph,
+  type SourceFocusRow,
+  type SourceOccurrence,
+} from "./source-focus-tree";
+import { sourceSlotCandidates, type SourceComponentCandidate } from "./source-slot-composition";
+import { sourceTreeNodes, type SourceImplementation, type SourceTreeNode, type SourceTreeSelection } from "./source-workspace-tree";
 
-export type SourceWorkspaceSelection = SourceTreeSelection;
+export interface SourceWorkspaceSelection extends SourceTreeSelection {
+  occurrenceId?: string;
+  sourceNodeId?: string;
+  slotName?: string;
+  kind?: "component" | "html" | "slot";
+}
 
 export interface SourceWorkspaceSidebarProps {
   className?: string;
   selected?: SourceWorkspaceSelection;
   workspace: RuntimeSourceWorkspace;
+  focusId?: string;
+  mode: SourceExplorerMode;
   onSelect: (selection: SourceWorkspaceSelection) => void;
+  onFocus: (occurrenceId: string, selection: SourceWorkspaceSelection) => void;
+  onModeChange: (mode: SourceExplorerMode) => void;
+  onApplySlot: (
+    slot: SourceWorkspaceLayer,
+    occurrence: SourceOccurrence,
+    candidate: SourceComponentCandidate,
+    action: "add" | "replace",
+  ) => void;
   onCreateComponent?: () => void;
 }
 
-const deviceLabels: Record<DesignSpaceDevice, string> = {
-  desktop: "Desktop",
-  tablet: "Tablet",
-  mobile: "Mobile",
-};
-
 export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   const device = props.selected?.device ?? "desktop";
-  const trees = useMemo(
-    () => {
-      const nodes = sourceTreeNodes(props.workspace);
-      return {
-        app: sourceTreeRows(nodes, device),
-        shared: sharedSourceTreeRows(nodes, device),
-      };
-    },
-    [device, props.workspace],
-  );
-  const rows = useMemo(() => [...trees.app, ...trees.shared], [trees]);
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => defaultCollapsedRows(rows, trees.shared));
-
-  useEffect(() => {
-    setCollapsed(defaultCollapsedRows(rows, trees.shared));
-  }, [rows, trees.shared]);
-
-  const visibleAppRows = visibleSourceTreeRows(trees.app, collapsed);
-  const visibleSharedRows = visibleSourceTreeRows(trees.shared, collapsed);
-  const toggleBranch = (key: string) => setCollapsed((current) => {
-    const next = new Set(current);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    return next;
-  });
+  const nodes = sourceTreeNodes(props.workspace);
+  const graph = sourceFocusGraph(nodes, device);
+  const focusId = graph.occurrences.has(props.focusId ?? "") ? props.focusId! : initialFocusOccurrence(graph);
+  const rows = focusId ? sourceFocusRows(graph, focusId, props.mode) : [];
+  const shared = nodes.filter((node) => node.area === "components");
   return (
-    <aside
-      aria-label="Source workspace"
-      className={`${props.className ?? "flex w-72"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}
-    >
+    <aside aria-label="Source workspace" className={`${props.className ?? "flex w-80"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
       <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
-        <FileCode2 aria-hidden="true" className="shrink-0 text-sky-400" size={16} />
+        <FileCode2 aria-hidden="true" className="text-sky-400" size={16} />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold text-zinc-100">Source tree</h2>
-          <p className="mt-0.5 truncate text-[9px] uppercase tracking-[0.14em] text-zinc-600">
-            {props.workspace.sourceRoot} · {props.workspace.runtime === "react-native" ? "React Native" : "React"}
-          </p>
+          <p className="mt-0.5 truncate text-[9px] uppercase tracking-[0.14em] text-zinc-600">{props.workspace.sourceRoot} · {props.workspace.runtime === "react-native" ? "React Native" : "React"}</p>
         </div>
-        {props.workspace.capabilities?.createComponents && props.onCreateComponent ? (
-          <Button
-            aria-label="Create component"
-            className="grid size-8 shrink-0 place-items-center rounded-md text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"
-            isIconOnly
-            size="sm"
-            variant="ghost"
-            onPress={props.onCreateComponent}
-          >
+        {props.workspace.capabilities?.createComponents && props.onCreateComponent && (
+          <Button aria-label="Create component" className="grid size-8 place-items-center rounded-md text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>
             <FilePlus2 aria-hidden="true" size={14} />
           </Button>
-        ) : <GitBranch aria-label="Static source composition" className="text-zinc-600" size={14} />}
+        )}
       </header>
-
+      <nav aria-label="Source tree view" className="grid h-10 shrink-0 grid-cols-3 border-b border-white/[0.08] p-1">
+        <ModeButton active={props.mode === "focus"} icon={<Focus size={12} />} label="Focus" onPress={() => props.onModeChange("focus")} />
+        <ModeButton active={props.mode === "overview"} icon={<Boxes size={12} />} label="Overview" onPress={() => props.onModeChange("overview")} />
+        <ModeButton active={props.mode === "layers"} icon={<Layers3 size={12} />} label="Layers" onPress={() => props.onModeChange("layers")} />
+      </nav>
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
-        <div aria-label="App source tree" role="tree">
-        {visibleAppRows.map((row) => (
-          <SourceNodeRow
-            key={row.key}
-            active={row.layer
-              ? props.selected?.nodeId === row.selectionNode.id && props.selected.layerId === row.layer.id
-              : Boolean(row.node && props.selected?.nodeId === row.node.id && !props.selected.layerId)}
-            collapsed={collapsed.has(row.key)}
-            row={row}
-            onPress={() => props.onSelect({
-              nodeId: row.selectionNode.id,
-              device,
-              ...(row.layer ? { layerId: row.layer.id } : {}),
-            })}
-            onToggle={() => toggleBranch(row.key)}
-          />
-        ))}
-        {!trees.app.length && <p className="px-4 py-3 text-[10px] leading-4 text-zinc-700">No exported app tree was found.</p>}
+        <div aria-label={props.mode === "overview" ? "Complete app overview" : props.mode === "layers" ? "Focused component layers" : "Focused source tree"} role="tree">
+          {rows.map((row) => (
+            <FocusTreeRow
+              key={`${props.mode}:${row.key}:${row.depth}`}
+              device={device}
+              graph={graph}
+              nodes={nodes}
+              row={row}
+              selected={props.selected}
+              workspace={props.workspace}
+              onApplySlot={props.onApplySlot}
+              onFocus={props.onFocus}
+              onSelect={props.onSelect}
+            />
+          ))}
+          {!rows.length && <p className="px-4 py-4 text-[10px] text-zinc-600">No configured entry component was found.</p>}
         </div>
-        {trees.shared.length > 0 && (
+        {shared.length > 0 && props.mode !== "layers" && (
           <section className="mt-4 border-t border-white/[0.07] pt-3">
-            <h3 className="px-4 pb-2 text-[9px] font-medium uppercase tracking-[0.16em] text-zinc-600">Shared components</h3>
-            <div aria-label="Shared components" role="tree">
-              {visibleSharedRows.map((row) => (
-                <SourceNodeRow
-                  key={`shared:${row.key}`}
-                  active={row.layer
-                    ? props.selected?.nodeId === row.selectionNode.id && props.selected.layerId === row.layer.id
-                    : Boolean(row.node && props.selected?.nodeId === row.node.id && !props.selected.layerId)}
-                  collapsed={collapsed.has(row.key)}
-                  row={row}
-                  onPress={() => props.onSelect({
-                    nodeId: row.selectionNode.id,
-                    device,
-                    ...(row.layer ? { layerId: row.layer.id } : {}),
-                  })}
-                  onToggle={() => toggleBranch(row.key)}
-                />
-              ))}
-            </div>
+            <h3 className="px-4 pb-1 text-[9px] font-medium uppercase tracking-[0.16em] text-zinc-600">Shared components</h3>
+            <p className="px-4 pb-2 text-[9px] leading-4 text-zinc-700">Reusable definitions above the app shell.</p>
+            {shared.map((node) => {
+              const occurrence = [...graph.occurrences.values()].find((candidate) => candidate.node.id === node.id);
+              return (
+                <Button key={node.id} className="h-9 w-full justify-start gap-2 rounded-none px-4 text-xs text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200" fullWidth variant="ghost" onPress={() => {
+                  if (occurrence) props.onFocus(occurrence.id, { nodeId: node.id, device, occurrenceId: occurrence.id, kind: "component" });
+                  else props.onSelect({ nodeId: node.id, device, kind: "component" });
+                }}>
+                  <Component aria-hidden="true" size={13} /><span className="min-w-0 flex-1 truncate">{node.label}</span><MissingDeviceCluster implementations={node.implementations} />
+                </Button>
+              );
+            })}
           </section>
         )}
       </div>
@@ -148,110 +121,133 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   );
 }
 
-function SourceNodeRow(props: {
-  active: boolean;
-  collapsed: boolean;
-  row: SourceTreeRow;
-  onPress: () => void;
-  onToggle: () => void;
+function ModeButton(props: { active: boolean; icon: React.ReactNode; label: string; onPress: () => void }) {
+  return <Button aria-label={`${props.label} source tree`} className={`h-8 min-w-0 gap-1.5 rounded-md px-2 text-[9px] ${props.active ? "bg-white/[0.08] text-zinc-100" : "text-zinc-600"}`} size="sm" variant="ghost" onPress={props.onPress}>{props.icon}{props.label}</Button>;
+}
+
+function FocusTreeRow(props: {
+  device: DesignSpaceDevice;
+  graph: SourceFocusGraph;
+  nodes: ReturnType<typeof sourceTreeNodes>;
+  row: SourceFocusRow;
+  selected?: SourceWorkspaceSelection;
+  workspace: RuntimeSourceWorkspace;
+  onApplySlot: SourceWorkspaceSidebarProps["onApplySlot"];
+  onFocus: SourceWorkspaceSidebarProps["onFocus"];
+  onSelect: SourceWorkspaceSidebarProps["onSelect"];
 }) {
   const { row } = props;
-  const NodeIcon = row.node
-    ? Component
-    : row.layer?.kind === "html"
-      ? CodeXml
-      : row.layer?.kind === "slot"
-        ? PanelTop
-        : Component;
-  const label = row.node?.label
-    ?? (row.layer?.kind === "html" ? `<${row.layer.label}>` : row.layer?.kind === "slot" ? `slot:${row.layer.label}` : row.layer?.label ?? "Layer");
+  const active = row.kind === "component"
+    ? props.selected?.occurrenceId === row.occurrence?.id && props.selected?.kind === "component"
+    : props.selected?.kind === row.kind && (
+      props.selected?.layerId === row.layer?.id
+      || (row.kind === "slot" && props.selected?.slotName === row.layer?.label)
+    );
+  const Icon = row.kind === "component" ? Component : row.kind === "html" ? CodeXml : PanelTop;
+  const slot = row.kind === "slot" ? row.layer : undefined;
+  const status = slot?.slot;
+  const sourceOwner = row.occurrence?.usageOwnerId
+    ? props.nodes.find((node) => node.id === row.occurrence?.usageOwnerId)
+    : row.occurrence?.node;
+  const ownerPath = sourceOwner?.implementations[props.device].entry?.relativePath ?? row.occurrence?.entry?.relativePath ?? "";
+  const candidates = slot ? sourceSlotCandidates(props.workspace, props.nodes, slot, props.device, ownerPath) : [];
+  const triggerId = slot ? `source-slot-picker-${safeId(slot.id)}` : undefined;
+  const select = () => {
+    if (row.kind === "component" && row.occurrence) {
+      const sourceNodeId = row.occurrence.usageOwnerId;
+      props.onFocus(row.occurrence.id, {
+        nodeId: row.occurrence.node.id,
+        device: props.device,
+        occurrenceId: row.occurrence.id,
+        kind: "component",
+        ...(sourceNodeId ? { sourceNodeId, layerId: row.occurrence.usageLayer?.id } : {}),
+      });
+      return;
+    }
+    if (row.layer && row.occurrence) {
+      props.onSelect({
+        nodeId: row.occurrence.node.id,
+        sourceNodeId: row.kind === "slot" ? row.occurrence.usageOwnerId : row.occurrence.node.id,
+        device: props.device,
+        occurrenceId: row.occurrence.id,
+        layerId: row.layer.id,
+        ...(row.kind === "slot" ? { slotName: row.layer.label } : {}),
+        kind: row.kind,
+      });
+    }
+  };
   return (
-    <div
-      aria-expanded={row.hasChildren ? !props.collapsed : undefined}
-      aria-label={label}
-      aria-level={row.depth + 1}
-      aria-selected={props.active}
-      className="relative flex min-h-10 items-center pr-2"
-      role="treeitem"
-      style={{ paddingLeft: 4 + row.depth * 18 }}
-    >
-      {row.depth > 0 && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute bottom-0 top-0 border-l border-white/[0.07]"
-          style={{ left: 18 + (row.depth - 1) * 18 }}
-        />
-      )}
-      {row.hasChildren ? (
-        <Button
-          aria-label={`${props.collapsed ? "Expand" : "Collapse"} ${label}`}
-          className="relative z-10 grid size-6 shrink-0 place-items-center rounded text-zinc-600 hover:bg-white/[0.05] hover:text-zinc-300"
-          isIconOnly
-          size="sm"
-          variant="ghost"
-          onPress={props.onToggle}
-        >
-          {props.collapsed ? <ChevronRight aria-hidden="true" size={12} /> : <ChevronDown aria-hidden="true" size={12} />}
-        </Button>
-      ) : <span aria-hidden="true" className="size-6 shrink-0" />}
+    <div aria-label={row.label} className="relative flex min-h-10 items-center pr-2 transition-[padding,opacity,transform] duration-150 ease-out motion-reduce:transition-none" role="treeitem" aria-level={row.depth + 1} aria-selected={active} style={{ paddingLeft: 8 + row.depth * 18 }}>
+      {row.depth > 0 && <span aria-hidden="true" className="absolute bottom-0 top-0 border-l border-white/[0.07]" style={{ left: 20 + (row.depth - 1) * 18 }} />}
+      <span className="relative z-10 grid size-6 shrink-0 place-items-center text-zinc-700">
+        {row.role === "parent" ? <ChevronRight size={11} /> : row.role === "focus" ? <CircleDot size={11} className="text-sky-400" /> : null}
+      </span>
       <Button
-        aria-label={label}
-        aria-pressed={props.active}
-        className={`group min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 text-left ${props.active ? "bg-sky-500/15 text-sky-100" : row.layer ? "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300" : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"}`}
+        aria-label={`${row.label}${row.role === "focus" ? ", focused" : ""}`}
+        className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 text-left ${active ? "bg-sky-500/15 text-sky-100" : row.role === "focus" ? "text-zinc-200" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}
         fullWidth
         size="sm"
         variant="ghost"
-        onPress={props.onPress}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && triggerId && active) {
+            event.preventDefault();
+            document.getElementById(triggerId)?.click();
+          }
+        }}
+        onPress={select}
       >
-        <NodeIcon aria-hidden="true" className="shrink-0" size={13} />
-        <span className={`min-w-0 flex-1 truncate text-xs ${row.layer?.kind === "html" ? "font-mono text-[10px]" : ""}`}>{label}</span>
-        {row.node && <MissingDeviceCluster implementations={row.node.implementations} />}
+        <Icon aria-hidden="true" className="shrink-0" size={13} />
+        <span className={`min-w-0 flex-1 truncate text-xs ${row.kind === "html" ? "font-mono text-[10px]" : ""}`}>{row.label}</span>
+        {row.kind === "component" && row.occurrence && <MissingDeviceCluster implementations={row.occurrence.node.implementations} />}
+        {status && <SlotStatus layer={slot!} />}
       </Button>
+      {slot && row.occurrence && active && (
+        <SourceComponentPicker
+          candidates={candidates}
+          slot={slot}
+          triggerId={triggerId}
+          onApply={(candidate, action) => props.onApplySlot(slot, row.occurrence!, candidate, action)}
+        />
+      )}
     </div>
   );
 }
 
-function defaultCollapsedRows(
-  rows: readonly SourceTreeRow[],
-  sharedRows: readonly SourceTreeRow[],
-): ReadonlySet<string> {
-  const sharedRoots = new Set(sharedRows.filter((row) => row.depth === 0).map((row) => row.key));
-  return new Set(rows.filter((row) => (
-    row.hasChildren && row.depth > 0 && (row.node || row.layer?.kind === "component")
-    || row.hasChildren && sharedRoots.has(row.key)
-  )).map((row) => row.key));
+function SlotStatus({ layer }: { layer: SourceWorkspaceLayer }) {
+  const usage = layer.slot!;
+  const max = usage.contract.max ?? "∞";
+  const warning = usage.validity === "missing" || usage.validity === "incompatible";
+  return (
+    <span className={`flex shrink-0 items-center gap-1 text-[9px] tabular-nums ${warning ? "text-amber-300" : "text-zinc-600"}`}>
+      {warning && <TriangleAlert aria-hidden="true" size={10} />}
+      {usage.received.length}/{max}
+      <span className="sr-only">{usage.validity}</span>
+    </span>
+  );
+}
+
+function safeId(value: string): string {
+  return value.replace(/[^A-Za-z0-9_-]/g, "-");
 }
 
 function MissingDeviceCluster(props: { implementations: SourceTreeNode["implementations"] }) {
-  const missing = designSpaceDevices.filter((device) => {
-    const state = props.implementations[device].state;
-    return state === "missing" || state === "fallback";
-  });
+  const missing = designSpaceDevices.filter((device) => ["missing", "fallback"].includes(props.implementations[device].state));
   if (!missing.length) return null;
-  const label = missing.map((device) => implementationLabel(props.implementations[device])).join("; ");
   return (
-    <span aria-label={label} className="ml-1 flex shrink-0 items-center gap-1 text-zinc-600" role="img">
-      {missing.map((device) => (
-        <MissingDeviceIcon key={device} device={device} implementation={props.implementations[device]} />
-      ))}
+    <span aria-label={missing.map((device) => implementationLabel(props.implementations[device])).join("; ")} className="flex shrink-0 items-center gap-0.5 text-zinc-600" role="img">
+      {missing.map((device) => <MissingDeviceIcon key={device} device={device} implementation={props.implementations[device]} />)}
     </span>
   );
 }
 
 function MissingDeviceIcon(props: { device: DesignSpaceDevice; implementation: SourceImplementation }) {
-  const DeviceIcon = props.device === "desktop" ? Monitor : props.device === "tablet" ? Tablet : Smartphone;
-  return (
-    <span className="relative grid size-4 place-items-center" title={implementationLabel(props.implementation)}>
-      <DeviceIcon aria-hidden="true" size={12} strokeWidth={1.8} />
-      <span aria-hidden="true" className="absolute h-px w-3 -rotate-45 bg-current" />
-    </span>
-  );
+  const Icon = props.device === "desktop" ? Monitor : props.device === "tablet" ? Tablet : Smartphone;
+  return <span className="relative grid size-4 place-items-center"><Icon aria-hidden="true" size={11} /><span aria-hidden="true" className="absolute h-px w-3 -rotate-45 bg-current" /></span>;
 }
 
 function implementationLabel(implementation: SourceImplementation): string {
-  const label = deviceLabels[implementation.requestedDevice];
-  if (implementation.state === "fallback") {
-    return `${label} has no dedicated implementation and uses ${implementation.sourceDevice ? deviceLabels[implementation.sourceDevice] : "a fallback"}`;
-  }
-  return `${label} implementation missing`;
+  const labels: Record<DesignSpaceDevice, string> = { desktop: "Desktop", tablet: "Tablet", mobile: "Mobile" };
+  return implementation.state === "fallback"
+    ? `${labels[implementation.requestedDevice]} uses ${implementation.sourceDevice ? labels[implementation.sourceDevice] : "a fallback"}`
+    : `${labels[implementation.requestedDevice]} implementation missing`;
 }

@@ -57,15 +57,20 @@ export async function indexTypeScriptComponents(
   }
   const program = ts.createProgram({ rootNames: filePaths, options: compilerOptions, host });
   const checker = program.getTypeChecker();
-  const components: IndexedTypeScriptComponent[] = [];
-
-  for (const filePath of filePaths) {
+  const indexFiles = (contracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>) => filePaths.flatMap((filePath) => {
     const sourceFile = program.getSourceFile(filePath);
     if (!sourceFile) {
       throw new DesignSpaceError("COMPILE_ERROR", "TypeScript could not load a registered source file");
     }
-    components.push(...indexSourceFile(sourceFile, checker, projectRoot));
+    return indexSourceFile(sourceFile, checker, projectRoot, contracts);
+  });
+  const initial = indexFiles();
+  const contracts = new Map<string, readonly SourceComponentSlot[]>();
+  for (const component of initial) {
+    contracts.set(component.label, component.slots);
+    contracts.set(component.exportName, component.slots);
   }
+  const components = indexFiles(contracts);
 
   return components.sort((left, right) =>
     left.filePath.localeCompare(right.filePath) || left.exportName.localeCompare(right.exportName));
@@ -134,6 +139,7 @@ function indexSourceFile(
   sourceFile: ts.SourceFile,
   checker: ts.TypeChecker,
   projectRoot: string,
+  componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): IndexedTypeScriptComponent[] {
   const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
   if (!moduleSymbol) return [];
@@ -168,6 +174,7 @@ function indexSourceFile(
       new Set([label]),
       relativePath,
       new Set(contract.slots.map((slot) => slot.name)),
+      componentContracts,
     );
     const renderedSlots = collectRenderedSlots(layers);
     const findings = [...contract.findings];
@@ -180,6 +187,7 @@ function indexSourceFile(
         });
       }
     }
+    collectSlotUsageFindings(layers, findings);
     components.push({
       exportName,
       filePath: relativePath,
@@ -202,6 +210,7 @@ function jsxLayers(
   path: ReadonlySet<string>,
   relativePath: string,
   slotNames: ReadonlySet<string>,
+  componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
   const layers: SourceWorkspaceLayer[] = [];
   const visit = (node: ts.Node): void => {
@@ -210,7 +219,7 @@ function jsxLayers(
       return;
     }
     if (ts.isJsxSelfClosingElement(node) && isFragmentTag(node.tagName.getText())) return;
-    const layer = jsxLayer(node, localComponents, path, relativePath, slotNames);
+    const layer = jsxLayer(node, localComponents, path, relativePath, slotNames, componentContracts);
     if (layer) {
       layers.push(layer);
       return;
@@ -227,6 +236,7 @@ function jsxLayer(
   path: ReadonlySet<string>,
   relativePath: string,
   slotNames: ReadonlySet<string>,
+  componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): SourceWorkspaceLayer | undefined {
   if (ts.isJsxElement(node)) {
     const label = node.openingElement.tagName.getText();
@@ -239,8 +249,9 @@ function jsxLayer(
       ...jsxClassName(node.openingElement, kind),
       ...jsxStaticText(node),
       children: [
-        ...localComponentLayers(label, kind, localComponents, path, relativePath),
-        ...jsxChildLayers(node.children, localComponents, path, relativePath, slotNames),
+        ...componentUsageSlots(node.openingElement, componentContracts?.get(label), localComponents, path, relativePath, componentContracts),
+        ...localComponentLayers(label, kind, localComponents, path, relativePath, componentContracts),
+        ...jsxChildLayers(node.children, localComponents, path, relativePath, slotNames, componentContracts),
       ],
     };
   }
@@ -253,7 +264,10 @@ function jsxLayer(
       kind,
       source: { start: node.getStart(), end: node.getEnd() },
       ...jsxClassName(node, kind),
-      children: localComponentLayers(label, kind, localComponents, path, relativePath),
+      children: [
+        ...componentUsageSlots(node, componentContracts?.get(label), localComponents, path, relativePath, componentContracts),
+        ...localComponentLayers(label, kind, localComponents, path, relativePath, componentContracts),
+      ],
     };
   }
   return undefined;
@@ -341,23 +355,24 @@ function jsxChildLayers(
   path: ReadonlySet<string>,
   relativePath: string,
   slotNames: ReadonlySet<string>,
+  componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
   return children.flatMap((child) => {
     if (ts.isJsxFragment(child)) {
-      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames);
+      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames, componentContracts);
     }
     if (ts.isJsxElement(child) && isFragmentTag(child.openingElement.tagName.getText())) {
-      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames);
+      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames, componentContracts);
     }
     if (ts.isJsxSelfClosingElement(child) && isFragmentTag(child.tagName.getText())) return [];
     const slot = sourceSlotLayer(child, slotNames, relativePath);
     if (slot) return [slot];
-    const direct = jsxLayer(child, localComponents, path, relativePath, slotNames);
+    const direct = jsxLayer(child, localComponents, path, relativePath, slotNames, componentContracts);
     if (direct) return [direct];
     if (!ts.isJsxExpression(child) || !child.expression) return [];
     const nested: SourceWorkspaceLayer[] = [];
     const visit = (node: ts.Node): void => {
-      const layer = jsxLayer(node, localComponents, path, relativePath, slotNames);
+      const layer = jsxLayer(node, localComponents, path, relativePath, slotNames, componentContracts);
       if (layer) {
         nested.push(layer);
         return;
@@ -399,6 +414,96 @@ function sourceSlotName(expression: ts.Expression): string | undefined {
   return undefined;
 }
 
+function componentUsageSlots(
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  contracts: readonly SourceComponentSlot[] | undefined,
+  localComponents: ReadonlyMap<string, ts.Declaration>,
+  path: ReadonlySet<string>,
+  relativePath: string,
+  componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
+): readonly SourceWorkspaceLayer[] {
+  if (!contracts?.length) return [];
+  const attribute = opening.attributes.properties.find((property): property is ts.JsxAttribute => (
+    ts.isJsxAttribute(property) && property.name.getText() === "slots"
+  ));
+  const expression = attribute?.initializer && ts.isJsxExpression(attribute.initializer)
+    ? attribute.initializer.expression
+    : undefined;
+  const object = expression && ts.isObjectLiteralExpression(expression) ? expression : undefined;
+
+  return contracts.map((contract) => {
+    const property = object?.properties.find((candidate): candidate is ts.PropertyAssignment => (
+      ts.isPropertyAssignment(candidate) && propertyName(candidate.name) === contract.name
+    ));
+    const value = property?.initializer;
+    const children = value
+      ? slotValueLayers(value, localComponents, path, relativePath, componentContracts)
+      : [];
+    const received = children.filter((child) => child.kind === "component").map((child) => child.label);
+    const incompatible = received.some((label) => !contract.accepts.includes(label));
+    const belowMinimum = received.length < contract.min;
+    const atMaximum = contract.max !== undefined && received.length >= contract.max;
+    const insertAt = object?.properties.end ?? opening.tagName.end;
+    return {
+      id: sourceWorkspaceLayerId(relativePath, property?.getStart() ?? insertAt, `slot.${contract.name}`),
+      label: contract.name,
+      kind: "slot" as const,
+      source: property
+        ? { start: property.getStart(), end: property.getEnd() }
+        : { start: insertAt, end: insertAt },
+      children,
+      slot: {
+        contract,
+        received,
+        validity: incompatible
+          ? "incompatible" as const
+          : belowMinimum
+            ? "missing" as const
+            : atMaximum
+              ? "full" as const
+              : received.length === 0
+                ? "optional" as const
+                : "valid" as const,
+        edit: {
+          kind: !attribute
+            ? "missing-attribute" as const
+            : !property
+              ? "missing-property" as const
+              : contract.multiple
+                ? "list" as const
+                : "single" as const,
+          insertAt,
+          ...(property ? { property: { start: property.getStart(), end: property.getEnd() } } : {}),
+          ...(value ? { value: { start: value.getStart(), end: value.getEnd() } } : {}),
+          ...(value && ts.isArrayLiteralExpression(value)
+            ? { list: { start: value.elements.pos, end: value.elements.end } }
+            : {}),
+        },
+      },
+    };
+  });
+}
+
+function slotValueLayers(
+  value: ts.Expression,
+  localComponents: ReadonlyMap<string, ts.Declaration>,
+  path: ReadonlySet<string>,
+  relativePath: string,
+  componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
+): readonly SourceWorkspaceLayer[] {
+  const values = ts.isArrayLiteralExpression(value) ? value.elements : [value];
+  return values.flatMap((candidate) => {
+    if (!ts.isExpression(candidate)) return [];
+    const layer = jsxLayer(candidate, localComponents, path, relativePath, new Set(), componentContracts);
+    return layer ? [layer] : [];
+  });
+}
+
+function propertyName(name: ts.PropertyName): string | undefined {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text;
+  return undefined;
+}
+
 function collectRenderedSlots(layers: readonly SourceWorkspaceLayer[]): ReadonlySet<string> {
   const result = new Set<string>();
   const visit = (layer: SourceWorkspaceLayer): void => {
@@ -409,17 +514,40 @@ function collectRenderedSlots(layers: readonly SourceWorkspaceLayer[]): Readonly
   return result;
 }
 
+function collectSlotUsageFindings(
+  layers: readonly SourceWorkspaceLayer[],
+  findings: SourceStrictUiFinding[],
+): void {
+  for (const layer of layers) {
+    if (layer.slot?.validity === "missing") {
+      findings.push({
+        ruleId: "strict-ui.slot-content-missing",
+        severity: "error",
+        message: `Slot ${layer.label} requires at least ${layer.slot.contract.min} compatible component${layer.slot.contract.min === 1 ? "" : "s"}.`,
+      });
+    } else if (layer.slot?.validity === "incompatible") {
+      findings.push({
+        ruleId: "strict-ui.slot-content-incompatible",
+        severity: "error",
+        message: `Slot ${layer.label} accepts ${layer.slot.contract.accepts.join(", ")} but received ${layer.slot.received.join(", ")}.`,
+      });
+    }
+    collectSlotUsageFindings(layer.children, findings);
+  }
+}
+
 function localComponentLayers(
   label: string,
   kind: SourceWorkspaceLayer["kind"],
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
-  if (kind !== "component" || path.has(label)) return [];
+  if (kind !== "component" || path.has(label) || componentContracts?.has(label)) return [];
   const declaration = localComponents.get(label);
   if (!declaration) return [];
-  return jsxLayers(declaration, localComponents, new Set(path).add(label), relativePath, new Set());
+  return jsxLayers(declaration, localComponents, new Set(path).add(label), relativePath, new Set(), componentContracts);
 }
 
 function localJsxDeclarations(sourceFile: ts.SourceFile): ReadonlyMap<string, ts.Declaration> {

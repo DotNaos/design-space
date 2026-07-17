@@ -45,6 +45,8 @@ function sourceEditor(overrides: Partial<SourceFileEditor> = {}): SourceFileEdit
     loading: false,
     prepared: undefined,
     saving: false,
+    canUndo: false,
+    canRedo: false,
     snapshot: {
       fileId: "file.grid",
       label: "src/app/components/CanvasGrid/canvas-grid-types.ts",
@@ -52,6 +54,8 @@ function sourceEditor(overrides: Partial<SourceFileEditor> = {}): SourceFileEdit
       version: "version-1",
     },
     setDraft: vi.fn(),
+    undo: vi.fn(),
+    redo: vi.fn(),
     reset: vi.fn(),
     prepare: vi.fn(async () => undefined),
     save: vi.fn(async () => undefined),
