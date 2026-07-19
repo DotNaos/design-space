@@ -58,6 +58,8 @@ src/app/
 
 Only real exported React components make a device path configured. Tablet may explicitly reuse Desktop or Mobile; no other device fallback is inferred. The editor lists each reusable component once and switches between its available device implementations. Component props and explicitly named Strict UI slots come from the exported component's TypeScript props type. `children` is forbidden, broad `ReactNode` props are not slot evidence, and the preview never persists a parallel JSON description of that contract.
 
+Canvas execution is supplied by a colocated `.design.tsx` module. Design Space never calls an indexed source component with guessed or empty props. The design imports the real component, provides concrete preview values, and uses `defineComponentDesign`; TypeScript remains the only property and slot schema. Literal unions and booleans become automatic property-matrix axes. Use the explicit `isStateful` boolean only when the component has named semantic states. The complete normative contract lives in `STRICT_UI.md`.
+
 The TypeScript-first workspace provides indexing, rendering, navigation, contract inspection, and guarded whole-file TypeScript editing with an exact diff before save. Components with required props are not executed until source-owned preview arguments exist.
 
 The same contract can be placed at a React Native project root with `runtime: "react-native"`. Design Space currently indexes its source tree and TypeScript contracts separately; a simulator renderer is still required before native preview can be marked ready.

@@ -7,6 +7,7 @@ import type { CanvasGridMode, CanvasLayoutGridSettings } from "../CanvasGrid/can
 type CanvasViewportControlsProps = {
   compact?: boolean;
   leadingContent?: React.ReactNode;
+  narrow?: boolean;
   showInteractionToggle?: boolean;
   gridMode: CanvasGridMode;
   gridVisible: boolean;
@@ -46,14 +47,15 @@ export function CanvasViewportControls(props: CanvasViewportControlsProps) {
       )}
       <div
         data-testid="canvas-viewport-toolbar"
-        className={`absolute top-3 z-20 flex h-11 max-w-[calc(100%-1.5rem)] items-center rounded-lg border border-white/10 bg-[#17181b]/95 px-1 shadow-xl lg:h-8 ${props.leadingContent ? "left-1/2 -translate-x-1/2" : "right-3"}`}
+        className={`group/canvas-controls absolute top-3 z-20 flex h-11 max-w-[calc(100%-1.5rem)] items-center rounded-lg border border-white/10 bg-[#17181b]/95 px-1 shadow-xl lg:h-8 ${props.leadingContent ? "left-1/2 -translate-x-1/2" : "right-3"}`}
+        data-narrow={props.narrow || undefined}
         onPointerDown={(event) => event.stopPropagation()}
         onPointerMove={(event) => event.stopPropagation()}
         onPointerUp={(event) => event.stopPropagation()}
       >
         {props.leadingContent && <div className="min-w-0 shrink">{props.leadingContent}</div>}
         {props.leadingContent && <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-white/10" />}
-        <div className="hidden shrink-0 sm:block">
+        <div className={`${props.narrow ? "hidden" : "hidden sm:block"} shrink-0`}>
           <CanvasGridControls
             gridVisible={props.gridVisible}
             layoutGrid={props.layoutGrid}
@@ -63,9 +65,9 @@ export function CanvasViewportControls(props: CanvasViewportControlsProps) {
             onModeChange={props.onGridModeChange}
           />
         </div>
-        <Button isIconOnly aria-label="Zoom out" className="hidden size-9 min-w-9 text-zinc-400 sm:inline-flex lg:size-7 lg:min-w-7" size="sm" variant="ghost" onPress={props.onZoomOut}><Minus size={14} /></Button>
-        <span className="hidden min-w-10 text-center text-[10px] tabular-nums text-zinc-300 sm:block">{Math.round(props.scale * 100)}%</span>
-        <Button isIconOnly aria-label="Zoom in" className="hidden size-9 min-w-9 text-zinc-400 sm:inline-flex lg:size-7 lg:min-w-7" size="sm" variant="ghost" onPress={props.onZoomIn}><Plus size={14} /></Button>
+        <Button isIconOnly aria-label="Zoom out" className={`${props.narrow ? "hidden" : "hidden sm:inline-flex"} size-9 min-w-9 text-zinc-400 lg:size-7 lg:min-w-7`} size="sm" variant="ghost" onPress={props.onZoomOut}><Minus size={14} /></Button>
+        <span className={`${props.narrow ? "hidden" : "hidden sm:block"} min-w-10 text-center text-[10px] tabular-nums text-zinc-300`}>{Math.round(props.scale * 100)}%</span>
+        <Button isIconOnly aria-label="Zoom in" className={`${props.narrow ? "hidden" : "hidden sm:inline-flex"} size-9 min-w-9 text-zinc-400 lg:size-7 lg:min-w-7`} size="sm" variant="ghost" onPress={props.onZoomIn}><Plus size={14} /></Button>
         <Button aria-label="Fit canvas" className="h-9 min-w-11 border-l border-white/10 px-2 text-[10px] text-zinc-300 lg:h-7" size="sm" variant="ghost" onPress={props.onFit}><Maximize2 size={12} /> Fit</Button>
         <Button isIconOnly aria-label="Reset zoom to 100%" className="size-9 min-w-9 border-l border-white/10 text-zinc-400 lg:size-7 lg:min-w-7" size="sm" variant="ghost" onPress={props.onReset}><RotateCcw size={13} /></Button>
       </div>

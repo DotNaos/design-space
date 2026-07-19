@@ -433,6 +433,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       <CanvasViewportControls
         compact={props.compact}
         leadingContent={props.toolbar}
+        narrow={viewportSize.width > 0 && viewportSize.width < 760}
         showInteractionToggle={!props.staticPreview}
         gridMode={gridMode}
         gridVisible={gridVisible}

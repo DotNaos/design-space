@@ -76,12 +76,13 @@ function sourceTargetModule(target: RegisteredTarget): string {
   const runtimeEntries = workspace.manifest.entries.map((entry) => {
     const absolutePath = workspace.entryFiles.get(entry.id);
     if (!absolutePath) throw new Error(`Missing source module for ${entry.id}`);
-    const modulePath = JSON.stringify(normalizePath(absolutePath));
-    const exportName = JSON.stringify(entry.exportName);
-    const component = web && entry.previewable !== false
-      ? `lazy(() => import(${modulePath}).then((module) => ({ default: module[${exportName}] })))`
-      : "NativePreviewUnavailable";
-    return `{ ...${JSON.stringify(entry)}, component: ${component} }`;
+    const designPath = entry.design
+      ? workspace.files.find((file) => file.id === entry.design?.fileId)?.absolutePath
+      : undefined;
+    const design = web && entry.design && designPath
+      ? `{ ...${JSON.stringify(entry.design)}, load: () => import(${JSON.stringify(normalizePath(designPath))}).then((module) => module.default) }`
+      : "undefined";
+    return `{ ...${JSON.stringify(entry)}, component: NativePreviewUnavailable, design: ${design} }`;
   });
   const styleImports = web ? workspace.stylePaths.map((path, index) => ({
     statement: `import SourceStyle${index} from ${JSON.stringify(`${normalizePath(path)}?inline`)};`,
@@ -90,7 +91,6 @@ function sourceTargetModule(target: RegisteredTarget): string {
   const files = registeredFileCatalog(target);
   const sourceRootLabel = relative(target.root, `${target.root}/${workspace.manifest.sourceRoot}`) || workspace.manifest.sourceRoot;
   return [
-    'import { lazy } from "react";',
     ...styleImports.map((style) => style.statement),
     "const NativePreviewUnavailable = () => null;",
     "const sourceHostAdapter = {",

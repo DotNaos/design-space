@@ -1,5 +1,7 @@
 import type { ComponentType } from "react";
 
+import type { ComponentDesignDefinition } from "./component-design";
+
 export const designSpaceAreas = ["layout", "pages", "components"] as const;
 export const designSpaceDevices = ["desktop", "tablet", "mobile"] as const;
 
@@ -40,6 +42,13 @@ export interface SourceComponentProp {
   type: string;
   required: boolean;
   kind: SourcePropKind;
+  /** Compiler-derived finite values that can form a property matrix axis. */
+  values?: readonly (boolean | number | string)[];
+}
+
+export interface SourceComponentDesign {
+  fileId: string;
+  relativePath: string;
 }
 
 export interface SourceComponentSlot {
@@ -80,6 +89,8 @@ export interface SourceWorkspaceEntry {
   /** JSX structure authored inside this export, including intrinsic HTML. */
   layers?: readonly SourceWorkspaceLayer[];
   previewable?: boolean;
+  /** Colocated executable preview evidence. Missing means the component is not previewable. */
+  design?: SourceComponentDesign;
 }
 
 export interface SourceWorkspaceLayer {
@@ -169,6 +180,9 @@ export interface SourceLibraryComponent {
 
 export interface RuntimeSourceWorkspaceEntry extends SourceWorkspaceEntry {
   component: ComponentType<Record<string, unknown>>;
+  design?: SourceComponentDesign & {
+    load: () => Promise<ComponentDesignDefinition>;
+  };
 }
 
 export interface RuntimeSourceWorkspace extends Omit<SourceWorkspaceManifest, "entries"> {

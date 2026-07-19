@@ -5,14 +5,13 @@ import type { RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace"
 import {
   applySourceLayerClassName,
   applySourceLayerText,
-  hasRequiredPreviewArguments,
   projectSourceLayer,
   SourcePreviewFrame,
 } from "./SourcePreviewFrame";
 
 afterEach(cleanup);
 
-it("states that required TypeScript props are unset instead of inventing preview values", () => {
+it("requires a colocated design instead of executing the source component", () => {
   const component = vi.fn(() => null);
   const entry = {
     id: "panel",
@@ -32,12 +31,12 @@ it("states that required TypeScript props are unset instead of inventing preview
   } satisfies RuntimeSourceWorkspaceEntry;
 
   render(<SourcePreviewFrame device="desktop" entry={entry} runtime="react" styles={[]} />);
-  expect(screen.getByText("Preview arguments required")).toBeVisible();
-  expect(screen.getByText(/Required props: title/)).toBeVisible();
+  expect(screen.getByText("Design required")).toBeVisible();
+  expect(screen.getByText(/Panel\/desktop\.design\.tsx/)).toBeVisible();
   expect(component).not.toHaveBeenCalled();
 });
 
-it("renders source previews as static, non-focusable UI", () => {
+it("renders source previews as static, non-focusable UI", async () => {
   const entry = {
     id: "dashboard",
     label: "Dashboard",
@@ -51,10 +50,22 @@ it("renders source previews as static, non-focusable UI", () => {
     findings: [],
     source: { start: 0, end: 1 },
     component: () => <button type="button">Target action</button>,
+    design: {
+      fileId: "dashboard-design",
+      relativePath: "src/app/desktop/pages/Dashboard.design.tsx",
+      load: async () => ({
+        component: () => null,
+        defaults: {},
+        initialCase: "default",
+        isStateful: false,
+        cases: { default: {} },
+        render: () => <button type="button">Designed action</button>,
+      }),
+    },
   } satisfies RuntimeSourceWorkspaceEntry;
 
   render(<SourcePreviewFrame device="desktop" entry={entry} runtime="react" styles={[]} />);
-  const frame = screen.getByTitle("Dashboard desktop preview");
+  const frame = await screen.findByTitle("Dashboard desktop preview");
   expect(frame).toHaveClass("pointer-events-none");
   expect(frame).toHaveAttribute("tabindex", "-1");
   expect(frame).toHaveAttribute("inert");
@@ -63,7 +74,54 @@ it("renders source previews as static, non-focusable UI", () => {
   expect(screen.getByRole("button", { name: "Zoom in" })).toBeVisible();
 });
 
-it("distinguishes components that can render directly from contracts that need a host", () => {
+it("shows a checking state while switching between asynchronously loaded designs", async () => {
+  const first = previewEntry("first", async () => previewDefinition("First design"));
+  let resolveSecond: ((value: ReturnType<typeof previewDefinition>) => void) | undefined;
+  const second = previewEntry("second", () => new Promise((resolve) => { resolveSecond = resolve; }));
+  const view = render(<SourcePreviewFrame device="desktop" entry={first} runtime="react" styles={[]} />);
+  expect(await screen.findByTitle("first desktop preview")).toBeVisible();
+
+  view.rerender(<SourcePreviewFrame device="desktop" entry={second} runtime="react" styles={[]} />);
+  expect(screen.getByText("Checking design")).toBeVisible();
+  resolveSecond?.(previewDefinition("Second design"));
+  expect(await screen.findByTitle("second desktop preview")).toBeVisible();
+});
+
+it("reports an invalid design without falling back to direct component execution", async () => {
+  const component = vi.fn(() => null);
+  const entry = {
+    ...previewEntry("invalid", async () => { throw new Error("Design compile failed"); }),
+    component,
+  };
+  render(<SourcePreviewFrame device="desktop" entry={entry} runtime="react" styles={[]} />);
+  expect(await screen.findByText("Design invalid")).toBeVisible();
+  expect(screen.getByText("Design compile failed")).toBeVisible();
+  expect(component).not.toHaveBeenCalled();
+});
+
+it("keeps the last valid preview when the same design temporarily becomes invalid", async () => {
+  const entry = previewEntry("stable", async () => previewDefinition("Stable design"));
+  const view = render(<SourcePreviewFrame device="desktop" entry={entry} runtime="react" styles={[]} />);
+  expect(await screen.findByTitle("stable desktop preview")).toBeVisible();
+
+  view.rerender(<SourcePreviewFrame
+    device="desktop"
+    entry={{
+      ...entry,
+      design: {
+        ...entry.design!,
+        load: async () => { throw new Error("Temporary design error"); },
+      },
+    }}
+    runtime="react"
+    styles={[]}
+  />);
+
+  expect(await screen.findByText("Last valid")).toBeVisible();
+  expect(screen.getByTitle("stable desktop preview")).toBeVisible();
+});
+
+it("keeps finite compiler-derived properties available to the preview matrix", () => {
   const direct = {
     id: "prompt",
     label: "Prompt",
@@ -72,20 +130,13 @@ it("distinguishes components that can render directly from contracts that need a
     fileId: "prompt-file",
     relativePath: "src/app/components/Prompt/index.tsx",
     exportName: "Prompt",
-    props: [{ name: "label", type: "string", required: false, kind: "string" }],
+    props: [{ name: "size", type: '"sm" | "md"', required: true, kind: "string", values: ["sm", "md"] }],
     slots: [],
     findings: [],
     source: { start: 0, end: 1 },
     component: () => null,
   } satisfies RuntimeSourceWorkspaceEntry;
-  const hosted = {
-    ...direct,
-    id: "hosted",
-    props: [{ name: "label", type: "string", required: true, kind: "string" }],
-  } satisfies RuntimeSourceWorkspaceEntry;
-
-  expect(hasRequiredPreviewArguments(direct)).toBe(false);
-  expect(hasRequiredPreviewArguments(hosted)).toBe(true);
+  expect(direct.props[0]?.values).toEqual(["sm", "md"]);
 });
 
 it("projects only the selected authored HTML element", () => {
@@ -118,3 +169,32 @@ it("applies a visual text draft without removing nested elements", () => {
   expect(applySourceLayerText(output, "Ready again ")).toBe(true);
   expect(output.querySelector("p")?.firstChild).toHaveTextContent("Ready again");
 });
+
+function previewDefinition(label: string) {
+  return {
+    component: () => null,
+    defaults: {},
+    initialCase: "default",
+    isStateful: false,
+    cases: { default: {} },
+    render: () => <p>{label}</p>,
+  };
+}
+
+function previewEntry(id: string, load: () => Promise<ReturnType<typeof previewDefinition>>): RuntimeSourceWorkspaceEntry {
+  return {
+    id,
+    label: id,
+    area: "components",
+    device: "desktop",
+    fileId: `${id}-file`,
+    relativePath: `src/app/components/${id}.tsx`,
+    exportName: id,
+    props: [],
+    slots: [],
+    findings: [],
+    source: { start: 0, end: 1 },
+    component: () => null,
+    design: { fileId: `${id}-design`, relativePath: `src/app/components/${id}.design.tsx`, load },
+  };
+}
