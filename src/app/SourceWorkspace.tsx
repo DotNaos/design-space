@@ -108,7 +108,6 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         setFocusId(occurrenceId);
         setSelection(next);
         setDraftSelection(undefined);
-        setRightMode("code");
         setActivity("app");
         setMobilePane("canvas");
       }}
@@ -131,7 +130,6 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       onSelect={(next) => {
         setSelection(next);
         setDraftSelection(undefined);
-        setRightMode("code");
         setActivity("app");
         setMobilePane(next.kind === "slot" ? "tree" : "canvas");
       }}
