@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
-import { initialFocusOccurrence, sourceFocusGraph, sourceFocusRows } from "./source-focus-tree";
+import {
+  initialFocusOccurrence,
+  initiallyCollapsedSourceBranches,
+  sourceCompositionRows,
+  sourceFocusGraph,
+  sourceFocusRows,
+  visibleSourceCompositionRows,
+} from "./source-focus-tree";
 import type { SourceTreeNode } from "./source-workspace-tree";
 
 describe("focused source tree", () => {
@@ -76,6 +83,39 @@ describe("focused source tree", () => {
     const graph = sourceFocusGraph([app, panel, heading], "desktop");
 
     expect(graph.occurrences.get(initialFocusOccurrence(graph)!)?.node.label).toBe("Panel");
+  });
+
+  it("keeps the complete tree stable when the selected component changes", () => {
+    const heading = node("Heading", entry("Heading"));
+    const text = node("Text", entry("Text"));
+    const panel = node("Panel", entry("Panel"));
+    const app = node("App", entry("App", [
+      component("Panel", [slot("content", [component("Heading"), component("Text")])]),
+    ]));
+    const graph = sourceFocusGraph([app, panel, heading, text], "desktop");
+    const headingId = [...graph.occurrences.values()].find((occurrence) => occurrence.node.label === "Heading")!.id;
+    const textId = [...graph.occurrences.values()].find((occurrence) => occurrence.node.label === "Text")!.id;
+
+    const headingRows = sourceCompositionRows(graph, headingId);
+    const textRows = sourceCompositionRows(graph, textId);
+
+    expect(headingRows.map(({ depth, key, kind, label }) => [depth, key, kind, label]))
+      .toEqual(textRows.map(({ depth, key, kind, label }) => [depth, key, kind, label]));
+    expect(headingRows.find((row) => row.role === "focus")?.label).toBe("Heading");
+    expect(textRows.find((row) => row.role === "focus")?.label).toBe("Text");
+  });
+
+  it("changes descendant visibility only through explicit collapsed branch keys", () => {
+    const heading = node("Heading", entry("Heading"));
+    const panel = node("Panel", entry("Panel"));
+    const app = node("App", entry("App", [component("Panel", [slot("header", [component("Heading")])])]));
+    const graph = sourceFocusGraph([app, panel, heading], "desktop");
+    const panelId = [...graph.occurrences.values()].find((occurrence) => occurrence.node.label === "Panel")!.id;
+    const rows = sourceCompositionRows(graph, panelId);
+    const initial = initiallyCollapsedSourceBranches(rows, panelId);
+
+    expect(visibleSourceCompositionRows(rows, initial).map((row) => row.label)).toEqual(["App", "Panel"]);
+    expect(visibleSourceCompositionRows(rows, new Set()).map((row) => row.label)).toEqual(["App", "Panel", "header", "Heading"]);
   });
 });
 

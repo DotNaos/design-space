@@ -13,16 +13,19 @@ import {
   Tablet,
   TriangleAlert,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { designSpaceDevices, type DesignSpaceDevice, type RuntimeSourceWorkspace, type SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { SourceComponentPicker } from "./SourceComponentPicker";
 import {
   initialFocusOccurrence,
+  initiallyCollapsedSourceBranches,
+  sourceCompositionRows,
   sourceFocusGraph,
-  sourceFocusRows,
   type SourceFocusGraph,
   type SourceFocusRow,
   type SourceOccurrence,
+  visibleSourceCompositionRows,
 } from "./source-focus-tree";
 import { sourceSlotCandidates, type SourceComponentCandidate } from "./source-slot-composition";
 import { sourceTreeNodes, type SourceImplementation, type SourceTreeNode, type SourceTreeSelection } from "./source-workspace-tree";
@@ -52,10 +55,18 @@ export interface SourceWorkspaceSidebarProps {
 
 export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   const device = props.selected?.device ?? "desktop";
-  const nodes = sourceTreeNodes(props.workspace);
-  const graph = sourceFocusGraph(nodes, device);
+  const nodes = useMemo(() => sourceTreeNodes(props.workspace), [props.workspace]);
+  const graph = useMemo(() => sourceFocusGraph(nodes, device), [device, nodes]);
   const focusId = graph.occurrences.has(props.focusId ?? "") ? props.focusId! : initialFocusOccurrence(graph);
-  const rows = focusId ? sourceFocusRows(graph, focusId) : [];
+  const rows = useMemo(() => sourceCompositionRows(graph, focusId), [focusId, graph]);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => initiallyCollapsedSourceBranches(rows, focusId));
+  const visibleRows = useMemo(() => visibleSourceCompositionRows(rows, collapsed), [collapsed, rows]);
+  const toggleBranch = (key: string) => setCollapsed((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
   return (
     <aside aria-label="Source workspace" className={`${props.className ?? "flex w-80"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
       <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
@@ -72,9 +83,10 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
         <div aria-label="Source tree" role="tree">
-          {rows.map((row) => (
+          {visibleRows.map((row) => (
             <FocusTreeRow
               key={`${row.key}:${row.depth}`}
+              collapsed={collapsed.has(row.key)}
               device={device}
               graph={graph}
               nodes={nodes}
@@ -84,6 +96,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
               onApplySlot={props.onApplySlot}
               onFocus={props.onFocus}
               onSelect={props.onSelect}
+              onToggleBranch={toggleBranch}
             />
           ))}
           {!rows.length && <p className="px-4 py-4 text-[10px] text-zinc-600">No configured entry component was found.</p>}
@@ -95,6 +108,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
 
 function FocusTreeRow(props: {
   device: DesignSpaceDevice;
+  collapsed: boolean;
   graph: SourceFocusGraph;
   nodes: ReturnType<typeof sourceTreeNodes>;
   row: SourceFocusRow;
@@ -103,13 +117,14 @@ function FocusTreeRow(props: {
   onApplySlot: SourceWorkspaceSidebarProps["onApplySlot"];
   onFocus: SourceWorkspaceSidebarProps["onFocus"];
   onSelect: SourceWorkspaceSidebarProps["onSelect"];
+  onToggleBranch: (key: string) => void;
 }) {
   const { row } = props;
   const occurrenceRow = row.kind === "component" && !row.layer;
   const focusTarget = row.targetOccurrence ?? (occurrenceRow ? row.occurrence : undefined);
   const active = occurrenceRow
     ? props.selected?.occurrenceId === row.occurrence?.id && props.selected?.kind === "component"
-    : props.selected?.kind === row.kind && (
+    : props.selected?.occurrenceId === row.occurrence?.id && props.selected?.kind === row.kind && (
       props.selected?.layerId === row.layer?.id
       || (row.kind === "slot" && props.selected?.slotName === row.layer?.label)
     );
@@ -148,13 +163,19 @@ function FocusTreeRow(props: {
   return (
     <div aria-label={row.label} className="relative flex min-h-10 items-center pr-2 transition-[padding,opacity,transform] duration-150 ease-out motion-reduce:transition-none" role="treeitem" aria-level={row.depth + 1} aria-selected={active} style={{ paddingLeft: 8 + row.depth * 18 }}>
       {row.depth > 0 && <span aria-hidden="true" className="absolute bottom-0 top-0 border-l border-white/[0.07]" style={{ left: 20 + (row.depth - 1) * 18 }} />}
-      <span className="relative z-10 grid size-6 shrink-0 place-items-center text-zinc-700">
-        {row.role === "focus"
-          ? <CircleDot size={11} className="text-sky-400" />
-          : row.collapsible
-            ? row.expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />
-            : null}
-      </span>
+      {row.collapsible ? (
+        <Button
+          isIconOnly
+          aria-expanded={!props.collapsed}
+          aria-label={`${props.collapsed ? "Expand" : "Collapse"} ${row.label}`}
+          className="relative z-10 size-6 min-w-6 shrink-0 rounded text-zinc-700 hover:bg-white/[0.06] hover:text-zinc-300"
+          size="sm"
+          variant="ghost"
+          onPress={() => props.onToggleBranch(row.key)}
+        >
+          {props.collapsed ? <ChevronRight aria-hidden="true" size={11} /> : <ChevronDown aria-hidden="true" size={11} />}
+        </Button>
+      ) : <span aria-hidden="true" className="size-6 shrink-0" />}
       <Button
         aria-label={`${row.label}${row.role === "focus" ? ", focused" : ""}`}
         className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 text-left ${active ? "bg-sky-500/15 text-sky-100" : row.role === "focus" ? "text-zinc-200" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}
@@ -171,6 +192,7 @@ function FocusTreeRow(props: {
       >
         <Icon aria-hidden="true" className="shrink-0" size={13} />
         <span className={`min-w-0 flex-1 truncate text-xs ${row.kind === "html" ? "font-mono text-[10px]" : ""}`}>{row.label}</span>
+        {row.role === "focus" && <CircleDot aria-label="Selected component" className="shrink-0 text-sky-400" size={11} />}
         {row.kind === "component" && row.occurrence && <MissingDeviceCluster implementations={row.occurrence.node.implementations} />}
         {status && <SlotStatus layer={slot!} />}
       </Button>

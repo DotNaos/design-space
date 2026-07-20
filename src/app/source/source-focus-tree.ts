@@ -121,6 +121,95 @@ export function sourceFocusRows(
   return compositionRows(graph, focus);
 }
 
+export function sourceCompositionRows(
+  graph: SourceFocusGraph,
+  selectedOccurrenceId?: string,
+): readonly SourceFocusRow[] {
+  const rows: SourceFocusRow[] = [];
+
+  const appendOccurrence = (occurrence: SourceOccurrence, depth: number) => {
+    const usageSlots = occurrenceSlots(occurrence);
+    const localLayers = occurrence.entry?.layers ?? [];
+    rows.push(componentRow(
+      occurrence,
+      depth,
+      occurrence.id === selectedOccurrenceId ? "focus" : undefined,
+      usageSlots.length > 0 || localLayers.length > 0,
+    ));
+
+    for (const slot of usageSlots) {
+      appendLayer(slot, occurrence, occurrence.usageOwnerId ?? occurrence.node.id, depth + 1);
+    }
+    for (const layer of localLayers) {
+      appendLayer(layer, occurrence, occurrence.node.id, depth + 1);
+    }
+  };
+
+  const appendLayer = (
+    layer: SourceWorkspaceLayer,
+    owner: SourceOccurrence,
+    sourceOwnerId: string,
+    depth: number,
+  ) => {
+    if (layer.kind === "component") {
+      const target = owner.children
+        .map((id) => graph.occurrences.get(id))
+        .find((candidate) => candidate?.usageLayer?.id === layer.id);
+      if (target) appendOccurrence(target, depth);
+      return;
+    }
+
+    rows.push({
+      ...layerRow(layer, depth, owner, sourceOwnerId),
+      key: `${owner.id}/${layer.id}`,
+      collapsible: layer.children.length > 0,
+    });
+    for (const child of layer.children) appendLayer(child, owner, sourceOwnerId, depth + 1);
+  };
+
+  for (const rootId of graph.roots) {
+    const root = graph.occurrences.get(rootId);
+    if (root) appendOccurrence(root, 0);
+  }
+  return rows;
+}
+
+export function visibleSourceCompositionRows(
+  rows: readonly SourceFocusRow[],
+  collapsed: ReadonlySet<string>,
+): readonly SourceFocusRow[] {
+  const visible: SourceFocusRow[] = [];
+  let hiddenBelowDepth: number | undefined;
+  for (const row of rows) {
+    if (hiddenBelowDepth !== undefined && row.depth > hiddenBelowDepth) continue;
+    hiddenBelowDepth = undefined;
+    visible.push(row);
+    if (row.collapsible && collapsed.has(row.key)) hiddenBelowDepth = row.depth;
+  }
+  return visible;
+}
+
+export function initiallyCollapsedSourceBranches(
+  rows: readonly SourceFocusRow[],
+  selectedOccurrenceId?: string,
+): ReadonlySet<string> {
+  const selectedIndex = rows.findIndex((row) => row.occurrence?.id === selectedOccurrenceId && row.kind === "component");
+  const openAncestors = new Set<string>();
+  if (selectedIndex >= 0) {
+    const selectedDepth = rows[selectedIndex]!.depth;
+    let parentDepth = selectedDepth - 1;
+    for (let index = selectedIndex - 1; index >= 0 && parentDepth >= 0; index -= 1) {
+      const candidate = rows[index]!;
+      if (candidate.depth !== parentDepth) continue;
+      openAncestors.add(candidate.key);
+      parentDepth -= 1;
+    }
+  }
+  return new Set(rows.flatMap((row) => (
+    row.collapsible && !openAncestors.has(row.key) ? [row.key] : []
+  )));
+}
+
 function compositionRows(
   graph: SourceFocusGraph,
   focus: SourceOccurrence,
