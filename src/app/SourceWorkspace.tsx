@@ -20,6 +20,9 @@ import {
   initialSourceTreeSelection,
   sourceTreeNodes,
 } from "./source/source-workspace-tree";
+import { initialFocusOccurrence, sourceFocusGraph } from "./source/source-focus-tree";
+import { applySourceSlotCandidate, moveSourceSlotChild, removeSourceSlotChild, type SourceComponentCandidate } from "./source/source-slot-composition";
+import { useSourceDraftAnalysis } from "./source/useSourceDraftAnalysis";
 import { useSourceFileEditor } from "./source/useSourceFileEditor";
 import { useSourceLayerClassEditor } from "./source/useSourceLayerClassEditor";
 import { DiffSheet } from "./components/DiffSheet/DiffSheet";
@@ -28,30 +31,53 @@ import { SourceComponentCreateSheet } from "./source/SourceComponentCreateSheet"
 import { useSourceComponentCreation } from "./source/useSourceComponentCreation";
 
 export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
-  const workspace = target.sourceWorkspace;
-  if (!workspace) return null;
-  const nodes = useMemo(() => sourceTreeNodes(workspace), [workspace]);
-  const initial = initialSourceTreeSelection(nodes);
+  const registeredWorkspace = target.sourceWorkspace;
+  if (!registeredWorkspace) return null;
+  const registeredNodes = useMemo(() => sourceTreeNodes(registeredWorkspace), [registeredWorkspace]);
+  const initial = initialSourceTreeSelection(registeredNodes);
+  const initialGraph = useMemo(() => sourceFocusGraph(registeredNodes, initial?.device ?? "desktop"), [initial?.device, registeredNodes]);
+  const initialFocusId = initialFocusOccurrence(initialGraph);
+  const initialFocus = initialFocusId ? initialGraph.occurrences.get(initialFocusId) : undefined;
   const [activity, setActivity] = useState<WorkspaceActivity>("app");
   const [mobilePane, setMobilePane] = useState<MobilePane>("canvas");
-  const [selection, setSelection] = useState<SourceWorkspaceSelection | undefined>(initial);
+  const [selection, setSelection] = useState<SourceWorkspaceSelection | undefined>(() => initial && initialFocusId ? {
+    ...initial,
+    nodeId: initialFocus?.node.id ?? initial.nodeId,
+    occurrenceId: initialFocusId,
+    kind: "component",
+  } : initial);
+  const [focusId, setFocusId] = useState<string | undefined>(initialFocusId);
+  const [draftSelection, setDraftSelection] = useState<{ start: number; end: number }>();
   const [rightMode, setRightMode] = useState<"code" | "design">("code");
   const [selectedProjectFileId, setSelectedProjectFileId] = useState<string>();
-  const [selectedLibraryComponent, setSelectedLibraryComponent] = useState(() => workspace.library?.components[0]?.name);
+  const [selectedLibraryComponent, setSelectedLibraryComponent] = useState(() => registeredWorkspace.library?.components[0]?.name);
   const componentCreation = useSourceComponentCreation();
-  const selectedNode = nodes.find((candidate) => candidate.id === selection?.nodeId) ?? nodes[0];
+  const registeredSourceNode = registeredNodes.find((candidate) => candidate.id === (selection?.sourceNodeId ?? selection?.nodeId)) ?? registeredNodes[0];
   const requestedDevice = selection?.device ?? initial?.device ?? "desktop";
-  const entry = selectedNode?.implementations[requestedDevice].entry;
-  const selectedLayer = findSourceTreeLayer(entry?.layers, selection?.layerId);
-  const previewEntry = selectedLayer?.kind === "html" && hasRequiredPreviewArguments(entry)
-    ? nodes.find((candidate) => candidate.area === "layout")?.implementations[requestedDevice].entry ?? entry
-    : entry;
+  const registeredCodeEntry = registeredSourceNode?.implementations[requestedDevice].entry;
+  const editor = useSourceFileEditor(registeredCodeEntry?.fileId);
+  const draftAnalysis = useSourceDraftAnalysis(registeredWorkspace, editor);
+  const workspace = draftAnalysis.workspace;
+  const nodes = useMemo(() => sourceTreeNodes(workspace), [workspace]);
+  const graph = useMemo(() => sourceFocusGraph(nodes, requestedDevice), [nodes, requestedDevice]);
+  const resolvedFocusId = graph.occurrences.has(focusId ?? "") ? focusId : initialFocusOccurrence(graph);
+  const focusedOccurrence = resolvedFocusId ? graph.occurrences.get(resolvedFocusId) : undefined;
+  const selectedNode = nodes.find((candidate) => candidate.id === selection?.nodeId) ?? focusedOccurrence?.node ?? nodes[0];
+  const sourceNode = nodes.find((candidate) => candidate.id === (selection?.sourceNodeId ?? selectedNode?.id)) ?? selectedNode;
+  const entry = sourceNode?.implementations[requestedDevice].entry;
+  const inspectorEntry = focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
+  const selectedLayer = findSourceTreeLayer(entry?.layers, selection?.layerId)
+    ?? (selection?.kind === "slot" && selection.slotName
+      ? findSourceSlotLayer(entry?.layers, selection.slotName)
+      : undefined);
+  const previewEntry = selectedLayer?.kind === "html" && hasRequiredPreviewArguments(inspectorEntry)
+    ? nodes.find((candidate) => candidate.area === "layout")?.implementations[requestedDevice].entry ?? inspectorEntry
+    : inspectorEntry;
   const selectedLabel = selectedLayer?.kind === "html"
     ? `<${selectedLayer.label}>`
     : selectedLayer?.kind === "slot"
       ? `slot:${selectedLayer.label}`
-      : selectedNode?.label;
-  const editor = useSourceFileEditor(entry?.fileId);
+      : focusedOccurrence?.node.label ?? selectedNode?.label;
   const styleEditor = useSourceLayerClassEditor({
     connected: workspace.runtime === "react",
     editor,
@@ -62,6 +88,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const activeEditor = activity === "files" ? fileEditor : editor;
   const activeEditable = activity === "files" ? Boolean(selectedProjectFile?.editable) : activity === "app" ? Boolean(entry) : false;
   const connected = workspace.runtime === "react";
+  const sourceSlotsValid = workspace.entries.every((candidate) => sourceLayersAreValid(candidate.layers ?? []));
   const breadcrumb = activity === "files"
     ? ["Files"]
     : activity === "library"
@@ -73,14 +100,39 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const appSidebar = (
     <SourceWorkspaceSidebar
       className="flex h-full w-full border-r-0"
+      focusId={resolvedFocusId}
       selected={selection}
       workspace={workspace}
       onCreateComponent={componentCreation.open}
-      onSelect={(next) => {
+      onFocus={(occurrenceId, next) => {
+        setFocusId(occurrenceId);
         setSelection(next);
-        setRightMode("code");
+        setDraftSelection(undefined);
         setActivity("app");
         setMobilePane("canvas");
+      }}
+      onApplySlot={(slot, _occurrence, candidate: SourceComponentCandidate, action) => {
+        if (!entry || !editor.snapshot || editor.snapshot.fileId !== entry.fileId) return;
+        try {
+          const result = applySourceSlotCandidate(editor.draft, entry.relativePath, slot, candidate, action);
+          editor.setDraft(result.source);
+          setDraftSelection(result.selection);
+          setSelection((current) => current ? {
+            ...current,
+            layerId: undefined,
+            slotName: slot.label,
+            kind: "slot",
+          } : current);
+        } catch {
+          return;
+        }
+      }}
+      onSelect={(next) => {
+        if (next.occurrenceId) setFocusId(next.occurrenceId);
+        setSelection(next);
+        setDraftSelection(undefined);
+        setActivity("app");
+        setMobilePane(next.kind === "slot" ? "tree" : "canvas");
       }}
     />
   );
@@ -113,19 +165,24 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
             editor={editor}
             label={entry?.label ?? selectedNode?.label ?? "Source"}
             path={entry?.relativePath}
-            selection={selectedLayer?.source ?? entry?.source}
+            selection={draftSelection ?? selectedLayer?.source ?? entry?.source}
           />
         ) : <SourcePreviewFrame
           device={requestedDevice}
           entry={previewEntry}
+          entries={workspace.entries}
           node={selectedNode}
-          selectedLayer={selectedLayer?.kind === "html" ? selectedLayer : undefined}
+          selectedLayer={selectedLayer}
           selectedClassCss={styleEditor.css}
           selectedClassName={selectedLayer?.className ? styleEditor.value : undefined}
           selectedText={selectedLayer?.text ? styleEditor.textValue : undefined}
           runtime={workspace.runtime}
           styles={workspace.styles}
-          onDeviceChange={(device) => selectedNode && setSelection({ nodeId: selectedNode.id, device })}
+          onDeviceChange={(device) => selectedNode && setSelection((current) => ({
+            ...(current ?? {}),
+            nodeId: selectedNode.id,
+            device,
+          }))}
         />}
       </div>
     </div>
@@ -147,14 +204,34 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
                 editor={editor}
                 label={entry?.label ?? selectedNode?.label ?? "Source"}
                 path={entry?.relativePath}
-                selection={selectedLayer?.source ?? entry?.source}
+                selection={draftSelection ?? selectedLayer?.source ?? entry?.source}
               />
             ) : (
               <SourceComponentInspector
                 className="flex h-full w-full border-l-0"
-                entry={entry}
+                entry={inspectorEntry}
                 layer={selectedLayer}
                 styleEditor={styleEditor}
+                onMoveSlotChild={(index, direction) => {
+                  if (!selectedLayer || selectedLayer.kind !== "slot") return;
+                  try {
+                    const result = moveSourceSlotChild(editor.draft, selectedLayer, index, direction);
+                    editor.setDraft(result.source);
+                    setDraftSelection(result.selection);
+                  } catch {
+                    return;
+                  }
+                }}
+                onRemoveSlotChild={(index) => {
+                  if (!selectedLayer || selectedLayer.kind !== "slot") return;
+                  try {
+                    const result = removeSourceSlotChild(editor.draft, selectedLayer, index);
+                    editor.setDraft(result.source);
+                    setDraftSelection(result.selection);
+                  } catch {
+                    return;
+                  }
+                }}
               />
             )}
           </div>
@@ -198,16 +275,22 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           documentLabel={activity === "files" ? selectedProjectFile?.label ?? "Project files" : selectedLabel ?? "No source entry"}
           breadcrumb={breadcrumb}
           connected={connected}
-          checking={false}
-          canUndo={false}
-          canRedo={false}
+          checking={draftAnalysis.analyzing}
+          canUndo={activeEditor.canUndo}
+          canRedo={activeEditor.canRedo}
           canReset={activeEditable && activeEditor.dirty}
           canStrictUi={false}
-          canDiff={activeEditable && activeEditor.dirty && !(activity === "app" && styleEditor.error)}
-          canSave={activeEditable && Boolean(activeEditor.prepared)}
+          canDiff={activeEditable && activeEditor.dirty && sourceSlotsValid && !(activity === "app" && styleEditor.error)}
+          canSave={activeEditable && sourceSlotsValid && Boolean(activeEditor.prepared)}
           saving={activeEditor.saving}
-          onUndo={() => undefined}
-          onRedo={() => undefined}
+          onUndo={() => {
+            activeEditor.undo();
+            setDraftSelection(undefined);
+          }}
+          onRedo={() => {
+            activeEditor.redo();
+            setDraftSelection(undefined);
+          }}
           onReset={activity === "app" && (selectedLayer?.className || selectedLayer?.text) ? styleEditor.reset : activeEditor.reset}
           onStrictUi={() => undefined}
           onDiff={() => void activeEditor.prepare()}
@@ -250,6 +333,18 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   );
 }
 
+function findSourceSlotLayer(
+  layers: readonly import("../shared/source-workspace").SourceWorkspaceLayer[] | undefined,
+  slotName: string,
+): import("../shared/source-workspace").SourceWorkspaceLayer | undefined {
+  for (const layer of layers ?? []) {
+    if (layer.kind === "slot" && layer.label === slotName) return layer;
+    const nested = findSourceSlotLayer(layer.children, slotName);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
 function FileEvidencePanel(props: { editable: boolean; label?: string }) {
   return (
     <aside aria-label="Project file evidence" className="flex h-full w-full flex-col border-l border-white/10 bg-[#141518] p-4">
@@ -262,4 +357,11 @@ function FileEvidencePanel(props: { editable: boolean; label?: string }) {
       </p>
     </aside>
   );
+}
+
+function sourceLayersAreValid(layers: readonly import("../shared/source-workspace").SourceWorkspaceLayer[]): boolean {
+  return layers.every((layer) => (
+    (!layer.slot || (layer.slot.validity !== "missing" && layer.slot.validity !== "incompatible"))
+    && sourceLayersAreValid(layer.children)
+  ));
 }

@@ -14,6 +14,7 @@ import {
   type SavedEdit,
   type SavedProjectFileEdit,
   type SavedSourceComponentCreate,
+  type SourceDraftAnalysis,
   type SourceSnapshot,
   type TailwindIntelligence,
   type TailwindPreview,
@@ -140,7 +141,7 @@ export class EditService {
     });
   }
 
-  async execute(input: unknown): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | TailwindPreview | TailwindIntelligence> {
+  async execute(input: unknown): Promise<SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | TailwindPreview | TailwindIntelligence> {
     const parsed = browserOperationSchema.safeParse(input);
     if (!parsed.success) {
       throw new DesignSpaceError("INVALID_REQUEST", "The browser operation is invalid");
@@ -148,7 +149,7 @@ export class EditService {
     return this.#executeParsed(parsed.data);
   }
 
-  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | ProjectFileSnapshot | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | TailwindPreview | TailwindIntelligence> {
+  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | TailwindPreview | TailwindIntelligence> {
     switch (operation.type) {
       case "analyze-tailwind":
         return this.#tailwindIntelligence.analyze(operation.value, operation.cursor);
@@ -156,6 +157,8 @@ export class EditService {
         return (await this.#tailwind.compile(operation.value)).preview;
       case "read-project-file":
         return this.readProjectFile(operation.fileId);
+      case "analyze-source-file-draft":
+        return this.analyzeSourceFileDraft(operation.fileId, operation.source);
       case "prepare-project-file-edit":
         return this.prepareProjectFileEdit(operation.fileId, operation.source, operation.baseVersion);
       case "save-project-file-edit":
@@ -185,6 +188,27 @@ export class EditService {
       unavailableMessage: "The registered file is not available for source browsing",
     });
     return { fileId, label: file.displayName, source, version: sourceVersion(source) };
+  }
+
+  async analyzeSourceFileDraft(fileId: string, source: string): Promise<SourceDraftAnalysis> {
+    const file = this.#editableProjectFile(fileId);
+    const workspace = this.#target.sourceWorkspace;
+    if (!workspace || !/\.tsx?$/.test(file.path)) {
+      throw new DesignSpaceError("INVALID_REQUEST", "Only registered TypeScript source targets can be analyzed");
+    }
+    try {
+      const loader = file.displayName.endsWith(".tsx") ? "tsx" : "ts";
+      await transformWithEsbuild(source, file.displayName, { loader, jsx: "automatic" });
+      assertEditedTypeScriptCompiles(this.#target.root, file.path, source);
+    } catch {
+      throw new DesignSpaceError("COMPILE_ERROR", "The edited TypeScript source did not compile");
+    }
+    const components = await indexTypeScriptComponents({
+      projectRoot: this.#target.root,
+      filePaths: workspace.files.filter((candidate) => /\.tsx?$/.test(candidate.absolutePath)).map((candidate) => candidate.absolutePath),
+      sourceOverrides: new Map([[file.path, source], [file.path.replaceAll("\\", "/"), source]]),
+    });
+    return { fileId, components };
   }
 
   async prepareProjectFileEdit(
@@ -395,6 +419,14 @@ async function assertStrictUiEditDoesNotRegress(
     filePaths: [filePath],
     sourceOverrides: new Map([[filePath, nextSource], [filePath.replaceAll("\\", "/"), nextSource]]),
   });
+  const invalidSlot = edited.flatMap((component) => component.findings.map((finding) => ({ component, finding })))
+    .find(({ finding }) => finding.ruleId === "strict-ui.slot-content-missing" || finding.ruleId === "strict-ui.slot-content-incompatible");
+  if (invalidSlot) {
+    throw new DesignSpaceError(
+      "COMPILE_ERROR",
+      `Strict UI rejected ${invalidSlot.component.label}: ${invalidSlot.finding.message}`,
+    );
+  }
   const baseline = new Set(current.flatMap((component) => component.findings.map((finding) => (
     `${component.exportName}:${finding.ruleId}:${finding.message}`
   ))));

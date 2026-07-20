@@ -7,6 +7,7 @@ import type {
   SavedEdit,
   SavedProjectFileEdit,
   SavedSourceComponentCreate,
+  SourceDraftAnalysis,
   SourceSnapshot,
   TailwindIntelligence,
   TailwindPreview,
@@ -14,7 +15,7 @@ import type {
 import type { DocumentOperation, DocumentOperationResult } from "../shared/document-transactions";
 
 type LocalOperation = BrowserOperation | DocumentOperation;
-type OperationResult = SourceSnapshot | ProjectFileSnapshot | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | TailwindPreview | TailwindIntelligence | DocumentOperationResult;
+type OperationResult = SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | TailwindPreview | TailwindIntelligence | DocumentOperationResult;
 
 export class LocalOperationError extends Error {
   constructor(

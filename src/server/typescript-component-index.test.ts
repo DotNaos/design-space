@@ -175,6 +175,61 @@ describe("TypeScript component index", () => {
     }]);
   });
 
+  it("maps typed slot occupancy and validation from the caller JSX", async () => {
+    const root = await createProject();
+    await writeFile(join(root, "src/components/Composition.tsx"), `
+      import type { ReactElement } from "react";
+      type ComponentSlot<T> = ReactElement & { readonly __accepts?: T };
+      type ComponentSlotList<T, Min extends number = 0, Max extends number = number> =
+        readonly ComponentSlot<T>[] & { readonly __cardinality?: readonly [Min, Max] };
+      export function Heading() { return <h2>Heading</h2>; }
+      export function Card() { return <article>Card</article>; }
+      export function Button() { return <button>Button</button>; }
+      interface PanelProps {
+        slots: {
+          header: ComponentSlot<typeof Heading>;
+          content: ComponentSlotList<typeof Card, 1, 2>;
+          actions?: ComponentSlotList<typeof Button>;
+        };
+        children?: never;
+      }
+      export function Panel({ slots }: PanelProps) {
+        return <section>{slots.header}{slots.content}{slots.actions}</section>;
+      }
+      export function App() {
+        return <Panel slots={{ header: <Heading />, content: [<Card />] }} />;
+      }
+    `);
+
+    const components = await indexTypeScriptComponents({
+      filePaths: ["src/components/Composition.tsx"],
+      projectRoot: root,
+    });
+    const app = components.find((component) => component.exportName === "App");
+    const panel = app?.layers[0];
+
+    expect(panel).toMatchObject({ label: "Panel", kind: "component" });
+    expect(panel?.children).toEqual([
+      expect.objectContaining({
+        label: "header",
+        kind: "slot",
+        slot: expect.objectContaining({ validity: "full", received: ["Heading"] }),
+        children: [expect.objectContaining({ label: "Heading", kind: "component" })],
+      }),
+      expect.objectContaining({
+        label: "content",
+        kind: "slot",
+        slot: expect.objectContaining({ validity: "valid", received: ["Card"] }),
+        children: [expect.objectContaining({ label: "Card", kind: "component" })],
+      }),
+      expect.objectContaining({
+        label: "actions",
+        kind: "slot",
+        slot: expect.objectContaining({ validity: "optional", received: [] }),
+      }),
+    ]);
+  });
+
   it("reports children instead of treating broad React content as a slot", async () => {
     const root = await createProject();
     await writeFile(join(root, "src/components/InvalidPanel.tsx"), `

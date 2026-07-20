@@ -9,6 +9,7 @@ import { ActivityRail, type WorkspaceMode } from "./components/ActivityRail/Acti
 import { CatalogPanel } from "./components/CatalogPanel/CatalogPanel";
 import { ComponentTree } from "./components/ComponentTree/ComponentTree";
 import { DiffSheet } from "./components/DiffSheet/DiffSheet";
+import { WorkspaceShell } from "./components/WorkspaceShell";
 import { FileBrowser } from "./components/FileBrowser/FileBrowser";
 import { Inspector } from "./components/Inspector/Inspector";
 import { MobileItemEditor } from "./components/MobileItemEditor/MobileItemEditor";
@@ -43,11 +44,25 @@ type FixtureUndo = { fixture: ComponentFixture; compositionCss: Readonly<Record<
 
 export function App() {
   const previewRuntime = useSourcePreviewRuntime();
-  if (target.sourceWorkspace) return <SourceWorkspace nestedPreview={previewRuntime} target={target} />;
-  return usesDocumentWorkspace(target) ? <DocumentWorkspace target={target} /> : <LegacyWorkspace />;
+  if (target.sourceWorkspace) {
+    return <WorkspaceShell slots={{
+      status: undefined as never,
+      content: <SourceWorkspace nestedPreview={previewRuntime} target={target} />,
+    }} />;
+  }
+  if (usesDocumentWorkspace(target)) {
+    return <WorkspaceShell slots={{
+      status: undefined as never,
+      content: <DocumentWorkspace target={target} />,
+    }} />;
+  }
+  return <WorkspaceShell slots={{
+    status: undefined as never,
+    content: <LegacyWorkspace />,
+  }} />;
 }
 
-function LegacyWorkspace() {
+export function LegacyWorkspace() {
   const [revealedInternals, setRevealedInternals] = useState<ReadonlySet<string>>(() => new Set());
   const [fixture, setFixture] = useState<ComponentFixture>(target.defaultFixture);
   const [fixtureUndoStack, setFixtureUndoStack] = useState<FixtureUndo[]>([]);

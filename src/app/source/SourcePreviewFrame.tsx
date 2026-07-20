@@ -16,6 +16,7 @@ export function SourcePreviewFrame(props: {
   entry?: RuntimeSourceWorkspaceEntry;
   runtime: "react" | "react-native";
   styles: readonly string[];
+  entries?: readonly RuntimeSourceWorkspaceEntry[];
   node?: SourceTreeNode;
   selectedLayer?: SourceWorkspaceLayer;
   selectedClassName?: string;
@@ -25,8 +26,9 @@ export function SourcePreviewFrame(props: {
 }) {
   const [mounts, setMounts] = useState<PreviewMounts>();
   const [projectedKey, setProjectedKey] = useState<string>();
-  const previewState = unavailablePreviewState(props);
-  const projectionKey = props.entry && props.selectedLayer
+  const slotSelected = props.selectedLayer?.kind === "slot";
+  const previewState = slotSelected ? undefined : unavailablePreviewState(props);
+  const projectionKey = props.entry && props.selectedLayer?.kind === "html"
     ? `${props.entry.id}:${props.selectedLayer.id}`
     : undefined;
   const completeProjection = useCallback(() => {
@@ -97,7 +99,11 @@ export function SourcePreviewFrame(props: {
                 tabIndex={-1}
                 title={`${props.entry?.label ?? props.node?.label ?? "Source"} ${props.device} preview`}
               />
-              {mounts && !projectionKey && createPortal(<PreviewContent entry={props.entry!} />, mounts.output)}
+              {mounts && slotSelected && createPortal(
+                <SlotPreviewContent entries={props.entries ?? []} layer={props.selectedLayer!} />,
+                mounts.output,
+              )}
+              {mounts && !slotSelected && !projectionKey && createPortal(<PreviewContent entry={props.entry!} />, mounts.output)}
               {mounts && projectionKey && projectedKey !== projectionKey && createPortal(
                 <>
                   <PreviewContent entry={props.entry!} />
@@ -115,6 +121,24 @@ export function SourcePreviewFrame(props: {
         </div>
       )}
     </SourceCanvasViewport>
+  );
+}
+
+function SlotPreviewContent(props: { entries: readonly RuntimeSourceWorkspaceEntry[]; layer: SourceWorkspaceLayer }) {
+  if (!props.layer.children.length) {
+    return <PreviewState title={`${props.layer.label} is empty`} message={props.layer.slot?.validity === "missing" ? "Choose a compatible component to satisfy this required slot." : "This optional slot has no current content."} />;
+  }
+  return (
+    <div data-design-space-slot-preview={props.layer.label} style={{ display: "grid", gap: 12, minHeight: "100%", alignContent: "center", padding: 24 }}>
+      {props.layer.children.map((child) => {
+        const entry = props.entries.find((candidate) => candidate.label === child.label || candidate.exportName === child.label);
+        if (!entry || hasRequiredPreviewArguments(entry)) {
+          return <p key={child.id} style={{ color: "#a1a1aa", font: "12px/1.5 system-ui,sans-serif" }}>{child.label} · source-mapped, preview arguments required</p>;
+        }
+        const Child = entry.component;
+        return <PreviewBoundary key={child.id} resetKey={child.id} errorTitle={`${child.label} preview crashed`} errorMessage="Fix this component source to recover."><Child /></PreviewBoundary>;
+      })}
+    </div>
   );
 }
 

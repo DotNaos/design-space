@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { opaqueIdSchema, sourceVersionSchema } from "./ids";
+import type { SourceComponentProp, SourceComponentSlot, SourceStrictUiFinding, SourceWorkspaceLayer } from "./source-workspace";
 
 export { opaqueIdSchema, sourceVersionSchema } from "./ids";
 
@@ -158,6 +159,11 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("analyze-tailwind"), value: z.string().max(10_000), cursor: z.number().int().min(0).max(10_000) }).strict(),
   z.object({ type: z.literal("read-project-file"), fileId: opaqueIdSchema }).strict(),
   z.object({
+    type: z.literal("analyze-source-file-draft"),
+    fileId: opaqueIdSchema,
+    source: z.string().max(512 * 1024),
+  }).strict(),
+  z.object({
     type: z.literal("prepare-project-file-edit"),
     fileId: opaqueIdSchema,
     baseVersion: sourceVersionSchema,
@@ -198,6 +204,23 @@ export interface ProjectFileSnapshot {
   label: string;
   source: string;
   version: string;
+}
+
+export interface SourceDraftComponent {
+  filePath: string;
+  exportName: string;
+  label: string;
+  props: readonly SourceComponentProp[];
+  slots: readonly SourceComponentSlot[];
+  findings: readonly SourceStrictUiFinding[];
+  source: { start: number; end: number };
+  uses: readonly string[];
+  layers: readonly SourceWorkspaceLayer[];
+}
+
+export interface SourceDraftAnalysis {
+  fileId: string;
+  components: readonly SourceDraftComponent[];
 }
 
 export interface PreparedProjectFileEdit {
