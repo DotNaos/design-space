@@ -11,6 +11,7 @@ import {
   EditService,
   loadRegisteredProject,
   LocalOperationService,
+  LibraryRuntimeService,
   resolveServerProjectRoot,
 } from "./src/server";
 import { createViteFileSystemPolicy } from "./src/server/vite-file-system-policy";
@@ -39,6 +40,7 @@ export default defineConfig(async () => {
   const api = new LocalOperationService(
     new EditService(registeredTarget),
     new DocumentService(registeredTarget),
+    new LibraryRuntimeService(registeredTarget.libraryRuntime),
   );
 
   return {

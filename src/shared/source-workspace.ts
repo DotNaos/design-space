@@ -28,6 +28,18 @@ export interface DesignSpaceProjectConfig {
   source?: {
     layout: string;
   };
+  /** Optional trusted component-library lifecycle owned by the local Design Space server. */
+  library?: {
+    package: string;
+    development?: {
+      /** Absolute or project-relative directory containing the library package. */
+      root: string;
+      /** Fixed executable and arguments. Browser operations can never replace these values. */
+      command: readonly [string, ...string[]];
+      /** Stable Portless service name used to prove that the library is ready. */
+      portlessName: string;
+    };
+  };
 }
 
 /** Keeps .designspace.ts type-safe without introducing a generated manifest. */

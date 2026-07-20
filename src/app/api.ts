@@ -1,5 +1,7 @@
 import type {
   BrowserOperation,
+  LibraryRuntimeOperation,
+  LibraryRuntimeStatus,
   PreparedEdit,
   PreparedProjectFileEdit,
   PreparedSourceComponentCreate,
@@ -14,8 +16,8 @@ import type {
 } from "../shared/contracts";
 import type { DocumentOperation, DocumentOperationResult } from "../shared/document-transactions";
 
-type LocalOperation = BrowserOperation | DocumentOperation;
-type OperationResult = SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | TailwindPreview | TailwindIntelligence | DocumentOperationResult;
+type LocalOperation = BrowserOperation | DocumentOperation | LibraryRuntimeOperation;
+type OperationResult = SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | TailwindPreview | TailwindIntelligence | DocumentOperationResult | LibraryRuntimeStatus;
 
 export class LocalOperationError extends Error {
   constructor(

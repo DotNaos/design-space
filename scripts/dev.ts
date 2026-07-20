@@ -1,10 +1,13 @@
 import { spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dir, "..");
 const isRaw = process.argv.includes("--raw");
 const allowDirect = process.env.DESIGN_SPACE_ALLOW_DIRECT === "1";
 const portlessName = process.env.DESIGN_SPACE_PORTLESS_NAME ?? "design-space";
+const uiLibraryRoot = process.env.DESIGN_SPACE_UI_LIBRARY_ROOT ?? siblingUiLibraryRoot();
 
 function run(command: string, args: string[], env = process.env) {
   const child = spawn(command, args, { cwd: root, env, stdio: "inherit" });
@@ -24,6 +27,7 @@ if (!isRaw) {
   run("bunx", ["portless", "--name", portlessName, "bun", "./scripts/dev.ts", "--raw"], {
     ...process.env,
     DESIGN_SPACE_VIA_PORTLESS: "1",
+    ...(uiLibraryRoot ? { DESIGN_SPACE_UI_LIBRARY_ROOT: uiLibraryRoot } : {}),
   });
 } else {
   if (process.env.DESIGN_SPACE_VIA_PORTLESS !== "1" && !allowDirect) {
@@ -35,4 +39,17 @@ if (!isRaw) {
   }
 
   run("bunx", ["vite", "--host", "127.0.0.1"], process.env);
+}
+
+function siblingUiLibraryRoot(): string | undefined {
+  try {
+    const commonDirectory = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+    const candidate = resolve(commonDirectory, "..", "..", "ui");
+    return existsSync(resolve(candidate, "package.json")) ? candidate : undefined;
+  } catch {
+    return undefined;
+  }
 }
