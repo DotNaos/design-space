@@ -47,8 +47,10 @@ it("shows exact TypeScript prop and slot contracts without editable or invented 
   const slots = screen.getByRole("region", { name: "Slots" });
   expect(within(slots).getByText("actions")).toBeVisible();
   expect(slots).toHaveTextContent("ComponentSlotList<typeof Action>");
-  expect(slots).toHaveTextContent("Multiple");
-  expect(slots).toHaveTextContent("Accepts Action · 1–∞");
+  expect(slots).toHaveTextContent("Required · 1+");
+  expect(within(slots).getByText("Accepts")).toBeVisible();
+  expect(within(slots).getByText("Action")).toBeVisible();
+  expect(within(slots).getByText("Type definition")).toBeVisible();
 
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Code" })).not.toBeInTheDocument();
