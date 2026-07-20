@@ -49,6 +49,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const [focusId, setFocusId] = useState<string | undefined>(initialFocusId);
   const [draftSelection, setDraftSelection] = useState<{ start: number; end: number }>();
   const [rightMode, setRightMode] = useState<"code" | "design">("code");
+  const [codeDocument, setCodeDocument] = useState<"source" | "design">("source");
   const [selectedProjectFileId, setSelectedProjectFileId] = useState<string>();
   const [selectedLibraryComponent, setSelectedLibraryComponent] = useState(() => registeredWorkspace.library?.components[0]?.name);
   const componentCreation = useSourceComponentCreation();
@@ -65,6 +66,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const selectedNode = nodes.find((candidate) => candidate.id === selection?.nodeId) ?? focusedOccurrence?.node ?? nodes[0];
   const sourceNode = nodes.find((candidate) => candidate.id === (selection?.sourceNodeId ?? selectedNode?.id)) ?? selectedNode;
   const entry = sourceNode?.implementations[requestedDevice].entry;
+  const designEditor = useSourceFileEditor(entry?.design?.fileId);
+  const activeCodeDocument = codeDocument === "design" && entry?.design ? "design" : "source";
+  const codeEditor = activeCodeDocument === "design" ? designEditor : editor;
+  const editingDesignDocument = activity === "app" && rightMode === "code" && activeCodeDocument === "design";
   const inspectorEntry = focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
   const selectedLayer = findSourceTreeLayer(entry?.layers, selection?.layerId)
     ?? (selection?.kind === "slot" && selection.slotName
@@ -83,8 +88,18 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   });
   const fileEditor = useSourceFileEditor(selectedProjectFileId);
   const selectedProjectFile = target.files.find((file) => file.id === selectedProjectFileId && file.kind === "file");
-  const activeEditor = activity === "files" ? fileEditor : editor;
-  const activeEditable = activity === "files" ? Boolean(selectedProjectFile?.editable) : activity === "app" ? Boolean(entry) : false;
+  const activeEditor = activity === "files"
+    ? fileEditor
+    : activity === "app" && rightMode === "code"
+      ? codeEditor
+      : editor;
+  const activeEditable = activity === "files"
+    ? Boolean(selectedProjectFile?.editable)
+    : activity === "app"
+      ? activeCodeDocument === "design" && rightMode === "code"
+        ? Boolean(entry?.design)
+        : Boolean(entry)
+      : false;
   const connected = workspace.runtime === "react";
   const sourceSlotsValid = workspace.entries.every((candidate) => sourceLayersAreValid(candidate.layers ?? []));
   const breadcrumb = activity === "files"
@@ -198,11 +213,14 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           <div className="min-h-0 flex-1">
             {rightMode === "code" ? (
               <SourceCodeCanvas
-                editable={Boolean(entry)}
-                editor={editor}
-                label={entry?.label ?? selectedNode?.label ?? "Source"}
-                path={entry?.relativePath}
-                selection={draftSelection ?? selectedLayer?.source ?? entry?.source}
+                editable={activeCodeDocument === "design" ? Boolean(entry?.design) : Boolean(entry)}
+                editor={codeEditor}
+                label={activeCodeDocument === "design" ? `${entry?.label ?? selectedNode?.label ?? "Component"} design` : entry?.label ?? selectedNode?.label ?? "Source"}
+                path={activeCodeDocument === "design" ? entry?.design?.relativePath : entry?.relativePath}
+                selection={activeCodeDocument === "source" ? draftSelection ?? selectedLayer?.source ?? entry?.source : undefined}
+                toolbar={entry?.design ? (
+                  <CodeDocumentSwitch value={activeCodeDocument} onChange={setCodeDocument} />
+                ) : undefined}
               />
             ) : (
               <SourceComponentInspector
@@ -278,8 +296,8 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           canRedo={activeEditor.canRedo}
           canReset={activeEditable && activeEditor.dirty}
           canStrictUi={false}
-          canDiff={activeEditable && activeEditor.dirty && sourceSlotsValid && !(activity === "app" && styleEditor.error)}
-          canSave={activeEditable && sourceSlotsValid && Boolean(activeEditor.prepared)}
+          canDiff={activeEditable && activeEditor.dirty && (editingDesignDocument || sourceSlotsValid) && !(activity === "app" && !editingDesignDocument && styleEditor.error)}
+          canSave={activeEditable && (editingDesignDocument || sourceSlotsValid) && Boolean(activeEditor.prepared)}
           saving={activeEditor.saving}
           onUndo={() => {
             activeEditor.undo();
@@ -289,7 +307,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
             activeEditor.redo();
             setDraftSelection(undefined);
           }}
-          onReset={activity === "app" && (selectedLayer?.className || selectedLayer?.text) ? styleEditor.reset : activeEditor.reset}
+          onReset={activity === "app" && activeEditor === editor && (selectedLayer?.className || selectedLayer?.text) ? styleEditor.reset : activeEditor.reset}
           onStrictUi={() => undefined}
           onDiff={() => void activeEditor.prepare()}
           onSave={() => void activeEditor.save()}
@@ -354,6 +372,34 @@ function FileEvidencePanel(props: { editable: boolean; label?: string }) {
           : "Choose a registered file in the tree. Its code will open in the center workspace."}
       </p>
     </aside>
+  );
+}
+
+function CodeDocumentSwitch(props: {
+  value: "source" | "design";
+  onChange: (value: "source" | "design") => void;
+}) {
+  return (
+    <div aria-label="Code file" className="flex shrink-0 items-center rounded-md bg-white/[0.04] p-0.5" role="group">
+      <Button
+        aria-pressed={props.value === "source"}
+        className={`h-5 min-w-0 rounded px-1.5 text-[9px] ${props.value === "source" ? "bg-white/10 text-zinc-200" : "text-zinc-600"}`}
+        size="sm"
+        variant="ghost"
+        onPress={() => props.onChange("source")}
+      >
+        Source
+      </Button>
+      <Button
+        aria-pressed={props.value === "design"}
+        className={`h-5 min-w-0 rounded px-1.5 text-[9px] ${props.value === "design" ? "bg-white/10 text-zinc-200" : "text-zinc-600"}`}
+        size="sm"
+        variant="ghost"
+        onPress={() => props.onChange("design")}
+      >
+        Design file
+      </Button>
+    </div>
   );
 }
 
