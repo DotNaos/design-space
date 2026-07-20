@@ -65,8 +65,10 @@ describe("TypeScript-first source index", () => {
       packageName: "@dotnaos/react-ui",
       mode: "release",
       editable: false,
-      components: [{ name: "Scrollable", evidence: "project-import" }],
     });
+    expect(result.manifest.library?.components).toEqual(expect.arrayContaining([
+      { name: "Scrollable", evidence: "package-export" },
+    ]));
   });
 
   it("indexes safe project source but excludes dependencies, secrets and symlinks", async () => {

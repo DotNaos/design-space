@@ -14,6 +14,7 @@ import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { readRegisteredFile } from "./registered-file-reader";
 import type { IndexedSourceWorkspace } from "./source-file-index";
 import type { RegisteredSourceComponentStore } from "./source-component-creation";
+import type { RegisteredLibraryRuntime } from "./library-runtime-service";
 
 export interface EditValidationContext {
   fileId: string;
@@ -137,6 +138,7 @@ export interface RegisteredTarget {
   registrationPath?: string;
   sourceWorkspace?: IndexedSourceWorkspace;
   sourceComponentStore?: RegisteredSourceComponentStore;
+  libraryRuntime?: RegisteredLibraryRuntime;
 }
 
 const trustedConfigShape = z

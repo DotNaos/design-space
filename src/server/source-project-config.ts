@@ -15,6 +15,14 @@ const sourceProjectConfigSchema = z.object({
   source: z.object({
     layout: z.string().regex(/^src\/(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+\.tsx$/),
   }).strict().optional(),
+  library: z.object({
+    package: z.string().regex(/^@?[a-z0-9][a-z0-9._/-]*$/i).max(160),
+    development: z.object({
+      root: z.string().min(1).max(1_024),
+      command: z.tuple([z.string().min(1).max(200)]).rest(z.string().min(1).max(500)).refine((command) => command.length <= 16),
+      portlessName: z.string().regex(/^[a-z0-9][a-z0-9.-]{0,79}$/),
+    }).strict().optional(),
+  }).strict().optional(),
 }).strict();
 
 export function parseSourceProjectConfig(value: unknown): DesignSpaceProjectConfig {

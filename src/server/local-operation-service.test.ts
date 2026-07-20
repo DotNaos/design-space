@@ -3,6 +3,7 @@ import { expect, it, vi } from "vitest";
 import type { DocumentService } from "./document-service";
 import type { EditService } from "./edit-service";
 import { LocalOperationService } from "./local-operation-service";
+import type { LibraryRuntimeService } from "./library-runtime-service";
 
 it("routes only typed legacy and document operations to their isolated services", async () => {
   const editExecute = vi.fn(async () => ({ kind: "edit" }));
@@ -25,6 +26,21 @@ it("routes only typed legacy and document operations to their isolated services"
   });
   expect(editExecute).toHaveBeenCalledTimes(1);
   expect(documentExecute).toHaveBeenCalledTimes(3);
+});
+
+it("routes library lifecycle operations only to the library runtime", async () => {
+  const libraryExecute = vi.fn(async () => ({ development: { configured: true, managed: false, state: "stopped" } }));
+  const service = new LocalOperationService(
+    { execute: vi.fn() } as unknown as EditService,
+    { execute: vi.fn() } as unknown as DocumentService,
+    { execute: libraryExecute } as unknown as LibraryRuntimeService,
+  );
+
+  await service.execute({ type: "get-library-runtime" });
+  await service.execute({ type: "start-library-development" });
+  await service.execute({ type: "stop-library-development" });
+
+  expect(libraryExecute).toHaveBeenCalledTimes(3);
 });
 
 it("disposes the edit service once and rejects operations after shutdown", async () => {

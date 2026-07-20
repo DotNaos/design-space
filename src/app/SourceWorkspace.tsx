@@ -30,6 +30,7 @@ import { DiffSheet } from "./components/DiffSheet/DiffSheet";
 import { SourceLibraryCanvas, SourceLibraryInspector, SourceLibrarySidebar } from "./source/SourceLibraryWorkspace";
 import { SourceComponentCreateSheet } from "./source/SourceComponentCreateSheet";
 import { useSourceComponentCreation } from "./source/useSourceComponentCreation";
+import { useSourceLibraryRuntime } from "./source/useSourceLibraryRuntime";
 
 export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
   const registeredWorkspace = target.sourceWorkspace;
@@ -60,6 +61,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const editor = useSourceFileEditor(registeredCodeEntry?.fileId);
   const draftAnalysis = useSourceDraftAnalysis(registeredWorkspace, editor);
   const workspace = draftAnalysis.workspace;
+  const libraryRuntime = useSourceLibraryRuntime(workspace.library);
   const nodes = useMemo(() => sourceTreeNodes(workspace), [workspace]);
   const graph = useMemo(() => sourceFocusGraph(nodes, requestedDevice), [nodes, requestedDevice]);
   const definitionSelected = selection?.kind === "component" && !selection.occurrenceId;
@@ -198,9 +200,34 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       }}
     />
   );
-  const librarySidebar = <SourceLibrarySidebar library={workspace.library} selected={selectedLibraryComponent} onSelect={setSelectedLibraryComponent} />;
+  const librarySidebar = (
+    <SourceLibrarySidebar
+      error={libraryRuntime.error}
+      library={workspace.library}
+      mode={libraryRuntime.mode}
+      pending={libraryRuntime.pending}
+      runtime={libraryRuntime.status}
+      selected={selectedLibraryComponent}
+      onModeChange={libraryRuntime.setMode}
+      onSelect={setSelectedLibraryComponent}
+      onStart={() => void libraryRuntime.start()}
+      onStop={() => void libraryRuntime.stop()}
+    />
+  );
   const left = activity === "files" ? fileSidebar : activity === "library" ? librarySidebar : appSidebar;
-  const canvas = activity === "library" ? <SourceLibraryCanvas library={workspace.library} selected={selectedLibraryComponent} /> : activity === "files" ? (
+  const canvas = activity === "library" ? (
+    <SourceLibraryCanvas
+      error={libraryRuntime.error}
+      library={workspace.library}
+      mode={libraryRuntime.mode}
+      pending={libraryRuntime.pending}
+      runtime={libraryRuntime.status}
+      selected={selectedLibraryComponent}
+      onModeChange={libraryRuntime.setMode}
+      onStart={() => void libraryRuntime.start()}
+      onStop={() => void libraryRuntime.stop()}
+    />
+  ) : activity === "files" ? (
     <SourceCodeCanvas
       editable={Boolean(selectedProjectFile?.editable)}
       editor={fileEditor}
@@ -238,7 +265,19 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     </div>
   );
   const right = activity === "library"
-    ? <SourceLibraryInspector library={workspace.library} selected={selectedLibraryComponent} />
+    ? (
+      <SourceLibraryInspector
+        error={libraryRuntime.error}
+        library={workspace.library}
+        mode={libraryRuntime.mode}
+        pending={libraryRuntime.pending}
+        runtime={libraryRuntime.status}
+        selected={selectedLibraryComponent}
+        onModeChange={libraryRuntime.setMode}
+        onStart={() => void libraryRuntime.start()}
+        onStop={() => void libraryRuntime.stop()}
+      />
+    )
     : activity === "files"
       ? <FileEvidencePanel editable={Boolean(selectedProjectFile?.editable)} label={selectedProjectFile?.label} />
       : (
