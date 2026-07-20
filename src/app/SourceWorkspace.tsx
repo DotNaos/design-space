@@ -62,7 +62,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const workspace = draftAnalysis.workspace;
   const nodes = useMemo(() => sourceTreeNodes(workspace), [workspace]);
   const graph = useMemo(() => sourceFocusGraph(nodes, requestedDevice), [nodes, requestedDevice]);
-  const resolvedFocusId = graph.occurrences.has(focusId ?? "") ? focusId : initialFocusOccurrence(graph);
+  const definitionSelected = selection?.kind === "component" && !selection.occurrenceId;
+  const resolvedFocusId = definitionSelected
+    ? undefined
+    : graph.occurrences.has(focusId ?? "") ? focusId : initialFocusOccurrence(graph);
   const focusedOccurrence = resolvedFocusId ? graph.occurrences.get(resolvedFocusId) : undefined;
   const selectedNode = nodes.find((candidate) => candidate.id === selection?.nodeId) ?? focusedOccurrence?.node ?? nodes[0];
   const sourceNode = nodes.find((candidate) => candidate.id === (selection?.sourceNodeId ?? selectedNode?.id)) ?? selectedNode;
@@ -152,6 +155,19 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       editingSourceOwnerId={selection?.sourceNodeId}
       slotEditorReady={slotEditorReady}
       onCreateComponent={componentCreation.open}
+      onSelectEntry={(selectedEntry) => {
+        const node = nodes.find((candidate) => candidate.entries.some((entry) => entry.id === selectedEntry.id));
+        if (!node) return;
+        setSelection({
+          nodeId: node.id,
+          sourceNodeId: node.id,
+          device: selectedEntry.device,
+          kind: "component",
+        });
+        setDraftSelection(undefined);
+        setActivity("app");
+        setMobilePane("canvas");
+      }}
       onFocus={(occurrenceId, next) => {
         setFocusId(occurrenceId);
         setSelection(next);

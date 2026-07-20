@@ -130,6 +130,7 @@ const callbacks = {
   onFocus: vi.fn(),
   onApplySlot: vi.fn(),
   onSelect: vi.fn(),
+  onSelectEntry: vi.fn(),
 };
 
 it("offers target-owned component creation from the focused tree", async () => {

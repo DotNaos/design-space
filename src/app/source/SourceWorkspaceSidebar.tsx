@@ -17,6 +17,7 @@ import { useMemo, useState } from "react";
 
 import { designSpaceDevices, type DesignSpaceDevice, type RuntimeSourceWorkspace, type SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { SourceComponentPicker } from "./SourceComponentPicker";
+import { SourceDesignAudit } from "./SourceDesignAudit";
 import {
   initialFocusOccurrence,
   initiallyCollapsedSourceBranches,
@@ -54,13 +55,17 @@ export interface SourceWorkspaceSidebarProps {
   slotEditorReady?: boolean;
   onPrepareSlotEdit?: (occurrence: SourceOccurrence) => void;
   onCreateComponent?: () => void;
+  onSelectEntry: (entry: RuntimeSourceWorkspace["entries"][number]) => void;
 }
 
 export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   const device = props.selected?.device ?? "desktop";
   const nodes = useMemo(() => sourceTreeNodes(props.workspace), [props.workspace]);
   const graph = useMemo(() => sourceFocusGraph(nodes, device), [device, nodes]);
-  const focusId = graph.occurrences.has(props.focusId ?? "") ? props.focusId! : initialFocusOccurrence(graph);
+  const definitionSelected = props.selected?.kind === "component" && !props.selected.occurrenceId;
+  const focusId = definitionSelected
+    ? undefined
+    : graph.occurrences.has(props.focusId ?? "") ? props.focusId! : initialFocusOccurrence(graph);
   const rows = useMemo(() => sourceCompositionRows(graph, focusId), [focusId, graph]);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => initiallyCollapsedSourceBranches(rows, focusId));
   const visibleRows = useMemo(() => visibleSourceCompositionRows(rows, collapsed), [collapsed, rows]);
@@ -78,6 +83,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           <h2 className="truncate text-sm font-semibold text-zinc-100">Source tree</h2>
           <p className="mt-0.5 truncate text-[9px] uppercase tracking-[0.14em] text-zinc-600">{props.workspace.sourceRoot} · {props.workspace.runtime === "react-native" ? "React Native" : "React"}</p>
         </div>
+        <SourceDesignAudit workspace={props.workspace} onSelect={props.onSelectEntry} />
         {props.workspace.capabilities?.createComponents && props.onCreateComponent && (
           <Button aria-label="Create component" className="grid size-8 place-items-center rounded-md text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>
             <FilePlus2 aria-hidden="true" size={14} />
