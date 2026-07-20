@@ -1,5 +1,5 @@
 import { Button, Popover, SearchField } from "@heroui/react";
-import { Check, ChevronDown, Component, Eye, Plus, Replace, SearchX } from "lucide-react";
+import { Check, ChevronDown, Component, Eye, SearchX } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { SourceWorkspaceLayer } from "../../shared/source-workspace";
@@ -48,8 +48,9 @@ export function SourceComponentPicker(props: {
           : `${action === "add" ? "Add to" : "Replace content in"} ${props.slot.label} slot`}
         className={props.appearance === "field"
           ? "h-8 w-full min-w-0 justify-between gap-2 rounded-md border border-white/[0.08] bg-black/15 px-2.5 text-[10px] text-zinc-400 hover:border-white/15 hover:bg-white/[0.035] hover:text-zinc-200"
-          : "h-7 min-w-0 shrink-0 gap-1 rounded-md px-2 text-[9px] text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200"}
+          : "grid size-6 min-w-6 shrink-0 place-items-center rounded text-zinc-600 hover:bg-white/[0.06] hover:text-zinc-300"}
         fullWidth={props.appearance === "field"}
+        isIconOnly={props.appearance !== "field"}
         isDisabled={full}
         size="sm"
         variant="ghost"
@@ -62,11 +63,11 @@ export function SourceComponentPicker(props: {
             <ChevronDown aria-hidden="true" className="shrink-0" size={11} />
           </>
         ) : (
-          <>
-            {action === "add" ? <Plus aria-hidden="true" size={11} /> : <Replace aria-hidden="true" size={11} />}
-            {action === "add" ? "Add" : "Replace"}
-            <ChevronDown aria-hidden="true" size={10} />
-          </>
+          <ChevronDown
+            aria-hidden="true"
+            className={`transition-transform ${open ? "rotate-180" : ""}`}
+            size={11}
+          />
         )}
       </Button>
       <Popover.Content className="w-[min(22rem,calc(100vw-1rem))] rounded-xl border border-white/10 bg-[#1a1b1f] p-0 text-zinc-200 shadow-2xl" placement="bottom start">

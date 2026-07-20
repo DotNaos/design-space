@@ -20,7 +20,10 @@ it("searches compatible components and applies the active result from the keyboa
     />,
   );
 
-  await userEvent.click(screen.getByRole("button", { name: "Add to notice slot" }));
+  const trigger = screen.getByRole("button", { name: "Add to notice slot" });
+  expect(trigger).not.toHaveTextContent("Add");
+  expect(trigger).not.toHaveTextContent("Replace");
+  await userEvent.click(trigger);
   const search = await screen.findByRole("combobox", { name: "Search compatible components" });
   await userEvent.type(search, "status{Enter}");
   expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ name: "StatusNotice" }), "add");
