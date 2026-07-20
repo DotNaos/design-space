@@ -29,6 +29,7 @@
     "verify:local-only": "bun ./scripts/verify-local-only.ts"
   },
   "dependencies": {
+    "@dotnaos/react-ui": "^0.0.5",
     "@heroui/react": "^3.0.5",
     "@heroui/styles": "^3.0.5",
     "@tailwindcss/language-server": "0.14.29",
