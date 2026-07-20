@@ -126,6 +126,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         }
       }}
       onSelect={(next) => {
+        if (next.occurrenceId) setFocusId(next.occurrenceId);
         setSelection(next);
         setDraftSelection(undefined);
         setActivity("app");

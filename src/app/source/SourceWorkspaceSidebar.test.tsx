@@ -1,5 +1,6 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import type {
@@ -7,7 +8,7 @@ import type {
   RuntimeSourceWorkspaceEntry,
   SourceWorkspaceDeviceState,
 } from "../../shared/source-workspace";
-import { SourceWorkspaceSidebar } from "./SourceWorkspaceSidebar";
+import { SourceWorkspaceSidebar, type SourceWorkspaceSelection } from "./SourceWorkspaceSidebar";
 
 afterEach(cleanup);
 
@@ -145,15 +146,19 @@ it("offers target-owned component creation from the focused tree", async () => {
   expect(onCreateComponent).toHaveBeenCalledOnce();
 });
 
-it("shows composition, typed slots, components, and HTML in one tree", () => {
+it("shows composition, typed slots, components, and HTML in one expandable tree", async () => {
   render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
 
   const tree = screen.getByRole("tree", { name: "Source tree" });
   expect(within(tree).getByRole("treeitem", { name: "DesktopLayout" })).toHaveAttribute("aria-level", "1");
   expect(within(tree).getByRole("button", { name: "Dashboard, focused" })).toBeVisible();
-  expect(within(tree).getByRole("treeitem", { name: "content" })).toHaveAttribute("aria-level", "3");
+  expect(within(tree).queryByRole("treeitem", { name: "content" })).not.toBeInTheDocument();
+  await userEvent.click(within(tree).getByRole("button", { name: "Expand Dashboard" }));
+  expect(within(tree).getByRole("treeitem", { name: "content" })).toHaveAttribute("aria-level", "4");
+  expect(within(tree).getByRole("treeitem", { name: "<section>" })).toHaveAttribute("aria-level", "4");
+  await userEvent.click(within(tree).getByRole("button", { name: "Expand content" }));
+  await userEvent.click(within(tree).getByRole("button", { name: "Expand <section>" }));
   expect(within(tree).getAllByRole("treeitem", { name: "ProjectSummary" })).toHaveLength(2);
-  expect(within(tree).getByRole("treeitem", { name: "<section>" })).toHaveAttribute("aria-level", "3");
   expect(screen.queryByText("Shared components")).not.toBeInTheDocument();
 });
 
@@ -161,6 +166,8 @@ it("moves focus to a child and preserves the direct parent path", async () => {
   const onFocus = vi.fn();
   render(<SourceWorkspaceSidebar {...callbacks} onFocus={onFocus} workspace={workspace} />);
 
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  await userEvent.click(screen.getByRole("button", { name: "Expand content" }));
   await userEvent.click(screen.getAllByRole("button", { name: "ProjectSummary" })[0]!);
   expect(onFocus).toHaveBeenCalledWith(expect.stringContaining("pages:Dashboard"), expect.objectContaining({
     device: "desktop",
@@ -190,6 +197,9 @@ it("drills into local components and selects HTML in the same tree", async () =>
     />,
   );
 
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  await userEvent.click(screen.getByRole("button", { name: "Expand content" }));
+  await userEvent.click(screen.getByRole("button", { name: "Expand <section>" }));
   await userEvent.click(screen.getAllByRole("button", { name: "ProjectSummary" })[1]!);
   expect(onFocus).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({
     kind: "component",
@@ -203,4 +213,47 @@ it("drills into local components and selects HTML in the same tree", async () =>
     layerId: "dashboard-section",
     sourceNodeId: expect.stringContaining("Dashboard"),
   }));
+});
+
+it("keeps the visible tree in place when a component is selected", async () => {
+  function ControlledTree() {
+    const [focusId, setFocusId] = useState<string>();
+    const [selected, setSelected] = useState<SourceWorkspaceSelection>();
+    return (
+      <SourceWorkspaceSidebar
+        {...callbacks}
+        focusId={focusId}
+        selected={selected}
+        workspace={workspace}
+        onFocus={(nextFocusId, nextSelection) => {
+          setFocusId(nextFocusId);
+          setSelected(nextSelection);
+        }}
+      />
+    );
+  }
+
+  render(<ControlledTree />);
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  await userEvent.click(screen.getByRole("button", { name: "Expand content" }));
+  const tree = screen.getByRole("tree", { name: "Source tree" });
+  const labelsBefore = within(tree).getAllByRole("treeitem").map((item) => item.getAttribute("aria-label"));
+
+  await userEvent.click(screen.getAllByRole("button", { name: "ProjectSummary" })[0]!);
+
+  expect(within(tree).getAllByRole("treeitem").map((item) => item.getAttribute("aria-label"))).toEqual(labelsBefore);
+  expect(screen.getByRole("button", { name: "Collapse Dashboard" })).toHaveAttribute("aria-expanded", "true");
+});
+
+it("changes branch visibility only from the chevron", async () => {
+  const onFocus = vi.fn();
+  render(<SourceWorkspaceSidebar {...callbacks} onFocus={onFocus} workspace={workspace} />);
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  expect(screen.getByRole("treeitem", { name: "content" })).toBeVisible();
+  expect(onFocus).not.toHaveBeenCalled();
+
+  await userEvent.click(screen.getByRole("button", { name: "Collapse Dashboard" }));
+  expect(screen.queryByRole("treeitem", { name: "content" })).not.toBeInTheDocument();
+  expect(onFocus).not.toHaveBeenCalled();
 });
