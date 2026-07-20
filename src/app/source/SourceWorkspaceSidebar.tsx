@@ -50,6 +50,9 @@ export interface SourceWorkspaceSidebarProps {
     candidate: SourceComponentCandidate,
     action: "add" | "replace",
   ) => void;
+  editingSourceOwnerId?: string;
+  slotEditorReady?: boolean;
+  onPrepareSlotEdit?: (occurrence: SourceOccurrence) => void;
   onCreateComponent?: () => void;
 }
 
@@ -94,6 +97,9 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
               selected={props.selected}
               workspace={props.workspace}
               onApplySlot={props.onApplySlot}
+              editingSourceOwnerId={props.editingSourceOwnerId}
+              slotEditorReady={props.slotEditorReady}
+              onPrepareSlotEdit={props.onPrepareSlotEdit}
               onFocus={props.onFocus}
               onSelect={props.onSelect}
               onToggleBranch={toggleBranch}
@@ -115,6 +121,9 @@ function FocusTreeRow(props: {
   selected?: SourceWorkspaceSelection;
   workspace: RuntimeSourceWorkspace;
   onApplySlot: SourceWorkspaceSidebarProps["onApplySlot"];
+  editingSourceOwnerId?: string;
+  slotEditorReady?: boolean;
+  onPrepareSlotEdit?: SourceWorkspaceSidebarProps["onPrepareSlotEdit"];
   onFocus: SourceWorkspaceSidebarProps["onFocus"];
   onSelect: SourceWorkspaceSidebarProps["onSelect"];
   onToggleBranch: (key: string) => void;
@@ -196,11 +205,13 @@ function FocusTreeRow(props: {
         {row.kind === "component" && row.occurrence && <MissingDeviceCluster implementations={row.occurrence.node.implementations} />}
         {status && <SlotStatus layer={slot!} />}
       </Button>
-      {slot && row.occurrence && active && (
+      {slot && row.occurrence && (
         <SourceComponentPicker
           candidates={candidates}
+          isBusy={props.editingSourceOwnerId === sourceOwnerId && props.slotEditorReady === false}
           slot={slot}
           triggerId={triggerId}
+          onOpen={() => props.onPrepareSlotEdit?.(row.occurrence!)}
           onApply={(candidate, action) => props.onApplySlot(slot, row.occurrence!, candidate, action)}
         />
       )}

@@ -257,3 +257,16 @@ it("changes branch visibility only from the chevron", async () => {
   expect(screen.queryByRole("treeitem", { name: "content" })).not.toBeInTheDocument();
   expect(onFocus).not.toHaveBeenCalled();
 });
+
+it("keeps a visible slot picker usable without selecting the slot row", async () => {
+  const onSelect = vi.fn();
+  render(<SourceWorkspaceSidebar {...callbacks} onSelect={onSelect} workspace={workspace} />);
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  const picker = screen.getByRole("button", { name: "Replace content in content slot" });
+  expect(picker).toBeVisible();
+
+  await userEvent.click(picker);
+  expect(await screen.findByRole("listbox", { name: "Compatible components" })).toBeVisible();
+  expect(onSelect).not.toHaveBeenCalled();
+});

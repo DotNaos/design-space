@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Braces, ChevronRight, CircleAlert, Component, FileCode2, Trash2 } from "lucide-react";
+import { Braces, ChevronRight, CircleAlert, Component, FileCode2 } from "lucide-react";
 import { Button, Chip, Label, TextArea, TextField } from "@heroui/react";
 
 import type {
@@ -8,15 +8,20 @@ import type {
   SourceWorkspaceLayer,
 } from "../../shared/source-workspace";
 import { TailwindClassField } from "../inspector/TailwindClassField";
+import { SourceComponentPicker } from "./SourceComponentPicker";
+import type { SourceComponentCandidate } from "./source-slot-composition";
 import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
 
 export interface SourceComponentInspectorProps {
   className?: string;
   entry?: SourceWorkspaceEntry;
   layer?: SourceWorkspaceLayer;
+  slotLayers?: readonly SourceWorkspaceLayer[];
+  slotEditorReady?: boolean;
   styleEditor?: SourceLayerClassEditor;
-  onRemoveSlotChild?: (index: number) => void;
-  onMoveSlotChild?: (index: number, direction: -1 | 1) => void;
+  candidatesForSlot?: (slot: SourceWorkspaceLayer) => readonly SourceComponentCandidate[];
+  onApplySlot?: (slot: SourceWorkspaceLayer, candidate: SourceComponentCandidate, action: "add" | "replace") => void;
+  onPrepareSlotEdit?: () => void;
 }
 
 export function SourceComponentInspector(props: SourceComponentInspectorProps) {
@@ -65,9 +70,6 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
             </ul>
           </section>
         )}
-        {props.layer?.kind === "slot" && props.layer.slot && (
-          <SelectedSlotSection layer={props.layer} onMove={props.onMoveSlotChild} onRemove={props.onRemoveSlotChild} />
-        )}
         {props.layer && (props.layer.kind === "html" || props.layer.text) && (
           <LayerDesignSection layer={props.layer} styleEditor={props.styleEditor} />
         )}
@@ -81,55 +83,15 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
           emptyMessage="No slot props are declared."
           icon={<Component aria-hidden="true" size={14} />}
           properties={slots}
+          slotLayers={props.slotLayers}
+          slotEditorReady={props.slotEditorReady}
+          candidatesForSlot={props.candidatesForSlot}
+          onApplySlot={props.onApplySlot}
+          onPrepareSlotEdit={props.onPrepareSlotEdit}
           title="Slots"
         />
       </div>
     </aside>
-  );
-}
-
-function SelectedSlotSection(props: {
-  layer: SourceWorkspaceLayer;
-  onRemove?: (index: number) => void;
-  onMove?: (index: number, direction: -1 | 1) => void;
-}) {
-  const { layer } = props;
-  const usage = layer.slot!;
-  const invalid = usage.validity === "missing" || usage.validity === "incompatible";
-  return (
-    <section aria-label={`${layer.label} slot contract`} className={`border-b px-4 py-4 ${invalid ? "border-amber-300/20 bg-amber-300/[0.04]" : "border-white/10"}`}>
-      <header className="flex items-center gap-2">
-        <Component aria-hidden="true" className={invalid ? "text-amber-300" : "text-sky-400"} size={14} />
-        <h3 className="font-mono text-xs font-semibold text-zinc-100">{layer.label}</h3>
-        <span className={`ml-auto text-[9px] font-medium capitalize ${invalid ? "text-amber-300" : "text-zinc-500"}`}>{usage.validity}</span>
-      </header>
-      <dl className="mt-3 grid grid-cols-[5rem_1fr] gap-x-3 gap-y-2 text-[10px] leading-4">
-        <dt className="text-zinc-600">Accepts</dt><dd className="text-zinc-300">{usage.contract.accepts.join(", ")}</dd>
-        <dt className="text-zinc-600">Cardinality</dt><dd className="text-zinc-300">{usage.received.length} current · {usage.contract.min}–{usage.contract.max ?? "∞"}</dd>
-        <dt className="text-zinc-600">Required</dt><dd className="text-zinc-300">{usage.contract.required || usage.contract.min > 0 ? "Yes" : "No"}</dd>
-        <dt className="text-zinc-600">Current</dt><dd className={usage.received.length ? "text-zinc-300" : "text-zinc-600"}>{usage.received.length ? usage.received.join(", ") : "Empty"}</dd>
-      </dl>
-      {usage.validity === "incompatible" && (
-        <p className="mt-3 text-[10px] leading-4 text-amber-200/80">Expected {usage.contract.accepts.join(" or ")}; received {usage.received.join(", ")}.</p>
-      )}
-      {usage.validity === "missing" && <p className="mt-3 text-[10px] leading-4 text-amber-200/80">This required slot needs at least {usage.contract.min} compatible component{usage.contract.min === 1 ? "" : "s"}.</p>}
-      {layer.children.length > 0 && (
-        <ol aria-label={`${layer.label} slot items`} className="mt-3 space-y-1 border-t border-white/[0.07] pt-2">
-          {layer.children.map((child, index) => (
-            <li key={child.id} className="flex min-h-8 items-center gap-1 rounded-md pl-2 text-[10px] text-zinc-400 hover:bg-white/[0.03]">
-              <Component aria-hidden="true" size={11} /><span className="min-w-0 flex-1 truncate">{child.label}</span>
-              {usage.contract.multiple && (
-                <>
-                  <Button aria-label={`Move ${child.label} up`} className="grid size-7 place-items-center text-zinc-600" isDisabled={index === 0} isIconOnly size="sm" variant="ghost" onPress={() => props.onMove?.(index, -1)}><ArrowUp aria-hidden="true" size={11} /></Button>
-                  <Button aria-label={`Move ${child.label} down`} className="grid size-7 place-items-center text-zinc-600" isDisabled={index === layer.children.length - 1} isIconOnly size="sm" variant="ghost" onPress={() => props.onMove?.(index, 1)}><ArrowDown aria-hidden="true" size={11} /></Button>
-                </>
-              )}
-              <Button aria-label={`Remove ${child.label}`} className="grid size-7 place-items-center text-zinc-600 hover:text-red-300" isDisabled={usage.received.length - 1 < usage.contract.min} isIconOnly size="sm" variant="ghost" onPress={() => props.onRemove?.(index)}><Trash2 aria-hidden="true" size={11} /></Button>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
   );
 }
 
@@ -187,6 +149,11 @@ function ContractSection(props: {
   emptyMessage: string;
   icon: React.ReactNode;
   properties: readonly (SourceComponentProp | SourceComponentSlot)[];
+  slotLayers?: readonly SourceWorkspaceLayer[];
+  slotEditorReady?: boolean;
+  candidatesForSlot?: SourceComponentInspectorProps["candidatesForSlot"];
+  onApplySlot?: SourceComponentInspectorProps["onApplySlot"];
+  onPrepareSlotEdit?: SourceComponentInspectorProps["onPrepareSlotEdit"];
   title: "Props" | "Slots";
 }) {
   return (
@@ -200,7 +167,17 @@ function ContractSection(props: {
       </header>
       {props.properties.length ? (
         <dl>
-          {props.properties.map((property) => <ContractProperty key={property.name} property={property} />)}
+          {props.properties.map((property) => (
+            <ContractProperty
+              key={property.name}
+              property={property}
+              slotLayer={"accepts" in property ? props.slotLayers?.find((layer) => layer.label === property.name) : undefined}
+              slotEditorReady={props.slotEditorReady}
+              candidatesForSlot={props.candidatesForSlot}
+              onApplySlot={props.onApplySlot}
+              onPrepareSlotEdit={props.onPrepareSlotEdit}
+            />
+          ))}
         </dl>
       ) : (
         <p className="px-4 pb-4 text-[10px] leading-4 text-zinc-600">{props.emptyMessage}</p>
@@ -209,9 +186,16 @@ function ContractSection(props: {
   );
 }
 
-function ContractProperty(props: { property: SourceComponentProp | SourceComponentSlot }) {
+function ContractProperty(props: {
+  property: SourceComponentProp | SourceComponentSlot;
+  slotLayer?: SourceWorkspaceLayer;
+  slotEditorReady?: boolean;
+  candidatesForSlot?: SourceComponentInspectorProps["candidatesForSlot"];
+  onApplySlot?: SourceComponentInspectorProps["onApplySlot"];
+  onPrepareSlotEdit?: SourceComponentInspectorProps["onPrepareSlotEdit"];
+}) {
   const slot = "accepts" in props.property ? props.property : undefined;
-  if (slot) return <SlotContractProperty slot={slot} />;
+  if (slot) return <SlotContractProperty {...props} slot={slot} />;
 
   return (
     <div className="border-t border-white/[0.06] px-4 py-3">
@@ -230,7 +214,15 @@ function ContractProperty(props: { property: SourceComponentProp | SourceCompone
   );
 }
 
-function SlotContractProperty({ slot }: { slot: SourceComponentSlot }) {
+function SlotContractProperty(props: {
+  slot: SourceComponentSlot;
+  slotLayer?: SourceWorkspaceLayer;
+  slotEditorReady?: boolean;
+  candidatesForSlot?: SourceComponentInspectorProps["candidatesForSlot"];
+  onApplySlot?: SourceComponentInspectorProps["onApplySlot"];
+  onPrepareSlotEdit?: SourceComponentInspectorProps["onPrepareSlotEdit"];
+}) {
+  const { slot, slotLayer } = props;
   return (
     <div className="border-t border-white/[0.06] px-4 py-3.5">
       <dt className="flex min-w-0 items-center gap-2">
@@ -241,7 +233,17 @@ function SlotContractProperty({ slot }: { slot: SourceComponentSlot }) {
         </span>
       </dt>
       <dd className="mt-2.5 pl-[21px]">
-        <p className="mb-1.5 text-[8px] font-medium uppercase tracking-[0.12em] text-zinc-700">Accepts</p>
+        {slotLayer && props.onApplySlot && (
+          <SourceComponentPicker
+            appearance="field"
+            candidates={props.candidatesForSlot?.(slotLayer) ?? []}
+            isBusy={props.slotEditorReady === false}
+            slot={slotLayer}
+            onOpen={props.onPrepareSlotEdit}
+            onApply={(candidate, action) => props.onApplySlot?.(slotLayer, candidate, action)}
+          />
+        )}
+        <p className={`${slotLayer && props.onApplySlot ? "mt-2.5" : ""} mb-1.5 text-[8px] font-medium uppercase tracking-[0.12em] text-zinc-700`}>Accepts</p>
         <div className="flex flex-wrap gap-1.5">
           {slot.accepts.map((accepted) => (
             <Chip key={accepted} className="h-5 border-white/[0.08] bg-white/[0.035] px-1.5 text-[9px] text-sky-300/80" size="sm" variant="secondary">

@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
 import type { SourceWorkspaceEntry } from "../../shared/source-workspace";
@@ -59,6 +60,50 @@ it("shows exact TypeScript prop and slot contracts without editable or invented 
 it("renders an honest empty selection state", () => {
   render(<SourceComponentInspector />);
   expect(screen.getByText("Select an exported component to inspect its TypeScript contract.")).toBeVisible();
+});
+
+it("fills every composed slot directly from the contract list", async () => {
+  const onApplySlot = vi.fn();
+  const onPrepareSlotEdit = vi.fn();
+  const actionsSlot = {
+    id: "panel-actions",
+    label: "actions",
+    kind: "slot" as const,
+    source: { start: 20, end: 20 },
+    children: [],
+    slot: {
+      contract: entry.slots[0]!,
+      validity: "missing" as const,
+      received: [],
+      edit: { kind: "missing-property" as const, insertAt: 20 },
+    },
+  };
+
+  render(
+    <SourceComponentInspector
+      entry={entry}
+      slotEditorReady
+      slotLayers={[actionsSlot]}
+      candidatesForSlot={() => [{
+        id: "action",
+        name: "Action",
+        group: "Project components",
+        source: "src/Action.tsx",
+        compatible: true,
+        insertable: true,
+        deviceState: "available",
+      }]}
+      onApplySlot={onApplySlot}
+      onPrepareSlotEdit={onPrepareSlotEdit}
+    />,
+  );
+
+  const picker = screen.getByRole("button", { name: "Add to actions slot" });
+  expect(picker).toHaveTextContent("Choose components…");
+  await userEvent.click(picker);
+  expect(onPrepareSlotEdit).toHaveBeenCalledOnce();
+  await userEvent.click(await screen.findByRole("button", { name: "Action, compatible" }));
+  expect(onApplySlot).toHaveBeenCalledWith(actionsSlot, expect.objectContaining({ name: "Action" }), "add");
 });
 
 it("edits a selected HTML layer through its source-derived Tailwind binding", () => {

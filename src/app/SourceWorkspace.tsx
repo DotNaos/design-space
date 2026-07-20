@@ -3,6 +3,7 @@ import { Button } from "@heroui/react";
 import { Code2, SlidersHorizontal } from "lucide-react";
 
 import type { TargetModule } from "../shared/target-module";
+import type { SourceWorkspaceLayer } from "../shared/source-workspace";
 import { ProjectFileBrowser } from "./documents/ProjectFileBrowser";
 import { ResizableWorkspacePanels } from "./shell/ResizableWorkspacePanels";
 import { MobileDock, type MobilePane } from "./shell/MobileDock";
@@ -20,8 +21,8 @@ import {
   initialSourceTreeSelection,
   sourceTreeNodes,
 } from "./source/source-workspace-tree";
-import { initialFocusOccurrence, sourceFocusGraph } from "./source/source-focus-tree";
-import { applySourceSlotCandidate, moveSourceSlotChild, removeSourceSlotChild, type SourceComponentCandidate } from "./source/source-slot-composition";
+import { initialFocusOccurrence, sourceFocusGraph, type SourceOccurrence } from "./source/source-focus-tree";
+import { applySourceSlotCandidate, sourceSlotCandidates, type SourceComponentCandidate } from "./source/source-slot-composition";
 import { useSourceDraftAnalysis } from "./source/useSourceDraftAnalysis";
 import { useSourceFileEditor } from "./source/useSourceFileEditor";
 import { useSourceLayerClassEditor } from "./source/useSourceLayerClassEditor";
@@ -76,6 +77,12 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       ? findSourceSlotLayer(entry?.layers, selection.slotName)
       : undefined);
   const previewEntry = inspectorEntry;
+  const inspectorSlotLayers = focusedOccurrence?.usageLayer?.children.filter((layer) => layer.kind === "slot" && layer.slot) ?? [];
+  const inspectorSourceOwner = focusedOccurrence?.usageOwnerId
+    ? nodes.find((node) => node.id === focusedOccurrence.usageOwnerId)
+    : undefined;
+  const inspectorSourceOwnerEntry = inspectorSourceOwner?.implementations[requestedDevice].entry;
+  const slotEditorReady = Boolean(entry && editor.snapshot?.fileId === entry.fileId && !editor.loading);
   const selectedLabel = selectedLayer?.kind === "html"
     ? `<${selectedLayer.label}>`
     : selectedLayer?.kind === "slot"
@@ -110,12 +117,40 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         ? ["App", selectedNode.label, ...(selectedLayer ? [selectedLabel ?? selectedLayer.label] : [])]
         : ["App"];
 
+  const prepareSlotEdit = (occurrence: SourceOccurrence) => {
+    const sourceOwnerId = occurrence.usageOwnerId ?? occurrence.node.id;
+    setSelection((current) => current ? { ...current, sourceNodeId: sourceOwnerId } : {
+      nodeId: occurrence.node.id,
+      sourceNodeId: sourceOwnerId,
+      device: requestedDevice,
+      occurrenceId: occurrence.id,
+      kind: "component",
+    });
+  };
+  const applySlot = (
+    slot: SourceWorkspaceLayer,
+    _occurrence: SourceOccurrence,
+    candidate: SourceComponentCandidate,
+    action: "add" | "replace",
+  ) => {
+    if (!entry || !editor.snapshot || editor.snapshot.fileId !== entry.fileId) return;
+    try {
+      const result = applySourceSlotCandidate(editor.draft, entry.relativePath, slot, candidate, action);
+      editor.setDraft(result.source);
+      setDraftSelection(result.selection);
+    } catch {
+      return;
+    }
+  };
+
   const appSidebar = (
     <SourceWorkspaceSidebar
       className="flex h-full w-full border-r-0"
       focusId={resolvedFocusId}
       selected={selection}
       workspace={workspace}
+      editingSourceOwnerId={selection?.sourceNodeId}
+      slotEditorReady={slotEditorReady}
       onCreateComponent={componentCreation.open}
       onFocus={(occurrenceId, next) => {
         setFocusId(occurrenceId);
@@ -124,22 +159,8 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         setActivity("app");
         setMobilePane("canvas");
       }}
-      onApplySlot={(slot, _occurrence, candidate: SourceComponentCandidate, action) => {
-        if (!entry || !editor.snapshot || editor.snapshot.fileId !== entry.fileId) return;
-        try {
-          const result = applySourceSlotCandidate(editor.draft, entry.relativePath, slot, candidate, action);
-          editor.setDraft(result.source);
-          setDraftSelection(result.selection);
-          setSelection((current) => current ? {
-            ...current,
-            layerId: undefined,
-            slotName: slot.label,
-            kind: "slot",
-          } : current);
-        } catch {
-          return;
-        }
-      }}
+      onApplySlot={applySlot}
+      onPrepareSlotEdit={prepareSlotEdit}
       onSelect={(next) => {
         if (next.occurrenceId) setFocusId(next.occurrenceId);
         setSelection(next);
@@ -227,27 +248,12 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
                 className="flex h-full w-full border-l-0"
                 entry={inspectorEntry}
                 layer={selectedLayer}
+                slotLayers={inspectorSlotLayers}
+                slotEditorReady={selection?.sourceNodeId === focusedOccurrence?.usageOwnerId && slotEditorReady}
                 styleEditor={styleEditor}
-                onMoveSlotChild={(index, direction) => {
-                  if (!selectedLayer || selectedLayer.kind !== "slot") return;
-                  try {
-                    const result = moveSourceSlotChild(editor.draft, selectedLayer, index, direction);
-                    editor.setDraft(result.source);
-                    setDraftSelection(result.selection);
-                  } catch {
-                    return;
-                  }
-                }}
-                onRemoveSlotChild={(index) => {
-                  if (!selectedLayer || selectedLayer.kind !== "slot") return;
-                  try {
-                    const result = removeSourceSlotChild(editor.draft, selectedLayer, index);
-                    editor.setDraft(result.source);
-                    setDraftSelection(result.selection);
-                  } catch {
-                    return;
-                  }
-                }}
+                candidatesForSlot={(slot) => sourceSlotCandidates(workspace, nodes, slot, requestedDevice, inspectorSourceOwnerEntry?.relativePath ?? entry?.relativePath ?? "")}
+                onApplySlot={(slot, candidate, action) => focusedOccurrence && applySlot(slot, focusedOccurrence, candidate, action)}
+                onPrepareSlotEdit={() => focusedOccurrence && prepareSlotEdit(focusedOccurrence)}
               />
             )}
           </div>

@@ -10,8 +10,11 @@ import {
 
 export function SourceComponentPicker(props: {
   candidates: readonly SourceComponentCandidate[];
+  appearance?: "action" | "field";
+  isBusy?: boolean;
   slot: SourceWorkspaceLayer;
   triggerId?: string;
+  onOpen?: () => void;
   onApply: (candidate: SourceComponentCandidate, action: "add" | "replace") => void;
 }) {
   const usage = props.slot.slot;
@@ -26,7 +29,7 @@ export function SourceComponentPicker(props: {
     [props.candidates, query, revealIncompatible],
   );
   const apply = (candidate: SourceComponentCandidate) => {
-    if (!candidate.insertable) return;
+    if (!candidate.insertable || props.isBusy) return;
     props.onApply(candidate, action);
     setOpen(false);
     setQuery("");
@@ -34,6 +37,7 @@ export function SourceComponentPicker(props: {
   return (
     <Popover isOpen={open} onOpenChange={(next) => {
       if (full) return;
+      if (next) props.onOpen?.();
       setOpen(next);
       if (next) setActive(0);
     }}>
@@ -42,14 +46,28 @@ export function SourceComponentPicker(props: {
         aria-label={full
           ? `${props.slot.label} slot is full, ${usage?.received.length} of ${usage?.contract.max}`
           : `${action === "add" ? "Add to" : "Replace content in"} ${props.slot.label} slot`}
-        className="h-7 min-w-0 shrink-0 gap-1 rounded-md px-2 text-[9px] text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200"
+        className={props.appearance === "field"
+          ? "h-8 w-full min-w-0 justify-between gap-2 rounded-md border border-white/[0.08] bg-black/15 px-2.5 text-[10px] text-zinc-400 hover:border-white/15 hover:bg-white/[0.035] hover:text-zinc-200"
+          : "h-7 min-w-0 shrink-0 gap-1 rounded-md px-2 text-[9px] text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200"}
+        fullWidth={props.appearance === "field"}
         isDisabled={full}
         size="sm"
         variant="ghost"
       >
-        {action === "add" ? <Plus aria-hidden="true" size={11} /> : <Replace aria-hidden="true" size={11} />}
-        {action === "add" ? "Add" : "Replace"}
-        <ChevronDown aria-hidden="true" size={10} />
+        {props.appearance === "field" ? (
+          <>
+            <span className={`min-w-0 flex-1 truncate text-left ${usage?.received.length ? "text-zinc-300" : "text-zinc-600"}`}>
+              {slotPickerValue(props.slot)}
+            </span>
+            <ChevronDown aria-hidden="true" className="shrink-0" size={11} />
+          </>
+        ) : (
+          <>
+            {action === "add" ? <Plus aria-hidden="true" size={11} /> : <Replace aria-hidden="true" size={11} />}
+            {action === "add" ? "Add" : "Replace"}
+            <ChevronDown aria-hidden="true" size={10} />
+          </>
+        )}
       </Button>
       <Popover.Content className="w-[min(22rem,calc(100vw-1rem))] rounded-xl border border-white/10 bg-[#1a1b1f] p-0 text-zinc-200 shadow-2xl" placement="bottom start">
         <Popover.Dialog className="outline-none">
@@ -100,7 +118,7 @@ export function SourceComponentPicker(props: {
                   aria-label={`${candidate.name}, ${candidate.compatible ? "compatible" : "incompatible"}`}
                   className={`min-h-12 w-full justify-start gap-2.5 rounded-lg px-2 text-left ${index === active ? "bg-sky-400/10 text-sky-100" : "text-zinc-300 hover:bg-white/[0.05]"}`}
                   fullWidth
-                  isDisabled={!candidate.insertable}
+                  isDisabled={!candidate.insertable || props.isBusy}
                   variant="ghost"
                   onHoverStart={() => setActive(index)}
                   onPress={() => apply(candidate)}
@@ -125,6 +143,9 @@ export function SourceComponentPicker(props: {
                 <p className="mt-1 text-[9px] leading-4 text-zinc-600">This slot accepts {usage?.contract.accepts.join(", ")}.</p>
               </div>
             )}
+            {props.isBusy && candidates.length > 0 && (
+              <p className="px-3 py-2 text-[9px] text-zinc-600">Loading the slot owner source…</p>
+            )}
           </div>
           <div className="flex items-center border-t border-white/10 p-2">
             <Button
@@ -142,4 +163,11 @@ export function SourceComponentPicker(props: {
       </Popover.Content>
     </Popover>
   );
+}
+
+function slotPickerValue(slot: SourceWorkspaceLayer): string {
+  const received = slot.slot?.received ?? [];
+  if (!received.length) return slot.slot?.contract.multiple ? "Choose components…" : "Choose component…";
+  if (received.length === 1) return received[0]!;
+  return `${received.length} components`;
 }
