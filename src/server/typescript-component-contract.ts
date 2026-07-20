@@ -58,6 +58,7 @@ export function extractComponentContract(
       name,
       required: isRequired(property, type),
       type: checker.typeToString(type, declaration, typeFormatFlags),
+      ...finiteValues(type),
     });
   }
 
@@ -67,6 +68,24 @@ export function extractComponentContract(
     findings,
     typeText: checker.typeToString(propsType, location, typeFormatFlags),
   };
+}
+
+function finiteValues(type: ts.Type): Pick<SourceComponentProp, "values"> {
+  const relevant = type.isUnion()
+    ? type.types.filter((part) => !(part.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)))
+    : [type];
+  if (!relevant.length) return {};
+  const values = relevant.flatMap((part): (boolean | number | string)[] => {
+    if (part.flags & ts.TypeFlags.BooleanLiteral) {
+      return [(part as unknown as { intrinsicName?: string }).intrinsicName === "true"];
+    }
+    if (part.isStringLiteral()) return [part.value];
+    if (part.isNumberLiteral()) return [part.value];
+    return [];
+  });
+  if (values.length === relevant.length && values.length <= 24) return { values };
+  if (relevant.length === 1 && relevant[0]?.flags & ts.TypeFlags.Boolean) return { values: [false, true] };
+  return {};
 }
 
 function extractNamedSlots(

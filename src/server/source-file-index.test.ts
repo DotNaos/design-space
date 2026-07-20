@@ -42,8 +42,9 @@ describe("TypeScript-first source index", () => {
     const summary = result.manifest.entries.find((entry) => entry.label === "ProjectSummary");
     expect(summary?.props).toEqual([
       expect.objectContaining({ name: "label", type: "string", required: true, kind: "string" }),
-      expect.objectContaining({ name: "ready", required: false, kind: "boolean" }),
+      expect.objectContaining({ name: "ready", required: false, kind: "boolean", values: [false, true] }),
     ]);
+    expect(summary?.design).toMatchObject({ relativePath: "src/app/components/ProjectSummary/desktop.design.tsx" });
     expect(summary?.slots).toEqual([]);
     expect(summary?.findings).toEqual([]);
     const shell = result.manifest.entries.find((entry) => entry.label === "AppShell");
@@ -102,6 +103,10 @@ describe("TypeScript-first source index", () => {
     await writeFile(join(root, "src", "design-space", "app.tsx"), "export function ProjectPreview() { return <main />; }\n");
     await writeFile(join(root, "src", "pages", "SettingsPage.tsx"), "export function SettingsPage() { return <main />; }\n");
     await writeFile(join(root, "src", "components", "Navigation.tsx"), "export function Navigation() { return <nav />; }\n");
+    await writeFile(join(root, "src", "components", "Navigation.design.tsx"), [
+      'import { Navigation } from "./Navigation";',
+      "export default defineComponentDesign(Navigation, {});",
+    ].join("\n"));
     await writeFile(join(root, "src", "components", "Navigation.test.tsx"), "export function TestOnly() { return <nav />; }\n");
     await writeFile(join(root, "src", "app", "components", "StatusBadge", "index.tsx"), "export function StatusBadge() { return <span />; }\n");
 
@@ -118,6 +123,36 @@ describe("TypeScript-first source index", () => {
       { area: "components", label: "Navigation", relativePath: "src/components/Navigation.tsx" },
     ]);
     expect(result.manifest.devices).toContainEqual(expect.objectContaining({ device: "mobile", state: "responsive" }));
+    expect(result.manifest.entries.find((entry) => entry.label === "Navigation")?.design).toMatchObject({
+      relativePath: "src/components/Navigation.design.tsx",
+    });
+    expect(result.manifest.entries.some((entry) => entry.label === "NavigationDesign")).toBe(false);
+  });
+
+  it("binds a colocated design only to the component export passed to defineComponentDesign", async () => {
+    const root = await mkdtemp(join(tmpdir(), "design-space-design-binding-"));
+    roots.push(root);
+    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
+    await mkdir(join(root, "src", "components", "Workspace"), { recursive: true });
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
+    await writeFile(join(root, "src", "components", "Workspace", "index.tsx"), [
+      "export function Workspace() { return <main />; }",
+      "export function WorkspaceStatus() { return <span />; }",
+    ].join("\n"));
+    await writeFile(join(root, "src", "components", "Workspace", "index.design.tsx"), [
+      'import { Workspace as Preview } from ".";',
+      "export default defineComponentDesign(Preview, {});",
+    ].join("\n"));
+
+    const result = await indexSourceWorkspace(root, {
+      project: { id: "bound-design", label: "Bound design" },
+      devices: { mode: "responsive" },
+    });
+
+    expect(result.manifest.entries.find((entry) => entry.label === "Workspace")?.design).toMatchObject({
+      relativePath: "src/components/Workspace/index.design.tsx",
+    });
+    expect(result.manifest.entries.find((entry) => entry.label === "WorkspaceStatus")?.design).toBeUndefined();
   });
 
   it("derives release and development connections without claiming unregistered write access", async () => {

@@ -50,6 +50,39 @@ owned by its source file regardless of how many instances exist.
 Component props MUST be read from the compiler-resolved TypeScript props type. Ordinary values such as
 `string`, `number`, `boolean`, enums, and structured data are properties, not source-tree nodes.
 
+## Colocated component designs
+
+Design Space MUST NOT execute an indexed source component directly. Every previewable component, page,
+or layout has a colocated `.design.tsx` module that imports the real component and binds it with
+`defineComponentDesign`. The implementation source remains the authority shown in the Source tree and
+Code tab; only the design module is executable preview input.
+
+The component props interface is the only property and slot schema. A design MUST NOT redeclare property
+names, property types, requiredness, finite choices, or slot contracts. It supplies concrete preview
+values, providers, callbacks, and typed slot content. Design Space derives finite property-matrix axes
+from compiler evidence such as literal unions, enums, and booleans. Arbitrary strings, numbers, objects,
+callbacks, and external data require explicit preview values because Design Space MUST NOT invent them.
+
+Statefulness is semantic and therefore explicit through the simple `isStateful` boolean. It MUST NOT be
+inferred from React hooks or prop names. A stateless design exposes one or more named designs and MUST
+include `default`. A stateful design exposes named states and MUST name one existing `initialState`.
+Both forms are normal TypeScript: their values MUST satisfy the real component props type, and the
+compiler MUST reject an `initialState` that is not a key of the declared `states` object.
+
+```tsx
+export default defineComponentDesign(Button, {
+  isStateful: false,
+  defaults: { variant: "solid", size: "md", isDisabled: false, slots: { label: "Button" } },
+  designs: { default: {}, disabled: { isDisabled: true } },
+  render: (props) => <Button {...props} />,
+});
+```
+
+Preview readiness follows an explicit state machine: missing design, checking, invalid design, ready,
+runtime crash, or last-valid preview while an edit is invalid. Only ready or last-valid evidence may
+reach the canvas renderer. Slot and HTML isolation MUST render through the active design as well; there
+is no direct-render fallback.
+
 ## HTML contract
 
 An HTML node is an intrinsic JSX element such as `<main>`, `<section>`, or `<button>`. Its identity and

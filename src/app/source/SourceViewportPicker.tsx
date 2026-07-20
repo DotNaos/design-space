@@ -1,5 +1,6 @@
 import { Label, ListBox, Select, Slider } from "@heroui/react";
 import { MonitorSmartphone } from "lucide-react";
+import type { ReactNode } from "react";
 
 import type { DesignSpaceDevice } from "../../shared/source-workspace";
 import { SourceDeviceTabs } from "./SourceDeviceTabs";
@@ -7,6 +8,7 @@ import type { SourceTreeNode } from "./source-workspace-tree";
 import { sourceViewportPresets } from "./source-viewports";
 
 export function SourceViewportPicker(props: {
+  after?: ReactNode;
   device: DesignSpaceDevice;
   node?: SourceTreeNode;
   presetId: string;
@@ -19,10 +21,10 @@ export function SourceViewportPicker(props: {
     <div className="pointer-events-auto flex h-9 min-w-0 items-center gap-1 px-0.5 lg:h-7">
       <SourceDeviceTabs device={props.device} node={props.node} onChange={props.onDeviceChange} />
       <span aria-hidden="true" className="h-5 w-px shrink-0 bg-white/10" />
-      <MonitorSmartphone aria-hidden="true" className="hidden shrink-0 text-zinc-500 sm:block" size={13} />
+      <MonitorSmartphone aria-hidden="true" className="hidden shrink-0 text-zinc-500 sm:block group-data-[narrow=true]/canvas-controls:hidden" size={13} />
       <Select
         aria-label="Preview dimensions"
-        className="w-28 min-w-0 shrink sm:w-36 lg:w-44"
+        className="w-28 min-w-0 shrink sm:w-36 lg:w-44 group-data-[narrow=true]/canvas-controls:w-24"
         selectedKey={props.presetId}
         onSelectionChange={(key) => props.onPresetChange(String(key))}
       >
@@ -57,6 +59,7 @@ export function SourceViewportPicker(props: {
           </Slider>
         </>
       )}
+      {props.after ? <><span aria-hidden="true" className="h-5 w-px shrink-0 bg-white/10" />{props.after}</> : null}
     </div>
   );
 }

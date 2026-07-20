@@ -14,6 +14,7 @@ export function SourceCanvasViewport(props: {
   node?: SourceTreeNode;
   selectionKey?: string;
   selectionLabel?: string;
+  toolbarEnd?: React.ReactNode;
   onDeviceChange: (device: DesignSpaceDevice) => void;
 }) {
   const [presetId, setPresetId] = useState(() => defaultSourceViewport(props.device).id);
@@ -52,6 +53,7 @@ export function SourceCanvasViewport(props: {
             onDeviceChange={changeDevice}
             onPresetChange={changePreset}
             onResponsiveWidthChange={(width) => setResponsiveWidth(Math.max(320, Math.min(1440, width)))}
+            after={props.toolbarEnd}
           />
         )}
         preview={(

@@ -17,6 +17,7 @@ import {
 import { DesignSpaceError } from "./errors";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { readRegisteredFile } from "./registered-file-reader";
+import { indexSourceDesigns, sourceDesignKey } from "./source-design-index";
 import { indexTypeScriptComponents } from "./typescript-component-index";
 
 const SOURCE_ROOT = "src/app" as const;
@@ -74,12 +75,13 @@ export async function indexSourceWorkspace(
   const conventionCandidates = files.filter((file) => sourceLocation(file.relativePath));
   const inferredCatalog = Boolean(config.source?.layout) || conventionCandidates.length === 0;
   const componentCandidates = inferredCatalog
-    ? files.filter((file) => inferredSourceLocation(file.relativePath, config))
+    ? files.filter((file) => !isDesignModule(file.relativePath) && inferredSourceLocation(file.relativePath, config))
     : conventionCandidates;
   const indexedComponents = await indexTypeScriptComponents({
     projectRoot: root,
     filePaths: componentCandidates.map((file) => file.absolutePath),
   });
+  const indexedDesigns = await indexSourceDesigns(root, files);
 
   const entries: SourceWorkspaceEntry[] = [];
   const entryFiles = new Map<string, string>();
@@ -109,6 +111,7 @@ export async function indexSourceWorkspace(
       uses: component.uses,
       layers: component.layers,
       previewable: true,
+      ...componentDesign(indexedDesigns, relativePath, component.exportName),
     });
     entryFiles.set(id, file.absolutePath);
   }
@@ -302,7 +305,7 @@ function inferredSourceLocation(
   relativePath: string,
   config: DesignSpaceProjectConfig,
 ): { area: DesignSpaceArea; device: DesignSpaceDevice } | undefined {
-  if (!relativePath.endsWith(".tsx") || /(?:^|\/)[^/]+\.(?:test|spec|stories)\.tsx$/.test(relativePath)) return undefined;
+  if (!relativePath.endsWith(".tsx") || /(?:^|\/)[^/]+\.(?:test|spec|stories|design)\.tsx$/.test(relativePath)) return undefined;
   const device = inferredDevice(relativePath);
   const fileName = relativePath.split("/").at(-1) ?? relativePath;
   const configuredLayout = config.source?.layout;
@@ -317,6 +320,19 @@ function inferredSourceLocation(
       ? "pages"
       : "components";
   return { area, device };
+}
+
+function isDesignModule(relativePath: string): boolean {
+  return relativePath.endsWith(".design.tsx");
+}
+
+function componentDesign(
+  designs: ReadonlyMap<string, { design: IndexedSourceFile }>,
+  sourcePath: string,
+  exportName: string,
+): Pick<SourceWorkspaceEntry, "design"> {
+  const file = designs.get(sourceDesignKey(sourcePath, exportName))?.design;
+  return file ? { design: { fileId: file.id, relativePath: file.relativePath } } : {};
 }
 
 function inferredDevice(relativePath: string): DesignSpaceDevice {

@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { Grid2X2 } from "lucide-react";
+import { Button, ListBox, Select } from "@heroui/react";
 
 import type {
   DesignSpaceDevice,
   RuntimeSourceWorkspaceEntry,
   SourceWorkspaceLayer,
 } from "../../shared/source-workspace";
+import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { PreviewBoundary } from "../PreviewBoundary";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
 import { SourcePreviewRuntimeContext } from "./SourcePreviewRuntime";
@@ -26,10 +29,56 @@ export function SourcePreviewFrame(props: {
 }) {
   const [mounts, setMounts] = useState<PreviewMounts>();
   const [projectedKey, setProjectedKey] = useState<string>();
-  const slotSelected = props.selectedLayer?.kind === "slot";
-  const previewState = slotSelected ? undefined : unavailablePreviewState(props);
-  const projectionKey = props.entry && props.selectedLayer?.kind === "html"
-    ? `${props.entry.id}:${props.selectedLayer.id}`
+  const [loaded, setLoaded] = useState<LoadedDesign>();
+  const [loadState, setLoadState] = useState<"checking" | "invalid" | "ready">("checking");
+  const [loadMessage, setLoadMessage] = useState<string>();
+  const [caseByDesign, setCaseByDesign] = useState<Readonly<Record<string, string>>>({});
+  const [matrixByDesign, setMatrixByDesign] = useState<Readonly<Record<string, boolean>>>({});
+  const designId = props.entry?.design?.fileId;
+  useEffect(() => {
+    const design = props.entry?.design;
+    if (!design) {
+      setLoaded(undefined);
+      setLoadState("checking");
+      setLoadMessage(undefined);
+      return;
+    }
+    let active = true;
+    setLoadState("checking");
+    void design.load().then((definition) => {
+      if (!active) return;
+      const message = invalidDesignMessage(definition);
+      if (message) {
+        setLoadState("invalid");
+        setLoadMessage(message);
+        return;
+      }
+      setLoaded({ designId: design.fileId, definition });
+      setLoadState("ready");
+      setLoadMessage(undefined);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      setLoadState("invalid");
+      setLoadMessage(error instanceof Error ? error.message : "The colocated design could not be loaded.");
+    });
+    return () => { active = false; };
+  }, [designId, props.entry?.design]);
+  const activeLoaded = loaded?.designId === designId ? loaded : undefined;
+  const definition = activeLoaded?.definition;
+  const caseNames = useMemo(() => Object.keys(definition?.cases ?? {}), [definition]);
+  const selectedCase = definition && caseNames.includes(caseByDesign[designId ?? ""] ?? "")
+    ? caseByDesign[designId ?? ""]!
+    : definition?.initialCase;
+  const matrixAvailable = Boolean(props.entry?.props.some((property) => (property.values?.length ?? 0) > 1));
+  const matrix = Boolean(designId && matrixByDesign[designId] && !props.selectedLayer);
+  const previewState = unavailablePreviewState({
+    ...props,
+    definition,
+    loadMessage,
+    loadState,
+  });
+  const projectionKey = props.entry && props.selectedLayer?.kind === "html" && selectedCase
+    ? `${props.entry.id}:${props.selectedLayer.id}:${selectedCase}`
     : undefined;
   const completeProjection = useCallback(() => {
     if (projectionKey) setProjectedKey(projectionKey);
@@ -85,6 +134,18 @@ export function SourcePreviewFrame(props: {
       selectionKey={props.selectedLayer?.id ?? props.entry?.id}
       selectionLabel={props.selectedLayer?.kind === "html" ? `<${props.selectedLayer.label}>` : props.node?.label}
       onDeviceChange={props.onDeviceChange ?? (() => undefined)}
+      toolbarEnd={definition && selectedCase ? (
+        <SourceDesignControls
+          caseNames={caseNames}
+          isStateful={definition.isStateful}
+          matrix={matrix}
+          matrixAvailable={matrixAvailable}
+          selectedCase={selectedCase}
+          stale={loadState === "invalid"}
+          onCaseChange={(next) => designId && setCaseByDesign((current) => ({ ...current, [designId]: next }))}
+          onMatrixChange={() => designId && setMatrixByDesign((current) => ({ ...current, [designId]: !current[designId] }))}
+        />
+      ) : undefined}
     >
       {(frame) => (
         <div className="h-full w-full" style={{ width: frame.width, height: frame.height }}>
@@ -99,14 +160,13 @@ export function SourcePreviewFrame(props: {
                 tabIndex={-1}
                 title={`${props.entry?.label ?? props.node?.label ?? "Source"} ${props.device} preview`}
               />
-              {mounts && slotSelected && createPortal(
-                <SlotPreviewContent entries={props.entries ?? []} layer={props.selectedLayer!} />,
+              {mounts && !projectionKey && createPortal(
+                <PreviewContent caseName={selectedCase!} definition={definition!} entry={props.entry!} matrix={matrix} />,
                 mounts.output,
               )}
-              {mounts && !slotSelected && !projectionKey && createPortal(<PreviewContent entry={props.entry!} />, mounts.output)}
               {mounts && projectionKey && projectedKey !== projectionKey && createPortal(
                 <>
-                  <PreviewContent entry={props.entry!} />
+                  <PreviewContent caseName={selectedCase!} definition={definition!} entry={props.entry!} matrix={false} />
                   <IsolatedLayerProjector
                     layerId={props.selectedLayer!.id}
                     output={mounts.output}
@@ -124,44 +184,20 @@ export function SourcePreviewFrame(props: {
   );
 }
 
-function SlotPreviewContent(props: { entries: readonly RuntimeSourceWorkspaceEntry[]; layer: SourceWorkspaceLayer }) {
-  if (!props.layer.children.length) {
-    return <PreviewState title={`${props.layer.label} is empty`} message={props.layer.slot?.validity === "missing" ? "Choose a compatible component to satisfy this required slot." : "This optional slot has no current content."} />;
-  }
-  return (
-    <div data-design-space-slot-preview={props.layer.label} style={{ display: "grid", gap: 12, minHeight: "100%", alignContent: "center", padding: 24 }}>
-      {props.layer.children.map((child) => {
-        const entry = props.entries.find((candidate) => candidate.label === child.label || candidate.exportName === child.label);
-        if (!entry || hasRequiredPreviewArguments(entry)) {
-          return <p key={child.id} style={{ color: "#a1a1aa", font: "12px/1.5 system-ui,sans-serif" }}>{child.label} · source-mapped, preview arguments required</p>;
-        }
-        const Child = entry.component;
-        return <PreviewBoundary key={child.id} resetKey={child.id} errorTitle={`${child.label} preview crashed`} errorMessage="Fix this component source to recover."><Child /></PreviewBoundary>;
-      })}
-    </div>
-  );
-}
-
-function unavailablePreviewState(props: Pick<Parameters<typeof SourcePreviewFrame>[0], "device" | "entry" | "runtime">) {
+function unavailablePreviewState(props: Pick<Parameters<typeof SourcePreviewFrame>[0], "device" | "entry" | "runtime"> & {
+  definition?: ComponentDesignDefinition;
+  loadMessage?: string;
+  loadState: "checking" | "invalid" | "ready";
+}) {
   if (props.runtime === "react-native") return <PreviewState title="React Native target indexed" message="The native source tree and TypeScript contracts are available. A simulator renderer must connect before this target can claim preview readiness." />;
   if (!props.entry) return <PreviewState title={`No ${props.device} implementation`} message="Add an exported React component at the shown fixed path, or configure the explicit Tablet fallback." />;
-  const requiredProps = props.entry.props.filter((property) => property.required);
-  const requiredSlots = props.entry.slots.filter((slot) => slot.required || slot.min > 0);
-  if (requiredProps.length > 0 || requiredSlots.length > 0) {
-    const requirements = [
-      requiredProps.length ? `Required props: ${requiredProps.map((property) => property.name).join(", ")}` : undefined,
-      requiredSlots.length ? `Required slots: ${requiredSlots.map((slot) => slot.name).join(", ")}` : undefined,
-    ].filter(Boolean).join(". ");
-    return <PreviewState title="Preview arguments required" message={`Design Space will not invent values or execute this component with an invalid contract. ${requirements}.`} />;
+  if (!props.entry.design) return <PreviewState title="Design required" message={`Add ${props.entry.relativePath.replace(/\.tsx$/, ".design.tsx")} next to this component. Design Space never executes source components directly.`} />;
+  if (!props.definition) {
+    return props.loadState === "invalid"
+      ? <PreviewState title="Design invalid" message={props.loadMessage ?? "Fix the colocated design to enable this preview."} />
+      : <PreviewState title="Checking design" message="TypeScript and the colocated design module are being verified before the canvas can execute them." />;
   }
   return undefined;
-}
-
-export function hasRequiredPreviewArguments(entry: RuntimeSourceWorkspaceEntry | undefined): boolean {
-  return Boolean(entry && (
-    entry.props.some((property) => property.required)
-    || entry.slots.some((slot) => slot.required || slot.min > 0)
-  ));
 }
 
 type PreviewMounts = {
@@ -172,15 +208,93 @@ type PreviewMounts = {
 
 const previewDocument = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style id="design-space-preview-styles"></style><style>#design-space-preview-staging{position:fixed;left:-100000px;top:0;width:100%;visibility:hidden;pointer-events:none}</style></head><body><div id="design-space-preview-staging"></div><div id="design-space-preview-root"></div></body></html>';
 
-function PreviewContent(props: { entry: RuntimeSourceWorkspaceEntry }) {
-  const entry = props.entry;
-  const Component = entry.component;
+function PreviewContent(props: {
+  caseName: string;
+  definition: ComponentDesignDefinition;
+  entry: RuntimeSourceWorkspaceEntry;
+  matrix: boolean;
+}) {
+  const cases = propertyCases(props.entry, props.matrix);
   return (
-    <PreviewBoundary resetKey={entry.id} errorTitle="Target preview crashed" errorMessage="Fix the target source or its required runtime context to recover.">
-      <SourcePreviewRuntimeContext.Provider value><Component /></SourcePreviewRuntimeContext.Provider>
+    <PreviewBoundary resetKey={`${props.entry.id}:${props.caseName}:${props.matrix}`} errorTitle="Design preview crashed" errorMessage="Fix the colocated design or its required runtime context to recover.">
+      <SourcePreviewRuntimeContext.Provider value>
+        <div style={cases.length > 1 ? { display: "grid", gridTemplateColumns: `repeat(${Math.min(cases.length, 3)}, minmax(0, 1fr))`, gap: 16, padding: 16 } : undefined}>
+          {cases.map((propertyCase) => (
+            <section key={propertyCase.label} style={cases.length > 1 ? { minWidth: 0, border: "1px solid rgba(127,127,127,.22)", borderRadius: 8, padding: 12 } : undefined}>
+              {cases.length > 1 ? <p style={{ margin: "0 0 8px", color: "#71717a", font: "10px/1.4 ui-monospace,monospace" }}>{propertyCase.label}</p> : null}
+              {props.definition.render({
+                ...props.definition.defaults,
+                ...props.definition.cases[props.caseName],
+                ...propertyCase.values,
+              })}
+            </section>
+          ))}
+        </div>
+      </SourcePreviewRuntimeContext.Provider>
     </PreviewBoundary>
   );
 }
+
+function propertyCases(entry: RuntimeSourceWorkspaceEntry, matrix: boolean): readonly PropertyCase[] {
+  if (!matrix) return [{ label: "Current", values: {} }];
+  const axes = entry.props.filter((property) => (property.values?.length ?? 0) > 1).slice(0, 2);
+  if (!axes.length) return [{ label: "Current", values: {} }];
+  const [rows, columns] = axes;
+  return (rows?.values ?? []).flatMap((row) => (columns?.values ?? [undefined]).map((column) => ({
+    label: [rows ? `${rows.name}=${String(row)}` : undefined, columns && column !== undefined ? `${columns.name}=${String(column)}` : undefined].filter(Boolean).join(" · "),
+    values: {
+      ...(rows ? { [rows.name]: row } : {}),
+      ...(columns && column !== undefined ? { [columns.name]: column } : {}),
+    },
+  }))).slice(0, 18);
+}
+
+function SourceDesignControls(props: {
+  caseNames: readonly string[];
+  isStateful: boolean;
+  matrix: boolean;
+  matrixAvailable: boolean;
+  selectedCase: string;
+  stale: boolean;
+  onCaseChange: (value: string) => void;
+  onMatrixChange: () => void;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-1">
+      {props.stale ? <span className="hidden text-[9px] text-amber-300 xl:inline">Last valid</span> : null}
+      <span className="hidden text-[9px] text-zinc-600 xl:inline">{props.isStateful ? "State" : "Design"}</span>
+      <Select
+        aria-label={props.isStateful ? "Component state" : "Component design"}
+        className="w-24 min-w-0 shrink-0"
+        selectedKey={props.selectedCase}
+        onSelectionChange={(key) => props.onCaseChange(String(key))}
+      >
+        <Select.Trigger className="flex h-6 min-w-0 items-center gap-1 rounded-md border border-white/10 bg-[#18191c] px-1.5 text-[10px] text-zinc-300 outline-none">
+          <Select.Value className="min-w-0 flex-1 truncate text-left" />
+          <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
+        </Select.Trigger>
+        <Select.Popover placement="bottom end" className="max-h-64 min-w-36 overflow-y-auto rounded-lg border border-white/10 bg-[#18191c] p-1 shadow-2xl">
+          <ListBox items={props.caseNames.map((name) => ({ id: name, name }))}>
+            {(item) => <ListBox.Item id={item.id} textValue={item.name} className="flex min-h-8 cursor-default items-center rounded-md px-2 text-xs text-zinc-300 outline-none data-[focused]:bg-white/10 data-[selected]:text-sky-300">{item.name}<ListBox.ItemIndicator className="ml-auto size-3" /></ListBox.Item>}
+          </ListBox>
+        </Select.Popover>
+      </Select>
+      {props.matrixAvailable ? <Button isIconOnly aria-label="Toggle property matrix" aria-pressed={props.matrix} className={`size-6 min-w-6 ${props.matrix ? "bg-sky-400/15 text-sky-300" : "text-zinc-500"}`} size="sm" variant="ghost" onPress={props.onMatrixChange}><Grid2X2 aria-hidden="true" size={12} /></Button> : null}
+    </div>
+  );
+}
+
+function invalidDesignMessage(definition: ComponentDesignDefinition | undefined): string | undefined {
+  if (!definition || typeof definition !== "object") return "The design module must default-export defineComponentDesign(...).";
+  if (typeof definition.render !== "function") return "The design must provide a render function.";
+  const names = Object.keys(definition.cases ?? {});
+  if (!names.length) return definition.isStateful ? "A stateful design must declare at least one state." : "A stateless design must declare at least the default design.";
+  if (!names.includes(definition.initialCase)) return `The initial ${definition.isStateful ? "state" : "design"} is not declared.`;
+  return undefined;
+}
+
+type LoadedDesign = { designId: string; definition: ComponentDesignDefinition };
+type PropertyCase = { label: string; values: Readonly<Record<string, boolean | number | string>> };
 
 function IsolatedLayerProjector(props: {
   layerId: string;

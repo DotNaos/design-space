@@ -10,7 +10,7 @@ import { WorkspaceActivityRail, type WorkspaceActivity } from "./shell/Workspace
 import { WorkspaceTopBar } from "./shell/WorkspaceTopBar";
 import { SourceComponentInspector } from "./source/SourceComponentInspector";
 import { SourceCodeCanvas } from "./source/SourceCodeCanvas";
-import { hasRequiredPreviewArguments, SourcePreviewFrame } from "./source/SourcePreviewFrame";
+import { SourcePreviewFrame } from "./source/SourcePreviewFrame";
 import {
   SourceWorkspaceSidebar,
   type SourceWorkspaceSelection,
@@ -70,9 +70,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     ?? (selection?.kind === "slot" && selection.slotName
       ? findSourceSlotLayer(entry?.layers, selection.slotName)
       : undefined);
-  const previewEntry = selectedLayer?.kind === "html" && hasRequiredPreviewArguments(inspectorEntry)
-    ? nodes.find((candidate) => candidate.area === "layout")?.implementations[requestedDevice].entry ?? inspectorEntry
-    : inspectorEntry;
+  const previewEntry = inspectorEntry;
   const selectedLabel = selectedLayer?.kind === "html"
     ? `<${selectedLayer.label}>`
     : selectedLayer?.kind === "slot"
