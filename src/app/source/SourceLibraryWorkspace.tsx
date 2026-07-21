@@ -11,6 +11,7 @@ import { suggestedSourceDesignPath } from "../../shared/source-design";
 import { SourceDesignStatus } from "./SourceDesignStatus";
 import { SourcePreviewFrame } from "./SourcePreviewFrame";
 import type { SourceLibraryMode } from "./useSourceLibraryRuntime";
+import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 
 interface SourceLibraryProps {
   catalog?: RuntimeSourceLibraryCatalog;
@@ -23,9 +24,12 @@ interface SourceLibraryProps {
   selectedClassCss?: string;
   selectedText?: string;
   selectionMode?: boolean;
+  previewMode?: SourcePreviewMode;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onModeChange: (mode: SourceLibraryMode) => void;
   onSelectLayer?: (layerId: string) => void;
+  onPreviewModeChange?: (mode: SourcePreviewMode) => void;
+  onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
   generateDesignError?: string;
   generatingDesignEntryId?: string;
   onGenerateDesign?: (entry: RuntimeSourceWorkspaceEntry) => void;
@@ -139,11 +143,14 @@ export function SourceLibraryCanvas(props: SourceLibraryProps) {
       selectedLayer={props.selectedLayer}
       selectedText={props.selectedText}
       isolateSelectedLayer={false}
+      mode={props.previewMode}
       selectionMode={props.selectionMode}
       styles={source?.styles ?? []}
       onGenerateDesign={props.mode === "development" && props.onGenerateDesign ? () => props.onGenerateDesign?.(component.entry!) : undefined}
       onDeviceChange={props.onDeviceChange}
+      onModeChange={props.onPreviewModeChange}
       onSelectLayer={props.onSelectLayer}
+      onSelectedLayerMetrics={props.onSelectedLayerMetrics}
     />
   );
 }

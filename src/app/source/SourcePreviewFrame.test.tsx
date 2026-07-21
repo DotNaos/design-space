@@ -13,6 +13,7 @@ import {
   sourceLayerIdFromElement,
   SourcePreviewFrame,
 } from "./SourcePreviewFrame";
+import { measureSourceLayer } from "./source-preview-selection-overlay";
 
 afterEach(cleanup);
 
@@ -97,6 +98,31 @@ it("can expose authored HTML layers for canvas selection without executing their
   expect(frame).toHaveClass("pointer-events-auto");
   expect(frame).not.toHaveAttribute("inert");
   expect(frame).toHaveProperty("inert", false);
+});
+
+it("separates design selection from playable component interactions", async () => {
+  const onSelectLayer = vi.fn();
+  const onAction = vi.fn();
+  const layerId = "jsx:interactive-button";
+  const entry = {
+    ...previewEntry("interactive", async () => ({
+      ...previewDefinition("Interactive"),
+      render: () => <button data-design-space-source-layer-id={layerId} type="button" onClick={onAction}>Run action</button>,
+    })),
+    layers: [{ id: layerId, label: "button", kind: "html" as const, source: { start: 2, end: 3 }, children: [] }],
+  };
+  const view = render(<SourcePreviewFrame device="desktop" entry={entry} mode="design" runtime="react" styles={[]} onModeChange={() => undefined} onSelectLayer={onSelectLayer} />);
+  const frame = await screen.findByTitle("interactive desktop preview");
+  expect(frame).toHaveClass("pointer-events-auto", "cursor-default");
+  expect(frame).not.toHaveAttribute("inert");
+  expect(screen.getByRole("button", { name: "Design mode" })).toHaveAttribute("aria-pressed", "true");
+
+  view.rerender(<SourcePreviewFrame device="desktop" entry={entry} mode="play" runtime="react" styles={[]} onModeChange={() => undefined} onSelectLayer={onSelectLayer} />);
+  const playable = await screen.findByRole("region", { name: "interactive interactive preview" });
+  expect(playable).toHaveClass("overflow-auto");
+  await userEvent.click(screen.getByRole("button", { name: "Run action" }));
+  expect(screen.getByRole("button", { name: "Play mode" })).toHaveAttribute("aria-pressed", "true");
+  expect(onAction).toHaveBeenCalledOnce();
 });
 
 it("shows a checking state while switching between asynchronously loaded designs", async () => {
@@ -194,6 +220,13 @@ it("maps pointer coordinates through a scaled preview frame", () => {
     { width: 832, height: 520 },
     { width: 1_280, height: 800 },
   )).toEqual({ x: 640, y: 400 });
+});
+
+it("measures a selected layer relative to its rendered canvas root", () => {
+  expect(measureSourceLayer(
+    { left: 124, top: 88, width: 320, height: 96 },
+    { left: 24, top: 40 },
+  )).toEqual({ x: 100, y: 48, width: 320, height: 96 });
 });
 
 it("ignores host and design-fixture markers while selecting registered source layers", () => {

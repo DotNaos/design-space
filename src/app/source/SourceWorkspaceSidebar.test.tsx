@@ -162,20 +162,29 @@ it("shows composition, typed slots, components, and HTML in one expandable tree"
   expect(screen.queryByText("Shared components")).not.toBeInTheDocument();
 });
 
-it("moves focus to a child and preserves the direct parent path", async () => {
+it("selects a nested component without replacing the canvas, then opens it explicitly", async () => {
   const onFocus = vi.fn();
-  render(<SourceWorkspaceSidebar {...callbacks} onFocus={onFocus} workspace={workspace} />);
+  const onSelect = vi.fn();
+  render(<SourceWorkspaceSidebar {...callbacks} onFocus={onFocus} onSelect={onSelect} workspace={workspace} />);
 
   await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
   await userEvent.click(screen.getByRole("button", { name: "Expand content" }));
-  await userEvent.click(screen.getAllByRole("button", { name: "ProjectSummary" })[0]!);
+  const summary = screen.getAllByRole("button", { name: "ProjectSummary" })[0]!;
+  await userEvent.click(summary);
+  expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({
+    device: "desktop",
+    nodeId: expect.stringContaining("ProjectSummary"),
+    kind: "component",
+  }));
+  expect(onFocus).not.toHaveBeenCalled();
+  await userEvent.dblClick(summary);
   expect(onFocus).toHaveBeenCalledWith(expect.stringContaining("pages:Dashboard"), expect.objectContaining({
     device: "desktop",
     nodeId: expect.stringContaining("ProjectSummary"),
     kind: "component",
   }));
   expect(onFocus.mock.calls[0]?.[1]).not.toHaveProperty("layerId");
-  expect(onFocus.mock.calls[0]?.[1]).not.toHaveProperty("sourceNodeId");
+  expect(onFocus.mock.calls[0]?.[1]).toHaveProperty("sourceNodeId", expect.stringContaining("ProjectSummary"));
 });
 
 it("does not expose a separate Layers mode", () => {
@@ -206,12 +215,16 @@ it("drills into local components and selects HTML in the same tree", async () =>
   await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
   await userEvent.click(screen.getByRole("button", { name: "Expand content" }));
   await userEvent.click(screen.getByRole("button", { name: "Expand <section>" }));
-  await userEvent.click(screen.getAllByRole("button", { name: "ProjectSummary" })[1]!);
+  await userEvent.dblClick(screen.getAllByRole("button", { name: "ProjectSummary" })[1]!);
   expect(onFocus).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({
     kind: "component",
     nodeId: expect.stringContaining("ProjectSummary"),
   }));
-  expect(onSelect).not.toHaveBeenCalled();
+  expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({
+    kind: "component",
+    layerId: "dashboard-summary",
+    sourceNodeId: expect.stringContaining("Dashboard"),
+  }));
 
   await userEvent.click(screen.getByRole("button", { name: "<section>" }));
   expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({

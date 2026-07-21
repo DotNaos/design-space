@@ -1,5 +1,5 @@
 import { Braces, ChevronRight, CircleAlert, Component, FileCode2 } from "lucide-react";
-import { Button, Chip, Label, TextArea, TextField } from "@heroui/react";
+import { Button, Chip } from "@heroui/react";
 
 import type {
   SourceComponentProp,
@@ -7,15 +7,17 @@ import type {
   SourceWorkspaceEntry,
   SourceWorkspaceLayer,
 } from "../../shared/source-workspace";
-import { TailwindClassField } from "../inspector/TailwindClassField";
 import { SourceComponentPicker } from "./SourceComponentPicker";
+import { SourceLayerDesignInspector } from "./SourceLayerDesignInspector";
 import type { SourceComponentCandidate } from "./source-slot-composition";
+import type { SourceLayerMetrics } from "./source-layer-design";
 import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
 
 export interface SourceComponentInspectorProps {
   className?: string;
   entry?: SourceWorkspaceEntry;
   layer?: SourceWorkspaceLayer;
+  layerMetrics?: SourceLayerMetrics;
   slotLayers?: readonly SourceWorkspaceLayer[];
   slotEditorReady?: boolean;
   styleEditor?: SourceLayerClassEditor;
@@ -70,8 +72,8 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
             </ul>
           </section>
         )}
-        {props.layer && (props.layer.className || props.layer.classNameDynamic || props.layer.text) && (
-          <LayerDesignSection layer={props.layer} styleEditor={props.styleEditor} />
+        {props.layer && (
+          <SourceLayerDesignInspector layer={props.layer} metrics={props.layerMetrics} styleEditor={props.styleEditor} />
         )}
         <ContractSection
           emptyMessage="No non-slot props are declared."
@@ -92,56 +94,6 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
         />
       </div>
     </aside>
-  );
-}
-
-function LayerDesignSection(props: {
-  layer: SourceWorkspaceLayer;
-  styleEditor?: SourceLayerClassEditor;
-}) {
-  const editor = props.styleEditor;
-  return (
-    <section aria-labelledby="source-layer-design" className="border-b border-white/10 px-4 pb-4">
-      <header className="flex min-h-10 items-center gap-2 text-zinc-500">
-        <Braces aria-hidden="true" size={14} />
-        <h3 id="source-layer-design" className="text-[10px] font-medium uppercase tracking-[0.14em]">Design</h3>
-        <code className="ml-auto font-mono text-[9px] text-zinc-700">&lt;{props.layer.label}&gt;</code>
-      </header>
-      {props.layer.className ? (
-        <>
-          <TailwindClassField
-            compileError={editor?.error}
-            disabled={!editor?.editable}
-            label="Tailwind classes"
-            value={editor?.value ?? props.layer.className.value}
-            onChange={(value) => editor?.change(value)}
-          />
-          <p className="mt-2 text-[9px] leading-4 text-zinc-600">
-            Changes are applied to this element only. Review the exact source diff before saving.
-          </p>
-        </>
-      ) : props.layer.classNameDynamic ? (
-        <p className="text-[10px] leading-4 text-zinc-600">
-          This element computes className in TypeScript. Open its code to preserve that expression.
-        </p>
-      ) : null}
-      {props.layer.text && (
-        <TextField
-          fullWidth
-          className={props.layer.kind === "html" ? "mt-4" : undefined}
-          isDisabled={!editor?.textEditable}
-          value={editor?.textValue ?? props.layer.text.value}
-          onChange={(value) => editor?.changeText(value)}
-        >
-          <Label className="text-[10px] text-zinc-500">Static text</Label>
-          <TextArea
-            aria-label="Static text"
-            className="mt-1 min-h-16 w-full resize-y rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-200 outline-none"
-            rows={2}
-          />
-        </TextField>
-      )}
-    </section>
   );
 }
 

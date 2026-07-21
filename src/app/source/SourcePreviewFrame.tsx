@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Grid2X2, WandSparkles } from "lucide-react";
 import { Button, ListBox, Select } from "@heroui/react";
@@ -11,6 +11,8 @@ import type {
 import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { PreviewBoundary } from "../PreviewBoundary";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
+import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
+import { mountSourceLayerSelection, sourceLayerElement } from "./source-preview-selection-overlay";
 import { SourcePreviewRuntimeContext } from "./SourcePreviewRuntime";
 import type { SourceTreeNode } from "./source-workspace-tree";
 
@@ -31,9 +33,12 @@ export function SourcePreviewFrame(props: {
   generateDesignError?: string;
   generatingDesign?: boolean;
   selectionMode?: boolean;
+  mode?: SourcePreviewMode;
   onGenerateDesign?: () => void;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
   onSelectLayer?: (layerId: string) => void;
+  onModeChange?: (mode: SourcePreviewMode) => void;
+  onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
 }) {
   const [mounts, setMounts] = useState<PreviewMounts>();
   const [projectedKey, setProjectedKey] = useState<string>();
@@ -42,6 +47,7 @@ export function SourcePreviewFrame(props: {
   const [loadMessage, setLoadMessage] = useState<string>();
   const [caseByDesign, setCaseByDesign] = useState<Readonly<Record<string, string>>>({});
   const [matrixByDesign, setMatrixByDesign] = useState<Readonly<Record<string, boolean>>>({});
+  const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
   const selectableLayerIds = useMemo(() => sourceLayerIds(props.entries ?? (props.entry ? [props.entry] : [])), [props.entries, props.entry]);
   const designId = props.entry?.design?.fileId;
   useEffect(() => {
@@ -97,8 +103,8 @@ export function SourcePreviewFrame(props: {
       setMounts(undefined);
       return;
     }
-    node.inert = !props.selectionMode;
-    if (props.selectionMode) node.removeAttribute("inert");
+    node.inert = previewMode === "static";
+    if (previewMode !== "static") node.removeAttribute("inert");
     else node.setAttribute("inert", "");
     const update = () => {
       const document = node.contentDocument;
@@ -109,10 +115,10 @@ export function SourcePreviewFrame(props: {
     };
     node.addEventListener("load", update, { once: true });
     update();
-  }, [props.selectionMode]);
+  }, [previewMode]);
 
   useEffect(() => {
-    if (!mounts || !props.selectionMode || !props.onSelectLayer) return undefined;
+    if (!mounts || previewMode !== "design" || !props.onSelectLayer) return undefined;
     const document = mounts.output.ownerDocument;
     const select = (event: Event) => {
       const point = sourceLayerTargetAtEventPoint(document, event);
@@ -129,7 +135,21 @@ export function SourcePreviewFrame(props: {
       document.removeEventListener("pointerdown", select, true);
       document.removeEventListener("click", select, true);
     };
-  }, [mounts, props.onSelectLayer, props.selectionMode, selectableLayerIds]);
+  }, [mounts, previewMode, props.onSelectLayer, selectableLayerIds]);
+
+  useLayoutEffect(() => {
+    if (!mounts || previewMode !== "design" || !props.selectedLayer) {
+      props.onSelectedLayerMetrics?.(undefined);
+      return undefined;
+    }
+    return mountSourceLayerSelection(
+      mounts.output.ownerDocument,
+      mounts.output,
+      props.selectedLayer.id,
+      props.selectedLayer.kind === "component" ? "component" : "layer",
+      props.onSelectedLayerMetrics,
+    );
+  }, [mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer]);
 
   useEffect(() => {
     if (mounts) mounts.styles.textContent = [props.styles.join("\n"), props.selectedClassCss ?? ""].join("\n");
@@ -157,10 +177,13 @@ export function SourcePreviewFrame(props: {
     <SourceCanvasViewport
       compact={props.compact}
       device={props.device}
+      mode={previewMode === "static" ? undefined : previewMode}
       node={props.node}
-      selectionKey={props.selectedLayer?.id ?? props.entry?.id}
+      selectedLayer={Boolean(props.selectedLayer)}
+      selectionKey={props.entry?.id}
       selectionLabel={props.selectedLayer?.kind === "html" ? `<${props.selectedLayer.label}>` : props.node?.label}
       onDeviceChange={props.onDeviceChange ?? (() => undefined)}
+      onModeChange={props.onModeChange}
       toolbarEnd={definition && selectedCase ? (
         <SourceDesignControls
           caseNames={caseNames}
@@ -176,13 +199,26 @@ export function SourcePreviewFrame(props: {
     >
       {(frame) => (
         <div className="h-full w-full" style={{ width: frame.width, height: frame.height }}>
-          {previewState ?? (
+          {previewState ?? (previewMode === "play" ? (
+            <PlayablePreview
+              caseName={selectedCase!}
+              centered={props.centerContent}
+              classCss={props.selectedClassCss}
+              className={props.selectedClassName}
+              definition={definition!}
+              entry={props.entry!}
+              layer={props.selectedLayer}
+              matrix={matrix}
+              styles={props.styles}
+              text={props.selectedText}
+            />
+          ) : (
             <>
               <iframe
                 key={projectionKey ?? props.entry?.id ?? "unavailable"}
                 ref={loadFrame}
                 aria-label={`${props.entry?.label ?? props.node?.label ?? "Source"} static preview`}
-                className={`${props.selectionMode ? "pointer-events-auto cursor-default" : "pointer-events-none"} h-full w-full select-none border-0`}
+                className={`${previewMode === "static" ? "pointer-events-none" : "pointer-events-auto"} ${previewMode === "design" ? "cursor-default select-none" : "cursor-auto"} h-full w-full border-0`}
                 srcDoc={previewDocument}
                 tabIndex={-1}
                 title={`${props.entry?.label ?? props.node?.label ?? "Source"} ${props.device} preview`}
@@ -204,7 +240,7 @@ export function SourcePreviewFrame(props: {
                 mounts.staging,
               )}
             </>
-          )}
+          ))}
         </div>
       )}
     </SourceCanvasViewport>
@@ -365,6 +401,35 @@ function invalidDesignMessage(definition: ComponentDesignDefinition | undefined)
 type LoadedDesign = { designId: string; definition: ComponentDesignDefinition };
 type PropertyCase = { label: string; values: Readonly<Record<string, boolean | number | string>> };
 
+function PlayablePreview(props: {
+  caseName: string;
+  centered?: boolean;
+  classCss?: string;
+  className?: string;
+  definition: ComponentDesignDefinition;
+  entry: RuntimeSourceWorkspaceEntry;
+  layer?: SourceWorkspaceLayer;
+  matrix: boolean;
+  styles: readonly string[];
+  text?: string;
+}) {
+  const output = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const root = output.current;
+    if (!root || !props.layer) return;
+    if (props.className !== undefined) applySourceLayerClassNameById(root, props.layer.id, props.className);
+    if (props.text !== undefined) applySourceLayerTextById(root, props.layer.id, props.text);
+  }, [props.className, props.layer, props.text]);
+  return (
+    <section aria-label={`${props.entry.label} interactive preview`} className="h-full w-full overflow-auto bg-[#0d0e10] text-zinc-100">
+      <style>{[props.styles.join("\n"), props.classCss ?? ""].join("\n")}</style>
+      <div ref={output} className="min-h-full">
+        <PreviewContent caseName={props.caseName} centered={props.centered} definition={props.definition} entry={props.entry} matrix={props.matrix} />
+      </div>
+    </section>
+  );
+}
+
 function IsolatedLayerProjector(props: {
   layerId: string;
   output: HTMLElement;
@@ -474,11 +539,6 @@ function replaceDirectText(selected: Element, text: string): boolean {
   if (!textNode) return false;
   textNode.textContent = text;
   return true;
-}
-
-function sourceLayerElement(output: HTMLElement, layerId: string): HTMLElement | null {
-  return [...output.querySelectorAll<HTMLElement>("[data-design-space-source-layer-id]")]
-    .find((element) => element.dataset.designSpaceSourceLayerId === layerId) ?? null;
 }
 
 function PreviewState(props: { action?: React.ReactNode; error?: string; title: string; message: string }) {

@@ -112,6 +112,19 @@ export function initialFocusOccurrence(graph: SourceFocusGraph): string | undefi
   return graph.roots[0] ?? graph.occurrences.keys().next().value;
 }
 
+export function sourceOccurrenceSubtree(graph: SourceFocusGraph, rootId?: string): ReadonlySet<string> {
+  const ids = new Set<string>();
+  const visit = (id: string) => {
+    if (ids.has(id)) return;
+    const occurrence = graph.occurrences.get(id);
+    if (!occurrence) return;
+    ids.add(id);
+    occurrence.children.forEach(visit);
+  };
+  if (rootId) visit(rootId);
+  return ids;
+}
+
 export function sourceFocusRows(
   graph: SourceFocusGraph,
   focusId: string,

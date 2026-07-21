@@ -2,15 +2,18 @@ import { Button } from "@heroui/react";
 import {
   ChevronDown,
   ChevronRight,
-  CircleDot,
-  CodeXml,
   Component,
+  Diamond,
   FileCode2,
   FilePlus2,
+  Frame,
+  Image,
   Monitor,
   PanelTop,
+  Square,
   Smartphone,
   Tablet,
+  Type,
   TriangleAlert,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -24,6 +27,7 @@ import {
   initiallyCollapsedSourceBranches,
   sourceCompositionRows,
   sourceFocusGraph,
+  sourceOccurrenceSubtree,
   type SourceFocusGraph,
   type SourceFocusRow,
   type SourceOccurrence,
@@ -67,6 +71,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
     ? undefined
     : graph.occurrences.has(props.focusId ?? "") ? props.focusId! : initialFocusOccurrence(graph);
   const rows = useMemo(() => sourceCompositionRows(graph, focusId), [focusId, graph]);
+  const activeCanvasIds = useMemo(() => sourceOccurrenceSubtree(graph, focusId), [focusId, graph]);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => initiallyCollapsedSourceBranches(rows, focusId));
   const visibleRows = useMemo(() => visibleSourceCompositionRows(rows, collapsed), [collapsed, rows]);
   const toggleBranch = (key: string) => setCollapsed((current) => {
@@ -99,6 +104,8 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
               graph={graph}
               nodes={nodes}
               row={row}
+              activeCanvasIds={activeCanvasIds}
+              activeCanvasId={focusId}
               selected={props.selected}
               workspace={props.workspace}
               onApplySlot={props.onApplySlot}
@@ -123,6 +130,8 @@ function FocusTreeRow(props: {
   graph: SourceFocusGraph;
   nodes: ReturnType<typeof sourceTreeNodes>;
   row: SourceFocusRow;
+  activeCanvasIds: ReadonlySet<string>;
+  activeCanvasId?: string;
   selected?: SourceWorkspaceSelection;
   workspace: RuntimeSourceWorkspace;
   onApplySlot: SourceWorkspaceSidebarProps["onApplySlot"];
@@ -142,7 +151,11 @@ function FocusTreeRow(props: {
       props.selected?.layerId === row.layer?.id
       || (row.kind === "slot" && props.selected?.slotName === row.layer?.label)
     );
-  const Icon = row.kind === "component" ? Component : row.kind === "html" ? CodeXml : PanelTop;
+  const withinCanvas = Boolean(row.occurrence && props.activeCanvasIds.has(row.occurrence.id));
+  const openedCanvas = occurrenceRow && row.occurrence?.id === props.activeCanvasId;
+  const Icon = row.kind === "component"
+    ? openedCanvas ? Component : Diamond
+    : row.kind === "html" ? htmlLayerIcon(row.label) : PanelTop;
   const slot = row.kind === "slot" ? row.layer : undefined;
   const status = slot?.slot;
   const sourceOwnerId = row.sourceOwnerId ?? row.occurrence?.usageOwnerId;
@@ -154,11 +167,13 @@ function FocusTreeRow(props: {
   const triggerId = slot ? `source-slot-picker-${safeId(slot.id)}` : undefined;
   const componentEntry = occurrenceRow ? row.occurrence?.entry : undefined;
   const select = () => {
-    if (focusTarget) {
-      props.onFocus(focusTarget.id, {
-        nodeId: focusTarget.node.id,
+    if (occurrenceRow && row.occurrence) {
+      props.onSelect({
+        nodeId: row.occurrence.node.id,
+        sourceNodeId: row.occurrence.usageOwnerId ?? row.occurrence.node.id,
         device: props.device,
-        occurrenceId: focusTarget.id,
+        occurrenceId: row.occurrence.id,
+        ...(row.occurrence.usageLayer ? { layerId: row.occurrence.usageLayer.id } : {}),
         kind: "component",
       });
       return;
@@ -193,21 +208,41 @@ function FocusTreeRow(props: {
       ) : <span aria-hidden="true" className="size-6 shrink-0" />}
       <Button
         aria-label={`${row.label}${row.role === "focus" ? ", focused" : ""}`}
-        className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 text-left ${active ? "bg-sky-500/15 text-sky-100" : row.role === "focus" ? "text-zinc-200" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}
+        className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 text-left ${active ? "bg-sky-500/15 text-sky-100" : withinCanvas ? "text-zinc-300 hover:bg-white/[0.04] hover:text-zinc-100" : "text-zinc-600 hover:bg-white/[0.04] hover:text-zinc-400"}`}
         fullWidth
         size="sm"
         variant="ghost"
         onKeyDown={(event) => {
+          if (event.key === "Enter" && focusTarget && occurrenceRow) {
+            event.preventDefault();
+            props.onFocus(focusTarget.id, {
+              nodeId: focusTarget.node.id,
+              sourceNodeId: focusTarget.node.id,
+              device: props.device,
+              occurrenceId: focusTarget.id,
+              kind: "component",
+            });
+            return;
+          }
           if (event.key === "Enter" && triggerId && active) {
             event.preventDefault();
             document.getElementById(triggerId)?.click();
           }
         }}
+        onDoubleClick={() => {
+          if (!focusTarget || !occurrenceRow) return;
+          props.onFocus(focusTarget.id, {
+            nodeId: focusTarget.node.id,
+            sourceNodeId: focusTarget.node.id,
+            device: props.device,
+            occurrenceId: focusTarget.id,
+            kind: "component",
+          });
+        }}
         onPress={select}
       >
-        <Icon aria-hidden="true" className="shrink-0" size={13} />
+        <Icon aria-hidden="true" className={`shrink-0 ${row.kind === "component" ? withinCanvas ? "text-violet-400" : "text-violet-500/45" : ""}`} size={row.kind === "component" && !openedCanvas ? 12 : 13} />
         <span className={`min-w-0 flex-1 truncate text-xs ${row.kind === "html" ? "font-mono text-[10px]" : ""}`}>{row.label}</span>
-        {row.role === "focus" && <CircleDot aria-label="Selected component" className="shrink-0 text-sky-400" size={11} />}
         {row.kind === "component" && row.occurrence && <MissingDeviceCluster implementations={row.occurrence.node.implementations} />}
         {status && <SlotStatus layer={slot!} />}
       </Button>
@@ -229,6 +264,13 @@ function FocusTreeRow(props: {
       )}
     </div>
   );
+}
+
+function htmlLayerIcon(label: string) {
+  if (["img", "picture", "svg", "canvas"].includes(label)) return Image;
+  if (["h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "label", "strong", "small"].includes(label)) return Type;
+  if (["button", "input", "select", "textarea", "a"].includes(label)) return Square;
+  return Frame;
 }
 
 function SlotStatus({ layer }: { layer: SourceWorkspaceLayer }) {

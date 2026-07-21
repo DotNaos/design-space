@@ -47,6 +47,8 @@ import type { SourceDraftLocation } from "./source/source-draft-workspace";
 import { useSourceDraftFile, useSourceDraftWorkspace } from "./source/useSourceDraftWorkspace";
 import { useSourceChangeReview } from "./source/useSourceChangeReview";
 import { CodeDocumentSwitch, FileEvidencePanel, findSourceSlotLayer } from "./source/SourceWorkspaceDetails";
+import { sourceCanvasSelection } from "./source/source-canvas-selection";
+import type { SourceLayerMetrics, SourcePreviewMode } from "./source/source-layer-design";
 
 export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
   const registeredWorkspace = target.sourceWorkspace;
@@ -68,6 +70,8 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const [draftSelection, setDraftSelection] = useState<{ start: number; end: number }>();
   const [rightMode, setRightMode] = useState<"code" | "design">("code");
   const [codeDocument, setCodeDocument] = useState<"source" | "design">("source");
+  const [canvasMode, setCanvasMode] = useState<SourcePreviewMode>("design");
+  const [selectedLayerMetrics, setSelectedLayerMetrics] = useState<SourceLayerMetrics>();
   const [selectedProjectFileId, setSelectedProjectFileId] = useState<string>();
   const [selectedLibraryComponent, setSelectedLibraryComponent] = useState(() => registeredWorkspace.library?.components[0]?.name);
   const [selectedLibraryLayerId, setSelectedLibraryLayerId] = useState<string>();
@@ -95,6 +99,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     ? undefined
     : graph.occurrences.has(focusId ?? "") ? focusId : initialFocusOccurrence(graph);
   const focusedOccurrence = resolvedFocusId ? graph.occurrences.get(resolvedFocusId) : undefined;
+  const selectedOccurrence = selection?.occurrenceId ? graph.occurrences.get(selection.occurrenceId) : undefined;
   const selectedNode = nodes.find((candidate) => candidate.id === selection?.nodeId) ?? focusedOccurrence?.node ?? nodes[0];
   const sourceNode = nodes.find((candidate) => candidate.id === (selection?.sourceNodeId ?? selectedNode?.id)) ?? selectedNode;
   const entry = sourceNode?.implementations[requestedDevice].entry;
@@ -106,13 +111,13 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const designEditor = useSourceDraftFile(draftWorkspace, designEditorLocation);
   const activeCodeDocument = codeDocument === "design" && entry?.design ? "design" : "source";
   const codeEditor = activeCodeDocument === "design" ? designEditor : editor;
-  const inspectorEntry = focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
+  const inspectorEntry = selectedOccurrence?.entry ?? focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
   const selectedLayer = findSourceTreeLayer(entry?.layers, selection?.layerId)
     ?? (selection?.kind === "slot" && selection.slotName
       ? findSourceSlotLayer(entry?.layers, selection.slotName)
       : undefined);
   const appReviewLayer = findSourceTreeLayer(registeredCodeEntry?.layers, selectedLayer?.id);
-  const previewEntry = inspectorEntry;
+  const previewEntry = focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
   const inspectorSlotLayers = focusedOccurrence?.usageLayer?.children.filter((layer) => layer.kind === "slot" && layer.slot) ?? [];
   const inspectorSourceOwner = focusedOccurrence?.usageOwnerId
     ? nodes.find((node) => node.id === focusedOccurrence.usageOwnerId)
@@ -343,7 +348,6 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       onApplySlot={applySlot}
       onPrepareSlotEdit={prepareSlotEdit}
       onSelect={(next) => {
-        if (next.occurrenceId) setFocusId(next.occurrenceId);
         setSelection(next);
         setDraftSelection(undefined);
         setActivity("app");
@@ -394,17 +398,20 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       selectedClassCss={libraryStyleEditor.css}
       selectedClassName={librarySelectedLayer?.className ? libraryStyleEditor.value : undefined}
       selectedText={librarySelectedLayer?.text ? libraryStyleEditor.textValue : undefined}
+      previewMode={canvasMode}
       selectionMode={libraryRuntime.mode === "development"}
       generateDesignError={designGeneration.error}
       generatingDesignEntryId={designGeneration.entryId}
       onDeviceChange={(device) => setSelection((current) => current ? { ...current, device } : current)}
       onGenerateDesign={(selectedEntry) => void generateDesign("library-development", selectedEntry.id)}
       onModeChange={libraryRuntime.setMode}
+      onPreviewModeChange={setCanvasMode}
       onSelectLayer={(layerId) => {
         setSelectedLibraryLayerId(layerId);
         setRightMode("design");
         setMobilePane("inspect");
       }}
+      onSelectedLayerMetrics={setSelectedLayerMetrics}
     />
   ) : activity === "files" ? (
     <SourceCodeCanvas
@@ -427,7 +434,9 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           device={requestedDevice}
           entry={previewEntry}
           entries={workspace.entries}
-          node={selectedNode}
+          isolateSelectedLayer={false}
+          mode={canvasMode}
+          node={focusedOccurrence?.node ?? selectedNode}
           selectedLayer={selectedLayer}
           selectedClassCss={styleEditor.css}
           selectedClassName={selectedLayer?.className ? styleEditor.value : undefined}
@@ -436,6 +445,15 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           generatingDesign={designGeneration.entryId === previewEntry?.id}
           runtime={workspace.runtime}
           styles={workspace.styles}
+          onModeChange={setCanvasMode}
+          onSelectedLayerMetrics={setSelectedLayerMetrics}
+          onSelectLayer={(layerId) => {
+            const next = sourceCanvasSelection(graph, resolvedFocusId, layerId, requestedDevice);
+            if (!next) return;
+            setSelection(next);
+            setDraftSelection(undefined);
+            setRightMode("design");
+          }}
           onGenerateDesign={previewEntry ? () => void generateDesign("app", previewEntry.id) : undefined}
           onDeviceChange={(device) => selectedNode && setSelection((current) => ({
             ...(current ?? {}),
@@ -464,6 +482,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           onModeChange={libraryRuntime.setMode}
         />}
         selectedLayer={librarySelectedLayer}
+        selectedLayerMetrics={selectedLayerMetrics}
         sourceEditor={libraryEditor}
         styleEditor={libraryStyleEditor}
         onActiveTabChange={setRightMode}
@@ -495,6 +514,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
                 className="flex h-full w-full border-l-0"
                 entry={inspectorEntry}
                 layer={selectedLayer}
+                layerMetrics={selectedLayerMetrics}
                 slotLayers={inspectorSlotLayers}
                 slotEditorReady={selection?.sourceNodeId === focusedOccurrence?.usageOwnerId && slotEditorReady}
                 styleEditor={styleEditor}
@@ -576,7 +596,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           onReviewChanges={activity === "files" ? undefined : review.show}
         />
         <ResizableWorkspacePanels
-          namespace={{ projectId: target.project.id, documentId: `${selectedNode?.id ?? "empty"}:${requestedDevice}:${selectedLayer?.id ?? "component"}` }}
+          namespace={{ projectId: target.project.id, documentId: `${focusedOccurrence?.node.id ?? selectedNode?.id ?? "empty"}:${requestedDevice}` }}
           left={{ label: "TypeScript app structure", content: left, defaultWidth: 300, minWidth: 260, maxWidth: 480 }}
           right={{ label: "Source code and component design", content: right, defaultWidth: 480, minWidth: 360, maxWidth: 760 }}
           mobile={mobile}

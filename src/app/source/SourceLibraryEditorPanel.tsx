@@ -6,6 +6,7 @@ import type { SourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/so
 import { SourceCodeCanvas, type SourceCodeEditor } from "./SourceCodeCanvas";
 import { SourceComponentInspector } from "./SourceComponentInspector";
 import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
+import type { SourceLayerMetrics } from "./source-layer-design";
 
 export type SourceLibraryEditorMode = "development" | "release";
 export type SourceLibraryEditorTab = "code" | "design";
@@ -19,6 +20,7 @@ export type SourceLibraryEditorPanelProps = {
   mode: SourceLibraryEditorMode;
   releaseFallback?: ReactNode;
   selectedLayer?: SourceWorkspaceLayer;
+  selectedLayerMetrics?: SourceLayerMetrics;
   sourceEditor: SourceCodeEditor;
   styleEditor?: SourceLayerClassEditor;
   onActiveTabChange: (tab: SourceLibraryEditorTab) => void;
@@ -57,6 +59,7 @@ export function SourceLibraryEditorPanel(props: SourceLibraryEditorPanelProps) {
             className="flex h-full w-full border-l-0"
             entry={props.entry}
             layer={props.selectedLayer}
+            layerMetrics={props.selectedLayerMetrics}
             styleEditor={props.styleEditor}
           />
         )}

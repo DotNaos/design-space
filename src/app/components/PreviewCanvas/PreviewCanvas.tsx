@@ -53,6 +53,7 @@ type PreviewCanvasProps = {
   strictUiViolations?: readonly StrictUiViolation[];
   compact?: boolean;
   staticPreview?: boolean;
+  forcedInteractionMode?: "select" | "interact";
   worldWidth?: number;
   onSelect: (selection: Selection) => void;
   onDeselect?: () => void;
@@ -87,6 +88,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showGestureHint, setShowGestureHint] = useState(true);
   const [interactionMode, setInteractionMode] = useState<"select" | "interact">("select");
+  const activeInteractionMode = props.forcedInteractionMode ?? interactionMode;
   const strictUiTargets = useMemo(
     () => buildStrictUiCanvasTargets(props.strictUiViolations ?? [], props.rootInstanceId),
     [props.rootInstanceId, props.strictUiViolations],
@@ -103,7 +105,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   }, []);
 
   useCanvasTrackpadGestures({
-    enabled: interactionMode === "select",
+    enabled: activeInteractionMode === "select",
     viewportRef,
     cameraRef,
     setCamera,
@@ -113,7 +115,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     viewportRef,
     cameraRef,
     suppressClick,
-    interactionMode,
+    interactionMode: activeInteractionMode,
     slots: props.slots,
     selectedComponentInstanceId: props.selectedComponentInstanceId,
     setCamera,
@@ -321,7 +323,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (interactionMode !== "select" || event.target !== event.currentTarget || !props.onNavigate) return;
+    if (activeInteractionMode !== "select" || event.target !== event.currentTarget || !props.onNavigate) return;
     const command = event.key === "Enter"
       ? event.shiftKey ? "parent" : "child"
       : event.key === "Escape"
@@ -335,7 +337,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   };
 
   useEffect(() => {
-    if (interactionMode !== "select" || !props.selection || !props.onNavigate) return;
+    if (activeInteractionMode !== "select" || !props.selection || !props.onNavigate) return;
     const navigateToParent = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       const target = event.target;
@@ -349,11 +351,11 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     };
     window.addEventListener("keydown", navigateToParent);
     return () => window.removeEventListener("keydown", navigateToParent);
-  }, [interactionMode, props.onNavigate, props.selection]);
+  }, [activeInteractionMode, props.onNavigate, props.selection]);
 
   const onPointerMove = (event: React.PointerEvent<HTMLElement>) => {
     touchGestures.onPointerMove(event);
-    if (interactionMode !== "select" || event.pointerType !== "mouse") return;
+    if (activeInteractionMode !== "select" || event.pointerType !== "mouse") return;
     const next = selectionForCanvasTarget(
       event.target instanceof Element ? event.target : undefined,
       props.slots,
@@ -407,19 +409,19 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       aria-label="Preview canvas"
       className={`${props.className ?? "flex"} relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[#0d0e10]`}
       style={{
-        touchAction: interactionMode === "select" ? "none" : "pan-x pan-y",
-        overscrollBehavior: interactionMode === "select" ? "none" : "contain",
+        touchAction: activeInteractionMode === "select" ? "none" : "pan-x pan-y",
+        overscrollBehavior: activeInteractionMode === "select" ? "none" : "contain",
       }}
-      onClickCapture={interactionMode === "select" ? onClick : undefined}
-      onContextMenuCapture={interactionMode === "select" ? onContextMenu : undefined}
-      onDoubleClickCapture={interactionMode === "select" ? onDoubleClick : undefined}
+      onClickCapture={activeInteractionMode === "select" ? onClick : undefined}
+      onContextMenuCapture={activeInteractionMode === "select" ? onContextMenu : undefined}
+      onDoubleClickCapture={activeInteractionMode === "select" ? onDoubleClick : undefined}
       onKeyDown={onKeyDown}
       onPointerCancel={touchGestures.finishPointer}
       onPointerDown={touchGestures.onPointerDown}
       onPointerLeave={() => setPointerHoveredSelection(undefined)}
       onPointerMove={onPointerMove}
       onPointerUp={touchGestures.finishPointer}
-      tabIndex={interactionMode === "select" ? 0 : -1}
+      tabIndex={activeInteractionMode === "select" ? 0 : -1}
     >
       <CanvasGridLayer
         grid={grid}
@@ -437,7 +439,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         showInteractionToggle={!props.staticPreview}
         gridMode={gridMode}
         gridVisible={gridVisible}
-        interactionMode={interactionMode}
+        interactionMode={activeInteractionMode}
         layoutGrid={layoutGrid}
         scale={camera.scale}
         onFit={() => {

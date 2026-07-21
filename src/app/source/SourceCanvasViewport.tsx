@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import type { DesignSpaceDevice } from "../../shared/source-workspace";
 import { PreviewCanvas } from "../components/PreviewCanvas/PreviewCanvas";
 import { SourceViewportPicker } from "./SourceViewportPicker";
+import { SourcePreviewModeToggle } from "./SourcePreviewModeToggle";
+import type { SourcePreviewMode } from "./source-layer-design";
 import type { SourceTreeNode } from "./source-workspace-tree";
 import { defaultSourceViewport, sourceViewportPresets } from "./source-viewports";
 
@@ -13,10 +15,13 @@ export function SourceCanvasViewport(props: {
   compact?: boolean;
   device: DesignSpaceDevice;
   node?: SourceTreeNode;
+  mode?: SourcePreviewMode;
+  selectedLayer?: boolean;
   selectionKey?: string;
   selectionLabel?: string;
   toolbarEnd?: React.ReactNode;
   onDeviceChange: (device: DesignSpaceDevice) => void;
+  onModeChange?: (mode: SourcePreviewMode) => void;
 }) {
   const [presetId, setPresetId] = useState(() => defaultSourceViewport(props.device).id);
   const [responsiveWidth, setResponsiveWidth] = useState(960);
@@ -54,7 +59,12 @@ export function SourceCanvasViewport(props: {
             onDeviceChange={changeDevice}
             onPresetChange={changePreset}
             onResponsiveWidthChange={(width) => setResponsiveWidth(Math.max(320, Math.min(1440, width)))}
-            after={props.toolbarEnd}
+            after={(
+              <>
+                {props.mode && props.onModeChange ? <SourcePreviewModeToggle mode={props.mode} onChange={props.onModeChange} /> : null}
+                {props.toolbarEnd}
+              </>
+            )}
           />
         )}
         preview={(
@@ -68,10 +78,11 @@ export function SourceCanvasViewport(props: {
         )}
         rootInstanceId={sourcePreviewId}
         selectedComponentInstanceId={sourcePreviewId}
-        selection={{ kind: "component", id: sourcePreviewId }}
+        selection={props.selectedLayer ? undefined : { kind: "component", id: sourcePreviewId }}
         selectionLabel={props.selectionLabel ?? `${preset.label.replace("Responsive", `Responsive · ${responsiveWidth} × ${preset.height}`)}`}
         slots={[]}
         staticPreview
+        forcedInteractionMode={props.mode === "play" ? "interact" : "select"}
         compact={props.compact}
         worldWidth={frame.width}
         onSelect={() => undefined}
