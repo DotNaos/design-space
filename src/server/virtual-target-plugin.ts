@@ -44,7 +44,7 @@ export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
       }
       if (sourceWorkspace) {
         const appRoot = normalizePath(`${target.root}/${sourceWorkspace.manifest.sourceRoot}/`);
-        server.watcher.add(sourceWorkspace.files.map((file) => file.absolutePath));
+        server.watcher.add([appRoot, ...sourceWorkspace.files.map((file) => file.absolutePath)]);
         const restartForSourceShape = (changedPath: string) => {
           const normalized = normalizePath(changedPath);
           if (normalized.startsWith(appRoot) && /\.[cm]?[jt]sx?$/.test(normalized)) void server.restart();
@@ -54,8 +54,8 @@ export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
         server.watcher.on("change", restartForSourceShape);
       }
       if (developmentLibrary) {
-        const libraryRoot = normalizePath(developmentLibrary.root);
-        server.watcher.add(developmentLibrary.files.map((file) => file.absolutePath));
+        const libraryRoot = normalizePath(`${developmentLibrary.root}/${developmentLibrary.manifest.sourceRoot}/`);
+        server.watcher.add([libraryRoot, ...developmentLibrary.files.map((file) => file.absolutePath)]);
         const restartForLibraryShape = (changedPath: string) => {
           const normalized = normalizePath(changedPath);
           if (normalized.startsWith(libraryRoot) && /\.[cm]?[jt]sx?$/.test(normalized)) void server.restart();

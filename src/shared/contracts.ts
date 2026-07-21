@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { opaqueIdSchema, sourceVersionSchema } from "./ids";
+import type { SourceDesignScope } from "./source-design";
 import type { SourceComponentProp, SourceComponentSlot, SourceStrictUiFinding, SourceWorkspaceLayer } from "./source-workspace";
 
 export { opaqueIdSchema, sourceVersionSchema } from "./ids";
@@ -175,6 +176,11 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
     name: z.string().trim().regex(/^[A-Z][A-Za-z0-9]{1,63}$/),
   }).strict(),
   z.object({ type: z.literal("save-source-component-create"), challengeId: z.string().uuid() }).strict(),
+  z.object({
+    type: z.literal("generate-source-design"),
+    scope: z.enum(["app", "library-development"]),
+    entryId: opaqueIdSchema,
+  }).strict(),
   z.object({ type: z.literal("read-source"), editTargetId: opaqueIdSchema }).strict(),
   z
     .object({
@@ -248,6 +254,13 @@ export interface PreparedSourceComponentCreate {
 export interface SavedSourceComponentCreate {
   state: "source-component-created";
   name: string;
+  relativePath: string;
+}
+
+export interface GeneratedSourceDesign {
+  state: "source-design-generated";
+  scope: SourceDesignScope;
+  entryId: string;
   relativePath: string;
 }
 

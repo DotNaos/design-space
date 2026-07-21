@@ -7,6 +7,7 @@ import { transformWithEsbuild } from "vite";
 import {
   browserOperationSchema,
   type BrowserOperation,
+  type GeneratedSourceDesign,
   type PreparedEdit,
   type PreparedProjectFileEdit,
   type PreparedSourceComponentCreate,
@@ -25,6 +26,7 @@ import { DesignSpaceError } from "./errors";
 import { assertStillRegistered } from "./path-security";
 import { readRegisteredFile } from "./registered-file-reader";
 import { SourceComponentCreation } from "./source-component-creation";
+import { SourceDesignGeneration } from "./source-design-generation";
 import { locateMarkedString, sourceVersion } from "./source-editor";
 import { TargetTailwindService } from "./target-tailwind-service";
 import { TailwindIntelligenceService } from "./tailwind-intelligence-service";
@@ -121,6 +123,7 @@ export class EditService {
   readonly #tailwind: TargetTailwindService;
   readonly #tailwindIntelligence: TailwindIntelligenceService;
   readonly #sourceComponentCreation: SourceComponentCreation;
+  readonly #sourceDesignGeneration: SourceDesignGeneration;
   #saveQueue: Promise<void> = Promise.resolve();
 
   constructor(target: RegisteredTarget, options: EditServiceOptions = {}) {
@@ -139,9 +142,10 @@ export class EditService {
       now: this.#now,
       createId: this.#createId,
     });
+    this.#sourceDesignGeneration = new SourceDesignGeneration(target);
   }
 
-  async execute(input: unknown): Promise<SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | TailwindPreview | TailwindIntelligence> {
+  async execute(input: unknown): Promise<SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | GeneratedSourceDesign | TailwindPreview | TailwindIntelligence> {
     const parsed = browserOperationSchema.safeParse(input);
     if (!parsed.success) {
       throw new DesignSpaceError("INVALID_REQUEST", "The browser operation is invalid");
@@ -149,7 +153,7 @@ export class EditService {
     return this.#executeParsed(parsed.data);
   }
 
-  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | TailwindPreview | TailwindIntelligence> {
+  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | SavedSourceComponentCreate | GeneratedSourceDesign | TailwindPreview | TailwindIntelligence> {
     switch (operation.type) {
       case "analyze-tailwind":
         return this.#tailwindIntelligence.analyze(operation.value, operation.cursor);
@@ -167,6 +171,8 @@ export class EditService {
         return this.#sourceComponentCreation.prepare(operation.name);
       case "save-source-component-create":
         return this.#sourceComponentCreation.save(operation.challengeId);
+      case "generate-source-design":
+        return this.#sourceDesignGeneration.generate(operation.scope, operation.entryId);
       case "read-source":
         return this.read(operation.editTargetId);
       case "prepare-edit":

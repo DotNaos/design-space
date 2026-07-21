@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
 import type { RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace";
@@ -32,8 +33,19 @@ it("requires a colocated design instead of executing the source component", () =
 
   render(<SourcePreviewFrame device="desktop" entry={entry} runtime="react" styles={[]} />);
   expect(screen.getByText("Design required")).toBeVisible();
-  expect(screen.getByText(/Panel\/desktop\.design\.tsx/)).toBeVisible();
+  expect(screen.getByText(/colocated design/)).toBeVisible();
   expect(component).not.toHaveBeenCalled();
+});
+
+it("offers best-effort design generation from the empty canvas", async () => {
+  const onGenerateDesign = vi.fn();
+  const entry = {
+    ...previewEntry("panel", async () => previewDefinition("unused")),
+    design: undefined,
+  };
+  render(<SourcePreviewFrame device="desktop" entry={entry} runtime="react" styles={[]} onGenerateDesign={onGenerateDesign} />);
+  await userEvent.click(screen.getByRole("button", { name: "Generate design" }));
+  expect(onGenerateDesign).toHaveBeenCalledOnce();
 });
 
 it("renders source previews as static, non-focusable UI", async () => {

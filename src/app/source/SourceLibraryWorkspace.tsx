@@ -1,5 +1,5 @@
 import { Button } from "@heroui/react";
-import { CircleAlert, Code2, Library, LockKeyhole, PackageCheck, Radio } from "lucide-react";
+import { Code2, Library, LockKeyhole, PackageCheck, Radio } from "lucide-react";
 
 import type {
   DesignSpaceDevice,
@@ -7,6 +7,8 @@ import type {
   RuntimeSourceWorkspaceEntry,
   SourceWorkspaceLibrary,
 } from "../../shared/source-workspace";
+import { suggestedSourceDesignPath } from "../../shared/source-design";
+import { SourceDesignStatus } from "./SourceDesignStatus";
 import { SourcePreviewFrame } from "./SourcePreviewFrame";
 import type { SourceLibraryMode } from "./useSourceLibraryRuntime";
 
@@ -18,6 +20,9 @@ interface SourceLibraryProps {
   selected?: string;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onModeChange: (mode: SourceLibraryMode) => void;
+  generateDesignError?: string;
+  generatingDesignEntryId?: string;
+  onGenerateDesign?: (entry: RuntimeSourceWorkspaceEntry) => void;
 }
 
 export function SourceLibrarySidebar(props: SourceLibraryProps & { onSelect: (name: string) => void }) {
@@ -56,17 +61,25 @@ export function SourceLibrarySidebar(props: SourceLibraryProps & { onSelect: (na
 
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
         {components.map((component) => (
-          <Button
-            key={component.id}
-            className={`min-h-10 w-full justify-start rounded-none px-4 text-xs ${selected === component.id ? "bg-sky-500/15 text-sky-100" : "text-zinc-400 hover:bg-white/[0.04]"}`}
-            fullWidth
-            variant="ghost"
-            onPress={() => props.onSelect(component.id)}
-          >
-            <Code2 size={13} />
-            <span className="min-w-0 truncate">{component.label}</span>
-            {!component.entry?.design ? <CircleAlert aria-label="Design missing" className="ml-auto shrink-0 text-amber-300" size={12} /> : null}
-          </Button>
+          <div key={component.id} className="relative flex min-h-10 items-center">
+            <Button
+              className={`min-h-10 w-full justify-start rounded-none px-4 pr-10 text-xs ${selected === component.id ? "bg-sky-500/15 text-sky-100" : "text-zinc-400 hover:bg-white/[0.04]"}`}
+              fullWidth
+              variant="ghost"
+              onPress={() => props.onSelect(component.id)}
+            >
+              <Code2 size={13} />
+              <span className="min-w-0 truncate">{component.label}</span>
+            </Button>
+            {!component.entry?.design ? (
+              <span className="absolute right-3">
+                <SourceDesignStatus
+                  designPath={component.entry ? suggestedSourceDesignPath(component.entry, selectedCatalog(props)?.entries ?? []) : "No registered source file"}
+                  label={component.label}
+                />
+              </span>
+            ) : null}
+          </div>
         ))}
         {components.length === 0 ? <p className="px-4 py-3 text-[10px] leading-4 text-zinc-600">No native component designs are available from this source.</p> : null}
       </div>
@@ -108,11 +121,15 @@ export function SourceLibraryCanvas(props: SourceLibraryProps) {
   }
   return (
     <SourcePreviewFrame
+      centerContent
       device={props.device}
       entry={component.entry}
       entries={source?.entries}
+      generateDesignError={props.generatingDesignEntryId === component.entry.id ? props.generateDesignError : undefined}
+      generatingDesign={props.generatingDesignEntryId === component.entry.id}
       runtime="react"
       styles={source?.styles ?? []}
+      onGenerateDesign={props.mode === "development" && props.onGenerateDesign ? () => props.onGenerateDesign?.(component.entry!) : undefined}
       onDeviceChange={props.onDeviceChange}
     />
   );

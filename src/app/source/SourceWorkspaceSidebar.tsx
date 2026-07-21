@@ -16,8 +16,9 @@ import {
 import { useMemo, useState } from "react";
 
 import { designSpaceDevices, type DesignSpaceDevice, type RuntimeSourceWorkspace, type SourceWorkspaceLayer } from "../../shared/source-workspace";
+import { suggestedSourceDesignPath } from "../../shared/source-design";
 import { SourceComponentPicker } from "./SourceComponentPicker";
-import { SourceDesignAudit } from "./SourceDesignAudit";
+import { SourceDesignStatus } from "./SourceDesignStatus";
 import {
   initialFocusOccurrence,
   initiallyCollapsedSourceBranches,
@@ -55,7 +56,6 @@ export interface SourceWorkspaceSidebarProps {
   slotEditorReady?: boolean;
   onPrepareSlotEdit?: (occurrence: SourceOccurrence) => void;
   onCreateComponent?: () => void;
-  onSelectEntry: (entry: RuntimeSourceWorkspace["entries"][number]) => void;
 }
 
 export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
@@ -83,7 +83,6 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           <h2 className="truncate text-sm font-semibold text-zinc-100">Source tree</h2>
           <p className="mt-0.5 truncate text-[9px] uppercase tracking-[0.14em] text-zinc-600">{props.workspace.sourceRoot} · {props.workspace.runtime === "react-native" ? "React Native" : "React"}</p>
         </div>
-        <SourceDesignAudit workspace={props.workspace} onSelect={props.onSelectEntry} />
         {props.workspace.capabilities?.createComponents && props.onCreateComponent && (
           <Button aria-label="Create component" className="grid size-8 place-items-center rounded-md text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>
             <FilePlus2 aria-hidden="true" size={14} />
@@ -153,6 +152,7 @@ function FocusTreeRow(props: {
   const ownerPath = sourceOwner?.implementations[props.device].entry?.relativePath ?? row.occurrence?.entry?.relativePath ?? "";
   const candidates = slot ? sourceSlotCandidates(props.workspace, props.nodes, slot, props.device, ownerPath) : [];
   const triggerId = slot ? `source-slot-picker-${safeId(slot.id)}` : undefined;
+  const componentEntry = occurrenceRow ? row.occurrence?.entry : undefined;
   const select = () => {
     if (focusTarget) {
       props.onFocus(focusTarget.id, {
@@ -211,6 +211,12 @@ function FocusTreeRow(props: {
         {row.kind === "component" && row.occurrence && <MissingDeviceCluster implementations={row.occurrence.node.implementations} />}
         {status && <SlotStatus layer={slot!} />}
       </Button>
+      {componentEntry && !componentEntry.design ? (
+        <SourceDesignStatus
+          designPath={suggestedSourceDesignPath(componentEntry, props.workspace.entries)}
+          label={componentEntry.label}
+        />
+      ) : null}
       {slot && row.occurrence && (
         <SourceComponentPicker
           candidates={candidates}

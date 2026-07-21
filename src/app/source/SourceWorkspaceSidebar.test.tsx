@@ -130,7 +130,6 @@ const callbacks = {
   onFocus: vi.fn(),
   onApplySlot: vi.fn(),
   onSelect: vi.fn(),
-  onSelectEntry: vi.fn(),
 };
 
 it("offers target-owned component creation from the focused tree", async () => {
@@ -184,6 +183,12 @@ it("does not expose a separate Layers mode", () => {
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   expect(screen.queryByRole("navigation", { name: "Source tree views" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Show (component layers|composition tree)/ })).not.toBeInTheDocument();
+});
+
+it("shows missing design evidence inline without an audit menu", () => {
+  render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
+  expect(screen.queryByRole("button", { name: /design file audit/i })).not.toBeInTheDocument();
+  expect(screen.getAllByLabelText(/design missing$/).length).toBeGreaterThan(0);
 });
 
 it("drills into local components and selects HTML in the same tree", async () => {

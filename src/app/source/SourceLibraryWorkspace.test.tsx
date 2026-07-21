@@ -72,9 +72,28 @@ it("shows native development and release sources with a design coverage audit", 
   );
 
   expect(screen.getByText("1/2")).toBeVisible();
-  expect(screen.getByLabelText("Design missing")).toBeVisible();
+  expect(screen.getByLabelText("Card design missing")).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: /Development/ }));
   expect(change).toHaveBeenCalledWith("development");
+});
+
+it("generates a missing design only for the attached development source", async () => {
+  const onGenerateDesign = vi.fn();
+  const missingEntry = { ...entry, design: undefined };
+  render(
+    <SourceLibraryCanvas
+      catalog={{ ...catalog, development: { ...catalog.development!, entries: [missingEntry] } }}
+      device="desktop"
+      library={{ ...library, components: [{ name: "Button", evidence: "package-export" }] }}
+      mode="development"
+      selected="library.development.Button"
+      onDeviceChange={vi.fn()}
+      onGenerateDesign={onGenerateDesign}
+      onModeChange={vi.fn()}
+    />,
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Generate design" }));
+  expect(onGenerateDesign).toHaveBeenCalledWith(missingEntry);
 });
 
 it("explains when an installed export has no native design", () => {

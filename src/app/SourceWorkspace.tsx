@@ -3,7 +3,10 @@ import { Button } from "@heroui/react";
 import { Code2, SlidersHorizontal } from "lucide-react";
 
 import type { TargetModule } from "../shared/target-module";
+import type { GeneratedSourceDesign } from "../shared/contracts";
+import type { SourceDesignScope } from "../shared/source-design";
 import type { SourceWorkspaceLayer } from "../shared/source-workspace";
+import { runLocalOperation } from "./api";
 import { ProjectFileBrowser } from "./documents/ProjectFileBrowser";
 import { ResizableWorkspacePanels } from "./shell/ResizableWorkspacePanels";
 import { MobileDock, type MobilePane } from "./shell/MobileDock";
@@ -54,6 +57,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const [codeDocument, setCodeDocument] = useState<"source" | "design">("source");
   const [selectedProjectFileId, setSelectedProjectFileId] = useState<string>();
   const [selectedLibraryComponent, setSelectedLibraryComponent] = useState(() => registeredWorkspace.library?.components[0]?.name);
+  const [designGeneration, setDesignGeneration] = useState<{ entryId?: string; error?: string }>({});
   const componentCreation = useSourceComponentCreation();
   const registeredSourceNode = registeredNodes.find((candidate) => candidate.id === (selection?.sourceNodeId ?? selection?.nodeId)) ?? registeredNodes[0];
   const requestedDevice = selection?.device ?? initial?.device ?? "desktop";
@@ -122,6 +126,17 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         ? ["App", selectedNode.label, ...(selectedLayer ? [selectedLabel ?? selectedLayer.label] : [])]
         : ["App"];
 
+  const generateDesign = async (scope: SourceDesignScope, entryId: string) => {
+    if (designGeneration.entryId && !designGeneration.error) return;
+    setDesignGeneration({ entryId });
+    try {
+      await runLocalOperation<GeneratedSourceDesign>({ type: "generate-source-design", scope, entryId });
+      setDesignGeneration({});
+    } catch (error) {
+      setDesignGeneration({ entryId, error: error instanceof Error ? error.message : "The design file could not be generated." });
+    }
+  };
+
   const prepareSlotEdit = (occurrence: SourceOccurrence) => {
     const sourceOwnerId = occurrence.usageOwnerId ?? occurrence.node.id;
     setSelection((current) => current ? { ...current, sourceNodeId: sourceOwnerId } : {
@@ -157,19 +172,6 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       editingSourceOwnerId={selection?.sourceNodeId}
       slotEditorReady={slotEditorReady}
       onCreateComponent={componentCreation.open}
-      onSelectEntry={(selectedEntry) => {
-        const node = nodes.find((candidate) => candidate.entries.some((entry) => entry.id === selectedEntry.id));
-        if (!node) return;
-        setSelection({
-          nodeId: node.id,
-          sourceNodeId: node.id,
-          device: selectedEntry.device,
-          kind: "component",
-        });
-        setDraftSelection(undefined);
-        setActivity("app");
-        setMobilePane("canvas");
-      }}
       onFocus={(occurrenceId, next) => {
         setFocusId(occurrenceId);
         setSelection(next);
@@ -207,7 +209,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       library={workspace.library}
       mode={libraryRuntime.mode}
       selected={selectedLibraryComponent}
+      generateDesignError={designGeneration.error}
+      generatingDesignEntryId={designGeneration.entryId}
       onDeviceChange={() => undefined}
+      onGenerateDesign={(selectedEntry) => void generateDesign("library-development", selectedEntry.id)}
       onModeChange={libraryRuntime.setMode}
       onSelect={setSelectedLibraryComponent}
     />
@@ -220,7 +225,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       library={workspace.library}
       mode={libraryRuntime.mode}
       selected={selectedLibraryComponent}
+      generateDesignError={designGeneration.error}
+      generatingDesignEntryId={designGeneration.entryId}
       onDeviceChange={(device) => setSelection((current) => current ? { ...current, device } : current)}
+      onGenerateDesign={(selectedEntry) => void generateDesign("library-development", selectedEntry.id)}
       onModeChange={libraryRuntime.setMode}
     />
   ) : activity === "files" ? (
@@ -249,8 +257,11 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           selectedClassCss={styleEditor.css}
           selectedClassName={selectedLayer?.className ? styleEditor.value : undefined}
           selectedText={selectedLayer?.text ? styleEditor.textValue : undefined}
+          generateDesignError={designGeneration.entryId === previewEntry?.id ? designGeneration.error : undefined}
+          generatingDesign={designGeneration.entryId === previewEntry?.id}
           runtime={workspace.runtime}
           styles={workspace.styles}
+          onGenerateDesign={previewEntry ? () => void generateDesign("app", previewEntry.id) : undefined}
           onDeviceChange={(device) => selectedNode && setSelection((current) => ({
             ...(current ?? {}),
             nodeId: selectedNode.id,

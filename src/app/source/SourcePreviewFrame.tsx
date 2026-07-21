@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Grid2X2 } from "lucide-react";
+import { Grid2X2, WandSparkles } from "lucide-react";
 import { Button, ListBox, Select } from "@heroui/react";
 
 import type {
@@ -25,6 +25,10 @@ export function SourcePreviewFrame(props: {
   selectedClassName?: string;
   selectedClassCss?: string;
   selectedText?: string;
+  centerContent?: boolean;
+  generateDesignError?: string;
+  generatingDesign?: boolean;
+  onGenerateDesign?: () => void;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
 }) {
   const [mounts, setMounts] = useState<PreviewMounts>();
@@ -161,12 +165,12 @@ export function SourcePreviewFrame(props: {
                 title={`${props.entry?.label ?? props.node?.label ?? "Source"} ${props.device} preview`}
               />
               {mounts && !projectionKey && createPortal(
-                <PreviewContent caseName={selectedCase!} definition={definition!} entry={props.entry!} matrix={matrix} />,
+                <PreviewContent caseName={selectedCase!} centered={props.centerContent} definition={definition!} entry={props.entry!} matrix={matrix} />,
                 mounts.output,
               )}
               {mounts && projectionKey && projectedKey !== projectionKey && createPortal(
                 <>
-                  <PreviewContent caseName={selectedCase!} definition={definition!} entry={props.entry!} matrix={false} />
+                  <PreviewContent caseName={selectedCase!} centered={props.centerContent} definition={definition!} entry={props.entry!} matrix={false} />
                   <IsolatedLayerProjector
                     layerId={props.selectedLayer!.id}
                     output={mounts.output}
@@ -184,14 +188,26 @@ export function SourcePreviewFrame(props: {
   );
 }
 
-function unavailablePreviewState(props: Pick<Parameters<typeof SourcePreviewFrame>[0], "device" | "entry" | "runtime"> & {
+function unavailablePreviewState(props: Pick<Parameters<typeof SourcePreviewFrame>[0], "device" | "entry" | "generateDesignError" | "generatingDesign" | "onGenerateDesign" | "runtime"> & {
   definition?: ComponentDesignDefinition;
   loadMessage?: string;
   loadState: "checking" | "invalid" | "ready";
 }) {
   if (props.runtime === "react-native") return <PreviewState title="React Native target indexed" message="The native source tree and TypeScript contracts are available. A simulator renderer must connect before this target can claim preview readiness." />;
   if (!props.entry) return <PreviewState title={`No ${props.device} implementation`} message="Add an exported React component at the shown fixed path, or configure the explicit Tablet fallback." />;
-  if (!props.entry.design) return <PreviewState title="Design required" message={`Add ${props.entry.relativePath.replace(/\.tsx$/, ".design.tsx")} next to this component. Design Space never executes source components directly.`} />;
+  if (!props.entry.design) return (
+    <PreviewState
+      title="Design required"
+      message="This component needs a colocated design before Design Space can render it in isolation."
+      error={props.generateDesignError}
+      action={props.onGenerateDesign ? (
+        <Button data-design-space-canvas-action isPending={props.generatingDesign} size="sm" variant="secondary" onPress={props.onGenerateDesign}>
+          <WandSparkles aria-hidden="true" size={13} />
+          {props.generatingDesign ? "Generating…" : "Generate design"}
+        </Button>
+      ) : undefined}
+    />
+  );
   if (!props.definition) {
     return props.loadState === "invalid"
       ? <PreviewState title="Design invalid" message={props.loadMessage ?? "Fix the colocated design to enable this preview."} />
@@ -210,6 +226,7 @@ const previewDocument = '<!doctype html><html class="dark" data-theme="dark" dat
 
 function PreviewContent(props: {
   caseName: string;
+  centered?: boolean;
   definition: ComponentDesignDefinition;
   entry: RuntimeSourceWorkspaceEntry;
   matrix: boolean;
@@ -218,15 +235,21 @@ function PreviewContent(props: {
   return (
     <PreviewBoundary resetKey={`${props.entry.id}:${props.caseName}:${props.matrix}`} errorTitle="Design preview crashed" errorMessage="Fix the colocated design or its required runtime context to recover.">
       <SourcePreviewRuntimeContext.Provider value>
-        <div style={cases.length > 1 ? { display: "grid", gridTemplateColumns: `repeat(${Math.min(cases.length, 3)}, minmax(0, 1fr))`, gap: 16, padding: 16 } : { minHeight: "100%" }}>
+        <div style={cases.length > 1
+          ? { display: "grid", gridTemplateColumns: `repeat(${Math.min(cases.length, 3)}, minmax(0, 1fr))`, gap: 16, minHeight: "100%", padding: 16 }
+          : props.centered
+            ? { alignItems: "center", display: "flex", justifyContent: "center", minHeight: "100%", width: "100%" }
+            : { minHeight: "100%" }}>
           {cases.map((propertyCase) => (
             <section key={propertyCase.label} style={cases.length > 1 ? { minWidth: 0, border: "1px solid rgba(127,127,127,.22)", borderRadius: 8, padding: 12 } : undefined}>
               {cases.length > 1 ? <p style={{ margin: "0 0 8px", color: "#71717a", font: "10px/1.4 ui-monospace,monospace" }}>{propertyCase.label}</p> : null}
-              {props.definition.render({
-                ...props.definition.defaults,
-                ...props.definition.cases[props.caseName],
-                ...propertyCase.values,
-              })}
+              <div style={cases.length > 1 && props.centered ? { alignItems: "center", display: "flex", justifyContent: "center", minHeight: 120 } : undefined}>
+                {props.definition.render({
+                  ...props.definition.defaults,
+                  ...props.definition.cases[props.caseName],
+                  ...propertyCase.values,
+                })}
+              </div>
             </section>
           ))}
         </div>
@@ -363,12 +386,14 @@ export function applySourceLayerText(output: HTMLElement, text: string): boolean
   return true;
 }
 
-function PreviewState(props: { title: string; message: string }) {
+function PreviewState(props: { action?: React.ReactNode; error?: string; title: string; message: string }) {
   return (
     <section className="grid h-full min-h-0 place-items-center bg-[#0d0e10] px-8 text-center">
       <div className="max-w-sm">
         <h2 className="text-sm font-semibold text-zinc-200">{props.title}</h2>
         <p className="mt-2 text-xs leading-5 text-zinc-500">{props.message}</p>
+        {props.error ? <p className="mt-3 text-[10px] leading-4 text-red-300">{props.error}</p> : null}
+        {props.action ? <div className="mt-4 flex justify-center">{props.action}</div> : null}
       </div>
     </section>
   );

@@ -18,6 +18,7 @@ export function selectionForCanvasTarget(
   slots: readonly SlotState[],
   selectedComponentInstanceId: string,
 ): Selection | undefined {
+  if (target?.closest("[data-design-space-canvas-action]")) return undefined;
   let element = target instanceof HTMLElement ? target : target?.parentElement;
   while (element) {
     const slotSelectionId = element.dataset.designSpaceSlotId;
