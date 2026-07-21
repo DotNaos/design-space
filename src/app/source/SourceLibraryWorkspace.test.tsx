@@ -2,82 +2,94 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
-import type { LibraryRuntimeStatus } from "../../shared/contracts";
-import type { SourceWorkspaceLibrary } from "../../shared/source-workspace";
+import type { RuntimeSourceLibraryCatalog, RuntimeSourceWorkspaceEntry, SourceWorkspaceLibrary } from "../../shared/source-workspace";
 import { SourceLibraryCanvas, SourceLibrarySidebar } from "./SourceLibraryWorkspace";
 
 afterEach(cleanup);
+
+const entry: RuntimeSourceWorkspaceEntry = {
+  id: "source.entry.button",
+  label: "Button",
+  area: "components",
+  device: "desktop",
+  fileId: "source.file.button",
+  relativePath: "src/shared/button/index.ts",
+  exportName: "Button",
+  props: [],
+  slots: [],
+  findings: [],
+  source: { start: 0, end: 10 },
+  component: () => null,
+  design: {
+    fileId: "source.file.button-design",
+    relativePath: "src/shared/button/index.design.tsx",
+    load: async () => ({
+      component: () => null,
+      defaults: {},
+      initialCase: "default",
+      isStateful: false,
+      cases: { default: {} },
+      render: () => <button>Button preview</button>,
+    }),
+  },
+};
 
 const library: SourceWorkspaceLibrary = {
   packageName: "@dotnaos/react-ui",
   version: "^0.0.5",
   mode: "release",
   editable: false,
-  components: [{ name: "Button", evidence: "package-export" }],
+  components: [
+    { name: "Button", evidence: "package-export" },
+    { name: "Card", evidence: "package-export" },
+  ],
 };
 
-const stopped: LibraryRuntimeStatus = {
+const catalog: RuntimeSourceLibraryCatalog = {
   packageName: "@dotnaos/react-ui",
-  release: { version: "^0.0.5" },
-  development: { configured: true, managed: false, state: "stopped" },
+  development: {
+    runtime: "react",
+    sourceRoot: "src",
+    entries: [entry],
+    devices: [],
+    styles: [],
+  },
+  release: { version: "0.0.5", entries: [entry], styles: [] },
 };
 
-it("offers development startup and the installed package in the same sidebar", async () => {
-  const start = vi.fn();
+it("shows native development and release sources with a design coverage audit", async () => {
   const change = vi.fn();
   render(
     <SourceLibrarySidebar
+      catalog={catalog}
+      device="desktop"
       library={library}
-      mode="development"
-      pending={false}
-      runtime={stopped}
+      mode="release"
+      onDeviceChange={vi.fn()}
       onModeChange={change}
       onSelect={vi.fn()}
-      onStart={start}
-      onStop={vi.fn()}
     />,
   );
 
-  expect(screen.getByText("Stopped")).toBeVisible();
-  expect(screen.getByText("^0.0.5 · Read only")).toBeVisible();
-  await userEvent.click(screen.getByRole("button", { name: /Start & use/ }));
-  expect(start).toHaveBeenCalledOnce();
-  await userEvent.click(screen.getByRole("button", { name: /Installed package/ }));
-  expect(change).toHaveBeenCalledWith("release");
+  expect(screen.getByText("1/2")).toBeVisible();
+  expect(screen.getByLabelText("Design missing")).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: /Development/ }));
+  expect(change).toHaveBeenCalledWith("development");
 });
 
-it("replaces the empty development canvas with a direct launcher", async () => {
-  const start = vi.fn();
+it("explains when an installed export has no native design", () => {
   render(
     <SourceLibraryCanvas
-      library={library}
-      mode="development"
-      pending={false}
-      runtime={stopped}
+      catalog={{ ...catalog, release: { version: "0.0.5", entries: [], styles: [] } }}
+      device="desktop"
+      library={{ ...library, components: [{ name: "Card", evidence: "package-export" }] }}
+      mode="release"
+      selected="library.release.Card"
+      onDeviceChange={vi.fn()}
       onModeChange={vi.fn()}
-      onStart={start}
-      onStop={vi.fn()}
     />,
   );
 
-  expect(screen.getByRole("heading", { name: "Development library is stopped" })).toBeVisible();
-  await userEvent.click(screen.getByRole("button", { name: "Start development library" }));
-  expect(start).toHaveBeenCalledOnce();
-  expect(screen.getByRole("button", { name: /Use installed version/ })).toBeVisible();
-});
-
-it("embeds a running development library in the canvas", () => {
-  render(
-    <SourceLibraryCanvas
-      library={library}
-      mode="development"
-      pending={false}
-      runtime={{ ...stopped, development: { configured: true, managed: false, state: "running", url: "http://dotnaos-ui-storybook.localhost:1355", components: [{ id: "button--primary", label: "Primary", group: "Primitives/Button" }] } }}
-      onModeChange={vi.fn()}
-      onStart={vi.fn()}
-      onStop={vi.fn()}
-    />,
-  );
-
-  expect(screen.getByTitle("Development preview: Primary")).toHaveAttribute("src", "http://dotnaos-ui-storybook.localhost:1355/iframe.html?id=button--primary&viewMode=story");
+  expect(screen.getByRole("heading", { name: "Design missing" })).toBeVisible();
+  expect(screen.getByText(/does not include a colocated native design/)).toBeVisible();
 });

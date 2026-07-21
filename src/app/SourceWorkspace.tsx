@@ -61,7 +61,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const editor = useSourceFileEditor(registeredCodeEntry?.fileId);
   const draftAnalysis = useSourceDraftAnalysis(registeredWorkspace, editor);
   const workspace = draftAnalysis.workspace;
-  const libraryRuntime = useSourceLibraryRuntime(workspace.library);
+  const libraryRuntime = useSourceLibraryRuntime(target.sourceLibrary);
   const nodes = useMemo(() => sourceTreeNodes(workspace), [workspace]);
   const graph = useMemo(() => sourceFocusGraph(nodes, requestedDevice), [nodes, requestedDevice]);
   const definitionSelected = selection?.kind === "component" && !selection.occurrenceId;
@@ -202,30 +202,26 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   );
   const librarySidebar = (
     <SourceLibrarySidebar
-      error={libraryRuntime.error}
+      catalog={target.sourceLibrary}
+      device={requestedDevice}
       library={workspace.library}
       mode={libraryRuntime.mode}
-      pending={libraryRuntime.pending}
-      runtime={libraryRuntime.status}
       selected={selectedLibraryComponent}
+      onDeviceChange={() => undefined}
       onModeChange={libraryRuntime.setMode}
       onSelect={setSelectedLibraryComponent}
-      onStart={() => void libraryRuntime.start()}
-      onStop={() => void libraryRuntime.stop()}
     />
   );
   const left = activity === "files" ? fileSidebar : activity === "library" ? librarySidebar : appSidebar;
   const canvas = activity === "library" ? (
     <SourceLibraryCanvas
-      error={libraryRuntime.error}
+      catalog={target.sourceLibrary}
+      device={requestedDevice}
       library={workspace.library}
       mode={libraryRuntime.mode}
-      pending={libraryRuntime.pending}
-      runtime={libraryRuntime.status}
       selected={selectedLibraryComponent}
+      onDeviceChange={(device) => setSelection((current) => current ? { ...current, device } : current)}
       onModeChange={libraryRuntime.setMode}
-      onStart={() => void libraryRuntime.start()}
-      onStop={() => void libraryRuntime.stop()}
     />
   ) : activity === "files" ? (
     <SourceCodeCanvas
@@ -267,15 +263,13 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const right = activity === "library"
     ? (
       <SourceLibraryInspector
-        error={libraryRuntime.error}
+        catalog={target.sourceLibrary}
+        device={requestedDevice}
         library={workspace.library}
         mode={libraryRuntime.mode}
-        pending={libraryRuntime.pending}
-        runtime={libraryRuntime.status}
         selected={selectedLibraryComponent}
+        onDeviceChange={() => undefined}
         onModeChange={libraryRuntime.setMode}
-        onStart={() => void libraryRuntime.start()}
-        onStop={() => void libraryRuntime.stop()}
       />
     )
     : activity === "files"

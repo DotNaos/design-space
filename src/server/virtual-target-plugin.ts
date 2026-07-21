@@ -13,9 +13,11 @@ const registeredTargetModuleId = `${DESIGN_SPACE_TARGET_MODULE_ID}/registered`;
 
 export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
   const sourceWorkspace = target.sourceWorkspace;
-  const sourceLayerPaths = new Map(sourceWorkspace?.files
+  const developmentLibrary = target.sourceLibrary?.development;
+  const indexedWorkspaces = [sourceWorkspace, developmentLibrary].filter((workspace) => workspace !== undefined);
+  const sourceLayerPaths = new Map(indexedWorkspaces.flatMap((workspace) => workspace.files)
     .filter((file) => file.relativePath.endsWith(".tsx"))
-    .map((file) => [normalizePath(file.absolutePath), file.relativePath]) ?? []);
+    .map((file) => [normalizePath(file.absolutePath), file.relativePath]));
   return {
     name: "design-space-target",
     enforce: "pre",
@@ -23,6 +25,9 @@ export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
       if (target.registrationPath) this.addWatchFile(target.registrationPath);
       if (sourceWorkspace) {
         for (const file of sourceWorkspace.files) this.addWatchFile(file.absolutePath);
+      }
+      if (developmentLibrary) {
+        for (const file of developmentLibrary.files) this.addWatchFile(file.absolutePath);
       }
     },
     resolveId(id) {
@@ -47,8 +52,19 @@ export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
         server.watcher.on("add", restartForSourceShape);
         server.watcher.on("unlink", restartForSourceShape);
         server.watcher.on("change", restartForSourceShape);
-        return;
       }
+      if (developmentLibrary) {
+        const libraryRoot = normalizePath(developmentLibrary.root);
+        server.watcher.add(developmentLibrary.files.map((file) => file.absolutePath));
+        const restartForLibraryShape = (changedPath: string) => {
+          const normalized = normalizePath(changedPath);
+          if (normalized.startsWith(libraryRoot) && /\.[cm]?[jt]sx?$/.test(normalized)) void server.restart();
+        };
+        server.watcher.on("add", restartForLibraryShape);
+        server.watcher.on("unlink", restartForLibraryShape);
+        server.watcher.on("change", restartForLibraryShape);
+      }
+      if (sourceWorkspace) return;
       const loaded = await server.ssrLoadModule(target.targetModulePath);
       validateTargetModule(loaded.target);
     },
@@ -73,25 +89,20 @@ function sourceTargetModule(target: RegisteredTarget): string {
   const workspace = target.sourceWorkspace;
   if (!workspace) throw new Error("Missing source workspace");
   const web = workspace.manifest.runtime === "react";
-  const runtimeEntries = workspace.manifest.entries.map((entry) => {
-    const absolutePath = workspace.entryFiles.get(entry.id);
-    if (!absolutePath) throw new Error(`Missing source module for ${entry.id}`);
-    const designPath = entry.design
-      ? workspace.files.find((file) => file.id === entry.design?.fileId)?.absolutePath
-      : undefined;
-    const design = web && entry.design && designPath
-      ? `{ ...${JSON.stringify(entry.design)}, load: () => import(${JSON.stringify(normalizePath(designPath))}).then((module) => module.default) }`
-      : "undefined";
-    return `{ ...${JSON.stringify(entry)}, component: NativePreviewUnavailable, design: ${design} }`;
-  });
-  const styleImports = web ? workspace.stylePaths.map((path, index) => ({
-    statement: `import SourceStyle${index} from ${JSON.stringify(`${normalizePath(path)}?inline`)};`,
-    variable: `SourceStyle${index}`,
-  })) : [];
+  const sourceRuntime = runtimeWorkspaceModule(workspace, "Source", web);
+  const developmentRuntime = target.sourceLibrary?.development
+    ? runtimeWorkspaceModule(target.sourceLibrary.development, "LibraryDevelopment", true)
+    : undefined;
+  const release = target.sourceLibrary?.release;
+  const releaseImport = release?.modulePath
+    ? `import { componentDesigns as ReleaseComponentDesigns, componentDesignStyles as ReleaseComponentDesignStyles } from ${JSON.stringify(normalizePath(release.modulePath))};`
+    : undefined;
   const files = registeredFileCatalog(target);
   const sourceRootLabel = relative(target.root, `${target.root}/${workspace.manifest.sourceRoot}`) || workspace.manifest.sourceRoot;
   return [
-    ...styleImports.map((style) => style.statement),
+    ...sourceRuntime.imports,
+    ...(developmentRuntime?.imports ?? []),
+    ...(releaseImport ? [releaseImport] : []),
     "const NativePreviewUnavailable = () => null;",
     "const sourceHostAdapter = {",
     `  component: { id: "source-workspace-host", label: "Source workspace", group: "Project", description: ${JSON.stringify(`Direct renderer for ${sourceRootLabel}`)}, slots: [] },`,
@@ -109,10 +120,63 @@ function sourceTargetModule(target: RegisteredTarget): string {
     `    devices: ${JSON.stringify(workspace.manifest.devices)},`,
     `    library: ${JSON.stringify(workspace.manifest.library)},`,
     `    capabilities: ${JSON.stringify({ createComponents: Boolean(target.sourceComponentStore) })},`,
-    `    entries: [${runtimeEntries.join(",\n")}],`,
-    `    styles: [${styleImports.map((style) => style.variable).join(", ")}],`,
+    `    entries: [${sourceRuntime.entries.join(",\n")}],`,
+    `    styles: [${sourceRuntime.styles.join(", ")}],`,
     "  },",
+    ...(target.sourceLibrary ? [
+      "  sourceLibrary: {",
+      `    packageName: ${JSON.stringify(target.sourceLibrary.packageName)},`,
+      ...(developmentRuntime ? [
+        "    development: {",
+        `      runtime: ${JSON.stringify(target.sourceLibrary.development?.manifest.runtime)},`,
+        `      sourceRoot: ${JSON.stringify(target.sourceLibrary.development?.manifest.sourceRoot)},`,
+        `      devices: ${JSON.stringify(target.sourceLibrary.development?.manifest.devices)},`,
+        "      capabilities: { createComponents: false },",
+        `      entries: [${developmentRuntime.entries.join(",\n")}],`,
+        `      styles: [${developmentRuntime.styles.join(", ")}],`,
+        "    },",
+      ] : []),
+      ...(release ? [
+        "    release: {",
+        `      version: ${JSON.stringify(release.version)},`,
+        `      entries: ${releaseImport ? "ReleaseComponentDesigns.map((item) => packagedLibraryEntry(item))" : "[]"},`,
+        `      styles: ${releaseImport ? "ReleaseComponentDesignStyles ?? []" : "[]"},`,
+        "    },",
+      ] : []),
+      "  },",
+    ] : []),
     "};",
+    "function packagedLibraryEntry(item) {",
+    "  const id = `library.release.${item.name}`;",
+    "  return { id, label: item.name, area: 'components', device: 'desktop', fileId: id, relativePath: item.source ?? `${item.name}.tsx`, exportName: item.name, props: [], slots: [], findings: [], source: { start: 0, end: 0 }, previewable: true, component: NativePreviewUnavailable, design: { fileId: `${id}.design`, relativePath: item.designSource ?? `${item.name}.design.tsx`, load: async () => item.definition } };",
+    "}",
     "export default target;",
   ].join("\n");
+}
+
+function runtimeWorkspaceModule(
+  workspace: NonNullable<RegisteredTarget["sourceWorkspace"]>,
+  prefix: string,
+  web: boolean,
+) {
+  const entries = workspace.manifest.entries.map((entry) => {
+    const absolutePath = workspace.entryFiles.get(entry.id);
+    if (!absolutePath) throw new Error(`Missing source module for ${entry.id}`);
+    const designPath = entry.design
+      ? workspace.files.find((file) => file.id === entry.design?.fileId)?.absolutePath
+      : undefined;
+    const design = web && entry.design && designPath
+      ? `{ ...${JSON.stringify(entry.design)}, load: () => import(${JSON.stringify(normalizePath(designPath))}).then((module) => module.default) }`
+      : "undefined";
+    return `{ ...${JSON.stringify(entry)}, component: NativePreviewUnavailable, design: ${design} }`;
+  });
+  const styleImports = web ? workspace.stylePaths.map((path, index) => ({
+    statement: `import ${prefix}Style${index} from ${JSON.stringify(`${normalizePath(path)}?inline`)};`,
+    variable: `${prefix}Style${index}`,
+  })) : [];
+  return {
+    entries,
+    imports: styleImports.map((style) => style.statement),
+    styles: styleImports.map((style) => style.variable),
+  };
 }

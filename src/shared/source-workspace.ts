@@ -34,10 +34,6 @@ export interface DesignSpaceProjectConfig {
     development?: {
       /** Absolute or project-relative directory containing the library package. */
       root: string;
-      /** Fixed executable and arguments. Browser operations can never replace these values. */
-      command: readonly [string, ...string[]];
-      /** Stable Portless service name used to prove that the library is ready. */
-      portlessName: string;
     };
   };
 }
@@ -201,4 +197,14 @@ export interface RuntimeSourceWorkspace extends Omit<SourceWorkspaceManifest, "e
   entries: readonly RuntimeSourceWorkspaceEntry[];
   /** Target-owned CSS, injected only into the isolated preview document. */
   styles: readonly string[];
+}
+
+export interface RuntimeSourceLibraryCatalog {
+  packageName: string;
+  development?: RuntimeSourceWorkspace;
+  release?: {
+    version: string;
+    entries: readonly RuntimeSourceWorkspaceEntry[];
+    styles: readonly string[];
+  };
 }

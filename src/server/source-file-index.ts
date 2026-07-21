@@ -58,6 +58,7 @@ export interface IndexedSourceFile {
 }
 
 export interface IndexedSourceWorkspace {
+  root: string;
   manifest: SourceWorkspaceManifest;
   files: readonly IndexedSourceFile[];
   entryFiles: ReadonlyMap<string, string>;
@@ -125,6 +126,7 @@ export async function indexSourceWorkspace(
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
   };
   return {
+    root,
     manifest: Object.freeze(manifest),
     files: Object.freeze(files),
     entryFiles,

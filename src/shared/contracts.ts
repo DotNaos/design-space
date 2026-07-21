@@ -193,34 +193,6 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
 
 export type BrowserOperation = z.infer<typeof browserOperationSchema>;
 
-export const libraryRuntimeOperationSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("get-library-runtime") }).strict(),
-  z.object({ type: z.literal("start-library-development") }).strict(),
-  z.object({ type: z.literal("stop-library-development") }).strict(),
-]);
-
-export type LibraryRuntimeOperation = z.infer<typeof libraryRuntimeOperationSchema>;
-export type LibraryDevelopmentState = "unconfigured" | "stopped" | "starting" | "running" | "failed";
-
-export interface LibraryRuntimeStatus {
-  packageName?: string;
-  release?: {
-    version: string;
-  };
-  development: {
-    configured: boolean;
-    managed: boolean;
-    state: LibraryDevelopmentState;
-    url?: string;
-    error?: string;
-    components?: readonly {
-      id: string;
-      label: string;
-      group: string;
-    }[];
-  };
-}
-
 export interface SourceSnapshot {
   editTargetId: string;
   value: string;

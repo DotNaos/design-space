@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 
 import type { ComponentControl, ComponentDescriptor } from "./contracts";
-import type { RuntimeSourceWorkspace } from "./source-workspace";
+import type { RuntimeSourceLibraryCatalog, RuntimeSourceWorkspace } from "./source-workspace";
 
 export type PreviewElementAttributes = Readonly<{
   "data-design-space-instance-id": string;
@@ -92,4 +92,6 @@ export interface TargetModule {
   files: readonly TargetFileEntry[];
   /** Present for TypeScript-first targets discovered from the fixed src/app tree. */
   sourceWorkspace?: RuntimeSourceWorkspace;
+  /** Trusted native design catalogs for an attached component library. */
+  sourceLibrary?: RuntimeSourceLibraryCatalog;
 }

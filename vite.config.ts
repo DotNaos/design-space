@@ -11,7 +11,6 @@ import {
   EditService,
   loadRegisteredProject,
   LocalOperationService,
-  LibraryRuntimeService,
   resolveServerProjectRoot,
 } from "./src/server";
 import { createViteFileSystemPolicy } from "./src/server/vite-file-system-policy";
@@ -40,7 +39,6 @@ export default defineConfig(async () => {
   const api = new LocalOperationService(
     new EditService(registeredTarget),
     new DocumentService(registeredTarget),
-    new LibraryRuntimeService(registeredTarget.libraryRuntime),
   );
 
   return {
@@ -61,7 +59,10 @@ export default defineConfig(async () => {
       host: "127.0.0.1",
       port: serverPort,
       strictPort: true,
-      fs: createViteFileSystemPolicy(root, registeredTarget.targetModulePath, registeredTarget.root),
+      fs: createViteFileSystemPolicy(root, registeredTarget.targetModulePath, registeredTarget.root, [
+        registeredTarget.sourceLibrary?.development?.root ?? "",
+        registeredTarget.sourceLibrary?.release?.modulePath ?? "",
+      ]),
     },
     build: { sourcemap: true },
   };

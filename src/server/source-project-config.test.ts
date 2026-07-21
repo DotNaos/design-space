@@ -29,15 +29,13 @@ describe("source project config", () => {
     })).toThrow("valid Design Space project config");
   });
 
-  it("accepts a fixed trusted development-library command", () => {
+  it("accepts a fixed trusted development-library root", () => {
     expect(parseSourceProjectConfig({
       project: { id: "library-host", label: "Library host" },
       library: {
         package: "@dotnaos/react-ui",
         development: {
           root: "../ui",
-          command: ["bun", "run", "dev"],
-          portlessName: "dotnaos-ui-storybook",
         },
       },
     })).toMatchObject({ library: { package: "@dotnaos/react-ui" } });

@@ -206,7 +206,7 @@ type PreviewMounts = {
   styles: HTMLElement;
 };
 
-const previewDocument = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style id="design-space-preview-styles"></style><style>html,body,#design-space-preview-root{height:100%;margin:0;background:#0d0e10}#design-space-preview-staging{position:fixed;left:-100000px;top:0;width:100%;visibility:hidden;pointer-events:none}</style></head><body><div id="design-space-preview-staging"></div><div id="design-space-preview-root"></div></body></html>';
+const previewDocument = '<!doctype html><html class="dark" data-theme="dark" data-resolved-theme="dark" data-component-library="shadcn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style id="design-space-preview-styles"></style><style>html,body,#design-space-preview-root{height:100%;margin:0;background:#0d0e10;color:#f4f4f5}#design-space-preview-staging{position:fixed;left:-100000px;top:0;width:100%;visibility:hidden;pointer-events:none}</style></head><body><div id="design-space-preview-staging"></div><div id="design-space-preview-root"></div></body></html>';
 
 function PreviewContent(props: {
   caseName: string;

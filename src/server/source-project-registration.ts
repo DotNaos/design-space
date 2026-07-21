@@ -1,9 +1,13 @@
 import type { DesignSpaceProjectConfig } from "../shared/source-workspace";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+
+import { runnerImport } from "vite";
 
 import { DesignSpaceError } from "./errors";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { indexSourceWorkspace } from "./source-file-index";
+import { parseSourceProjectConfig } from "./source-project-config";
 import { registerSourceComponentStore } from "./source-component-creation";
 import type { RegisteredTarget } from "./target-registration";
 
@@ -14,7 +18,7 @@ export async function registerSourceProject(
   const root = await canonicalRoot(unsafeRoot);
   const registrationPath = await canonicalRegisteredFile(root, ".designspace.ts");
   const sourceWorkspace = await indexSourceWorkspace(root, config);
-  const libraryRuntime = await registerLibraryRuntime(root, config, sourceWorkspace.manifest.library);
+  const sourceLibrary = await registerSourceLibrary(root, config, sourceWorkspace.manifest.library);
   const sourceComponentStore = await registerSourceComponentStore(
     root,
     "src/app/components",
@@ -39,11 +43,11 @@ export async function registerSourceProject(
     editableFileIds,
     sourceWorkspace,
     sourceComponentStore,
-    libraryRuntime,
+    sourceLibrary,
   };
 }
 
-async function registerLibraryRuntime(
+async function registerSourceLibrary(
   root: string,
   config: DesignSpaceProjectConfig,
   detected: import("../shared/source-workspace").SourceWorkspaceLibrary | undefined,
@@ -55,18 +59,44 @@ async function registerLibraryRuntime(
       `Configured library ${configuredPackage} does not match detected package ${detected.packageName}`,
     );
   }
+  const packageName = configuredPackage ?? detected?.packageName;
+  if (!packageName) return undefined;
   const development = config.library?.development;
+  const developmentRoot = development ? await canonicalRoot(resolve(root, development.root)) : undefined;
   return {
-    packageName: configuredPackage ?? detected?.packageName,
-    ...(detected?.mode === "release" ? { release: { version: detected.version } } : {}),
-    ...(development ? {
-      development: {
-        root: await canonicalRoot(resolve(root, development.root)),
-        command: Object.freeze([...development.command]) as readonly [string, ...string[]],
-        portlessName: development.portlessName,
+    packageName,
+    ...(detected?.mode === "release" ? {
+      release: {
+        version: detected.version,
+        modulePath: await resolveLibraryDesignModule(root, configuredPackage ?? detected.packageName),
       },
     } : {}),
+    ...(developmentRoot ? { development: await loadLibraryWorkspace(developmentRoot) } : {}),
   };
+}
+
+async function loadLibraryWorkspace(root: string) {
+  const configPath = await canonicalRegisteredFile(root, ".designspace.ts");
+  const { module } = await runnerImport<Record<string, unknown>>(configPath, {
+    root,
+    logLevel: "silent",
+  });
+  return indexSourceWorkspace(root, parseSourceProjectConfig(module.default ?? module.designSpace));
+}
+
+async function resolveLibraryDesignModule(root: string, packageName: string): Promise<string | undefined> {
+  const packageRoot = resolve(root, "node_modules", ...packageName.split("/"));
+  const manifest = await readFile(resolve(packageRoot, "package.json"), "utf8")
+    .then((source) => JSON.parse(source) as { exports?: Record<string, unknown> })
+    .catch(() => undefined);
+  const designExport = manifest?.exports?.["./designs"];
+  const relativePath = typeof designExport === "string"
+    ? designExport
+    : designExport && typeof designExport === "object" && !Array.isArray(designExport)
+      ? ((designExport as Record<string, unknown>).import ?? (designExport as Record<string, unknown>).default)
+      : undefined;
+  if (typeof relativePath !== "string") return undefined;
+  return canonicalRegisteredFile(packageRoot, relativePath.replace(/^\.\//, "")).catch(() => undefined);
 }
 
 function isEditableTypeScriptSource(relativePath: string): boolean {
