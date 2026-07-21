@@ -70,7 +70,7 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
             </ul>
           </section>
         )}
-        {props.layer && (props.layer.kind === "html" || props.layer.text) && (
+        {props.layer && (props.layer.className || props.layer.classNameDynamic || props.layer.text) && (
           <LayerDesignSection layer={props.layer} styleEditor={props.styleEditor} />
         )}
         <ContractSection
@@ -120,7 +120,7 @@ function LayerDesignSection(props: {
             Changes are applied to this element only. Review the exact source diff before saving.
           </p>
         </>
-      ) : props.layer.kind === "html" ? (
+      ) : props.layer.classNameDynamic ? (
         <p className="text-[10px] leading-4 text-zinc-600">
           This element computes className in TypeScript. Open its code to preserve that expression.
         </p>

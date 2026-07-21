@@ -1,5 +1,5 @@
 import { Button } from "@heroui/react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, FileDiff, LoaderCircle, Redo2, RotateCcw, Save, Shield, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, FileDiff, GitCompareArrows, LoaderCircle, Redo2, RotateCcw, Save, Shield, Undo2 } from "lucide-react";
 
 import type { StrictUiEvidence } from "../../shared/strict-ui";
 import { RunningTargetSwitcher } from "./RunningTargetSwitcher";
@@ -18,12 +18,14 @@ export function WorkspaceTopBar(props: {
   canDiff: boolean;
   canSave: boolean;
   saving: boolean;
+  pendingChanges?: number;
   onUndo: () => void;
   onRedo: () => void;
   onReset: () => void;
   onStrictUi: () => void;
   onDiff: () => void;
   onSave: () => void;
+  onReviewChanges?: () => void;
   onExitFocus?: () => void;
 }) {
   return (
@@ -55,8 +57,25 @@ export function WorkspaceTopBar(props: {
         <Button aria-label="Undo" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canUndo} onPress={props.onUndo}><Undo2 size={15} /></Button>
         <Button aria-label="Redo" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canRedo} onPress={props.onRedo}><Redo2 size={15} /></Button>
         <Button aria-label="Reset document" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canReset} onPress={props.onReset}><RotateCcw size={14} /></Button>
-        <Button aria-label="Prepare exact diff" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canDiff} onPress={props.onDiff}><FileDiff size={15} /></Button>
-        <Button aria-label={props.saving ? "Saving" : "Save"} isIconOnly className={`size-9 lg:size-8 ${props.canSave ? "bg-sky-500 text-white hover:bg-sky-400" : "bg-white/[0.04] text-zinc-600"}`} size="sm" isDisabled={!props.canSave} onPress={props.onSave}>{props.saving ? <LoaderCircle className="animate-spin" size={15} /> : <Save size={15} />}</Button>
+        {props.onReviewChanges ? (
+          <Button
+            aria-label={`Review ${props.pendingChanges ?? 0} pending changes`}
+            className={`h-8 gap-1.5 rounded-md px-2.5 text-[10px] ${(props.pendingChanges ?? 0) > 0 ? "bg-amber-400/10 text-amber-200 hover:bg-amber-400/15" : "text-zinc-600"}`}
+            isDisabled={(props.pendingChanges ?? 0) === 0}
+            size="sm"
+            variant="ghost"
+            onPress={props.onReviewChanges}
+          >
+            <GitCompareArrows aria-hidden="true" size={13} />
+            <span>{props.pendingChanges ?? 0} changes</span>
+            {(props.pendingChanges ?? 0) > 0 ? <span className="rounded bg-amber-300/10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-amber-300">Draft</span> : null}
+          </Button>
+        ) : (
+          <>
+            <Button aria-label="Prepare exact diff" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canDiff} onPress={props.onDiff}><FileDiff size={15} /></Button>
+            <Button aria-label={props.saving ? "Saving" : "Save"} isIconOnly className={`size-9 lg:size-8 ${props.canSave ? "bg-sky-500 text-white hover:bg-sky-400" : "bg-white/[0.04] text-zinc-600"}`} size="sm" isDisabled={!props.canSave} onPress={props.onSave}>{props.saving ? <LoaderCircle className="animate-spin" size={15} /> : <Save size={15} />}</Button>
+          </>
+        )}
       </div>
     </header>
   );

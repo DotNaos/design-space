@@ -54,6 +54,18 @@ export class ChallengeStore<Value extends ExpiringChallenge> {
     return value;
   }
 
+  /** Removes a challenge only when it belongs to the expected owner/scope. */
+  remove(id: string, matches: (value: Value) => boolean = () => true): boolean {
+    const value = this.#values.get(id);
+    if (!value || !matches(value)) {
+      this.pruneExpired();
+      return false;
+    }
+    this.#values.delete(id);
+    this.pruneExpired();
+    return true;
+  }
+
   pruneExpired(): number {
     return this.#pruneExpiredExcept();
   }

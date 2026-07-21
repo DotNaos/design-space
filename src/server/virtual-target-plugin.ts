@@ -1,9 +1,14 @@
 import { relative } from "node:path";
 
-import { normalizePath, type Plugin } from "vite";
+import { normalizePath, transformWithEsbuild, type Plugin } from "vite";
 
 import { registeredFileCatalog } from "./document-catalog-files";
 import { annotateSourceHtmlLayers } from "./source-layer-annotation";
+import {
+  parseSourceDraftPreviewModuleId,
+  sourceDraftPreviewModuleId,
+  type SourceDraftPreviewRegistry,
+} from "./source-draft-preview-registry";
 import type { RegisteredTarget } from "./target-registration";
 import { validateTargetModule } from "./target-registration";
 
@@ -11,7 +16,7 @@ export const DESIGN_SPACE_TARGET_MODULE_ID = "virtual:design-space-target";
 const resolvedModuleId = `\0${DESIGN_SPACE_TARGET_MODULE_ID}`;
 const registeredTargetModuleId = `${DESIGN_SPACE_TARGET_MODULE_ID}/registered`;
 
-export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
+export function designSpaceTargetPlugin(target: RegisteredTarget, draftPreviews?: SourceDraftPreviewRegistry): Plugin {
   const sourceWorkspace = target.sourceWorkspace;
   const developmentLibrary = target.sourceLibrary?.development;
   const indexedWorkspaces = [sourceWorkspace, developmentLibrary].filter((workspace) => workspace !== undefined);
@@ -30,7 +35,33 @@ export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
         for (const file of developmentLibrary.files) this.addWatchFile(file.absolutePath);
       }
     },
-    resolveId(id) {
+    async resolveId(id, importer) {
+      const requestedPreview = parseSourceDraftPreviewModuleId(id);
+      const requestedFile = requestedPreview
+        ? draftPreviews?.metadata(requestedPreview.challengeId, requestedPreview.fileId)
+        : undefined;
+      if (requestedPreview && requestedFile) {
+        return `\0${sourceDraftPreviewModuleId(
+          requestedPreview.challengeId,
+          requestedPreview.fileId,
+          requestedFile.relativePath,
+        )}${requestSuffix(id)}`;
+      }
+      const previewImporter = importer ? parseSourceDraftPreviewModuleId(importer) : undefined;
+      if (previewImporter && draftPreviews) {
+        const originalImporter = draftPreviews.originalImporter(previewImporter.challengeId, previewImporter.fileId);
+        if (!originalImporter) return undefined;
+        const resolved = await this.resolve(id, originalImporter, { skipSelf: true });
+        if (!resolved) return undefined;
+        const previewFile = draftPreviews.fileForPath(previewImporter.challengeId, resolved.id);
+        return previewFile
+          ? `\0${sourceDraftPreviewModuleId(
+            previewImporter.challengeId,
+            previewFile.id,
+            previewFile.relativePath,
+          )}${requestSuffix(resolved.id)}`
+          : resolved;
+      }
       if (id === DESIGN_SPACE_TARGET_MODULE_ID) return resolvedModuleId;
       if (!sourceWorkspace && id === registeredTargetModuleId) return target.targetModulePath;
       return undefined;
@@ -68,7 +99,9 @@ export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
       const loaded = await server.ssrLoadModule(target.targetModulePath);
       validateTargetModule(loaded.target);
     },
-    load(id) {
+    async load(id) {
+      const preview = parseSourceDraftPreviewModuleId(id);
+      if (preview && draftPreviews) return (await draftPreviews.load(preview.challengeId, preview.fileId))?.source;
       if (id !== resolvedModuleId) return undefined;
       if (sourceWorkspace) return sourceTargetModule(target);
       return [
@@ -77,12 +110,37 @@ export function designSpaceTargetPlugin(target: RegisteredTarget): Plugin {
         "export default registeredTarget;",
       ].join("\n");
     },
-    transform(code, id) {
+    async transform(code, id) {
+      const preview = parseSourceDraftPreviewModuleId(id);
+      const previewPath = preview && draftPreviews
+        ? draftPreviews.metadata(preview.challengeId, preview.fileId)?.relativePath
+        : undefined;
+      if (previewPath) {
+        const loader = previewScriptLoader(previewPath);
+        if (!loader) return undefined;
+        const source = previewPath.endsWith(".tsx")
+          ? annotateSourceHtmlLayers(code, previewPath)
+          : code;
+        return transformWithEsbuild(source, previewPath, { loader, jsx: "automatic" });
+      }
       const relativePath = sourceLayerPaths.get(normalizePath(id.split("?", 1)[0] ?? id));
       if (!relativePath) return undefined;
       return { code: annotateSourceHtmlLayers(code, relativePath), map: null };
     },
   };
+}
+
+function requestSuffix(id: string): string {
+  const query = id.indexOf("?");
+  const fragment = id.indexOf("#");
+  const start = query < 0 ? fragment : fragment < 0 ? query : Math.min(query, fragment);
+  return start < 0 ? "" : id.slice(start);
+}
+
+function previewScriptLoader(relativePath: string): "js" | "jsx" | "ts" | "tsx" | undefined {
+  const extension = relativePath.split(/[?#]/, 1)[0]?.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
+  if (extension === "js" || extension === "jsx" || extension === "ts" || extension === "tsx") return extension;
+  return undefined;
 }
 
 function sourceTargetModule(target: RegisteredTarget): string {

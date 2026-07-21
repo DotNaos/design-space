@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { sourceWithLayerClassName, sourceWithLayerText } from "./source-layer-class-edit";
+import { sourceWithLayerClassName, sourceWithLayerText, sourceWithLayerVisualState } from "./source-layer-class-edit";
 
 it("replaces a static JSX className with an exact expression literal", () => {
   const source = 'export const Panel = () => <section className="p-4">Panel</section>;';
@@ -54,4 +54,38 @@ it("preserves an authored JSX string expression", () => {
   }, 'Needs "review"')).toBe(
     'export const Badge = () => <span>{"Needs \\"review\\""}</span>;',
   );
+});
+
+it("applies class and text changes from the same source snapshot without shifting bindings", () => {
+  const source = 'export const Badge = () => <span className="px-2">Ready</span>;';
+  const classStart = source.indexOf("className");
+  const textStart = source.indexOf("Ready");
+  expect(sourceWithLayerVisualState(source, {
+    className: {
+      binding: { value: "px-2", start: classStart, end: classStart + 'className="px-2"'.length, syntax: "attribute" },
+      value: "rounded-full px-4",
+    },
+    text: {
+      binding: { value: "Ready", start: textStart, end: textStart + "Ready".length, syntax: "text" },
+      value: "Approved",
+    },
+  })).toBe('export const Badge = () => <span className="rounded-full px-4">Approved</span>;');
+});
+
+it("refuses stale visual bindings instead of editing unrelated source", () => {
+  const original = 'export const Panel = () => <section className="p-4">Ready</section>;';
+  const shifted = `// Monaco changed the offsets\n${original}`;
+  const classStart = original.indexOf("className");
+  const textStart = original.indexOf("Ready");
+
+  expect(sourceWithLayerVisualState(shifted, {
+    className: {
+      binding: { value: "p-4", start: classStart, end: classStart + 'className="p-4"'.length, syntax: "attribute" },
+      value: "p-6",
+    },
+    text: {
+      binding: { value: "Ready", start: textStart, end: textStart + "Ready".length, syntax: "text" },
+      value: "Approved",
+    },
+  })).toBe(shifted);
 });

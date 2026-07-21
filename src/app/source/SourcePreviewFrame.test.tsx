@@ -5,8 +5,12 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace";
 import {
   applySourceLayerClassName,
+  applySourceLayerClassNameById,
   applySourceLayerText,
+  applySourceLayerTextById,
   projectSourceLayer,
+  scalePreviewEventPoint,
+  sourceLayerIdFromElement,
   SourcePreviewFrame,
 } from "./SourcePreviewFrame";
 
@@ -86,6 +90,15 @@ it("renders source previews as static, non-focusable UI", async () => {
   expect(screen.getByRole("button", { name: "Zoom in" })).toBeVisible();
 });
 
+it("can expose authored HTML layers for canvas selection without executing their actions", async () => {
+  const entry = previewEntry("selectable", async () => previewDefinition("Selectable design"));
+  render(<SourcePreviewFrame device="desktop" entry={entry} runtime="react" selectionMode styles={[]} onSelectLayer={vi.fn()} />);
+  const frame = await screen.findByTitle("selectable desktop preview");
+  expect(frame).toHaveClass("pointer-events-auto");
+  expect(frame).not.toHaveAttribute("inert");
+  expect(frame).toHaveProperty("inert", false);
+});
+
 it("shows a checking state while switching between asynchronously loaded designs", async () => {
   const first = previewEntry("first", async () => previewDefinition("First design"));
   let resolveSecond: ((value: ReturnType<typeof previewDefinition>) => void) | undefined;
@@ -163,6 +176,42 @@ it("projects only the selected authored HTML element", () => {
   expect(projectSourceLayer(staging, output, "missing-layer")).toBe(false);
 });
 
+it("maps a nested canvas target to its nearest authored source layer", () => {
+  const layer = document.createElement("section");
+  layer.dataset.designSpaceSourceLayerId = "jsx:src/app/Panel.tsx:42";
+  const child = document.createElement("span");
+  layer.append(child);
+  expect(sourceLayerIdFromElement(child)).toBe("jsx:src/app/Panel.tsx:42");
+  expect(sourceLayerIdFromElement(document.createTextNode("text"))).toBeUndefined();
+  expect(sourceLayerIdFromElement({
+    closest: () => layer,
+  } as unknown as EventTarget)).toBe("jsx:src/app/Panel.tsx:42");
+});
+
+it("maps pointer coordinates through a scaled preview frame", () => {
+  expect(scalePreviewEventPoint(
+    { clientX: 416, clientY: 260 },
+    { width: 832, height: 520 },
+    { width: 1_280, height: 800 },
+  )).toEqual({ x: 640, y: 400 });
+});
+
+it("ignores host and design-fixture markers while selecting registered source layers", () => {
+  const source = document.createElement("button");
+  source.dataset.designSpaceSourceLayerId = "jsx:src/components/Button.tsx:42";
+  const fixture = document.createElement("div");
+  fixture.dataset.designSpaceSourceLayerId = "jsx:src/components/Button.design.tsx:9";
+  const host = document.createElement("section");
+  host.dataset.designSpaceSourceLayerId = "jsx:src/app/source/SourcePreviewFrame.tsx:12";
+  fixture.append(source);
+  host.append(fixture);
+
+  expect(sourceLayerIdFromElement(source, new Set(["jsx:src/components/Button.tsx:42"])))
+    .toBe("jsx:src/components/Button.tsx:42");
+  expect(sourceLayerIdFromElement(fixture, new Set(["jsx:src/components/Button.tsx:42"])))
+    .toBeUndefined();
+});
+
 it("applies a visual class draft only to the isolated element", () => {
   const output = document.createElement("div");
   output.innerHTML = '<section class="p-4"><span>Child</span></section>';
@@ -180,6 +229,18 @@ it("applies a visual text draft without removing nested elements", () => {
   expect(applySourceLayerText(output, "")).toBe(true);
   expect(applySourceLayerText(output, "Ready again ")).toBe(true);
   expect(output.querySelector("p")?.firstChild).toHaveTextContent("Ready again");
+});
+
+it("projects a visual draft into one nested layer while keeping the full component", () => {
+  const output = document.createElement("div");
+  output.innerHTML = '<article data-design-space-source-layer-id="card"><h2 data-design-space-source-layer-id="title">Old <span>badge</span></h2></article>';
+
+  expect(applySourceLayerClassNameById(output, "title", "text-lg")).toBe(true);
+  expect(applySourceLayerTextById(output, "title", "New ")).toBe(true);
+  expect(output.querySelector("article")).not.toBeNull();
+  expect(output.querySelector("h2")).toHaveClass("text-lg");
+  expect(output.querySelector("h2")).toHaveTextContent("New badge");
+  expect(output.querySelector("span")).toHaveTextContent("badge");
 });
 
 function previewDefinition(label: string) {

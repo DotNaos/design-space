@@ -18,8 +18,14 @@ interface SourceLibraryProps {
   library?: SourceWorkspaceLibrary;
   mode: SourceLibraryMode;
   selected?: string;
+  selectedLayer?: import("../../shared/source-workspace").SourceWorkspaceLayer;
+  selectedClassName?: string;
+  selectedClassCss?: string;
+  selectedText?: string;
+  selectionMode?: boolean;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onModeChange: (mode: SourceLibraryMode) => void;
+  onSelectLayer?: (layerId: string) => void;
   generateDesignError?: string;
   generatingDesignEntryId?: string;
   onGenerateDesign?: (entry: RuntimeSourceWorkspaceEntry) => void;
@@ -27,7 +33,7 @@ interface SourceLibraryProps {
 
 export function SourceLibrarySidebar(props: SourceLibraryProps & { onSelect: (name: string) => void }) {
   const components = libraryComponents(props);
-  const selected = selectedLibraryComponent(props);
+  const selected = resolvedSelectedLibraryComponentId(props);
   const ready = components.filter((component) => component.entry?.design).length;
   return (
     <aside aria-label="Component library catalog" className="flex h-full min-h-0 w-full flex-col bg-[#141518]">
@@ -113,7 +119,7 @@ function SourceOption(props: {
 }
 
 export function SourceLibraryCanvas(props: SourceLibraryProps) {
-  const component = libraryComponents(props).find((candidate) => candidate.id === selectedLibraryComponent(props));
+  const component = selectedSourceLibraryComponent(props);
   const source = selectedCatalog(props);
   if (!component) return <LibraryState title="No component selected" message="Choose a component from the native design catalog." />;
   if (!component.entry) {
@@ -128,9 +134,16 @@ export function SourceLibraryCanvas(props: SourceLibraryProps) {
       generateDesignError={props.generatingDesignEntryId === component.entry.id ? props.generateDesignError : undefined}
       generatingDesign={props.generatingDesignEntryId === component.entry.id}
       runtime="react"
+      selectedClassCss={props.selectedClassCss}
+      selectedClassName={props.selectedClassName}
+      selectedLayer={props.selectedLayer}
+      selectedText={props.selectedText}
+      isolateSelectedLayer={false}
+      selectionMode={props.selectionMode}
       styles={source?.styles ?? []}
       onGenerateDesign={props.mode === "development" && props.onGenerateDesign ? () => props.onGenerateDesign?.(component.entry!) : undefined}
       onDeviceChange={props.onDeviceChange}
+      onSelectLayer={props.onSelectLayer}
     />
   );
 }
@@ -144,7 +157,7 @@ function LibraryState(props: { message: string; title: string }) {
 }
 
 export function SourceLibraryInspector(props: SourceLibraryProps) {
-  const component = libraryComponents(props).find((candidate) => candidate.id === selectedLibraryComponent(props));
+  const component = selectedSourceLibraryComponent(props);
   return (
     <aside aria-label="Component library evidence" className="h-full w-full bg-[#141518] p-5">
       <div className="flex items-center gap-2 text-zinc-500"><PackageCheck size={14} /><span className="text-[10px] font-medium uppercase tracking-[0.14em]">Library evidence</span></div>
@@ -158,17 +171,21 @@ export function SourceLibraryInspector(props: SourceLibraryProps) {
   );
 }
 
-type LibraryComponent = {
+export type LibraryComponent = {
   entry?: RuntimeSourceWorkspaceEntry;
   id: string;
   label: string;
 };
 
-function selectedCatalog(props: SourceLibraryProps) {
+type SourceLibrarySelectionProps = Pick<SourceLibraryProps, "catalog" | "library" | "mode" | "selected">;
+
+export function selectedSourceLibraryCatalog(props: Pick<SourceLibraryProps, "catalog" | "mode">) {
   return props.mode === "development" ? props.catalog?.development : props.catalog?.release;
 }
 
-function libraryComponents(props: SourceLibraryProps): readonly LibraryComponent[] {
+const selectedCatalog = selectedSourceLibraryCatalog;
+
+function libraryComponents(props: SourceLibrarySelectionProps): readonly LibraryComponent[] {
   const source = selectedCatalog(props);
   if (props.mode === "development") {
     const entries = source?.entries ?? [];
@@ -198,7 +215,12 @@ function developmentEntry(entries: readonly RuntimeSourceWorkspaceEntry[], name:
   return exact[0];
 }
 
-function selectedLibraryComponent(props: SourceLibraryProps): string | undefined {
+function resolvedSelectedLibraryComponentId(props: SourceLibrarySelectionProps): string | undefined {
   const components = libraryComponents(props);
   return components.some((component) => component.id === props.selected) ? props.selected : components[0]?.id;
+}
+
+export function selectedSourceLibraryComponent(props: SourceLibrarySelectionProps): LibraryComponent | undefined {
+  const selected = resolvedSelectedLibraryComponentId(props);
+  return libraryComponents(props).find((component) => component.id === selected);
 }

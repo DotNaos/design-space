@@ -1,17 +1,17 @@
 import { expect, it } from "vitest";
 
-import { annotateSourceHtmlLayers, sourceWorkspaceLayerId } from "./source-layer-annotation";
+import { annotateSourceHtmlLayers } from "./source-layer-annotation";
 
-it("adds stable runtime IDs to intrinsic JSX without changing component props", () => {
+it("adds stable runtime IDs to intrinsic and component JSX while leaving fragments untouched", () => {
   const source = `
     export function Panel() {
-      return <section><Header /><div><span /></div></section>;
+      return <><section><Header /><div><span /></div></section></>;
     }
   `;
   const annotated = annotateSourceHtmlLayers(source, "src/components/Panel.tsx");
 
-  expect(annotated).toContain(`<section data-design-space-source-layer-id="${sourceWorkspaceLayerId("src/components/Panel.tsx", source.indexOf("<section"))}">`);
-  expect(annotated).toContain("<Header />");
-  expect(annotated).not.toContain("<Header data-design-space-source-layer-id");
-  expect(annotated.match(/data-design-space-source-layer-id/g)).toHaveLength(3);
+  expect(annotated).toContain('<section data-design-space-source-layer-id="jsx:src/components/Panel.tsx:layer-0">');
+  expect(annotated).toContain('<Header data-design-space-source-layer-id="jsx:src/components/Panel.tsx:layer-1" />');
+  expect(annotated).not.toContain("< data-design-space-source-layer-id");
+  expect(annotated.match(/data-design-space-source-layer-id/g)).toHaveLength(4);
 });

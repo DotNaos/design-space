@@ -3,7 +3,6 @@ import { isAbsolute, join, relative, sep } from "node:path";
 import ts from "typescript";
 
 import type {
-  SourceLayerClassNameBinding,
   SourceLayerTextBinding,
   SourceComponentSlot,
   SourceStrictUiFinding,
@@ -15,8 +14,9 @@ import {
   canonicalRegisteredFile,
   canonicalRoot,
 } from "./path-security";
-import { sourceWorkspaceLayerId } from "./source-layer-annotation";
+import { sourceWorkspaceJsxLayerId, sourceWorkspaceLayerId } from "./source-layer-annotation";
 import { extractComponentContract } from "./typescript-component-contract";
+import { jsxClassName } from "./typescript-jsx-class-binding";
 
 export interface IndexedTypeScriptComponent {
   filePath: string;
@@ -168,12 +168,14 @@ function indexSourceFile(
     if (!signature) continue;
 
     const contract = extractComponentContract(signature, declaration, checker);
+    const renderedDeclaration = renderedComponentDeclaration(declaration, localComponents);
     const layers = jsxLayers(
-      declaration,
+      renderedDeclaration,
       localComponents,
       new Set([label]),
       relativePath,
       new Set(contract.slots.map((slot) => slot.name)),
+      checker,
       componentContracts,
     );
     const renderedSlots = collectRenderedSlots(layers);
@@ -196,8 +198,8 @@ function indexSourceFile(
       slots: contract.slots,
       findings,
       propsTypeText: contract.typeText,
-      source: { start: declaration.getStart(), end: declaration.getEnd() },
-      uses: jsxComponentNames(declaration),
+      source: { start: renderedDeclaration.getStart(), end: renderedDeclaration.getEnd() },
+      uses: jsxComponentNames(renderedDeclaration),
       layers,
     });
   }
@@ -210,6 +212,7 @@ function jsxLayers(
   path: ReadonlySet<string>,
   relativePath: string,
   slotNames: ReadonlySet<string>,
+  checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
   const layers: SourceWorkspaceLayer[] = [];
@@ -219,7 +222,7 @@ function jsxLayers(
       return;
     }
     if (ts.isJsxSelfClosingElement(node) && isFragmentTag(node.tagName.getText())) return;
-    const layer = jsxLayer(node, localComponents, path, relativePath, slotNames, componentContracts);
+    const layer = jsxLayer(node, localComponents, path, relativePath, slotNames, checker, componentContracts);
     if (layer) {
       layers.push(layer);
       return;
@@ -236,22 +239,23 @@ function jsxLayer(
   path: ReadonlySet<string>,
   relativePath: string,
   slotNames: ReadonlySet<string>,
+  checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): SourceWorkspaceLayer | undefined {
   if (ts.isJsxElement(node)) {
     const label = node.openingElement.tagName.getText();
     const kind = jsxLayerKind(label);
     return {
-      id: sourceWorkspaceLayerId(relativePath, node.getStart()),
+      id: sourceWorkspaceJsxLayerId(relativePath, node),
       label,
       kind,
       source: { start: node.getStart(), end: node.getEnd() },
-      ...jsxClassName(node.openingElement, kind),
+      ...jsxClassName(node.openingElement, kind, checker),
       ...jsxStaticText(node),
       children: [
-        ...componentUsageSlots(node.openingElement, componentContracts?.get(label), localComponents, path, relativePath, componentContracts),
-        ...localComponentLayers(label, kind, localComponents, path, relativePath, componentContracts),
-        ...jsxChildLayers(node.children, localComponents, path, relativePath, slotNames, componentContracts),
+        ...componentUsageSlots(node.openingElement, componentContracts?.get(label), localComponents, path, relativePath, checker, componentContracts),
+        ...localComponentLayers(label, kind, localComponents, path, relativePath, checker, componentContracts),
+        ...jsxChildLayers(node.children, localComponents, path, relativePath, slotNames, checker, componentContracts),
       ],
     };
   }
@@ -259,47 +263,18 @@ function jsxLayer(
     const label = node.tagName.getText();
     const kind = jsxLayerKind(label);
     return {
-      id: sourceWorkspaceLayerId(relativePath, node.getStart()),
+      id: sourceWorkspaceJsxLayerId(relativePath, node),
       label,
       kind,
       source: { start: node.getStart(), end: node.getEnd() },
-      ...jsxClassName(node, kind),
+      ...jsxClassName(node, kind, checker),
       children: [
-        ...componentUsageSlots(node, componentContracts?.get(label), localComponents, path, relativePath, componentContracts),
-        ...localComponentLayers(label, kind, localComponents, path, relativePath, componentContracts),
+        ...componentUsageSlots(node, componentContracts?.get(label), localComponents, path, relativePath, checker, componentContracts),
+        ...localComponentLayers(label, kind, localComponents, path, relativePath, checker, componentContracts),
       ],
     };
   }
   return undefined;
-}
-
-function jsxClassName(
-  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
-  kind: SourceWorkspaceLayer["kind"],
-): Pick<SourceWorkspaceLayer, "className" | "classNameDynamic"> {
-  if (kind !== "html") return {};
-  const attribute = opening.attributes.properties.find((property): property is ts.JsxAttribute => (
-    ts.isJsxAttribute(property) && property.name.getText() === "className"
-  ));
-  if (!attribute) {
-    return {
-      className: {
-        value: "",
-        start: opening.tagName.end,
-        end: opening.tagName.end,
-        insert: true,
-      },
-    };
-  }
-  const staticValue = staticJsxAttributeValue(attribute.initializer);
-  if (!staticValue) return { classNameDynamic: true };
-  const className: SourceLayerClassNameBinding = {
-    value: staticValue.value,
-    start: attribute.getStart(),
-    end: attribute.getEnd(),
-    syntax: staticValue.syntax,
-  };
-  return { className };
 }
 
 function jsxStaticText(
@@ -337,42 +312,31 @@ function decodeJsxText(value: string): string {
     .replaceAll("&amp;", "&");
 }
 
-function staticJsxAttributeValue(
-  initializer: ts.JsxAttributeValue | undefined,
-): Pick<SourceLayerClassNameBinding, "value" | "syntax"> | undefined {
-  if (!initializer) return undefined;
-  if (ts.isStringLiteral(initializer)) return { value: initializer.text, syntax: "attribute" };
-  if (!ts.isJsxExpression(initializer) || !initializer.expression) return undefined;
-  if (ts.isStringLiteral(initializer.expression) || ts.isNoSubstitutionTemplateLiteral(initializer.expression)) {
-    return { value: initializer.expression.text, syntax: "expression" };
-  }
-  return undefined;
-}
-
 function jsxChildLayers(
   children: ts.NodeArray<ts.JsxChild>,
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
   slotNames: ReadonlySet<string>,
+  checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
   return children.flatMap((child) => {
     if (ts.isJsxFragment(child)) {
-      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames, componentContracts);
+      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames, checker, componentContracts);
     }
     if (ts.isJsxElement(child) && isFragmentTag(child.openingElement.tagName.getText())) {
-      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames, componentContracts);
+      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames, checker, componentContracts);
     }
     if (ts.isJsxSelfClosingElement(child) && isFragmentTag(child.tagName.getText())) return [];
     const slot = sourceSlotLayer(child, slotNames, relativePath);
     if (slot) return [slot];
-    const direct = jsxLayer(child, localComponents, path, relativePath, slotNames, componentContracts);
+    const direct = jsxLayer(child, localComponents, path, relativePath, slotNames, checker, componentContracts);
     if (direct) return [direct];
     if (!ts.isJsxExpression(child) || !child.expression) return [];
     const nested: SourceWorkspaceLayer[] = [];
     const visit = (node: ts.Node): void => {
-      const layer = jsxLayer(node, localComponents, path, relativePath, slotNames, componentContracts);
+      const layer = jsxLayer(node, localComponents, path, relativePath, slotNames, checker, componentContracts);
       if (layer) {
         nested.push(layer);
         return;
@@ -420,6 +384,7 @@ function componentUsageSlots(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
   if (!contracts?.length) return [];
@@ -437,7 +402,7 @@ function componentUsageSlots(
     ));
     const value = property?.initializer;
     const children = value
-      ? slotValueLayers(value, localComponents, path, relativePath, componentContracts)
+      ? slotValueLayers(value, localComponents, path, relativePath, checker, componentContracts)
       : [];
     const received = children.filter((child) => child.kind === "component").map((child) => child.label);
     const incompatible = received.some((label) => !contract.accepts.includes(label));
@@ -489,12 +454,13 @@ function slotValueLayers(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
   const values = ts.isArrayLiteralExpression(value) ? value.elements : [value];
   return values.flatMap((candidate) => {
     if (!ts.isExpression(candidate)) return [];
-    const layer = jsxLayer(candidate, localComponents, path, relativePath, new Set(), componentContracts);
+    const layer = jsxLayer(candidate, localComponents, path, relativePath, new Set(), checker, componentContracts);
     return layer ? [layer] : [];
   });
 }
@@ -542,12 +508,13 @@ function localComponentLayers(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
   if (kind !== "component" || path.has(label) || componentContracts?.has(label)) return [];
   const declaration = localComponents.get(label);
   if (!declaration) return [];
-  return jsxLayers(declaration, localComponents, new Set(path).add(label), relativePath, new Set(), componentContracts);
+  return jsxLayers(declaration, localComponents, new Set(path).add(label), relativePath, new Set(), checker, componentContracts);
 }
 
 function localJsxDeclarations(sourceFile: ts.SourceFile): ReadonlyMap<string, ts.Declaration> {
@@ -565,6 +532,28 @@ function localJsxDeclarations(sourceFile: ts.SourceFile): ReadonlyMap<string, ts
     }
   }
   return declarations;
+}
+
+function renderedComponentDeclaration(
+  declaration: ts.Declaration,
+  localComponents: ReadonlyMap<string, ts.Declaration>,
+): ts.Declaration {
+  if (containsJsx(declaration)) return declaration;
+  if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) return declaration;
+  let resolved: ts.Declaration | undefined;
+  const visit = (node: ts.Node): void => {
+    if (resolved) return;
+    if (ts.isIdentifier(node)) {
+      const candidate = localComponents.get(node.text);
+      if (candidate && candidate !== declaration) {
+        resolved = candidate;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(declaration.initializer);
+  return resolved ?? declaration;
 }
 
 function jsxLayerKind(label: string): SourceWorkspaceLayer["kind"] {

@@ -54,4 +54,17 @@ describe("WorkspaceTopBar", () => {
     expect(props.onDiff).toHaveBeenCalledOnce();
     expect(props.onSave).toHaveBeenCalledOnce();
   });
+
+  it("replaces direct save actions with one staged review trigger", async () => {
+    const onReviewChanges = vi.fn();
+    renderTopBar({ pendingChanges: 3, onReviewChanges });
+
+    await userEvent.click(screen.getByRole("button", { name: "Review 3 pending changes" }));
+
+    expect(screen.getByText("3 changes")).toBeVisible();
+    expect(screen.getByText("Draft")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Prepare exact diff" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    expect(onReviewChanges).toHaveBeenCalledOnce();
+  });
 });

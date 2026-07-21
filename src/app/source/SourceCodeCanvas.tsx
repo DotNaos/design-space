@@ -2,7 +2,7 @@ import { Button } from "@heroui/react";
 import { Code2, Eye, LoaderCircle, LockKeyhole } from "lucide-react";
 import { lazy, Suspense } from "react";
 
-import type { SourceFileEditor } from "./useSourceFileEditor";
+import type { ProjectFileSnapshot } from "../../shared/contracts";
 import type { SourceLayerBinding } from "../../shared/source-workspace";
 
 const MonacoSourceEditor = lazy(async () => {
@@ -11,7 +11,7 @@ const MonacoSourceEditor = lazy(async () => {
 });
 
 export function SourceCodeCanvas(props: {
-  editor: SourceFileEditor;
+  editor: SourceCodeEditor;
   editable: boolean;
   label: string;
   path?: string;
@@ -57,3 +57,12 @@ export function SourceCodeCanvas(props: {
     </section>
   );
 }
+
+export type SourceCodeEditor = {
+  draft: string;
+  dirty: boolean;
+  error?: string;
+  loading: boolean;
+  snapshot?: ProjectFileSnapshot;
+  setDraft: (source: string) => void;
+};

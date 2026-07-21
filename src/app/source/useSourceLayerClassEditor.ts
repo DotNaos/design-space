@@ -1,28 +1,34 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { TailwindPreview } from "../../shared/contracts";
+import type { SourceDesignScope } from "../../shared/source-design";
 import type { SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { runLocalOperation } from "../api";
-import { sourceWithLayerClassName, sourceWithLayerText } from "./source-layer-class-edit";
-import type { SourceFileEditor } from "./useSourceFileEditor";
+import { sourceWithLayerVisualState } from "./source-layer-class-edit";
+import type { SourceCodeEditor } from "./SourceCodeCanvas";
 
 export function useSourceLayerClassEditor(options: {
   connected: boolean;
-  editor: SourceFileEditor;
+  editor: SourceCodeEditor & { reset: () => void };
   layer?: SourceWorkspaceLayer;
+  ready?: boolean;
+  scope?: SourceDesignScope;
 }) {
-  const binding = options.layer?.kind === "html" ? options.layer.className : undefined;
+  const binding = options.layer?.className;
   const textBinding = options.layer?.text;
   const [value, setValue] = useState(binding?.value ?? "");
   const [textValue, setTextValue] = useState(textBinding?.value ?? "");
   const [css, setCss] = useState("");
   const [error, setError] = useState<string>();
+  const editBase = useRef(options.editor.draft);
+  const lastCanvasDraft = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     setValue(binding?.value ?? "");
     setTextValue(textBinding?.value ?? "");
     setCss("");
     setError(undefined);
+    editBase.current = options.editor.draft;
   }, [
     binding?.end,
     binding?.start,
@@ -34,11 +40,21 @@ export function useSourceLayerClassEditor(options: {
   ]);
 
   useEffect(() => {
+    if (options.editor.draft !== lastCanvasDraft.current) {
+      editBase.current = options.editor.draft;
+    }
+  }, [options.editor.draft]);
+
+  useEffect(() => {
     if (!binding || !options.connected) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        const result = await runLocalOperation<TailwindPreview>({ type: "compile-tailwind", value });
+        const result = await runLocalOperation<TailwindPreview>({
+          type: "compile-tailwind",
+          value,
+          scope: options.scope,
+        });
         if (!cancelled) {
           setCss(result.css);
           setError(undefined);
@@ -54,16 +70,19 @@ export function useSourceLayerClassEditor(options: {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [binding, options.connected, value]);
+  }, [binding, options.connected, options.scope, value]);
 
   const apply = useCallback((nextClassName: string, nextText: string) => {
-    const source = options.editor.snapshot?.source;
+    if (options.ready === false) return;
+    const source = editBase.current;
     if (source === undefined) return;
-    const withText = textBinding ? sourceWithLayerText(source, textBinding, nextText) : source;
-    options.editor.setDraft(binding
-      ? sourceWithLayerClassName(withText, binding, nextClassName)
-      : withText);
-  }, [binding, options.editor, textBinding]);
+    const nextSource = sourceWithLayerVisualState(source, {
+      ...(binding ? { className: { binding, value: nextClassName } } : {}),
+      ...(textBinding ? { text: { binding: textBinding, value: nextText } } : {}),
+    });
+    lastCanvasDraft.current = nextSource;
+    options.editor.setDraft(nextSource);
+  }, [binding, options.editor, options.ready, textBinding]);
 
   const change = useCallback((next: string) => {
     setValue(next);
@@ -87,12 +106,12 @@ export function useSourceLayerClassEditor(options: {
     binding,
     change,
     css,
-    editable: Boolean(binding && options.editor.snapshot),
+    editable: Boolean(binding && options.editor.snapshot && options.ready !== false),
     error,
     reset,
     changeText,
     textBinding,
-    textEditable: Boolean(textBinding && options.editor.snapshot),
+    textEditable: Boolean(textBinding && options.editor.snapshot && options.ready !== false),
     textValue,
     value,
   };

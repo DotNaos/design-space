@@ -1,10 +1,11 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { indexTypeScriptComponents } from "./typescript-component-index";
+import { annotateSourceHtmlLayers } from "./source-layer-annotation";
 
 describe("TypeScript component index", () => {
   const roots: string[] = [];
@@ -43,6 +44,7 @@ describe("TypeScript component index", () => {
         }],
       }],
     });
+    expect(components[0]?.layers[0]?.children[0]?.className).toBeUndefined();
 
     const props = Object.fromEntries(components[0]!.props.map((prop) => [prop.name, prop]));
     expect(props.title).toMatchObject({
@@ -90,11 +92,64 @@ describe("TypeScript component index", () => {
     expect(components[0]).toMatchObject({
       exportName: "WrappedPanel",
       propsTypeText: "PanelProps",
+      uses: [],
+      layers: [{
+        label: "section",
+        kind: "html",
+      }],
     });
     expect(components[0]!.props.find((prop) => prop.name === "strict")).toMatchObject({
       kind: "unknown",
       required: true,
     });
+  });
+
+  it("only synthesizes className editing for JSX components whose props accept it", async () => {
+    const root = await createProject();
+    await writeFile(join(root, "src/components/ClassNameComposition.tsx"), `
+      interface SurfaceProps { className?: string; }
+      function Surface(_props: SurfaceProps) { return <section />; }
+      function Plain() { return <span />; }
+      export function Composition() { return <div><Surface /><Plain /></div>; }
+    `);
+
+    const components = await indexTypeScriptComponents({
+      filePaths: ["src/components/ClassNameComposition.tsx"],
+      projectRoot: root,
+    });
+    const composition = components.find((component) => component.exportName === "Composition");
+    const surface = composition?.layers[0]?.children.find((layer) => layer.label === "Surface");
+    const plain = composition?.layers[0]?.children.find((layer) => layer.label === "Plain");
+
+    expect(surface?.className).toMatchObject({ value: "", insert: true });
+    expect(plain?.className).toBeUndefined();
+  });
+
+  it("keeps rendered JSX layer IDs stable when an earlier source edit shifts offsets", async () => {
+    const root = await createProject();
+    const filePath = join(root, "src/components/StableLayers.tsx");
+    const source = `
+      export function StableLayers() {
+        return <main><section>First</section><button>Later</button></main>;
+      }
+    `;
+    await writeFile(filePath, source);
+    const relativePath = "src/components/StableLayers.tsx";
+    const base = await indexTypeScriptComponents({ filePaths: [relativePath], projectRoot: root });
+    const shiftedSource = source.replace("return <main>", 'return <main className="grid">');
+    const shifted = await indexTypeScriptComponents({
+      filePaths: [relativePath],
+      projectRoot: root,
+      sourceOverrides: new Map([[await realpath(filePath), shiftedSource]]),
+    });
+    const later = base[0]?.layers[0]?.children.find((layer) => layer.label === "button");
+    const shiftedLater = shifted[0]?.layers[0]?.children.find((layer) => layer.label === "button");
+
+    expect(shiftedLater?.source.start).not.toBe(later?.source.start);
+    expect(shiftedLater?.id).toBe(later?.id);
+    expect(annotateSourceHtmlLayers(source, "src/components/StableLayers.tsx")).toContain(
+      `data-design-space-source-layer-id="${shiftedLater?.id}"`,
+    );
   });
 
   it("indexes only explicit typed slots and flattens fragments", async () => {

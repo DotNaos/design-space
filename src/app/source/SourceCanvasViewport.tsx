@@ -10,6 +10,7 @@ const sourcePreviewId = "source-preview";
 
 export function SourceCanvasViewport(props: {
   children: (frame: { width: number; height: number }) => React.ReactNode;
+  compact?: boolean;
   device: DesignSpaceDevice;
   node?: SourceTreeNode;
   selectionKey?: string;
@@ -71,6 +72,7 @@ export function SourceCanvasViewport(props: {
         selectionLabel={props.selectionLabel ?? `${preset.label.replace("Responsive", `Responsive · ${responsiveWidth} × ${preset.height}`)}`}
         slots={[]}
         staticPreview
+        compact={props.compact}
         worldWidth={frame.width}
         onSelect={() => undefined}
       />

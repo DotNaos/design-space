@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import type { RuntimeSourceLibraryCatalog, RuntimeSourceWorkspaceEntry, SourceWorkspaceLibrary } from "../../shared/source-workspace";
 import { SourceLibraryCanvas, SourceLibrarySidebar } from "./SourceLibraryWorkspace";
+import { findSourceLibraryLayerOwner } from "./source-library-selection";
 
 afterEach(cleanup);
 
@@ -111,4 +112,27 @@ it("explains when an installed export has no native design", () => {
 
   expect(screen.getByRole("heading", { name: "Design missing" })).toBeVisible();
   expect(screen.getByText(/does not include a colocated native design/)).toBeVisible();
+});
+
+it("resolves a selected rendered layer to the source entry that owns it", () => {
+  const nestedOwner: RuntimeSourceWorkspaceEntry = {
+    ...entry,
+    id: "source.entry.button-container",
+    label: "ButtonContainer",
+    fileId: "source.file.button-container",
+    relativePath: "src/shared/button/ButtonContainer.tsx",
+    exportName: "ButtonContainer",
+    design: undefined,
+    layers: [{
+      id: "jsx:button-container:12",
+      label: "button",
+      kind: "html",
+      children: [],
+      source: { start: 12, end: 42 },
+    }],
+  };
+
+  expect(findSourceLibraryLayerOwner({ ...catalog.development!, entries: [entry, nestedOwner] }, "jsx:button-container:12"))
+    .toBe(nestedOwner);
+  expect(findSourceLibraryLayerOwner(catalog.development, "missing-layer")).toBeUndefined();
 });

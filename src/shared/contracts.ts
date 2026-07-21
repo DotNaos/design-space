@@ -156,13 +156,22 @@ export const componentControlSchema = componentControlUnionSchema.superRefine((c
 export type ComponentControl = z.infer<typeof componentControlSchema>;
 
 export const browserOperationSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("compile-tailwind"), value: z.string().max(10_000) }).strict(),
+  z.object({
+    type: z.literal("compile-tailwind"),
+    value: z.string().max(10_000),
+    scope: z.enum(["app", "library-development"]).optional(),
+  }).strict(),
   z.object({ type: z.literal("analyze-tailwind"), value: z.string().max(10_000), cursor: z.number().int().min(0).max(10_000) }).strict(),
-  z.object({ type: z.literal("read-project-file"), fileId: opaqueIdSchema }).strict(),
+  z.object({
+    type: z.literal("read-project-file"),
+    fileId: opaqueIdSchema,
+    scope: z.enum(["app", "library-development"]).optional(),
+  }).strict(),
   z.object({
     type: z.literal("analyze-source-file-draft"),
     fileId: opaqueIdSchema,
     source: z.string().max(512 * 1024),
+    scope: z.enum(["app", "library-development"]).optional(),
   }).strict(),
   z.object({
     type: z.literal("prepare-project-file-edit"),
@@ -171,6 +180,17 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
     source: z.string().max(512 * 1024),
   }).strict(),
   z.object({ type: z.literal("save-project-file-edit"), challengeId: z.string().uuid() }).strict(),
+  z.object({
+    type: z.literal("prepare-source-change-set"),
+    scope: z.enum(["app", "library-development"]),
+    supersedesChallengeId: z.string().uuid().optional(),
+    changes: z.array(z.object({
+      fileId: opaqueIdSchema,
+      baseVersion: sourceVersionSchema,
+      source: z.string().max(512 * 1024),
+    }).strict()).min(1).max(50),
+  }).strict(),
+  z.object({ type: z.literal("apply-source-change-set"), challengeId: z.string().uuid() }).strict(),
   z.object({
     type: z.literal("prepare-source-component-create"),
     name: z.string().trim().regex(/^[A-Z][A-Za-z0-9]{1,63}$/),
@@ -240,6 +260,37 @@ export interface PreparedProjectFileEdit {
 
 export interface SavedProjectFileEdit extends ProjectFileSnapshot {
   previousVersion: string;
+}
+
+export interface SourceChangeReviewEvidence {
+  changeId: string;
+  fileId: string;
+  label: string;
+  baseVersion: string;
+  nextVersion: string;
+  beforeSource: string;
+  afterSource: string;
+  diff: string;
+}
+
+export interface PreparedSourceChangeSet {
+  state: "source-change-set-ready";
+  challengeId: string;
+  scope: SourceDesignScope;
+  changes: readonly SourceChangeReviewEvidence[];
+  expiresAt: string;
+}
+
+export interface AppliedSourceChangeSet {
+  state: "source-change-set-applied";
+  scope: SourceDesignScope;
+  changes: readonly {
+    changeId: string;
+    fileId: string;
+    label: string;
+    previousVersion: string;
+    version: string;
+  }[];
 }
 
 export interface PreparedSourceComponentCreate {

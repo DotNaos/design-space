@@ -26,10 +26,14 @@ export function SourcePreviewFrame(props: {
   selectedClassCss?: string;
   selectedText?: string;
   centerContent?: boolean;
+  compact?: boolean;
+  isolateSelectedLayer?: boolean;
   generateDesignError?: string;
   generatingDesign?: boolean;
+  selectionMode?: boolean;
   onGenerateDesign?: () => void;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
+  onSelectLayer?: (layerId: string) => void;
 }) {
   const [mounts, setMounts] = useState<PreviewMounts>();
   const [projectedKey, setProjectedKey] = useState<string>();
@@ -38,6 +42,7 @@ export function SourcePreviewFrame(props: {
   const [loadMessage, setLoadMessage] = useState<string>();
   const [caseByDesign, setCaseByDesign] = useState<Readonly<Record<string, string>>>({});
   const [matrixByDesign, setMatrixByDesign] = useState<Readonly<Record<string, boolean>>>({});
+  const selectableLayerIds = useMemo(() => sourceLayerIds(props.entries ?? (props.entry ? [props.entry] : [])), [props.entries, props.entry]);
   const designId = props.entry?.design?.fileId;
   useEffect(() => {
     const design = props.entry?.design;
@@ -81,7 +86,7 @@ export function SourcePreviewFrame(props: {
     loadMessage,
     loadState,
   });
-  const projectionKey = props.entry && props.selectedLayer?.kind === "html" && selectedCase
+  const projectionKey = props.isolateSelectedLayer !== false && props.entry && props.selectedLayer?.kind === "html" && selectedCase
     ? `${props.entry.id}:${props.selectedLayer.id}:${selectedCase}`
     : undefined;
   const completeProjection = useCallback(() => {
@@ -92,8 +97,9 @@ export function SourcePreviewFrame(props: {
       setMounts(undefined);
       return;
     }
-    node.inert = true;
-    node.setAttribute("inert", "");
+    node.inert = !props.selectionMode;
+    if (props.selectionMode) node.removeAttribute("inert");
+    else node.setAttribute("inert", "");
     const update = () => {
       const document = node.contentDocument;
       const output = document?.getElementById("design-space-preview-root");
@@ -103,36 +109,53 @@ export function SourcePreviewFrame(props: {
     };
     node.addEventListener("load", update, { once: true });
     update();
-  }, []);
+  }, [props.selectionMode]);
+
+  useEffect(() => {
+    if (!mounts || !props.selectionMode || !props.onSelectLayer) return undefined;
+    const document = mounts.output.ownerDocument;
+    const select = (event: Event) => {
+      const point = sourceLayerTargetAtEventPoint(document, event);
+      const layerId = sourceLayerIdFromElement(point ?? event.target, selectableLayerIds);
+      if (!layerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      props.onSelectLayer?.(layerId);
+    };
+    document.addEventListener("pointerdown", select, true);
+    document.addEventListener("click", select, true);
+    return () => {
+      document.removeEventListener("pointerdown", select, true);
+      document.removeEventListener("click", select, true);
+    };
+  }, [mounts, props.onSelectLayer, props.selectionMode, selectableLayerIds]);
 
   useEffect(() => {
     if (mounts) mounts.styles.textContent = [props.styles.join("\n"), props.selectedClassCss ?? ""].join("\n");
   }, [mounts, props.selectedClassCss, props.styles]);
 
   useEffect(() => {
-    if (
-      mounts &&
-      projectionKey &&
-      projectedKey === projectionKey &&
-      props.selectedClassName !== undefined
-    ) {
+    if (!mounts || props.selectedClassName === undefined) return;
+    if (projectionKey && projectedKey === projectionKey) {
       applySourceLayerClassName(mounts.output, props.selectedClassName);
+    } else if (!projectionKey && props.selectedLayer) {
+      applySourceLayerClassNameById(mounts.output, props.selectedLayer.id, props.selectedClassName);
     }
-  }, [mounts, projectedKey, projectionKey, props.selectedClassName]);
+  }, [mounts, projectedKey, projectionKey, props.selectedClassName, props.selectedLayer]);
 
   useEffect(() => {
-    if (
-      mounts &&
-      projectionKey &&
-      projectedKey === projectionKey &&
-      props.selectedText !== undefined
-    ) {
+    if (!mounts || props.selectedText === undefined) return;
+    if (projectionKey && projectedKey === projectionKey) {
       applySourceLayerText(mounts.output, props.selectedText);
+    } else if (!projectionKey && props.selectedLayer) {
+      applySourceLayerTextById(mounts.output, props.selectedLayer.id, props.selectedText);
     }
-  }, [mounts, projectedKey, projectionKey, props.selectedText]);
+  }, [mounts, projectedKey, projectionKey, props.selectedLayer, props.selectedText]);
 
   return (
     <SourceCanvasViewport
+      compact={props.compact}
       device={props.device}
       node={props.node}
       selectionKey={props.selectedLayer?.id ?? props.entry?.id}
@@ -159,7 +182,7 @@ export function SourcePreviewFrame(props: {
                 key={projectionKey ?? props.entry?.id ?? "unavailable"}
                 ref={loadFrame}
                 aria-label={`${props.entry?.label ?? props.node?.label ?? "Source"} static preview`}
-                className="pointer-events-none h-full w-full select-none border-0"
+                className={`${props.selectionMode ? "pointer-events-auto cursor-default" : "pointer-events-none"} h-full w-full select-none border-0`}
                 srcDoc={previewDocument}
                 tabIndex={-1}
                 title={`${props.entry?.label ?? props.node?.label ?? "Source"} ${props.device} preview`}
@@ -186,6 +209,29 @@ export function SourcePreviewFrame(props: {
       )}
     </SourceCanvasViewport>
   );
+}
+
+export function scalePreviewEventPoint(
+  point: { clientX: number; clientY: number },
+  frame: { height: number; width: number },
+  viewport: { height: number; width: number },
+): { x: number; y: number } {
+  return {
+    x: point.clientX * (frame.width > 0 && viewport.width > 0 ? viewport.width / frame.width : 1),
+    y: point.clientY * (frame.height > 0 && viewport.height > 0 ? viewport.height / frame.height : 1),
+  };
+}
+
+function sourceLayerTargetAtEventPoint(document: Document, event: Event): Element | null {
+  if (!("clientX" in event) || !("clientY" in event)) return null;
+  const frame = document.defaultView?.frameElement;
+  const bounds = frame?.getBoundingClientRect();
+  const point = scalePreviewEventPoint(
+    { clientX: Number(event.clientX), clientY: Number(event.clientY) },
+    { height: bounds?.height ?? 0, width: bounds?.width ?? 0 },
+    { height: document.documentElement.clientHeight, width: document.documentElement.clientWidth },
+  );
+  return document.elementFromPoint(point.x, point.y);
 }
 
 function unavailablePreviewState(props: Pick<Parameters<typeof SourcePreviewFrame>[0], "device" | "entry" | "generateDesignError" | "generatingDesign" | "onGenerateDesign" | "runtime"> & {
@@ -368,8 +414,43 @@ export function projectSourceLayer(staging: HTMLElement, output: HTMLElement, la
   return true;
 }
 
+export function sourceLayerIdFromElement(
+  target: EventTarget | null,
+  accepted?: ReadonlySet<string>,
+): string | undefined {
+  let element = target as Element | null;
+  if (!element || typeof element.closest !== "function") return undefined;
+  if (!accepted) return element.closest<HTMLElement>("[data-design-space-source-layer-id]")?.dataset.designSpaceSourceLayerId;
+  element = element.closest<HTMLElement>("[data-design-space-source-layer-id]");
+  while (element) {
+    const layerId = (element as HTMLElement).dataset.designSpaceSourceLayerId;
+    if (layerId && accepted.has(layerId)) return layerId;
+    element = element.parentElement?.closest<HTMLElement>("[data-design-space-source-layer-id]") ?? null;
+  }
+  return undefined;
+}
+
+function sourceLayerIds(entries: readonly RuntimeSourceWorkspaceEntry[]): ReadonlySet<string> {
+  const ids = new Set<string>();
+  const visit = (layers: readonly SourceWorkspaceLayer[] | undefined): void => {
+    for (const layer of layers ?? []) {
+      ids.add(layer.id);
+      visit(layer.children);
+    }
+  };
+  for (const entry of entries) visit(entry.layers);
+  return ids;
+}
+
 export function applySourceLayerClassName(output: HTMLElement, className: string): boolean {
   const selected = output.firstElementChild;
+  if (!selected) return false;
+  selected.setAttribute("class", className);
+  return true;
+}
+
+export function applySourceLayerClassNameById(output: HTMLElement, layerId: string, className: string): boolean {
+  const selected = sourceLayerElement(output, layerId);
   if (!selected) return false;
   selected.setAttribute("class", className);
   return true;
@@ -378,12 +459,26 @@ export function applySourceLayerClassName(output: HTMLElement, className: string
 export function applySourceLayerText(output: HTMLElement, text: string): boolean {
   const selected = output.firstElementChild;
   if (!selected) return false;
+  return replaceDirectText(selected, text);
+}
+
+export function applySourceLayerTextById(output: HTMLElement, layerId: string, text: string): boolean {
+  const selected = sourceLayerElement(output, layerId);
+  return selected ? replaceDirectText(selected, text) : false;
+}
+
+function replaceDirectText(selected: Element, text: string): boolean {
   const textNodes = [...selected.childNodes].filter((node) => node.nodeType === 3);
   const textNode = textNodes.find((node) => Boolean(node.textContent?.trim()))
     ?? (textNodes.length === 1 ? textNodes[0] : undefined);
   if (!textNode) return false;
   textNode.textContent = text;
   return true;
+}
+
+function sourceLayerElement(output: HTMLElement, layerId: string): HTMLElement | null {
+  return [...output.querySelectorAll<HTMLElement>("[data-design-space-source-layer-id]")]
+    .find((element) => element.dataset.designSpaceSourceLayerId === layerId) ?? null;
 }
 
 function PreviewState(props: { action?: React.ReactNode; error?: string; title: string; message: string }) {

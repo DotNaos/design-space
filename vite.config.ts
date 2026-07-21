@@ -12,6 +12,7 @@ import {
   loadRegisteredProject,
   LocalOperationService,
   resolveServerProjectRoot,
+  SourceDraftPreviewRegistry,
 } from "./src/server";
 import { createViteFileSystemPolicy } from "./src/server/vite-file-system-policy";
 import { targetTypeScriptAliases } from "./src/server/typescript-path-aliases";
@@ -36,8 +37,9 @@ export default defineConfig(async () => {
   const registeredTarget = await loadRegisteredProject(
     resolveServerProjectRoot(resolve(root, "examples/source-target")),
   );
+  const sourceDraftPreviews = new SourceDraftPreviewRegistry();
   const api = new LocalOperationService(
-    new EditService(registeredTarget),
+    new EditService(registeredTarget, { sourceDraftPreviews }),
     new DocumentService(registeredTarget),
   );
 
@@ -49,7 +51,7 @@ export default defineConfig(async () => {
     },
     plugins: [
       enforcedPortless(),
-      designSpaceTargetPlugin(registeredTarget),
+      designSpaceTargetPlugin(registeredTarget, sourceDraftPreviews),
       designSpaceApiPlugin(api),
       runningTargetPlugin(registeredTarget.project),
       react(),

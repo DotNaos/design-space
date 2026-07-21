@@ -1,47 +1,68 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { SourceDraftAnalysis } from "../../shared/contracts";
+import type { SourceDesignScope } from "../../shared/source-design";
 import type { RuntimeSourceWorkspace } from "../../shared/source-workspace";
 import { runLocalOperation } from "../api";
-import type { SourceFileEditor } from "./useSourceFileEditor";
+import type { SourceCodeEditor } from "./SourceCodeCanvas";
 
 export function useSourceDraftAnalysis(
   workspace: RuntimeSourceWorkspace,
-  editor: SourceFileEditor,
-): { workspace: RuntimeSourceWorkspace; analyzing: boolean; error?: string } {
+  editor: SourceCodeEditor,
+  scope: SourceDesignScope = "app",
+): { workspace: RuntimeSourceWorkspace; analyzing: boolean; ready: boolean; error?: string } {
   const request = useRef(0);
-  const [analysis, setAnalysis] = useState<SourceDraftAnalysis>();
-  const [analyzing, setAnalyzing] = useState(false);
-  const [error, setError] = useState<string>();
+  const [result, setResult] = useState<{
+    fileId: string;
+    source: string;
+    scope: SourceDesignScope;
+    status: "pending" | "success" | "error";
+    analysis?: SourceDraftAnalysis;
+    error?: string;
+  }>();
   const fileId = editor.snapshot?.fileId;
 
   useEffect(() => {
     const current = ++request.current;
     if (!fileId || !editor.dirty) {
-      setAnalysis(undefined);
-      setAnalyzing(false);
-      setError(undefined);
+      setResult(undefined);
       return;
     }
-    setAnalyzing(true);
+    const source = editor.draft;
+    setResult({ fileId, source, scope, status: "pending" });
     const timer = window.setTimeout(() => {
       void runLocalOperation<SourceDraftAnalysis>({
         type: "analyze-source-file-draft",
         fileId,
-        source: editor.draft,
+        source,
+        scope,
       }).then((result) => {
         if (request.current !== current) return;
-        setAnalysis(result);
-        setError(undefined);
+        setResult({ fileId, source, scope, status: "success", analysis: result });
       }).catch((reason: unknown) => {
         if (request.current !== current) return;
-        setError(reason instanceof Error ? reason.message : "The source draft could not be analyzed.");
-      }).finally(() => {
-        if (request.current === current) setAnalyzing(false);
+        setResult({
+          fileId,
+          source,
+          scope,
+          status: "error",
+          error: reason instanceof Error ? reason.message : "The source draft could not be analyzed.",
+        });
       });
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [editor.dirty, editor.draft, fileId]);
+  }, [editor.dirty, editor.draft, fileId, scope]);
+
+  const current = Boolean(
+    result
+    && result.fileId === fileId
+    && result.source === editor.draft
+    && result.scope === scope,
+  );
+  const analysis = current && result?.status === "success" ? result.analysis : undefined;
+  const analyzing = Boolean(fileId && editor.dirty && (!current || result?.status === "pending"));
+  const ready = !editor.dirty || Boolean(current && result?.status === "success" && analysis);
+  const error = current && result?.status === "error" ? result.error : undefined;
 
   const effective = useMemo<RuntimeSourceWorkspace>(() => {
     if (!analysis) return workspace;
@@ -54,5 +75,5 @@ export function useSourceDraftAnalysis(
       }),
     };
   }, [analysis, workspace]);
-  return { workspace: effective, analyzing, ...(error ? { error } : {}) };
+  return { workspace: effective, analyzing, ready, ...(error ? { error } : {}) };
 }

@@ -6,6 +6,10 @@ import { expect, it } from "vitest";
 
 import { registerTrustedTarget } from "./target-registration";
 import { registerSourceProject } from "./source-project-registration";
+import {
+  SourceDraftPreviewRegistry,
+  sourceDraftPreviewModuleId,
+} from "./source-draft-preview-registry";
 import { DESIGN_SPACE_TARGET_MODULE_ID, designSpaceTargetPlugin } from "./virtual-target-plugin";
 
 it("binds the virtual runtime to the server-registered target module", async () => {
@@ -58,4 +62,43 @@ it("generates a runtime from server-indexed TypeScript exports without a target 
     page!.absolutePath,
   );
   expect(transformed.code).toContain("data-design-space-source-layer-id");
+});
+
+it("serves a validated draft graph through Vite without changing the registered files", async () => {
+  const root = resolve(import.meta.dirname, "../../examples/source-target");
+  const target = await registerSourceProject(root, {
+    project: { id: "generated-project-template-web", label: "Generated Project Template Web" },
+    tablet: { fallback: "desktop" },
+  });
+  const entry = target.sourceWorkspace?.manifest.entries.find((candidate) => candidate.design);
+  const sourceFile = target.sourceWorkspace?.files.find((file) => file.id === entry?.fileId);
+  const designFile = target.sourceWorkspace?.files.find((file) => file.id === entry?.design?.fileId);
+  expect(sourceFile).toBeDefined();
+  expect(designFile).toBeDefined();
+  const draft = `${await readFile(sourceFile!.absolutePath, "utf8")}\n// prepared review\n`;
+  const registry = new SourceDraftPreviewRegistry();
+  registry.register({
+    challengeId: "prepared-review",
+    scope: "app",
+    workspace: target.sourceWorkspace!,
+    changes: [{ fileId: sourceFile!.id, source: draft }],
+    expiresAt: Date.now() + 60_000,
+  });
+  const plugin = designSpaceTargetPlugin(target, registry);
+  const designId = sourceDraftPreviewModuleId("prepared-review", designFile!.id, designFile!.relativePath);
+  const resolvedDesign = await (plugin.resolveId as Function)(designId);
+
+  expect(await (plugin.load as Function)(resolvedDesign)).toBe(await readFile(designFile!.absolutePath, "utf8"));
+  const resolvedSource = await (plugin.resolveId as Function).call({
+    resolve: async () => ({ id: sourceFile!.absolutePath }),
+  }, "./component", resolvedDesign);
+  expect(resolvedSource).toBe(`\0${sourceDraftPreviewModuleId(
+    "prepared-review",
+    sourceFile!.id,
+    sourceFile!.relativePath,
+  )}`);
+  expect(await (plugin.load as Function)(resolvedSource)).toBe(draft);
+  const transformed = await (plugin.transform as Function)(draft, resolvedSource);
+  expect(transformed.code).toContain("data-design-space-source-layer-id");
+  expect(await readFile(sourceFile!.absolutePath, "utf8")).not.toContain("prepared review");
 });
