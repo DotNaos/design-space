@@ -1,6 +1,6 @@
 import { Button, Checkbox, Label, Modal } from "@heroui/react";
-import { CheckCircle2, CircleAlert, FileCode2, LoaderCircle, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, CircleAlert, Diff, FileCode2, LoaderCircle, Trash2, X } from "lucide-react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   reconcileSourceChangeReviewState,
@@ -10,6 +10,11 @@ import {
   type SourceChangeReviewItem,
   type SourceChangeReviewState,
 } from "./source-change-review";
+
+const MonacoSourceDiff = lazy(async () => {
+  const module = await import("./MonacoSourceDiff");
+  return { default: module.MonacoSourceDiff };
+});
 
 export type SourceChangeReviewModalProps = {
   applying?: boolean;
@@ -258,29 +263,46 @@ function ChangeComparison(props: { applying: boolean; change: SourceChangeReview
           {props.change.validationMessage}
         </p>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2" data-testid="source-change-comparison-grid">
-          <ComparisonSide label="Before" snapshot={props.change.before} />
-          <ComparisonSide label="After" snapshot={props.change.after} />
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:p-4">
+        <div className="grid shrink-0 grid-cols-1 gap-3 xl:grid-cols-2" data-testid="source-change-comparison-grid">
+          <PreviewSide label="Before" preview={props.change.before.preview} />
+          <PreviewSide label="After" preview={props.change.after.preview} />
         </div>
+        <SourceDiff change={props.change} />
       </div>
     </section>
   );
 }
 
-function ComparisonSide(props: { label: "After" | "Before"; snapshot: SourceChangeReviewItem["before"] }) {
+function PreviewSide(props: { label: "After" | "Before"; preview: React.ReactNode }) {
   return (
-    <section aria-label={`${props.label} change`} className="min-w-0 overflow-hidden border border-white/[0.08] bg-[#0d0e10]">
+    <section aria-label={`${props.label} change`} className="min-w-0 overflow-hidden rounded-md border border-white/[0.08] bg-[#0d0e10]">
       <h3 className="border-b border-white/[0.07] px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">{props.label}</h3>
-      <div aria-label={`${props.label} preview`} className="grid min-h-44 place-items-center overflow-auto bg-[#101113] p-4" role="region">
-        {props.snapshot.preview}
+      <div aria-label={`${props.label} preview`} className="grid h-52 place-items-center overflow-auto bg-[#101113] p-4" role="region">
+        {props.preview}
       </div>
-      <div className="border-y border-white/[0.07] px-3 py-1.5 text-[9px] font-medium uppercase tracking-[0.12em] text-zinc-600">Source</div>
-      <pre
-        aria-label={`${props.label} source`}
-        className="max-h-72 overflow-auto p-3 font-mono text-[10px] leading-5 text-zinc-400"
-        tabIndex={0}
-      ><code>{props.snapshot.source}</code></pre>
+    </section>
+  );
+}
+
+function SourceDiff(props: { change: SourceChangeReviewItem }) {
+  return (
+    <section aria-label="Source diff" className="min-h-[22rem] flex-1 overflow-hidden rounded-md border border-white/[0.08] bg-[#0d0e10]">
+      <header className="flex h-9 items-center gap-2 border-b border-white/[0.07] px-3">
+        <Diff aria-hidden="true" className="text-sky-300" size={13} />
+        <h3 className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">Source diff</h3>
+        <span className="ml-auto text-[9px] text-zinc-600">Synchronized scroll</span>
+      </header>
+      <div className="h-[calc(100%-2.25rem)] min-h-0">
+        <Suspense fallback={<div className="grid h-full place-items-center text-[10px] text-zinc-600"><LoaderCircle className="animate-spin" size={14} /> Loading highlighted diff…</div>}>
+          <MonacoSourceDiff
+            key={props.change.id}
+            modified={props.change.after.source}
+            original={props.change.before.source}
+            path={props.change.path}
+          />
+        </Suspense>
+      </div>
     </section>
   );
 }

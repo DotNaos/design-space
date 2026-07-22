@@ -2,8 +2,8 @@ import "./monaco-environment";
 
 import { useEffect, useId, useRef } from "react";
 import * as monaco from "monaco-editor";
-import * as typeScriptContribution from "monaco-editor/esm/vs/language/typescript/monaco.contribution.js";
 import type { SourceLayerBinding } from "../../shared/source-workspace";
+import { configureMonacoTypeScript, sourceLanguageFor } from "./monaco-source-language";
 import { monacoModelPath } from "./monaco-model-path";
 
 configureMonacoTypeScript();
@@ -34,7 +34,7 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
     if (!container) return;
 
     const uri = monaco.Uri.file(monacoModelPath(props.path, modelId));
-    const model = monaco.editor.createModel(props.value, languageFor(props.path), uri);
+    const model = monaco.editor.createModel(props.value, sourceLanguageFor(props.path), uri);
     const editor = monaco.editor.create(container, {
       model,
       theme: "vs-dark",
@@ -104,40 +104,4 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
   }, [props.selection, props.value]);
 
   return <div ref={containerRef} className="h-full min-h-0 w-full" />;
-}
-
-function configureMonacoTypeScript() {
-  const diagnostics = {
-    // The editor intentionally opens one trusted file at a time. Project-wide
-    // semantic validation remains the server compiler's responsibility.
-    noSemanticValidation: true,
-    noSyntaxValidation: false,
-  };
-  type LanguageDefaults = {
-    getCompilerOptions: () => Record<string, unknown>;
-    setCompilerOptions: (options: Record<string, unknown>) => void;
-    setDiagnosticsOptions: (options: typeof diagnostics) => void;
-  };
-  const contribution = typeScriptContribution as unknown as {
-    JsxEmit: { ReactJSX: number };
-    javascriptDefaults: LanguageDefaults;
-    typescriptDefaults: LanguageDefaults;
-  };
-  for (const language of [contribution.typescriptDefaults, contribution.javascriptDefaults]) {
-    language.setCompilerOptions({
-      ...language.getCompilerOptions(),
-      allowNonTsExtensions: true,
-      jsx: contribution.JsxEmit.ReactJSX,
-    });
-    language.setDiagnosticsOptions(diagnostics);
-  }
-}
-
-function languageFor(path: string): string {
-  if (/\.tsx?$/i.test(path)) return "typescript";
-  if (/\.jsx?$/i.test(path)) return "javascript";
-  if (/\.json$/i.test(path)) return "json";
-  if (/\.(?:css|scss|less)$/i.test(path)) return "css";
-  if (/\.(?:html|htm)$/i.test(path)) return "html";
-  return "plaintext";
 }

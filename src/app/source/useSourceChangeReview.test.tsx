@@ -1,4 +1,4 @@
-import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -12,7 +12,10 @@ import type { SourceDraftBase, SourceDraftLocation } from "./source-draft-worksp
 import { SourceChangeReviewModal } from "./SourceChangeReviewModal";
 import { type SourceChangeReviewOptions, useSourceChangeReview } from "./useSourceChangeReview";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 vi.mock("./source-draft-local", () => ({
   preparedSourceDraftModuleUrl: () => `data:text/javascript,${encodeURIComponent(`
@@ -29,7 +32,12 @@ vi.mock("./source-draft-local", () => ({
 }));
 
 vi.mock("./SourcePreviewFrame", () => ({
-  SourcePreviewFrame: (props: { entry?: RuntimeSourceWorkspaceEntry; styles?: readonly string[] }) => {
+  SourcePreviewFrame: (props: {
+    entry?: RuntimeSourceWorkspaceEntry;
+    selectedClassName?: string;
+    selectedText?: string;
+    styles?: readonly string[];
+  }) => {
     const [evidence, setEvidence] = useState("Loading review preview");
     useEffect(() => {
       let active = true;
@@ -38,7 +46,14 @@ vi.mock("./SourcePreviewFrame", () => ({
       });
       return () => { active = false; };
     }, [props.entry]);
-    return <div>{evidence}<output aria-label="Preview styles">{props.styles?.join("\n")}</output></div>;
+    return (
+      <div>
+        {evidence}
+        <output aria-label="Preview class">{props.selectedClassName}</output>
+        <output aria-label="Preview text">{props.selectedText}</output>
+        <output aria-label="Preview styles">{props.styles?.join("\n")}</output>
+      </div>
+    );
   },
 }));
 
@@ -60,8 +75,35 @@ it("renders the complete prepared graph after a visual edit plus another Monaco 
   render(result.current.items[0]!.after.preview);
 
   expect(await screen.findByText("visual class p-6; Monaco label Renamed")).toBeVisible();
+  expect(screen.getByLabelText("Preview class")).toHaveTextContent("p-6");
   expect(screen.getByLabelText("Preview styles")).toHaveTextContent(".p-6{}");
   expect(screen.queryByText("baseline class p-4; baseline label Save")).not.toBeInTheDocument();
+});
+
+it("renders a safe visual after-preview even while the coordinated code draft is invalid", async () => {
+  const workspace = sourceWorkspace();
+  const validChange = draftEntry();
+  const change: SourceDraftEntry = {
+    ...validChange,
+    validation: { state: "invalid", draftDigest: validChange.draftDigest, message: "Strict UI rejected another file." },
+  };
+  const { result } = renderHook(() => useSourceChangeReview({
+    appLabel: "Design Space",
+    appVisual: { css: ".p-6{}", textValue: "Renamed", value: "p-6" },
+    appWorkspace: workspace,
+    changes: [change],
+    draftWorkspace: createSourceDraftWorkspace(),
+    libraryLabel: "UI",
+    libraryVisual: { css: "", textValue: "", value: "" },
+    libraryWorkspace: workspace,
+  }));
+
+  render(result.current.items[0]!.after.preview);
+
+  expect(await screen.findByText("baseline class p-4; baseline label Save")).toBeVisible();
+  expect(screen.getByLabelText("Preview class")).toHaveTextContent("p-6");
+  expect(screen.getByLabelText("Preview styles")).toHaveTextContent(".p-6{}");
+  expect(screen.queryByText(/cannot be executed safely/i)).not.toBeInTheDocument();
 });
 
 type PreparedReviewDefinition = ComponentDesignDefinition & { reviewEvidence: string };

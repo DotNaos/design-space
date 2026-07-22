@@ -8,6 +8,16 @@ import type { SourceChangeReviewItem } from "./source-change-review";
 
 afterEach(cleanup);
 
+vi.mock("./MonacoSourceDiff", () => ({
+  MonacoSourceDiff: (props: { modified: string; original: string; path: string }) => (
+    <div aria-label="Source diff editor" data-path={props.path}>
+      <pre aria-label="Before source">{props.original}</pre>
+      <pre aria-label="After source">{props.modified}</pre>
+      <span>Highlighted synchronized diff</span>
+    </div>
+  ),
+}));
+
 const buttonChange = change({
   id: "button",
   digest: "button:v1",
@@ -35,8 +45,9 @@ describe("SourceChangeReviewModal", () => {
     expect(screen.getByText("0 of 2 approved · 2 selected")).toBeVisible();
     expect(screen.getByRole("region", { name: "Before preview" })).toHaveTextContent("Button before");
     expect(screen.getByRole("region", { name: "After preview" })).toHaveTextContent("Button after");
-    expect(screen.getByLabelText("Before source")).toHaveTextContent("<button>Save</button>");
+    expect(await screen.findByLabelText("Before source")).toHaveTextContent("<button>Save</button>");
     expect(screen.getByLabelText("After source")).toHaveTextContent("className=\"rounded\"");
+    expect(screen.getByRole("region", { name: "Source diff" })).toHaveTextContent("Highlighted synchronized diff");
 
     const apply = screen.getByRole("button", { name: "Apply selected (2)" });
     expect(apply).toBeDisabled();
