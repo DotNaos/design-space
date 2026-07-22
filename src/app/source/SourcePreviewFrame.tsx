@@ -10,7 +10,8 @@ import type {
 import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
-import { mountSourceLayerSelection, sourceLayerElement } from "./source-preview-selection-overlay";
+import { sourceLayerIdAtPreviewPoint } from "./source-preview-hit-testing";
+import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
 import { renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
 import type { SourceTreeNode } from "./source-workspace-tree";
@@ -46,6 +47,7 @@ export function SourcePreviewFrame(props: {
   const [caseByDesign, setCaseByDesign] = useState<Readonly<Record<string, string>>>({});
   const [matrixByDesign, setMatrixByDesign] = useState<Readonly<Record<string, boolean>>>({});
   const [staticRevision, setStaticRevision] = useState(0);
+  const [hoveredLayerId, setHoveredLayerId] = useState<string>();
   const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
   const selectableLayerIds = useMemo(() => sourceLayerIds(props.entries ?? (props.entry ? [props.entry] : [])), [props.entries, props.entry]);
   const defaultVisualLayer = sourceCanvasVisualLayer(props.entry, undefined);
@@ -154,6 +156,13 @@ export function SourcePreviewFrame(props: {
     props.onSelectLayer(layerId);
   };
 
+  const hoverStaticLayer = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const layerId = sourceLayerIdAtPreviewPoint(frame, event, selectableLayerIds, defaultVisualLayer?.id);
+    setHoveredLayerId((current) => current === layerId ? current : layerId);
+  };
+
   useLayoutEffect(() => {
     if (!mounts || previewMode !== "design" || !props.selectedLayer) {
       props.onSelectedLayerMetrics?.(undefined);
@@ -170,6 +179,22 @@ export function SourcePreviewFrame(props: {
         : undefined,
     );
   }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer, staticRevision]);
+
+  useLayoutEffect(() => {
+    if (!mounts || previewMode !== "design" || !hoveredLayerId || hoveredLayerId === props.selectedLayer?.id) return undefined;
+    return mountSourceLayerHover(
+      mounts.output.ownerDocument,
+      mounts.output,
+      hoveredLayerId,
+      hoveredLayerId === defaultVisualLayer?.id
+        ? mounts.output.querySelector<HTMLElement>("[data-design-space-preview-entry-root]")
+        : undefined,
+    );
+  }, [defaultVisualLayer?.id, hoveredLayerId, mounts, previewMode, props.selectedLayer?.id, staticRevision]);
+
+  useEffect(() => {
+    setHoveredLayerId(undefined);
+  }, [props.entry?.id, previewMode]);
 
   useEffect(() => {
     if (mounts) mounts.styles.textContent = [props.styles.join("\n"), props.selectedClassCss ?? ""].join("\n");
@@ -250,6 +275,8 @@ export function SourcePreviewFrame(props: {
                   data-design-space-canvas-action
                   data-testid="source-preview-selection-surface"
                   onClick={selectStaticLayer}
+                  onMouseLeave={() => setHoveredLayerId(undefined)}
+                  onMouseMove={hoverStaticLayer}
                 />
               ) : null}
             </>
@@ -258,37 +285,6 @@ export function SourcePreviewFrame(props: {
       )}
     </SourceCanvasViewport>
   );
-}
-
-export function scalePreviewEventPoint(
-  point: { clientX: number; clientY: number },
-  frame: { height: number; width: number },
-  viewport: { height: number; width: number },
-): { x: number; y: number } {
-  return {
-    x: point.clientX * (frame.width > 0 && viewport.width > 0 ? viewport.width / frame.width : 1),
-    y: point.clientY * (frame.height > 0 && viewport.height > 0 ? viewport.height / frame.height : 1),
-  };
-}
-
-export function sourceLayerIdAtPreviewPoint(
-  frame: HTMLIFrameElement,
-  event: Pick<MouseEvent, "clientX" | "clientY">,
-  accepted?: ReadonlySet<string>,
-  fallbackLayerId?: string,
-): string | undefined {
-  const document = frame.contentDocument;
-  if (!document) return fallbackLayerId;
-  const frameBounds = frame.getBoundingClientRect();
-  const point = scalePreviewEventPoint(
-    { clientX: event.clientX - frameBounds.left, clientY: event.clientY - frameBounds.top },
-    { height: frameBounds.height, width: frameBounds.width },
-    { height: document.documentElement.clientHeight, width: document.documentElement.clientWidth },
-  );
-  return sourceLayerIdFromElement(
-    document.elementFromPoint(point.x, point.y),
-    accepted,
-  ) ?? fallbackLayerId;
 }
 
 function unavailablePreviewState(props: Pick<Parameters<typeof SourcePreviewFrame>[0], "device" | "entry" | "generateDesignError" | "generatingDesign" | "onGenerateDesign" | "runtime"> & {
@@ -414,22 +410,6 @@ function showStaticPreviewMessage(output: HTMLElement, message: string, error = 
   element.textContent = message;
   element.style.cssText = `margin:24px;color:${error ? "#fda4af" : "#71717a"};font:12px/1.5 system-ui,sans-serif`;
   output.replaceChildren(element);
-}
-
-export function sourceLayerIdFromElement(
-  target: EventTarget | null,
-  accepted?: ReadonlySet<string>,
-): string | undefined {
-  let element = target as Element | null;
-  if (!element || typeof element.closest !== "function") return undefined;
-  if (!accepted) return element.closest<HTMLElement>("[data-design-space-source-layer-id]")?.dataset.designSpaceSourceLayerId;
-  element = element.closest<HTMLElement>("[data-design-space-source-layer-id]");
-  while (element) {
-    const layerId = (element as HTMLElement).dataset.designSpaceSourceLayerId;
-    if (layerId && accepted.has(layerId)) return layerId;
-    element = element.parentElement?.closest<HTMLElement>("[data-design-space-source-layer-id]") ?? null;
-  }
-  return undefined;
 }
 
 function sourceLayerIds(entries: readonly RuntimeSourceWorkspaceEntry[]): ReadonlySet<string> {

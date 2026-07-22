@@ -8,21 +8,57 @@ export function mountSourceLayerSelection(
   onMetrics?: (metrics: SourceLayerMetrics | undefined) => void,
   fallback?: HTMLElement | null,
 ): () => void {
+  return mountSourceLayerOutline(document, output, layerId, {
+    fallback,
+    onMetrics,
+    tone,
+    variant: "selection",
+  });
+}
+
+export function mountSourceLayerHover(
+  document: Document,
+  output: HTMLElement,
+  layerId: string,
+  fallback?: HTMLElement | null,
+): () => void {
+  return mountSourceLayerOutline(document, output, layerId, {
+    fallback,
+    tone: "layer",
+    variant: "hover",
+  });
+}
+
+function mountSourceLayerOutline(
+  document: Document,
+  output: HTMLElement,
+  layerId: string,
+  options: {
+    fallback?: HTMLElement | null;
+    onMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
+    tone: "component" | "layer";
+    variant: "hover" | "selection";
+  },
+): () => void {
   const ownerWindow = document.defaultView;
   const overlay = document.createElement("div");
-  overlay.dataset.designSpaceSourceSelection = layerId;
+  if (options.variant === "selection") overlay.dataset.designSpaceSourceSelection = layerId;
+  else overlay.dataset.designSpaceSourceHover = layerId;
+  const color = options.tone === "component" ? "#a855f7" : "#38bdf8";
   overlay.style.cssText = [
     "position:fixed",
     "z-index:2147483647",
     "pointer-events:none",
-    `border:1.5px solid ${tone === "component" ? "#a855f7" : "#38bdf8"}`,
+    `border:${options.variant === "selection" ? "1.5px" : "1px"} solid ${color}`,
     "box-sizing:border-box",
     "display:none",
   ].join(";");
-  for (const position of ["top:0;left:0", "top:0;right:0", "bottom:0;left:0", "bottom:0;right:0"]) {
-    const handle = document.createElement("span");
-    handle.style.cssText = `${position};position:absolute;width:7px;height:7px;border:1px solid ${tone === "component" ? "#a855f7" : "#38bdf8"};background:#f4f4f5;box-sizing:border-box`;
-    overlay.append(handle);
+  if (options.variant === "selection") {
+    for (const position of ["top:0;left:0", "top:0;right:0", "bottom:0;left:0", "bottom:0;right:0"]) {
+      const handle = document.createElement("span");
+      handle.style.cssText = `${position};position:absolute;width:7px;height:7px;border:1px solid ${color};background:#f4f4f5;box-sizing:border-box`;
+      overlay.append(handle);
+    }
   }
   document.body.append(overlay);
 
@@ -30,10 +66,10 @@ export function mountSourceLayerSelection(
   let previous = "";
   const update = () => {
     frame = undefined;
-    const target = sourceLayerElement(output, layerId) ?? fallback;
+    const target = sourceLayerElement(output, layerId) ?? options.fallback;
     if (!target) {
       overlay.style.display = "none";
-      if (previous) onMetrics?.(undefined);
+      if (previous) options.onMetrics?.(undefined);
       previous = "";
       return;
     }
@@ -47,7 +83,7 @@ export function mountSourceLayerSelection(
     overlay.style.height = `${Math.max(1, rect.height)}px`;
     if (serialized !== previous) {
       previous = serialized;
-      onMetrics?.(metrics);
+      options.onMetrics?.(metrics);
     }
   };
   const schedule = () => {

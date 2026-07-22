@@ -9,12 +9,10 @@ import {
   applySourceLayerText,
   applySourceLayerTextById,
   projectSourceLayer,
-  scalePreviewEventPoint,
-  sourceLayerIdAtPreviewPoint,
-  sourceLayerIdFromElement,
   SourcePreviewFrame,
 } from "./SourcePreviewFrame";
-import { measureSourceLayer, mountSourceLayerSelection, sourceLayerBounds } from "./source-preview-selection-overlay";
+import { scalePreviewEventPoint, sourceLayerIdAtPreviewPoint, sourceLayerIdFromElement } from "./source-preview-hit-testing";
+import { measureSourceLayer, mountSourceLayerHover, mountSourceLayerSelection, sourceLayerBounds } from "./source-preview-selection-overlay";
 import { renderStaticSourcePreviewMarkup } from "./source-static-preview";
 
 afterEach(cleanup);
@@ -304,6 +302,20 @@ it("keeps selection handles inside the preview boundary", () => {
 
   expect(handles).toHaveLength(4);
   expect(handles.every((handle) => handle.style.transform === "")).toBe(true);
+
+  dispose();
+  output.remove();
+});
+
+it("renders hover feedback as a lightweight outline without selection handles", () => {
+  const output = document.createElement("div");
+  document.body.append(output);
+  const dispose = mountSourceLayerHover(document, output, "hovered");
+  const overlay = document.querySelector<HTMLElement>("[data-design-space-source-hover]")!;
+
+  expect(overlay.dataset.designSpaceSourceHover).toBe("hovered");
+  expect(overlay.querySelector("span")).toBeNull();
+  expect(overlay.style.borderWidth).toBe("1px");
 
   dispose();
   output.remove();
