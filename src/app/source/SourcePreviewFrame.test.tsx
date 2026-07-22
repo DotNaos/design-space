@@ -295,32 +295,41 @@ it("measures a selected layer relative to its rendered canvas root", () => {
   )).toEqual({ x: 100, y: 48, width: 320, height: 96 });
 });
 
-it("keeps selection handles inside the preview boundary", () => {
-  const output = document.createElement("div");
-  document.body.append(output);
-  const dispose = mountSourceLayerSelection(document, output, "selected", "layer");
+it("mounts selection chrome outside the rendered preview DOM without changing its layout tree", () => {
+  const frame = document.createElement("iframe");
+  document.body.append(frame);
+  const previewDocument = frame.contentDocument!;
+  const output = previewDocument.createElement("div");
+  output.innerHTML = '<section data-design-space-source-layer-id="selected"><span>Rendered content</span></section>';
+  previewDocument.body.append(output);
+  const renderedMarkup = output.innerHTML;
+  const dispose = mountSourceLayerSelection(output, "selected", "layer");
   const overlay = document.querySelector<HTMLElement>("[data-design-space-source-selection]")!;
   const handles = [...overlay.querySelectorAll<HTMLElement>("span")];
 
   expect(handles).toHaveLength(4);
-  expect(handles.every((handle) => handle.style.transform === "")).toBe(true);
-  expect(overlay.parentElement).toHaveAttribute("id", "design-space-preview-overlays");
-  expect(overlay.style.position).toBe("absolute");
+  expect(handles.every((handle) => handle.style.cssText.includes("translate(-50%"))).toBe(true);
+  expect(overlay.parentElement).toHaveAttribute("id", "design-space-canvas-overlays");
+  expect(overlay.parentElement).toHaveStyle({ overflow: "visible" });
+  expect(output.innerHTML).toBe(renderedMarkup);
+  expect(previewDocument.querySelector("[data-design-space-source-selection]")).toBeNull();
+  expect(overlay.style.position).toBe("fixed");
   expect(overlay.style.borderWidth).toBe("0px");
 
   dispose();
-  output.remove();
+  frame.remove();
 });
 
 it("renders hover feedback as a lightweight outline without selection handles", () => {
   const output = document.createElement("div");
   document.body.append(output);
-  const dispose = mountSourceLayerHover(document, output, "hovered");
+  const dispose = mountSourceLayerHover(output, "hovered");
   const overlay = document.querySelector<HTMLElement>("[data-design-space-source-hover]")!;
 
   expect(overlay.dataset.designSpaceSourceHover).toBe("hovered");
   expect(overlay.querySelector("span")).toBeNull();
   expect(overlay.style.borderWidth).toBe("0px");
+  expect(overlay.parentElement).toHaveAttribute("id", "design-space-canvas-overlays");
 
   dispose();
   output.remove();
