@@ -302,6 +302,9 @@ it("keeps selection handles inside the preview boundary", () => {
 
   expect(handles).toHaveLength(4);
   expect(handles.every((handle) => handle.style.transform === "")).toBe(true);
+  expect(overlay.parentElement).toHaveAttribute("id", "design-space-preview-overlays");
+  expect(overlay.style.position).toBe("absolute");
+  expect(overlay.style.borderWidth).toBe("0px");
 
   dispose();
   output.remove();
@@ -315,7 +318,7 @@ it("renders hover feedback as a lightweight outline without selection handles", 
 
   expect(overlay.dataset.designSpaceSourceHover).toBe("hovered");
   expect(overlay.querySelector("span")).toBeNull();
-  expect(overlay.style.borderWidth).toBe("1px");
+  expect(overlay.style.borderWidth).toBe("0px");
 
   dispose();
   output.remove();
