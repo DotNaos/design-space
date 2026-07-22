@@ -376,11 +376,16 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       library={workspace.library}
       mode={libraryRuntime.mode}
       selected={selectedLibraryComponent}
+      selectedLayer={librarySelectedLayer}
       generateDesignError={designGeneration.error}
       generatingDesignEntryId={designGeneration.entryId}
       onDeviceChange={() => undefined}
       onGenerateDesign={(selectedEntry) => void generateDesign("library-development", selectedEntry.id)}
       onModeChange={libraryRuntime.setMode}
+      onSelectLayer={(layerId) => {
+        setSelectedLibraryLayerId(layerId);
+        setActivity("library");
+      }}
       onSelect={(componentId) => {
         setSelectedLibraryComponent(componentId);
         setSelectedLibraryLayerId(undefined);

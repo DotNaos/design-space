@@ -64,6 +64,32 @@ describe("focused source tree", () => {
     expect(sourceFocusRows(graph, focus).map((row) => row.kind)).toEqual(["component", "html"]);
   });
 
+  it("can expose every library component as an independent root", () => {
+    const button = node("Button", entry("Button", [{
+      id: "html.button",
+      label: "button",
+      kind: "html",
+      source: { start: 0, end: 10 },
+      children: [],
+    }]));
+    const badge = node("Badge", entry("Badge", [{
+      id: "html.span",
+      label: "span",
+      kind: "html",
+      source: { start: 0, end: 10 },
+      children: [],
+    }]));
+    const graph = sourceFocusGraph([button, badge], "desktop", [button.id, badge.id]);
+
+    expect(graph.roots.map((id) => graph.occurrences.get(id)?.node.label)).toEqual(["Button", "Badge"]);
+    expect(sourceCompositionRows(graph).map((row) => [row.depth, row.label])).toEqual([
+      [0, "Button"],
+      [1, "<button>"],
+      [0, "Badge"],
+      [1, "<span>"],
+    ]);
+  });
+
   it("shows internal component layers without inventing slot nodes", () => {
     const internal = node("InternalPanel", entry("InternalPanel"));
     const app = node("App", entry("App", [component("InternalPanel")]));
@@ -73,6 +99,16 @@ describe("focused source tree", () => {
     expect(sourceFocusRows(graph, focus).map((row) => [row.kind, row.label])).toEqual([
       ["component", "App"],
       ["component", "InternalPanel"],
+    ]);
+  });
+
+  it("keeps unresolved component layers visible in the complete tree", () => {
+    const app = node("App", entry("App", [component("RuntimeImplementation")]));
+    const graph = sourceFocusGraph([app], "desktop");
+
+    expect(sourceCompositionRows(graph).map((row) => [row.kind, row.label])).toEqual([
+      ["component", "App"],
+      ["component", "RuntimeImplementation"],
     ]);
   });
 

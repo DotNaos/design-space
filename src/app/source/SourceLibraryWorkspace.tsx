@@ -1,15 +1,21 @@
 import { Button } from "@heroui/react";
-import { Code2, Library, LockKeyhole, PackageCheck, Radio } from "lucide-react";
+import { Diamond, Library, LockKeyhole, PackageCheck, Radio } from "lucide-react";
+import { useMemo } from "react";
 
 import type {
   DesignSpaceDevice,
   RuntimeSourceLibraryCatalog,
+  RuntimeSourceWorkspace,
   RuntimeSourceWorkspaceEntry,
   SourceWorkspaceLibrary,
 } from "../../shared/source-workspace";
 import { suggestedSourceDesignPath } from "../../shared/source-design";
 import { SourceDesignStatus } from "./SourceDesignStatus";
 import { SourcePreviewFrame } from "./SourcePreviewFrame";
+import { sourceCanvasSelection } from "./source-canvas-selection";
+import { sourceFocusGraph } from "./source-focus-tree";
+import { SourceWorkspaceTree, type SourceWorkspaceSelection } from "./SourceWorkspaceSidebar";
+import { sourceTreeNodes, type SourceTreeNode } from "./source-workspace-tree";
 import type { SourceLibraryMode } from "./useSourceLibraryRuntime";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 
@@ -27,7 +33,7 @@ interface SourceLibraryProps {
   previewMode?: SourcePreviewMode;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onModeChange: (mode: SourceLibraryMode) => void;
-  onSelectLayer?: (layerId: string) => void;
+  onSelectLayer?: (layerId: string | undefined) => void;
   onPreviewModeChange?: (mode: SourcePreviewMode) => void;
   onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
   generateDesignError?: string;
@@ -36,9 +42,45 @@ interface SourceLibraryProps {
 }
 
 export function SourceLibrarySidebar(props: SourceLibraryProps & { onSelect: (name: string) => void }) {
-  const components = libraryComponents(props);
+  const components = useMemo(() => libraryComponents(props), [props.catalog, props.library, props.mode]);
   const selected = resolvedSelectedLibraryComponentId(props);
   const ready = components.filter((component) => component.entry?.design).length;
+  const source = selectedLibraryWorkspace(props);
+  const nodes = useMemo(() => source ? sourceTreeNodes(source) : [], [source]);
+  const roots = useMemo(() => libraryRootNodes(components, nodes), [components, nodes]);
+  const rootNodeIds = useMemo(() => roots.map(({ node }) => node.id), [roots]);
+  const rootLabels = useMemo(
+    () => Object.fromEntries(roots.map(({ component, node }) => [node.id, component.label])),
+    [roots],
+  );
+  const resolvedRootIds = useMemo(() => new Set(roots.map(({ component }) => component.id)), [roots]);
+  const unresolvedRoots = useMemo(
+    () => components.filter((component) => !resolvedRootIds.has(component.id)),
+    [components, resolvedRootIds],
+  );
+  const focusNodeId = roots.find(({ component }) => component.id === selected)?.node.id;
+  const graph = useMemo(
+    () => sourceFocusGraph(nodes, props.device, rootNodeIds),
+    [nodes, props.device, rootNodeIds],
+  );
+  const focusId = graph.roots.find((id) => graph.occurrences.get(id)?.node.id === focusNodeId);
+  const treeSelection = props.selectedLayer
+    ? sourceCanvasSelection(graph, focusId, props.selectedLayer.id, props.device)
+    : undefined;
+  const selectRoot = (node: SourceTreeNode) => {
+    const root = roots.find((candidate) => candidate.node.id === node.id);
+    if (!root) return;
+    props.onSelect(root.component.id);
+  };
+  const selectTree = (selection: SourceWorkspaceSelection) => {
+    const occurrence = selection.occurrenceId ? graph.occurrences.get(selection.occurrenceId) : undefined;
+    if (!occurrence) return;
+    if (!occurrence.parentId && selection.kind === "component" && !selection.layerId) {
+      selectRoot(occurrence.node);
+      return;
+    }
+    if (selection.layerId) props.onSelectLayer?.(selection.layerId);
+  };
   return (
     <aside aria-label="Component library catalog" className="flex h-full min-h-0 w-full flex-col bg-[#141518]">
       <header className="shrink-0 border-b border-white/10 px-4 py-4">
@@ -69,31 +111,71 @@ export function SourceLibrarySidebar(props: SourceLibraryProps & { onSelect: (na
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto py-2">
-        {components.map((component) => (
-          <div key={component.id} className="relative flex min-h-10 items-center">
-            <Button
-              className={`min-h-10 w-full justify-start rounded-none px-4 pr-10 text-xs ${selected === component.id ? "bg-sky-500/15 text-sky-100" : "text-zinc-400 hover:bg-white/[0.04]"}`}
-              fullWidth
-              variant="ghost"
-              onPress={() => props.onSelect(component.id)}
-            >
-              <Code2 size={13} />
-              <span className="min-w-0 truncate">{component.label}</span>
-            </Button>
-            {!component.entry?.design ? (
-              <span className="absolute right-3">
-                <SourceDesignStatus
-                  designPath={component.entry ? suggestedSourceDesignPath(component.entry, selectedCatalog(props)?.entries ?? []) : "No registered source file"}
-                  label={component.label}
-                />
-              </span>
-            ) : null}
-          </div>
-        ))}
-        {components.length === 0 ? <p className="px-4 py-3 text-[10px] leading-4 text-zinc-600">No native component designs are available from this source.</p> : null}
-      </div>
+      {source ? (
+        <SourceWorkspaceTree
+          emptyMessage="No component source roots are available from this library."
+          focusNodeId={focusNodeId}
+          key={`library-${props.mode}`}
+          rootLabels={rootLabels}
+          rootNodeIds={rootNodeIds}
+          selected={treeSelection}
+          trailingRows={unresolvedRoots.length ? (
+            <MissingLibraryRoots
+              components={unresolvedRoots}
+              selected={selected}
+              source={source}
+              onSelect={props.onSelect}
+            />
+          ) : undefined}
+          workspace={source}
+          onFocus={(_, selection) => {
+            const occurrence = selection.occurrenceId ? graph.occurrences.get(selection.occurrenceId) : undefined;
+            if (occurrence) selectRoot(occurrence.node);
+          }}
+          onSelect={selectTree}
+        />
+      ) : (
+        <div aria-label="Source tree" className="min-h-0 flex-1 overflow-y-auto py-2" role="tree">
+          <MissingLibraryRoots
+            components={components}
+            selected={selected}
+            onSelect={props.onSelect}
+          />
+        </div>
+      )}
     </aside>
+  );
+}
+
+function MissingLibraryRoots(props: {
+  components: readonly LibraryComponent[];
+  selected?: string;
+  source?: { entries: readonly RuntimeSourceWorkspaceEntry[] };
+  onSelect: (id: string) => void;
+}) {
+  if (!props.components.length) return null;
+  return (
+    <>
+      {props.components.map((component) => (
+        <div aria-label={component.label} aria-level={1} key={component.id} className="relative flex min-h-10 items-center pr-2 pl-8" role="treeitem">
+          <Button
+            className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 text-left text-xs ${props.selected === component.id ? "bg-sky-500/15 text-sky-100" : "text-zinc-500 hover:bg-white/[0.04]"}`}
+            fullWidth
+            variant="ghost"
+            onPress={() => props.onSelect(component.id)}
+          >
+            <Diamond className="text-violet-500/45" size={12} />
+            <span className="min-w-0 truncate">{component.label}</span>
+          </Button>
+          <span className="absolute right-3">
+            <SourceDesignStatus
+              designPath={component.entry ? suggestedSourceDesignPath(component.entry, props.source?.entries ?? []) : "No registered source file"}
+              label={component.label}
+            />
+          </span>
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -184,6 +266,21 @@ export type LibraryComponent = {
   label: string;
 };
 
+function libraryRootNodes(
+  components: readonly LibraryComponent[],
+  nodes: readonly SourceTreeNode[],
+): readonly { component: LibraryComponent; node: SourceTreeNode }[] {
+  const seen = new Set<string>();
+  return components.flatMap((component) => {
+    const node = component.entry
+      ? nodes.find((candidate) => candidate.entries.some((entry) => entry.id === component.entry?.id))
+      : nodes.find((candidate) => candidate.label === component.label);
+    if (!node || seen.has(node.id)) return [];
+    seen.add(node.id);
+    return [{ component, node }];
+  });
+}
+
 type SourceLibrarySelectionProps = Pick<SourceLibraryProps, "catalog" | "library" | "mode" | "selected">;
 
 export function selectedSourceLibraryCatalog(props: Pick<SourceLibraryProps, "catalog" | "mode">) {
@@ -191,6 +288,20 @@ export function selectedSourceLibraryCatalog(props: Pick<SourceLibraryProps, "ca
 }
 
 const selectedCatalog = selectedSourceLibraryCatalog;
+
+function selectedLibraryWorkspace(props: Pick<SourceLibraryProps, "catalog" | "library" | "mode">): RuntimeSourceWorkspace | undefined {
+  if (props.mode === "development") return props.catalog?.development;
+  const release = props.catalog?.release;
+  if (!release) return undefined;
+  return {
+    runtime: props.catalog?.development?.runtime ?? "react",
+    sourceRoot: "package",
+    entries: release.entries,
+    devices: [],
+    styles: release.styles,
+    ...(props.library ? { library: props.library } : {}),
+  };
+}
 
 function libraryComponents(props: SourceLibrarySelectionProps): readonly LibraryComponent[] {
   const source = selectedCatalog(props);

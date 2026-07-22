@@ -34,6 +34,7 @@ export interface SourceFocusRow {
 export function sourceFocusGraph(
   nodes: readonly SourceTreeNode[],
   device: DesignSpaceDevice,
+  rootNodeIds?: readonly string[],
 ): SourceFocusGraph {
   const references = new Map<string, SourceTreeNode>();
   for (const node of nodes) {
@@ -41,8 +42,14 @@ export function sourceFocusGraph(
     node.entries.forEach((entry) => references.set(entry.exportName, node));
   }
   const mutable = new Map<string, SourceOccurrence>();
+  const requestedRoots = rootNodeIds?.flatMap((id) => {
+    const node = nodes.find((candidate) => candidate.id === id);
+    return node ? [node] : [];
+  });
   const roots = nodes.filter((node) => node.area === "layout");
-  const initial = roots.length ? roots : nodes.filter((node) => node.area === "pages");
+  const initial = requestedRoots?.length
+    ? requestedRoots
+    : roots.length ? roots : nodes.filter((node) => node.area === "pages");
 
   const addOccurrence = (
     node: SourceTreeNode,
@@ -168,7 +175,16 @@ export function sourceCompositionRows(
       const target = owner.children
         .map((id) => graph.occurrences.get(id))
         .find((candidate) => candidate?.usageLayer?.id === layer.id);
-      if (target) appendOccurrence(target, depth);
+      if (target) {
+        appendOccurrence(target, depth);
+      } else {
+        rows.push({
+          ...layerRow(layer, depth, owner, sourceOwnerId),
+          key: `${owner.id}/${layer.id}`,
+          collapsible: layer.children.length > 0,
+        });
+        for (const child of layer.children) appendLayer(child, owner, sourceOwnerId, depth + 1);
+      }
       return;
     }
 

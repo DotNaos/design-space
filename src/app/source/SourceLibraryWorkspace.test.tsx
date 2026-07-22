@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -74,8 +74,60 @@ it("shows native development and release sources with a design coverage audit", 
 
   expect(screen.getByText("1/2")).toBeVisible();
   expect(screen.getByLabelText("Card design missing")).toBeVisible();
+  const tree = screen.getByRole("tree", { name: "Source tree" });
+  expect(within(tree).getByRole("treeitem", { name: "Button" })).toBeVisible();
+  expect(within(tree).getByRole("treeitem", { name: "Card" })).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: /Development/ }));
   expect(change).toHaveBeenCalledWith("development");
+});
+
+it("shows library components as independent expandable source roots", async () => {
+  const button = {
+    ...entry,
+    layers: [{
+      id: "html.button",
+      label: "button",
+      kind: "html" as const,
+      children: [],
+      source: { start: 2, end: 8 },
+    }],
+  };
+  const card: RuntimeSourceWorkspaceEntry = {
+    ...entry,
+    id: "source.entry.card",
+    label: "Card",
+    fileId: "source.file.card",
+    relativePath: "src/shared/card/index.ts",
+    exportName: "Card",
+    layers: [{
+      id: "html.article",
+      label: "article",
+      kind: "html",
+      children: [],
+      source: { start: 2, end: 8 },
+    }],
+  };
+  const selectLayer = vi.fn();
+  render(
+    <SourceLibrarySidebar
+      catalog={{ ...catalog, development: { ...catalog.development!, entries: [button, card] } }}
+      device="desktop"
+      library={library}
+      mode="development"
+      selected="library.development.Button"
+      onDeviceChange={vi.fn()}
+      onModeChange={vi.fn()}
+      onSelect={vi.fn()}
+      onSelectLayer={selectLayer}
+    />,
+  );
+
+  const tree = screen.getByRole("tree", { name: "Source tree" });
+  expect(within(tree).getByRole("treeitem", { name: "Button" })).toBeVisible();
+  expect(within(tree).getByRole("treeitem", { name: "Card" })).toBeVisible();
+  await userEvent.click(within(tree).getByRole("button", { name: "Expand Button" }));
+  await userEvent.click(within(tree).getByRole("button", { name: "<button>" }));
+  expect(selectLayer).toHaveBeenCalledWith("html.button");
 });
 
 it("generates a missing design only for the attached development source", async () => {

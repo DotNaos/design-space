@@ -16,7 +16,7 @@ import {
   Type,
   TriangleAlert,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { designSpaceDevices, type DesignSpaceDevice, type RuntimeSourceWorkspace, type SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { suggestedSourceDesignPath } from "../../shared/source-design";
@@ -50,7 +50,7 @@ export interface SourceWorkspaceSidebarProps {
   focusId?: string;
   onSelect: (selection: SourceWorkspaceSelection) => void;
   onFocus: (occurrenceId: string, selection: SourceWorkspaceSelection) => void;
-  onApplySlot: (
+  onApplySlot?: (
     slot: SourceWorkspaceLayer,
     occurrence: SourceOccurrence,
     candidate: SourceComponentCandidate,
@@ -63,13 +63,42 @@ export interface SourceWorkspaceSidebarProps {
 }
 
 export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
+  return (
+    <aside aria-label="Source workspace" className={`${props.className ?? "flex w-80"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
+      <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
+        <FileCode2 aria-hidden="true" className="text-sky-400" size={16} />
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-semibold text-zinc-100">Source tree</h2>
+          <p className="mt-0.5 truncate text-[9px] uppercase tracking-[0.14em] text-zinc-600">{props.workspace.sourceRoot} · {props.workspace.runtime === "react-native" ? "React Native" : "React"}</p>
+        </div>
+        {props.workspace.capabilities?.createComponents && props.onCreateComponent && (
+          <Button aria-label="Create component" className="grid size-8 place-items-center rounded-md text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>
+            <FilePlus2 aria-hidden="true" size={14} />
+          </Button>
+        )}
+      </header>
+      <SourceWorkspaceTree {...props} />
+    </aside>
+  );
+}
+
+export interface SourceWorkspaceTreeProps extends Omit<SourceWorkspaceSidebarProps, "className" | "onCreateComponent"> {
+  emptyMessage?: string;
+  focusNodeId?: string;
+  rootLabels?: Readonly<Record<string, string>>;
+  rootNodeIds?: readonly string[];
+  trailingRows?: ReactNode;
+}
+
+export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
   const device = props.selected?.device ?? "desktop";
   const nodes = useMemo(() => sourceTreeNodes(props.workspace), [props.workspace]);
-  const graph = useMemo(() => sourceFocusGraph(nodes, device), [device, nodes]);
+  const graph = useMemo(() => sourceFocusGraph(nodes, device, props.rootNodeIds), [device, nodes, props.rootNodeIds]);
   const definitionSelected = props.selected?.kind === "component" && !props.selected.occurrenceId;
+  const requestedRootFocus = graph.roots.find((rootId) => graph.occurrences.get(rootId)?.node.id === props.focusNodeId);
   const focusId = definitionSelected
     ? undefined
-    : graph.occurrences.has(props.focusId ?? "") ? props.focusId! : initialFocusOccurrence(graph);
+    : graph.occurrences.has(props.focusId ?? "") ? props.focusId! : requestedRootFocus ?? initialFocusOccurrence(graph);
   const rows = useMemo(() => sourceCompositionRows(graph, focusId), [focusId, graph]);
   const activeCanvasIds = useMemo(() => sourceOccurrenceSubtree(graph, focusId), [focusId, graph]);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => initiallyCollapsedSourceBranches(rows, focusId));
@@ -95,29 +124,20 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
     return next;
   });
   return (
-    <aside aria-label="Source workspace" className={`${props.className ?? "flex w-80"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
-      <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
-        <FileCode2 aria-hidden="true" className="text-sky-400" size={16} />
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold text-zinc-100">Source tree</h2>
-          <p className="mt-0.5 truncate text-[9px] uppercase tracking-[0.14em] text-zinc-600">{props.workspace.sourceRoot} · {props.workspace.runtime === "react-native" ? "React Native" : "React"}</p>
-        </div>
-        {props.workspace.capabilities?.createComponents && props.onCreateComponent && (
-          <Button aria-label="Create component" className="grid size-8 place-items-center rounded-md text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>
-            <FilePlus2 aria-hidden="true" size={14} />
-          </Button>
-        )}
-      </header>
-      <div className="min-h-0 flex-1 overflow-y-auto py-2">
-        <div aria-label="Source tree" role="tree">
-          {visibleRows.map((row) => (
+    <div className="min-h-0 flex-1 overflow-y-auto py-2">
+      <div aria-label="Source tree" role="tree">
+        {visibleRows.map((row) => {
+          const displayRow = row.depth === 0 && row.kind === "component" && row.occurrence
+            ? { ...row, label: props.rootLabels?.[row.occurrence.node.id] ?? row.label }
+            : row;
+          return (
             <FocusTreeRow
               key={`${row.key}:${row.depth}`}
               collapsed={collapsed.has(row.key)}
               device={device}
               graph={graph}
               nodes={nodes}
-              row={row}
+              row={displayRow}
               activeCanvasIds={activeCanvasIds}
               activeCanvasId={focusId}
               selected={props.selected}
@@ -130,11 +150,12 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
               onSelect={props.onSelect}
               onToggleBranch={toggleBranch}
             />
-          ))}
-          {!rows.length && <p className="px-4 py-4 text-[10px] text-zinc-600">No configured entry component was found.</p>}
-        </div>
+          );
+        })}
+        {props.trailingRows}
+        {!rows.length && !props.trailingRows && <p className="px-4 py-4 text-[10px] text-zinc-600">{props.emptyMessage ?? "No configured entry component was found."}</p>}
       </div>
-    </aside>
+    </div>
   );
 }
 
@@ -160,12 +181,12 @@ function FocusTreeRow(props: {
   const rowButton = useRef<HTMLButtonElement>(null);
   const occurrenceRow = row.kind === "component" && !row.layer;
   const focusTarget = row.targetOccurrence ?? (occurrenceRow ? row.occurrence : undefined);
-  const active = occurrenceRow
+  const active = (occurrenceRow
     ? props.selected?.occurrenceId === row.occurrence?.id && props.selected?.kind === "component"
     : props.selected?.occurrenceId === row.occurrence?.id && props.selected?.kind === row.kind && (
       props.selected?.layerId === row.layer?.id
       || (row.kind === "slot" && props.selected?.slotName === row.layer?.label)
-    );
+    )) || (!props.selected?.occurrenceId && occurrenceRow && row.occurrence?.id === props.activeCanvasId);
   useEffect(() => {
     if (active) rowButton.current?.scrollIntoView?.({ block: "nearest" });
   }, [active]);
@@ -271,14 +292,14 @@ function FocusTreeRow(props: {
           label={componentEntry.label}
         />
       ) : null}
-      {slot && row.occurrence && (
+      {slot && row.occurrence && props.onApplySlot && (
         <SourceComponentPicker
           candidates={candidates}
           isBusy={props.editingSourceOwnerId === sourceOwnerId && props.slotEditorReady === false}
           slot={slot}
           triggerId={triggerId}
           onOpen={() => props.onPrepareSlotEdit?.(row.occurrence!)}
-          onApply={(candidate, action) => props.onApplySlot(slot, row.occurrence!, candidate, action)}
+          onApply={(candidate, action) => props.onApplySlot?.(slot, row.occurrence!, candidate, action)}
         />
       )}
     </div>
