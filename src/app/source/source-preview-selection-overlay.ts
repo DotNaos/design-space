@@ -6,10 +6,12 @@ export function mountSourceLayerSelection(
   tone: "component" | "layer",
   onMetrics?: (metrics: SourceLayerMetrics | undefined) => void,
   fallback?: HTMLElement | null,
+  occurrence = 0,
 ): () => void {
   return mountSourceLayerOutline(output, layerId, {
     fallback,
     onMetrics,
+    occurrence,
     tone,
     variant: "selection",
   });
@@ -19,9 +21,11 @@ export function mountSourceLayerHover(
   output: HTMLElement,
   layerId: string,
   fallback?: HTMLElement | null,
+  occurrence = 0,
 ): () => void {
   return mountSourceLayerOutline(output, layerId, {
     fallback,
+    occurrence,
     tone: "layer",
     variant: "hover",
   });
@@ -33,6 +37,7 @@ function mountSourceLayerOutline(
   options: {
     fallback?: HTMLElement | null;
     onMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
+    occurrence: number;
     tone: "component" | "layer";
     variant: "hover" | "selection";
   },
@@ -76,7 +81,7 @@ function mountSourceLayerOutline(
   let previous = "";
   const update = () => {
     frame = undefined;
-    const target = sourceLayerElement(output, layerId) ?? options.fallback;
+    const target = sourceLayerElement(output, layerId, options.occurrence) ?? options.fallback;
     if (!target) {
       overlay.style.display = "none";
       if (previous) options.onMetrics?.(undefined);
@@ -213,7 +218,7 @@ export function measureSourceLayer(
   };
 }
 
-export function sourceLayerElement(output: HTMLElement, layerId: string): HTMLElement | null {
+export function sourceLayerElement(output: HTMLElement, layerId: string, occurrence = 0): HTMLElement | null {
   return [...output.querySelectorAll<HTMLElement>("[data-design-space-source-layer-id]")]
-    .find((element) => element.dataset.designSpaceSourceLayerId === layerId) ?? null;
+    .filter((element) => element.dataset.designSpaceSourceLayerId === layerId)[occurrence] ?? null;
 }

@@ -11,8 +11,8 @@ import {
   projectSourceLayer,
   SourcePreviewFrame,
 } from "./SourcePreviewFrame";
-import { scalePreviewEventPoint, sourceLayerIdAtPreviewPoint, sourceLayerIdFromElement } from "./source-preview-hit-testing";
-import { measureSourceLayer, mountSourceLayerHover, mountSourceLayerSelection, sourceLayerBounds } from "./source-preview-selection-overlay";
+import { scalePreviewEventPoint, sourceLayerHitAtPreviewPoint, sourceLayerIdAtPreviewPoint, sourceLayerIdFromElement } from "./source-preview-hit-testing";
+import { measureSourceLayer, mountSourceLayerHover, mountSourceLayerSelection, sourceLayerBounds, sourceLayerElement } from "./source-preview-selection-overlay";
 import { renderStaticSourcePreviewMarkup } from "./source-static-preview";
 
 afterEach(cleanup);
@@ -260,6 +260,37 @@ it("maps a host-canvas click through a scaled iframe to its source layer", () =>
     new Set(["heading"]),
   )).toBe("heading");
   expect(frameDocument.elementFromPoint).toHaveBeenCalledWith(500, 250);
+});
+
+it("distinguishes repeated DOM occurrences created from the same source layer", () => {
+  const frame = document.createElement("iframe");
+  document.body.append(frame);
+  const frameDocument = frame.contentDocument!;
+  const staging = frameDocument.createElement("div");
+  staging.id = "design-space-preview-root";
+  const stagingFirst = frameDocument.createElement("button");
+  const stagingSecond = frameDocument.createElement("button");
+  stagingFirst.dataset.designSpaceSourceLayerId = "accordion-trigger";
+  stagingSecond.dataset.designSpaceSourceLayerId = "accordion-trigger";
+  staging.append(stagingFirst, stagingSecond);
+  const output = frameDocument.createElement("div");
+  output.id = "design-space-preview-root";
+  const first = frameDocument.createElement("button");
+  const second = frameDocument.createElement("button");
+  first.dataset.designSpaceSourceLayerId = "accordion-trigger";
+  second.dataset.designSpaceSourceLayerId = "accordion-trigger";
+  output.append(first, second);
+  frameDocument.body.append(staging, output);
+  Object.defineProperty(frameDocument.documentElement, "clientWidth", { configurable: true, value: 100 });
+  Object.defineProperty(frameDocument.documentElement, "clientHeight", { configurable: true, value: 100 });
+  frame.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 100 }) as DOMRect;
+  frameDocument.elementFromPoint = vi.fn(() => second);
+
+  expect(sourceLayerHitAtPreviewPoint(frame, { clientX: 20, clientY: 70 }, new Set(["accordion-trigger"])))
+    .toEqual({ layerId: "accordion-trigger", occurrence: 1 });
+  expect(sourceLayerElement(output, "accordion-trigger", 1)).toBe(second);
+
+  frame.remove();
 });
 
 it("falls back to the component boundary when an external primitive has no source marker", () => {
