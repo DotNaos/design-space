@@ -10,11 +10,12 @@ import {
   applySourceLayerTextById,
   projectSourceLayer,
   scalePreviewEventPoint,
-  sourceLayerIdAtEvent,
+  sourceLayerIdAtPreviewPoint,
   sourceLayerIdFromElement,
   SourcePreviewFrame,
 } from "./SourcePreviewFrame";
 import { measureSourceLayer, sourceLayerBounds } from "./source-preview-selection-overlay";
+import { renderStaticSourcePreviewMarkup } from "./source-static-preview";
 
 afterEach(cleanup);
 
@@ -92,13 +93,15 @@ it("renders source previews as static, non-focusable UI", async () => {
   expect(screen.getByRole("button", { name: "Zoom in" })).toBeVisible();
 });
 
-it("can expose authored HTML layers for canvas selection without executing their actions", async () => {
+it("places a non-interactive selection surface over authored HTML in design mode", async () => {
   const entry = previewEntry("selectable", async () => previewDefinition("Selectable design"));
   render(<SourcePreviewFrame device="desktop" entry={entry} runtime="react" selectionMode styles={[]} onSelectLayer={vi.fn()} />);
   const frame = await screen.findByTitle("selectable desktop preview");
-  expect(frame).toHaveClass("pointer-events-auto");
-  expect(frame).not.toHaveAttribute("inert");
-  expect(frame).toHaveProperty("inert", false);
+  expect(frame).toHaveClass("pointer-events-none");
+  expect(frame).toHaveAttribute("inert");
+  expect(frame).toHaveProperty("inert", true);
+  expect(screen.getByTestId("source-preview-selection-surface"))
+    .toHaveAttribute("data-design-space-canvas-action");
 });
 
 it("separates design selection from playable component interactions", async () => {
@@ -114,8 +117,9 @@ it("separates design selection from playable component interactions", async () =
   };
   const view = render(<SourcePreviewFrame device="desktop" entry={entry} mode="design" runtime="react" styles={[]} onModeChange={() => undefined} onSelectLayer={onSelectLayer} />);
   const frame = await screen.findByTitle("interactive desktop preview");
-  expect(frame).toHaveClass("pointer-events-auto", "cursor-default");
-  expect(frame).not.toHaveAttribute("inert");
+  expect(frame).toHaveClass("pointer-events-none");
+  expect(frame).toHaveAttribute("inert");
+  expect(screen.getByTestId("source-preview-selection-surface")).toBeVisible();
   expect(screen.getByRole("button", { name: "Design mode" })).toHaveAttribute("aria-pressed", "true");
 
   view.rerender(<SourcePreviewFrame device="desktop" entry={entry} mode="play" runtime="react" styles={[]} onModeChange={() => undefined} onSelectLayer={onSelectLayer} />);
@@ -124,6 +128,30 @@ it("separates design selection from playable component interactions", async () =
   await userEvent.click(screen.getByRole("button", { name: "Run action" }));
   expect(screen.getByRole("button", { name: "Play mode" })).toHaveAttribute("aria-pressed", "true");
   expect(onAction).toHaveBeenCalledOnce();
+});
+
+it("serializes design content without keeping component handlers attached", async () => {
+  const onAction = vi.fn();
+  function InteractiveDesign() {
+    return <button type="button" onClick={onAction}>Run action</button>;
+  }
+  const definition = {
+    ...previewDefinition("unused"),
+    render: () => <InteractiveDesign />,
+  };
+  const markup = await renderStaticSourcePreviewMarkup({
+    caseName: "default",
+    definition,
+    entry: previewEntry("static", async () => previewDefinition("unused")),
+    matrix: false,
+  });
+  const container = document.createElement("div");
+  container.innerHTML = markup;
+  const button = container.querySelector("button")!;
+  button.click();
+
+  expect(button).toHaveTextContent("Run action");
+  expect(onAction).not.toHaveBeenCalled();
 });
 
 it("shows a checking state while switching between asynchronously loaded designs", async () => {
@@ -215,29 +243,38 @@ it("maps a nested canvas target to its nearest authored source layer", () => {
   } as unknown as EventTarget)).toBe("jsx:src/app/Panel.tsx:42");
 });
 
-it("uses the element that was actually clicked before coordinate fallbacks", () => {
+it("maps a host-canvas click through a scaled iframe to its source layer", () => {
+  const frame = document.createElement("iframe");
+  document.body.append(frame);
+  const frameDocument = frame.contentDocument!;
   const clicked = document.createElement("h2");
   clicked.dataset.designSpaceSourceLayerId = "heading";
-  const unrelated = document.createElement("section");
-  unrelated.dataset.designSpaceSourceLayerId = "section";
-  const event = new MouseEvent("pointerdown", { clientX: 10, clientY: 20 });
-  Object.defineProperty(event, "target", { value: clicked });
+  Object.defineProperty(frameDocument.documentElement, "clientWidth", { configurable: true, value: 1000 });
+  Object.defineProperty(frameDocument.documentElement, "clientHeight", { configurable: true, value: 500 });
+  frame.getBoundingClientRect = () => ({ left: 100, top: 50, width: 200, height: 100 }) as DOMRect;
+  frameDocument.elementFromPoint = vi.fn(() => clicked);
 
-  expect(sourceLayerIdAtEvent(
-    { elementFromPoint: () => unrelated },
-    event,
-    new Set(["heading", "section"]),
+  expect(sourceLayerIdAtPreviewPoint(
+    frame,
+    { clientX: 200, clientY: 100 },
+    new Set(["heading"]),
   )).toBe("heading");
+  expect(frameDocument.elementFromPoint).toHaveBeenCalledWith(500, 250);
 });
 
 it("falls back to the component boundary when an external primitive has no source marker", () => {
+  const frame = document.createElement("iframe");
+  document.body.append(frame);
+  const frameDocument = frame.contentDocument!;
   const external = document.createElement("button");
-  const event = new MouseEvent("pointerdown", { clientX: 10, clientY: 20 });
-  Object.defineProperty(event, "target", { value: external });
+  Object.defineProperty(frameDocument.documentElement, "clientWidth", { configurable: true, value: 100 });
+  Object.defineProperty(frameDocument.documentElement, "clientHeight", { configurable: true, value: 100 });
+  frame.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 100 }) as DOMRect;
+  frameDocument.elementFromPoint = vi.fn(() => external);
 
-  expect(sourceLayerIdAtEvent(
-    { elementFromPoint: () => external },
-    event,
+  expect(sourceLayerIdAtPreviewPoint(
+    frame,
+    { clientX: 10, clientY: 20 },
     new Set(["component-root"]),
     "component-root",
   )).toBe("component-root");

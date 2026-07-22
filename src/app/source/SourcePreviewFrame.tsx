@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Grid2X2, WandSparkles } from "lucide-react";
 import { Button, ListBox, Select } from "@heroui/react";
 
@@ -9,12 +8,11 @@ import type {
   SourceWorkspaceLayer,
 } from "../../shared/source-workspace";
 import type { ComponentDesignDefinition } from "../../shared/component-design";
-import { PreviewBoundary } from "../PreviewBoundary";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 import { mountSourceLayerSelection, sourceLayerElement } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
-import { SourcePreviewRuntimeContext } from "./SourcePreviewRuntime";
+import { renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
 import type { SourceTreeNode } from "./source-workspace-tree";
 
 export function SourcePreviewFrame(props: {
@@ -42,12 +40,12 @@ export function SourcePreviewFrame(props: {
   onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
 }) {
   const [mounts, setMounts] = useState<PreviewMounts>();
-  const [projectedKey, setProjectedKey] = useState<string>();
   const [loaded, setLoaded] = useState<LoadedDesign>();
   const [loadState, setLoadState] = useState<"checking" | "invalid" | "ready">("checking");
   const [loadMessage, setLoadMessage] = useState<string>();
   const [caseByDesign, setCaseByDesign] = useState<Readonly<Record<string, string>>>({});
   const [matrixByDesign, setMatrixByDesign] = useState<Readonly<Record<string, boolean>>>({});
+  const [staticRevision, setStaticRevision] = useState(0);
   const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
   const selectableLayerIds = useMemo(() => sourceLayerIds(props.entries ?? (props.entry ? [props.entry] : [])), [props.entries, props.entry]);
   const defaultVisualLayer = sourceCanvasVisualLayer(props.entry, undefined);
@@ -88,6 +86,7 @@ export function SourcePreviewFrame(props: {
     : definition?.initialCase;
   const matrixAvailable = Boolean(props.entry?.props.some((property) => (property.values?.length ?? 0) > 1));
   const matrix = Boolean(designId && matrixByDesign[designId] && !props.selectedLayer);
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
   const previewState = unavailablePreviewState({
     ...props,
     definition,
@@ -97,17 +96,14 @@ export function SourcePreviewFrame(props: {
   const projectionKey = props.isolateSelectedLayer !== false && props.entry && props.selectedLayer?.kind === "html" && selectedCase
     ? `${props.entry.id}:${props.selectedLayer.id}:${selectedCase}`
     : undefined;
-  const completeProjection = useCallback(() => {
-    if (projectionKey) setProjectedKey(projectionKey);
-  }, [projectionKey]);
   const loadFrame = useCallback((node: HTMLIFrameElement | null) => {
+    frameRef.current = node;
     if (!node) {
       setMounts(undefined);
       return;
     }
-    node.inert = previewMode === "static";
-    if (previewMode !== "static") node.removeAttribute("inert");
-    else node.setAttribute("inert", "");
+    node.inert = true;
+    node.setAttribute("inert", "");
     const update = () => {
       const document = node.contentDocument;
       const output = document?.getElementById("design-space-preview-root");
@@ -117,26 +113,46 @@ export function SourcePreviewFrame(props: {
     };
     node.addEventListener("load", update, { once: true });
     update();
-  }, [previewMode]);
+  }, []);
 
   useEffect(() => {
-    if (!mounts || previewMode !== "design" || !props.onSelectLayer) return undefined;
-    const document = mounts.output.ownerDocument;
-    const select = (event: Event) => {
-      const layerId = sourceLayerIdAtEvent(document, event, selectableLayerIds, defaultVisualLayer?.id);
-      if (!layerId) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      props.onSelectLayer?.(layerId);
-    };
-    document.addEventListener("pointerdown", select, true);
-    document.addEventListener("click", select, true);
-    return () => {
-      document.removeEventListener("pointerdown", select, true);
-      document.removeEventListener("click", select, true);
-    };
-  }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectLayer, selectableLayerIds]);
+    if (!mounts || previewMode === "play" || !definition || !props.entry || !selectedCase) return;
+    let active = true;
+    mounts.output.replaceChildren();
+    mounts.staging.replaceChildren();
+    void renderStaticSourcePreviewMarkup({
+      caseName: selectedCase,
+      centered: props.centerContent,
+      definition,
+      entry: props.entry,
+      matrix,
+    }).then((markup) => {
+      if (!active) return;
+      mounts.staging.innerHTML = markup;
+      if (projectionKey && props.selectedLayer) {
+        if (!projectSourceLayer(mounts.staging, mounts.output, props.selectedLayer.id)) {
+          showStaticPreviewMessage(mounts.output, "This HTML layer is not rendered in the current state.");
+        }
+      } else {
+        mounts.output.innerHTML = mounts.staging.innerHTML;
+      }
+      setStaticRevision((current) => current + 1);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      showStaticPreviewMessage(mounts.output, error instanceof Error ? error.message : "The static design could not be rendered.", true);
+    });
+    return () => { active = false; };
+  }, [definition, matrix, mounts, previewMode, projectionKey, props.centerContent, props.entry, props.selectedLayer, selectedCase]);
+
+  const selectStaticLayer = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const frame = frameRef.current;
+    if (!frame || !props.onSelectLayer) return;
+    const layerId = sourceLayerIdAtPreviewPoint(frame, event, selectableLayerIds, defaultVisualLayer?.id);
+    if (!layerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    props.onSelectLayer(layerId);
+  };
 
   useLayoutEffect(() => {
     if (!mounts || previewMode !== "design" || !props.selectedLayer) {
@@ -153,7 +169,7 @@ export function SourcePreviewFrame(props: {
         ? mounts.output.querySelector<HTMLElement>("[data-design-space-preview-entry-root]")
         : undefined,
     );
-  }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer]);
+  }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer, staticRevision]);
 
   useEffect(() => {
     if (mounts) mounts.styles.textContent = [props.styles.join("\n"), props.selectedClassCss ?? ""].join("\n");
@@ -161,21 +177,21 @@ export function SourcePreviewFrame(props: {
 
   useEffect(() => {
     if (!mounts || props.selectedClassName === undefined) return;
-    if (projectionKey && projectedKey === projectionKey) {
+    if (projectionKey) {
       applySourceLayerClassName(mounts.output, props.selectedClassName);
     } else if (!projectionKey && props.selectedLayer) {
       applySourceLayerClassNameById(mounts.output, props.selectedLayer.id, props.selectedClassName);
     }
-  }, [mounts, projectedKey, projectionKey, props.selectedClassName, props.selectedLayer]);
+  }, [mounts, projectionKey, props.selectedClassName, props.selectedLayer, staticRevision]);
 
   useEffect(() => {
     if (!mounts || props.selectedText === undefined) return;
-    if (projectionKey && projectedKey === projectionKey) {
+    if (projectionKey) {
       applySourceLayerText(mounts.output, props.selectedText);
     } else if (!projectionKey && props.selectedLayer) {
       applySourceLayerTextById(mounts.output, props.selectedLayer.id, props.selectedText);
     }
-  }, [mounts, projectedKey, projectionKey, props.selectedLayer, props.selectedText]);
+  }, [mounts, projectionKey, props.selectedLayer, props.selectedText, staticRevision]);
 
   return (
     <SourceCanvasViewport
@@ -202,7 +218,7 @@ export function SourcePreviewFrame(props: {
       ) : undefined}
     >
       {(frame) => (
-        <div className="h-full w-full" style={{ width: frame.width, height: frame.height }}>
+        <div className="relative h-full w-full" style={{ width: frame.width, height: frame.height }}>
           {previewState ?? (previewMode === "play" ? (
             <PlayablePreview
               caseName={selectedCase!}
@@ -222,27 +238,20 @@ export function SourcePreviewFrame(props: {
                 key={projectionKey ?? props.entry?.id ?? "unavailable"}
                 ref={loadFrame}
                 aria-label={`${props.entry?.label ?? props.node?.label ?? "Source"} static preview`}
-                className={`${previewMode === "static" ? "pointer-events-none" : "pointer-events-auto"} ${previewMode === "design" ? "cursor-default select-none" : "cursor-auto"} h-full w-full border-0`}
+                className="pointer-events-none h-full w-full select-none border-0"
                 srcDoc={previewDocument}
                 tabIndex={-1}
                 title={`${props.entry?.label ?? props.node?.label ?? "Source"} ${props.device} preview`}
               />
-              {mounts && !projectionKey && createPortal(
-                <PreviewContent caseName={selectedCase!} centered={props.centerContent} definition={definition!} entry={props.entry!} matrix={matrix} />,
-                mounts.output,
-              )}
-              {mounts && projectionKey && projectedKey !== projectionKey && createPortal(
-                <>
-                  <PreviewContent caseName={selectedCase!} centered={props.centerContent} definition={definition!} entry={props.entry!} matrix={false} />
-                  <IsolatedLayerProjector
-                    layerId={props.selectedLayer!.id}
-                    output={mounts.output}
-                    staging={mounts.staging}
-                    onProjected={completeProjection}
-                  />
-                </>,
-                mounts.staging,
-              )}
+              {previewMode === "design" ? (
+                <div
+                  aria-label="Select layers in static preview"
+                  className="absolute inset-0 z-10 cursor-default touch-none"
+                  data-design-space-canvas-action
+                  data-testid="source-preview-selection-surface"
+                  onClick={selectStaticLayer}
+                />
+              ) : null}
             </>
           ))}
         </div>
@@ -262,17 +271,22 @@ export function scalePreviewEventPoint(
   };
 }
 
-export function sourceLayerIdAtEvent(
-  document: Pick<Document, "elementFromPoint">,
-  event: Event,
+export function sourceLayerIdAtPreviewPoint(
+  frame: HTMLIFrameElement,
+  event: Pick<MouseEvent, "clientX" | "clientY">,
   accepted?: ReadonlySet<string>,
   fallbackLayerId?: string,
 ): string | undefined {
-  const direct = sourceLayerIdFromElement(event.target, accepted);
-  if (direct) return direct;
-  if (!("clientX" in event) || !("clientY" in event)) return fallbackLayerId;
+  const document = frame.contentDocument;
+  if (!document) return fallbackLayerId;
+  const frameBounds = frame.getBoundingClientRect();
+  const point = scalePreviewEventPoint(
+    { clientX: event.clientX - frameBounds.left, clientY: event.clientY - frameBounds.top },
+    { height: frameBounds.height, width: frameBounds.width },
+    { height: document.documentElement.clientHeight, width: document.documentElement.clientWidth },
+  );
   return sourceLayerIdFromElement(
-    document.elementFromPoint(Number(event.clientX), Number(event.clientY)),
+    document.elementFromPoint(point.x, point.y),
     accepted,
   ) ?? fallbackLayerId;
 }
@@ -312,56 +326,6 @@ type PreviewMounts = {
 };
 
 const previewDocument = '<!doctype html><html class="dark" data-theme="dark" data-resolved-theme="dark" data-component-library="shadcn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style id="design-space-preview-styles"></style><style>html,body,#design-space-preview-root{height:100%;margin:0;background:#0d0e10;color:#f4f4f5}#design-space-preview-staging{position:fixed;left:-100000px;top:0;width:100%;visibility:hidden;pointer-events:none}</style></head><body><div id="design-space-preview-staging"></div><div id="design-space-preview-root"></div></body></html>';
-
-function PreviewContent(props: {
-  caseName: string;
-  centered?: boolean;
-  definition: ComponentDesignDefinition;
-  entry: RuntimeSourceWorkspaceEntry;
-  matrix: boolean;
-}) {
-  const cases = propertyCases(props.entry, props.matrix);
-  return (
-    <PreviewBoundary resetKey={`${props.entry.id}:${props.caseName}:${props.matrix}`} errorTitle="Design preview crashed" errorMessage="Fix the colocated design or its required runtime context to recover.">
-      <SourcePreviewRuntimeContext.Provider value>
-        <div style={cases.length > 1
-          ? { display: "grid", gridTemplateColumns: `repeat(${Math.min(cases.length, 3)}, minmax(0, 1fr))`, gap: 16, minHeight: "100%", padding: 16 }
-          : props.centered
-            ? { alignItems: "center", display: "flex", justifyContent: "center", minHeight: "100%", width: "100%" }
-            : { minHeight: "100%" }}>
-          {cases.map((propertyCase) => (
-            <section key={propertyCase.label} style={cases.length > 1 ? { minWidth: 0, border: "1px solid rgba(127,127,127,.22)", borderRadius: 8, padding: 12 } : undefined}>
-              {cases.length > 1 ? <p style={{ margin: "0 0 8px", color: "#71717a", font: "10px/1.4 ui-monospace,monospace" }}>{propertyCase.label}</p> : null}
-              <div style={cases.length > 1 && props.centered ? { alignItems: "center", display: "flex", justifyContent: "center", minHeight: 120 } : undefined}>
-                <span data-design-space-preview-entry-root style={{ display: "contents" }}>
-                  {props.definition.render({
-                    ...props.definition.defaults,
-                    ...props.definition.cases[props.caseName],
-                    ...propertyCase.values,
-                  })}
-                </span>
-              </div>
-            </section>
-          ))}
-        </div>
-      </SourcePreviewRuntimeContext.Provider>
-    </PreviewBoundary>
-  );
-}
-
-function propertyCases(entry: RuntimeSourceWorkspaceEntry, matrix: boolean): readonly PropertyCase[] {
-  if (!matrix) return [{ label: "Current", values: {} }];
-  const axes = entry.props.filter((property) => (property.values?.length ?? 0) > 1).slice(0, 2);
-  if (!axes.length) return [{ label: "Current", values: {} }];
-  const [rows, columns] = axes;
-  return (rows?.values ?? []).flatMap((row) => (columns?.values ?? [undefined]).map((column) => ({
-    label: [rows ? `${rows.name}=${String(row)}` : undefined, columns && column !== undefined ? `${columns.name}=${String(column)}` : undefined].filter(Boolean).join(" · "),
-    values: {
-      ...(rows ? { [rows.name]: row } : {}),
-      ...(columns && column !== undefined ? { [columns.name]: column } : {}),
-    },
-  }))).slice(0, 18);
-}
 
 function SourceDesignControls(props: {
   caseNames: readonly string[];
@@ -408,8 +372,6 @@ function invalidDesignMessage(definition: ComponentDesignDefinition | undefined)
 }
 
 type LoadedDesign = { designId: string; definition: ComponentDesignDefinition };
-type PropertyCase = { label: string; values: Readonly<Record<string, boolean | number | string>> };
-
 function PlayablePreview(props: {
   caseName: string;
   centered?: boolean;
@@ -433,51 +395,10 @@ function PlayablePreview(props: {
     <section aria-label={`${props.entry.label} interactive preview`} className="h-full w-full overflow-auto bg-[#0d0e10] text-zinc-100">
       <style>{[props.styles.join("\n"), props.classCss ?? ""].join("\n")}</style>
       <div ref={output} className="min-h-full">
-        <PreviewContent caseName={props.caseName} centered={props.centered} definition={props.definition} entry={props.entry} matrix={props.matrix} />
+        <SourcePreviewContent caseName={props.caseName} centered={props.centered} definition={props.definition} entry={props.entry} matrix={props.matrix} />
       </div>
     </section>
   );
-}
-
-function IsolatedLayerProjector(props: {
-  layerId: string;
-  output: HTMLElement;
-  staging: HTMLElement;
-  onProjected: () => void;
-}) {
-  const { layerId, onProjected, output, staging } = props;
-  useLayoutEffect(() => {
-    const ownerWindow = staging.ownerDocument.defaultView;
-    if (!ownerWindow) return undefined;
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      onProjected();
-    };
-    const project = () => {
-      if (!projectSourceLayer(staging, output, layerId)) return false;
-      finish();
-      return true;
-    };
-    output.replaceChildren();
-    if (project()) return undefined;
-    const observer = new ownerWindow.MutationObserver(() => project());
-    observer.observe(staging, { childList: true, subtree: true });
-    const timer = ownerWindow.setTimeout(() => {
-      if (settled) return;
-      const message = output.ownerDocument.createElement("p");
-      message.textContent = "This HTML layer is not rendered in the current state.";
-      message.style.cssText = "margin:24px;color:#71717a;font:12px/1.5 system-ui,sans-serif";
-      output.replaceChildren(message);
-      finish();
-    }, 3_000);
-    return () => {
-      observer.disconnect();
-      ownerWindow.clearTimeout(timer);
-    };
-  }, [layerId, onProjected, output, staging]);
-  return null;
 }
 
 export function projectSourceLayer(staging: HTMLElement, output: HTMLElement, layerId: string): boolean {
@@ -486,6 +407,13 @@ export function projectSourceLayer(staging: HTMLElement, output: HTMLElement, la
   if (!target) return false;
   output.replaceChildren(target.cloneNode(true));
   return true;
+}
+
+function showStaticPreviewMessage(output: HTMLElement, message: string, error = false): void {
+  const element = output.ownerDocument.createElement("p");
+  element.textContent = message;
+  element.style.cssText = `margin:24px;color:${error ? "#fda4af" : "#71717a"};font:12px/1.5 system-ui,sans-serif`;
+  output.replaceChildren(element);
 }
 
 export function sourceLayerIdFromElement(

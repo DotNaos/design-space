@@ -8,6 +8,8 @@ import type {
   RuntimeSourceWorkspaceEntry,
   SourceWorkspaceDeviceState,
 } from "../../shared/source-workspace";
+import { initialFocusOccurrence, sourceFocusGraph } from "./source-focus-tree";
+import { sourceTreeNodes } from "./source-workspace-tree";
 import { SourceWorkspaceSidebar, type SourceWorkspaceSelection } from "./SourceWorkspaceSidebar";
 
 afterEach(cleanup);
@@ -261,6 +263,30 @@ it("keeps the visible tree in place when a component is selected", async () => {
   await userEvent.click(screen.getAllByRole("button", { name: "ProjectSummary" })[0]!);
 
   expect(within(tree).getAllByRole("treeitem").map((item) => item.getAttribute("aria-label"))).toEqual(labelsBefore);
+  expect(screen.getByRole("button", { name: "Collapse Dashboard" })).toHaveAttribute("aria-expanded", "true");
+});
+
+it("reveals and highlights a layer selected from the canvas", async () => {
+  const graph = sourceFocusGraph(sourceTreeNodes(workspace), "desktop");
+  const occurrenceId = initialFocusOccurrence(graph)!;
+  const occurrence = graph.occurrences.get(occurrenceId)!;
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      selected={{
+        device: "desktop",
+        kind: "html",
+        layerId: "dashboard-section",
+        nodeId: occurrence.node.id,
+        occurrenceId,
+        sourceNodeId: occurrence.node.id,
+      }}
+      workspace={workspace}
+    />,
+  );
+
+  const selectedLayer = await screen.findByRole("treeitem", { name: "<section>" });
+  expect(selectedLayer).toHaveAttribute("aria-selected", "true");
   expect(screen.getByRole("button", { name: "Collapse Dashboard" })).toHaveAttribute("aria-expanded", "true");
 });
 
