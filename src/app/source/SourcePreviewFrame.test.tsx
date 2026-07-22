@@ -10,10 +10,11 @@ import {
   applySourceLayerTextById,
   projectSourceLayer,
   scalePreviewEventPoint,
+  sourceLayerIdAtEvent,
   sourceLayerIdFromElement,
   SourcePreviewFrame,
 } from "./SourcePreviewFrame";
-import { measureSourceLayer } from "./source-preview-selection-overlay";
+import { measureSourceLayer, sourceLayerBounds } from "./source-preview-selection-overlay";
 
 afterEach(cleanup);
 
@@ -214,6 +215,34 @@ it("maps a nested canvas target to its nearest authored source layer", () => {
   } as unknown as EventTarget)).toBe("jsx:src/app/Panel.tsx:42");
 });
 
+it("uses the element that was actually clicked before coordinate fallbacks", () => {
+  const clicked = document.createElement("h2");
+  clicked.dataset.designSpaceSourceLayerId = "heading";
+  const unrelated = document.createElement("section");
+  unrelated.dataset.designSpaceSourceLayerId = "section";
+  const event = new MouseEvent("pointerdown", { clientX: 10, clientY: 20 });
+  Object.defineProperty(event, "target", { value: clicked });
+
+  expect(sourceLayerIdAtEvent(
+    { elementFromPoint: () => unrelated },
+    event,
+    new Set(["heading", "section"]),
+  )).toBe("heading");
+});
+
+it("falls back to the component boundary when an external primitive has no source marker", () => {
+  const external = document.createElement("button");
+  const event = new MouseEvent("pointerdown", { clientX: 10, clientY: 20 });
+  Object.defineProperty(event, "target", { value: external });
+
+  expect(sourceLayerIdAtEvent(
+    { elementFromPoint: () => external },
+    event,
+    new Set(["component-root"]),
+    "component-root",
+  )).toBe("component-root");
+});
+
 it("maps pointer coordinates through a scaled preview frame", () => {
   expect(scalePreviewEventPoint(
     { clientX: 416, clientY: 260 },
@@ -227,6 +256,18 @@ it("measures a selected layer relative to its rendered canvas root", () => {
     { left: 124, top: 88, width: 320, height: 96 },
     { left: 24, top: 40 },
   )).toEqual({ x: 100, y: 48, width: 320, height: 96 });
+});
+
+it("measures display-contents roots from their visible descendants", () => {
+  const root = document.createElement("div");
+  const first = document.createElement("header");
+  const second = document.createElement("main");
+  root.append(first, second);
+  root.getBoundingClientRect = () => ({ left: 0, top: 0, width: 0, height: 0 }) as DOMRect;
+  first.getBoundingClientRect = () => ({ left: 20, top: 30, width: 100, height: 40 }) as DOMRect;
+  second.getBoundingClientRect = () => ({ left: 10, top: 80, width: 240, height: 120 }) as DOMRect;
+
+  expect(sourceLayerBounds(root)).toEqual({ left: 10, top: 30, width: 240, height: 170 });
 });
 
 it("ignores host and design-fixture markers while selecting registered source layers", () => {

@@ -1,4 +1,4 @@
-import type { DesignSpaceDevice } from "../../shared/source-workspace";
+import type { DesignSpaceDevice, SourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import type { SourceWorkspaceSelection } from "./SourceWorkspaceSidebar";
 import { findSourceTreeLayer } from "./source-workspace-tree";
 import { sourceOccurrenceSubtree, type SourceFocusGraph } from "./source-focus-tree";
@@ -35,6 +35,23 @@ export function sourceCanvasSelection(
       ...(layer.kind === "slot" ? { slotName: layer.label } : {}),
       kind: layer.kind,
     };
+  }
+  return undefined;
+}
+
+export function sourceCanvasVisualLayer(
+  entry: SourceWorkspaceEntry | undefined,
+  selected: SourceWorkspaceLayer | undefined,
+): SourceWorkspaceLayer | undefined {
+  if (selected) return selected;
+  return firstHtmlLayer(entry?.layers) ?? entry?.layers?.[0];
+}
+
+function firstHtmlLayer(layers: readonly SourceWorkspaceLayer[] | undefined): SourceWorkspaceLayer | undefined {
+  for (const layer of layers ?? []) {
+    if (layer.kind === "html") return layer;
+    const nested = firstHtmlLayer(layer.children);
+    if (nested) return nested;
   }
   return undefined;
 }

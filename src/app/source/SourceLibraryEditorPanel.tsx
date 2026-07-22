@@ -19,6 +19,7 @@ export type SourceLibraryEditorPanelProps = {
   entry?: SourceWorkspaceEntry;
   mode: SourceLibraryEditorMode;
   releaseFallback?: ReactNode;
+  designLayer?: SourceWorkspaceLayer;
   selectedLayer?: SourceWorkspaceLayer;
   selectedLayerMetrics?: SourceLayerMetrics;
   sourceEditor: SourceCodeEditor;
@@ -58,7 +59,7 @@ export function SourceLibraryEditorPanel(props: SourceLibraryEditorPanelProps) {
           <SourceComponentInspector
             className="flex h-full w-full border-l-0"
             entry={props.entry}
-            layer={props.selectedLayer}
+            layer={props.designLayer ?? props.selectedLayer}
             layerMetrics={props.selectedLayerMetrics}
             styleEditor={props.styleEditor}
           />

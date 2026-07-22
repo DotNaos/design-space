@@ -47,7 +47,7 @@ import type { SourceDraftLocation } from "./source/source-draft-workspace";
 import { useSourceDraftFile, useSourceDraftWorkspace } from "./source/useSourceDraftWorkspace";
 import { useSourceChangeReview } from "./source/useSourceChangeReview";
 import { CodeDocumentSwitch, FileEvidencePanel, findSourceSlotLayer } from "./source/SourceWorkspaceDetails";
-import { sourceCanvasSelection } from "./source/source-canvas-selection";
+import { sourceCanvasSelection, sourceCanvasVisualLayer } from "./source/source-canvas-selection";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source/source-layer-design";
 
 export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
@@ -112,12 +112,13 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const activeCodeDocument = codeDocument === "design" && entry?.design ? "design" : "source";
   const codeEditor = activeCodeDocument === "design" ? designEditor : editor;
   const inspectorEntry = selectedOccurrence?.entry ?? focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
+  const previewEntry = focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
   const selectedLayer = findSourceTreeLayer(entry?.layers, selection?.layerId)
     ?? (selection?.kind === "slot" && selection.slotName
       ? findSourceSlotLayer(entry?.layers, selection.slotName)
       : undefined);
-  const appReviewLayer = findSourceTreeLayer(registeredCodeEntry?.layers, selectedLayer?.id);
-  const previewEntry = focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
+  const visualLayer = sourceCanvasVisualLayer(previewEntry, selectedLayer);
+  const appReviewLayer = findSourceTreeLayer(registeredCodeEntry?.layers, visualLayer?.id);
   const inspectorSlotLayers = focusedOccurrence?.usageLayer?.children.filter((layer) => layer.kind === "slot" && layer.slot) ?? [];
   const inspectorSourceOwner = focusedOccurrence?.usageOwnerId
     ? nodes.find((node) => node.id === focusedOccurrence.usageOwnerId)
@@ -132,7 +133,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const styleEditor = useSourceLayerClassEditor({
     connected: workspace.runtime === "react",
     editor,
-    layer: selectedLayer,
+    layer: visualLayer,
     ready: draftAnalysis.ready,
     scope: "app",
   });
@@ -183,11 +184,12 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   ), [libraryEntry?.design?.fileId, libraryRootId, libraryRuntime.mode]);
   const libraryDesignEditor = useSourceDraftFile(draftWorkspace, libraryDesignEditorLocation);
   const librarySelectedLayer = findSourceTreeLayer(libraryEntry?.layers, selectedLibraryLayerId) ?? baseLibrarySelectedLayer;
-  const libraryReviewLayer = baseLibrarySelectedLayer;
+  const libraryVisualLayer = sourceCanvasVisualLayer(libraryEntry, librarySelectedLayer);
+  const libraryReviewLayer = sourceCanvasVisualLayer(baseLibraryEditEntry, baseLibrarySelectedLayer);
   const libraryStyleEditor = useSourceLayerClassEditor({
     connected: libraryDraftAnalysis.workspace.runtime === "react",
     editor: libraryEditor,
-    layer: librarySelectedLayer,
+    layer: libraryVisualLayer,
     ready: libraryDraftAnalysis.ready,
     scope: "library-development",
   });
@@ -394,10 +396,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       library={workspace.library}
       mode={libraryRuntime.mode}
       selected={selectedLibraryComponent}
-      selectedLayer={librarySelectedLayer}
+      selectedLayer={libraryVisualLayer}
       selectedClassCss={libraryStyleEditor.css}
-      selectedClassName={librarySelectedLayer?.className ? libraryStyleEditor.value : undefined}
-      selectedText={librarySelectedLayer?.text ? libraryStyleEditor.textValue : undefined}
+      selectedClassName={libraryVisualLayer?.className ? libraryStyleEditor.value : undefined}
+      selectedText={libraryVisualLayer?.text ? libraryStyleEditor.textValue : undefined}
       previewMode={canvasMode}
       selectionMode={libraryRuntime.mode === "development"}
       generateDesignError={designGeneration.error}
@@ -437,10 +439,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           isolateSelectedLayer={false}
           mode={canvasMode}
           node={focusedOccurrence?.node ?? selectedNode}
-          selectedLayer={selectedLayer}
+          selectedLayer={visualLayer}
           selectedClassCss={styleEditor.css}
-          selectedClassName={selectedLayer?.className ? styleEditor.value : undefined}
-          selectedText={selectedLayer?.text ? styleEditor.textValue : undefined}
+          selectedClassName={visualLayer?.className ? styleEditor.value : undefined}
+          selectedText={visualLayer?.text ? styleEditor.textValue : undefined}
           generateDesignError={designGeneration.entryId === previewEntry?.id ? designGeneration.error : undefined}
           generatingDesign={designGeneration.entryId === previewEntry?.id}
           runtime={workspace.runtime}
@@ -482,6 +484,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           onModeChange={libraryRuntime.setMode}
         />}
         selectedLayer={librarySelectedLayer}
+        designLayer={libraryVisualLayer}
         selectedLayerMetrics={selectedLayerMetrics}
         sourceEditor={libraryEditor}
         styleEditor={libraryStyleEditor}
@@ -513,7 +516,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
               <SourceComponentInspector
                 className="flex h-full w-full border-l-0"
                 entry={inspectorEntry}
-                layer={selectedLayer}
+                layer={visualLayer}
                 layerMetrics={selectedLayerMetrics}
                 slotLayers={inspectorSlotLayers}
                 slotEditorReady={selection?.sourceNodeId === focusedOccurrence?.usageOwnerId && slotEditorReady}
@@ -585,9 +588,9 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
             activeEditor.redo();
             setDraftSelection(undefined);
           }}
-          onReset={activity === "app" && activeEditor === editor && (selectedLayer?.className || selectedLayer?.text)
+          onReset={activity === "app" && activeEditor === editor && (visualLayer?.className || visualLayer?.text)
             ? styleEditor.reset
-            : activity === "library" && activeEditor === libraryEditor && (librarySelectedLayer?.className || librarySelectedLayer?.text)
+            : activity === "library" && activeEditor === libraryEditor && (libraryVisualLayer?.className || libraryVisualLayer?.text)
               ? libraryStyleEditor.reset
               : activeEditor.reset}
           onStrictUi={() => undefined}

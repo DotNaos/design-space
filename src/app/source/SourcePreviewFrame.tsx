@@ -13,6 +13,7 @@ import { PreviewBoundary } from "../PreviewBoundary";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 import { mountSourceLayerSelection, sourceLayerElement } from "./source-preview-selection-overlay";
+import { sourceCanvasVisualLayer } from "./source-canvas-selection";
 import { SourcePreviewRuntimeContext } from "./SourcePreviewRuntime";
 import type { SourceTreeNode } from "./source-workspace-tree";
 
@@ -49,6 +50,7 @@ export function SourcePreviewFrame(props: {
   const [matrixByDesign, setMatrixByDesign] = useState<Readonly<Record<string, boolean>>>({});
   const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
   const selectableLayerIds = useMemo(() => sourceLayerIds(props.entries ?? (props.entry ? [props.entry] : [])), [props.entries, props.entry]);
+  const defaultVisualLayer = sourceCanvasVisualLayer(props.entry, undefined);
   const designId = props.entry?.design?.fileId;
   useEffect(() => {
     const design = props.entry?.design;
@@ -121,8 +123,7 @@ export function SourcePreviewFrame(props: {
     if (!mounts || previewMode !== "design" || !props.onSelectLayer) return undefined;
     const document = mounts.output.ownerDocument;
     const select = (event: Event) => {
-      const point = sourceLayerTargetAtEventPoint(document, event);
-      const layerId = sourceLayerIdFromElement(point ?? event.target, selectableLayerIds);
+      const layerId = sourceLayerIdAtEvent(document, event, selectableLayerIds, defaultVisualLayer?.id);
       if (!layerId) return;
       event.preventDefault();
       event.stopPropagation();
@@ -135,7 +136,7 @@ export function SourcePreviewFrame(props: {
       document.removeEventListener("pointerdown", select, true);
       document.removeEventListener("click", select, true);
     };
-  }, [mounts, previewMode, props.onSelectLayer, selectableLayerIds]);
+  }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectLayer, selectableLayerIds]);
 
   useLayoutEffect(() => {
     if (!mounts || previewMode !== "design" || !props.selectedLayer) {
@@ -148,8 +149,11 @@ export function SourcePreviewFrame(props: {
       props.selectedLayer.id,
       props.selectedLayer.kind === "component" ? "component" : "layer",
       props.onSelectedLayerMetrics,
+      props.selectedLayer.id === defaultVisualLayer?.id
+        ? mounts.output.querySelector<HTMLElement>("[data-design-space-preview-entry-root]")
+        : undefined,
     );
-  }, [mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer]);
+  }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer]);
 
   useEffect(() => {
     if (mounts) mounts.styles.textContent = [props.styles.join("\n"), props.selectedClassCss ?? ""].join("\n");
@@ -258,16 +262,19 @@ export function scalePreviewEventPoint(
   };
 }
 
-function sourceLayerTargetAtEventPoint(document: Document, event: Event): Element | null {
-  if (!("clientX" in event) || !("clientY" in event)) return null;
-  const frame = document.defaultView?.frameElement;
-  const bounds = frame?.getBoundingClientRect();
-  const point = scalePreviewEventPoint(
-    { clientX: Number(event.clientX), clientY: Number(event.clientY) },
-    { height: bounds?.height ?? 0, width: bounds?.width ?? 0 },
-    { height: document.documentElement.clientHeight, width: document.documentElement.clientWidth },
-  );
-  return document.elementFromPoint(point.x, point.y);
+export function sourceLayerIdAtEvent(
+  document: Pick<Document, "elementFromPoint">,
+  event: Event,
+  accepted?: ReadonlySet<string>,
+  fallbackLayerId?: string,
+): string | undefined {
+  const direct = sourceLayerIdFromElement(event.target, accepted);
+  if (direct) return direct;
+  if (!("clientX" in event) || !("clientY" in event)) return fallbackLayerId;
+  return sourceLayerIdFromElement(
+    document.elementFromPoint(Number(event.clientX), Number(event.clientY)),
+    accepted,
+  ) ?? fallbackLayerId;
 }
 
 function unavailablePreviewState(props: Pick<Parameters<typeof SourcePreviewFrame>[0], "device" | "entry" | "generateDesignError" | "generatingDesign" | "onGenerateDesign" | "runtime"> & {
@@ -326,11 +333,13 @@ function PreviewContent(props: {
             <section key={propertyCase.label} style={cases.length > 1 ? { minWidth: 0, border: "1px solid rgba(127,127,127,.22)", borderRadius: 8, padding: 12 } : undefined}>
               {cases.length > 1 ? <p style={{ margin: "0 0 8px", color: "#71717a", font: "10px/1.4 ui-monospace,monospace" }}>{propertyCase.label}</p> : null}
               <div style={cases.length > 1 && props.centered ? { alignItems: "center", display: "flex", justifyContent: "center", minHeight: 120 } : undefined}>
-                {props.definition.render({
-                  ...props.definition.defaults,
-                  ...props.definition.cases[props.caseName],
-                  ...propertyCase.values,
-                })}
+                <span data-design-space-preview-entry-root style={{ display: "contents" }}>
+                  {props.definition.render({
+                    ...props.definition.defaults,
+                    ...props.definition.cases[props.caseName],
+                    ...propertyCase.values,
+                  })}
+                </span>
               </div>
             </section>
           ))}
