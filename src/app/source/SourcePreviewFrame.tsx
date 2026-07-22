@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { Grid2X2, WandSparkles } from "lucide-react";
+import { CircleAlert, Grid2X2, WandSparkles } from "lucide-react";
 import { Button, ListBox, Select } from "@heroui/react";
 
 import type {
@@ -309,7 +309,14 @@ function unavailablePreviewState(props: Pick<Parameters<typeof SourcePreviewFram
   );
   if (!props.definition) {
     return props.loadState === "invalid"
-      ? <PreviewState title="Design invalid" message={props.loadMessage ?? "Fix the colocated design to enable this preview."} />
+      ? (
+        <PreviewState
+          tone="error"
+          title="Design invalid"
+          message="The component design could not be loaded."
+          error={props.loadMessage ?? "Fix the colocated design to enable this preview."}
+        />
+      )
       : <PreviewState title="Checking design" message="TypeScript and the colocated design module are being verified before the canvas can execute them." />;
   }
   return undefined;
@@ -458,13 +465,29 @@ function replaceDirectText(selected: Element, text: string): boolean {
   return true;
 }
 
-function PreviewState(props: { action?: React.ReactNode; error?: string; title: string; message: string }) {
+function PreviewState(props: {
+  action?: React.ReactNode;
+  error?: string;
+  message: string;
+  title: string;
+  tone?: "error" | "neutral";
+}) {
+  const isError = props.tone === "error" || Boolean(props.error);
   return (
-    <section className="grid h-full min-h-0 place-items-center bg-[#0d0e10] px-8 text-center">
+    <section
+      aria-live={isError ? "assertive" : undefined}
+      className="grid h-full min-h-0 place-items-center bg-[#0d0e10] px-8 text-center"
+      role={isError ? "alert" : undefined}
+    >
       <div className="max-w-sm">
-        <h2 className="text-sm font-semibold text-zinc-200">{props.title}</h2>
-        <p className="mt-2 text-xs leading-5 text-zinc-500">{props.message}</p>
-        {props.error ? <p className="mt-3 text-[10px] leading-4 text-red-300">{props.error}</p> : null}
+        {isError ? <CircleAlert aria-hidden="true" className="mx-auto text-red-400" size={24} /> : null}
+        <h2 className={`text-sm font-semibold ${isError ? "mt-3 text-red-200" : "text-zinc-200"}`}>{props.title}</h2>
+        <p className={`mt-2 text-xs leading-5 ${isError ? "text-red-300/80" : "text-zinc-500"}`}>{props.message}</p>
+        {props.error ? (
+          <p className="mt-3 max-h-24 overflow-auto border-t border-red-500/20 pt-3 font-mono text-[10px] leading-4 text-red-300/70">
+            {props.error}
+          </p>
+        ) : null}
         {props.action ? <div className="mt-4 flex justify-center">{props.action}</div> : null}
       </div>
     </section>

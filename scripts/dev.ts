@@ -47,8 +47,12 @@ function siblingUiLibraryRoot(): string | undefined {
       cwd: root,
       encoding: "utf8",
     }).trim();
-    const candidate = resolve(commonDirectory, "..", "..", "ui");
-    return existsSync(resolve(candidate, "package.json")) ? candidate : undefined;
+    const repository = resolve(commonDirectory, "..", "..", "ui");
+    const candidate = resolve(repository, "packages", "react-ui");
+    return existsSync(resolve(candidate, "package.json"))
+      && existsSync(resolve(candidate, ".designspace.ts"))
+      ? candidate
+      : undefined;
   } catch {
     return undefined;
   }

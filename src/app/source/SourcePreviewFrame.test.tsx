@@ -172,8 +172,10 @@ it("reports an invalid design without falling back to direct component execution
     component,
   };
   render(<SourcePreviewFrame device="desktop" entry={entry} runtime="react" styles={[]} />);
-  expect(await screen.findByText("Design invalid")).toBeVisible();
-  expect(screen.getByText("Design compile failed")).toBeVisible();
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("Design invalid");
+  expect(alert).toHaveTextContent("The component design could not be loaded.");
+  expect(screen.getByText("Design compile failed")).toHaveClass("text-red-300/70");
   expect(component).not.toHaveBeenCalled();
 });
 
