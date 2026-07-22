@@ -14,7 +14,7 @@ import {
   sourceLayerIdFromElement,
   SourcePreviewFrame,
 } from "./SourcePreviewFrame";
-import { measureSourceLayer, sourceLayerBounds } from "./source-preview-selection-overlay";
+import { measureSourceLayer, mountSourceLayerSelection, sourceLayerBounds } from "./source-preview-selection-overlay";
 import { renderStaticSourcePreviewMarkup } from "./source-static-preview";
 
 afterEach(cleanup);
@@ -293,6 +293,20 @@ it("measures a selected layer relative to its rendered canvas root", () => {
     { left: 124, top: 88, width: 320, height: 96 },
     { left: 24, top: 40 },
   )).toEqual({ x: 100, y: 48, width: 320, height: 96 });
+});
+
+it("keeps selection handles inside the preview boundary", () => {
+  const output = document.createElement("div");
+  document.body.append(output);
+  const dispose = mountSourceLayerSelection(document, output, "selected", "layer");
+  const overlay = document.querySelector<HTMLElement>("[data-design-space-source-selection]")!;
+  const handles = [...overlay.querySelectorAll<HTMLElement>("span")];
+
+  expect(handles).toHaveLength(4);
+  expect(handles.every((handle) => handle.style.transform === "")).toBe(true);
+
+  dispose();
+  output.remove();
 });
 
 it("measures display-contents roots from their visible descendants", () => {

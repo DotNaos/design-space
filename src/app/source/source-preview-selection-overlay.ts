@@ -21,9 +21,7 @@ export function mountSourceLayerSelection(
   ].join(";");
   for (const position of ["top:0;left:0", "top:0;right:0", "bottom:0;left:0", "bottom:0;right:0"]) {
     const handle = document.createElement("span");
-    handle.style.cssText = `${position};position:absolute;width:7px;height:7px;transform:translate(var(--tx),var(--ty));border:1px solid ${tone === "component" ? "#a855f7" : "#38bdf8"};background:#f4f4f5;box-sizing:border-box`;
-    handle.style.setProperty("--tx", position.includes("left") ? "-50%" : "50%");
-    handle.style.setProperty("--ty", position.includes("top") ? "-50%" : "50%");
+    handle.style.cssText = `${position};position:absolute;width:7px;height:7px;border:1px solid ${tone === "component" ? "#a855f7" : "#38bdf8"};background:#f4f4f5;box-sizing:border-box`;
     overlay.append(handle);
   }
   document.body.append(overlay);
