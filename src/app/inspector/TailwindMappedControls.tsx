@@ -199,6 +199,7 @@ function SegmentedUtilityControl(props: {
   onChange: (value: string) => void;
 }) {
   const selection = findBaseSelection(props.current, props.group);
+  const change = (next: string) => props.onChange(replaceSegmentedUtility(props.current, props.group, next));
   return (
     <div className="min-w-0">
       <div className="mb-1 flex min-h-4 items-center gap-1.5">
@@ -210,7 +211,7 @@ function SegmentedUtilityControl(props: {
           active={!selection.token}
           icon={Minus}
           label={`${props.group.label}: Auto`}
-          onPress={() => props.onChange(replaceTailwindUtilityGroup(props.current, optionValues(props.group), "", props.group.matches))}
+          onPress={() => change("")}
         />
         {props.group.options.map((option) => (
           <SegmentButton
@@ -218,12 +219,34 @@ function SegmentedUtilityControl(props: {
             active={!selection.custom && selection.utility === option.value}
             icon={option.icon ?? Square}
             label={`${props.group.label}: ${option.label}`}
-            onPress={() => props.onChange(replaceTailwindUtilityGroup(props.current, optionValues(props.group), option.value, props.group.matches))}
+            onPress={() => change(option.value)}
           />
         ))}
       </div>
     </div>
   );
+}
+
+function replaceSegmentedUtility(current: string, group: UtilityGroup, next: string): string {
+  let prepared = current;
+  if (next && group.id === "direction" && !hasBaseLayoutDisplay(current, /^(?:flex|inline-flex)$/)) {
+    prepared = replaceDisplayUtility(current, "flex");
+  } else if (next && (group.id === "align" || group.id === "justify") && !hasBaseLayoutDisplay(current, /^(?:flex|inline-flex|grid|inline-grid)$/)) {
+    prepared = replaceDisplayUtility(current, "flex");
+  }
+  return replaceTailwindUtilityGroup(prepared, optionValues(group), next, group.matches);
+}
+
+function replaceDisplayUtility(current: string, next: string): string {
+  const display = segmentedGroups[0]!;
+  return replaceTailwindUtilityGroup(current, optionValues(display), next, display.matches);
+}
+
+function hasBaseLayoutDisplay(current: string, pattern: RegExp): boolean {
+  return current.split(/\s+/).filter(Boolean).some((token) => {
+    const parsed = parseTailwindToken(token);
+    return !parsed.modified && pattern.test(parsed.utility);
+  });
 }
 
 function SegmentButton(props: { active: boolean; icon: LucideIcon; label: string; onPress: () => void }) {

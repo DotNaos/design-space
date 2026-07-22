@@ -136,6 +136,30 @@ describe("TailwindMappedControls", () => {
     expect(onChange).toHaveBeenCalledWith("flex items-center-safe justify-end gap-4");
   });
 
+  it("turns on flex layout when a direction is chosen on a normal element", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<TailwindMappedControls value="min-w-0" onChange={onChange} />);
+
+    await user.click(screen.getByRole("button", { name: "Direction: Column" }));
+
+    expect(onChange).toHaveBeenCalledWith("min-w-0 flex flex-col");
+  });
+
+  it("turns on flex layout for alignment but preserves an existing grid", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = render(<TailwindMappedControls value="block" onChange={onChange} />);
+
+    await user.click(screen.getByRole("button", { name: "Align: End" }));
+    expect(onChange).toHaveBeenLastCalledWith("flex items-end");
+
+    onChange.mockClear();
+    rerender(<TailwindMappedControls value="grid" onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: "Justify: Center" }));
+    expect(onChange).toHaveBeenLastCalledWith("grid justify-center");
+  });
+
   it("shows arbitrary base values as Custom and replaces them in place", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
