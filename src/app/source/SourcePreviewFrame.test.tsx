@@ -327,8 +327,11 @@ it("measures a selected layer relative to its rendered canvas root", () => {
 });
 
 it("mounts selection chrome outside the rendered preview DOM without changing its layout tree", () => {
+  const canvas = document.createElement("main");
+  canvas.dataset.designSpaceCanvasViewport = "";
   const frame = document.createElement("iframe");
-  document.body.append(frame);
+  canvas.append(frame);
+  document.body.append(canvas);
   const previewDocument = frame.contentDocument!;
   const output = previewDocument.createElement("div");
   output.innerHTML = '<section data-design-space-source-layer-id="selected"><span>Rendered content</span></section>';
@@ -339,16 +342,17 @@ it("mounts selection chrome outside the rendered preview DOM without changing it
   const handles = [...overlay.querySelectorAll<HTMLElement>("span")];
 
   expect(handles).toHaveLength(4);
-  expect(handles.every((handle) => handle.style.cssText.includes("translate(-50%"))).toBe(true);
+  expect(handles.every((handle) => !handle.style.cssText.includes("translate(-50%"))).toBe(true);
   expect(overlay.parentElement).toHaveAttribute("id", "design-space-canvas-overlays");
-  expect(overlay.parentElement).toHaveStyle({ overflow: "visible" });
+  expect(overlay.parentElement?.parentElement).toBe(canvas);
+  expect(overlay.parentElement).toHaveStyle({ overflow: "hidden", position: "absolute", zIndex: "10" });
   expect(output.innerHTML).toBe(renderedMarkup);
   expect(previewDocument.querySelector("[data-design-space-source-selection]")).toBeNull();
-  expect(overlay.style.position).toBe("fixed");
+  expect(overlay.style.position).toBe("absolute");
   expect(overlay.style.borderWidth).toBe("0px");
 
   dispose();
-  frame.remove();
+  canvas.remove();
 });
 
 it("renders hover feedback as a lightweight outline without selection handles", () => {

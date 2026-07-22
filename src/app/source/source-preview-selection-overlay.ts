@@ -51,7 +51,7 @@ function mountSourceLayerOutline(
   else overlay.dataset.designSpaceSourceHover = layerId;
   const color = options.tone === "component" ? "#a855f7" : "#38bdf8";
   overlay.style.cssText = [
-    "position:fixed",
+    "position:absolute",
     "pointer-events:none",
     "border:0",
     "margin:0",
@@ -60,7 +60,12 @@ function mountSourceLayerOutline(
     "display:none",
   ].join(";");
   if (options.variant === "selection") {
-    for (const position of ["top:0;left:0", "top:0;right:0", "bottom:0;left:0", "bottom:0;right:0"]) {
+    for (const position of [
+      "top:0;left:0;transform:translate(0,0)",
+      "top:0;right:0;transform:translate(0,0)",
+      "bottom:0;left:0;transform:translate(0,0)",
+      "bottom:0;right:0;transform:translate(0,0)",
+    ]) {
       const handle = overlayRoot.ownerDocument.createElement("span");
       handle.style.cssText = [
         position,
@@ -68,7 +73,6 @@ function mountSourceLayerOutline(
         "display:block",
         "margin:0",
         "padding:0",
-        "transform:translate(-50%,-50%)",
         "background:#f4f4f5",
         "box-sizing:border-box",
       ].join(";");
@@ -89,7 +93,7 @@ function mountSourceLayerOutline(
       return;
     }
     const sourceRect = sourceLayerBounds(target);
-    const rect = sourceLayerOverlayBounds(sourceRect, output);
+    const rect = sourceLayerOverlayBounds(sourceRect, output, overlayRoot);
     const metrics = measureSourceLayer(sourceRect, output.getBoundingClientRect());
     const serialized = `${metrics.x}:${metrics.y}:${metrics.width}:${metrics.height}`;
     const outlineWidth = options.variant === "selection" ? 1.5 : 1;
@@ -101,10 +105,12 @@ function mountSourceLayerOutline(
     overlay.style.boxShadow = `0 0 0 ${outlineWidth}px ${color}`;
     if (options.variant === "selection") {
       const handleSize = 6;
-      for (const handle of overlay.querySelectorAll<HTMLElement>("span")) {
+      const handles = [...overlay.querySelectorAll<HTMLElement>("span")];
+      for (const [index, handle] of handles.entries()) {
         handle.style.width = `${handleSize}px`;
         handle.style.height = `${handleSize}px`;
         handle.style.border = `1px solid ${color}`;
+        handle.style.transform = `translate(${index % 2 ? "-100%" : "0"},${index > 1 ? "-100%" : "0"})`;
       }
     }
     if (serialized !== previous) {
@@ -157,36 +163,41 @@ function mountSourceLayerOutline(
 function sourceLayerOverlayRoot(previewDocument: Document): HTMLElement {
   const frame = previewDocument.defaultView?.frameElement as HTMLElement | null | undefined;
   const hostDocument = frame?.ownerDocument ?? previewDocument;
-  const existing = hostDocument.getElementById("design-space-canvas-overlays");
+  const canvas = frame?.closest<HTMLElement>("[data-design-space-canvas-viewport]");
+  const host = canvas ?? hostDocument.body;
+  const existing = [...host.children]
+    .find((child): child is HTMLElement => child instanceof HTMLElement && child.id === "design-space-canvas-overlays");
   if (existing) return existing;
   const root = hostDocument.createElement("div");
   root.id = "design-space-canvas-overlays";
   root.setAttribute("aria-hidden", "true");
   root.style.cssText = [
-    "position:fixed",
+    `position:${canvas ? "absolute" : "fixed"}`,
     "inset:0",
-    "z-index:2147483646",
+    "z-index:10",
     "pointer-events:none",
-    "overflow:visible",
-    "contain:layout style",
+    "overflow:hidden",
+    "contain:layout style paint",
     "isolation:isolate",
   ].join(";");
-  hostDocument.body.append(root);
+  host.append(root);
   return root;
 }
 
 function sourceLayerOverlayBounds(
   rect: Pick<DOMRect, "height" | "left" | "top" | "width">,
   output: HTMLElement,
+  overlayRoot: HTMLElement,
 ): Pick<DOMRect, "height" | "left" | "top" | "width"> {
   const frame = output.ownerDocument.defaultView?.frameElement as HTMLElement | null | undefined;
   if (!frame) return rect;
   const frameRect = frame.getBoundingClientRect();
+  const overlayRect = overlayRoot.getBoundingClientRect();
   const frameScaleX = frame.clientWidth > 0 ? frameRect.width / frame.clientWidth : 1;
   const frameScaleY = frame.clientHeight > 0 ? frameRect.height / frame.clientHeight : frameScaleX;
   return {
-    left: frameRect.left + frame.clientLeft * frameScaleX + rect.left * frameScaleX,
-    top: frameRect.top + frame.clientTop * frameScaleY + rect.top * frameScaleY,
+    left: frameRect.left - overlayRect.left + frame.clientLeft * frameScaleX + rect.left * frameScaleX,
+    top: frameRect.top - overlayRect.top + frame.clientTop * frameScaleY + rect.top * frameScaleY,
     width: rect.width * frameScaleX,
     height: rect.height * frameScaleY,
   };

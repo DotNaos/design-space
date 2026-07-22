@@ -408,6 +408,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       ref={viewportRef}
       aria-label="Preview canvas"
       className={`${props.className ?? "flex"} relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[#0d0e10]`}
+      data-design-space-canvas-viewport
       style={{
         touchAction: activeInteractionMode === "select" ? "none" : "pan-x pan-y",
         overscrollBehavior: activeInteractionMode === "select" ? "none" : "contain",
