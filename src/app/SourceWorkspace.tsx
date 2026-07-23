@@ -49,7 +49,6 @@ import { useSourceChangeReview } from "./source/useSourceChangeReview";
 import { CodeDocumentSwitch, FileEvidencePanel, findSourceSlotLayer } from "./source/SourceWorkspaceDetails";
 import { sourceCanvasSelection, sourceCanvasSelectionOccurrence, sourceCanvasVisualLayer } from "./source/source-canvas-selection";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source/source-layer-design";
-import { useCanvasSlotEdit } from "./source/useCanvasSlotEdit";
 
 export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
   const registeredWorkspace = target.sourceWorkspace;
@@ -69,7 +68,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   } : initial);
   const [focusId, setFocusId] = useState<string | undefined>(initialFocusId);
   const [draftSelection, setDraftSelection] = useState<{ start: number; end: number }>();
-  const [rightMode, setRightMode] = useState<"code" | "design">("code");
+  const [rightMode, setRightMode] = useState<"code" | "design">("design");
   const [codeDocument, setCodeDocument] = useState<"source" | "design">("source");
   const [canvasMode, setCanvasMode] = useState<SourcePreviewMode>("design");
   const [selectedLayerMetrics, setSelectedLayerMetrics] = useState<SourceLayerMetrics>();
@@ -332,14 +331,6 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       return;
     }
   };
-  const canvasSlotEdit = useCanvasSlotEdit({
-    graph,
-    sourceNodeId: selection?.sourceNodeId,
-    slotEditorReady,
-    onApply: applySlot,
-    onPrepare: prepareSlotEdit,
-  });
-
   const appSidebar = (
     <SourceWorkspaceSidebar
       className="flex h-full w-full border-r-0"
@@ -460,14 +451,11 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           selectedClassCss={styleEditor.css}
           selectedClassName={visualLayer?.className ? styleEditor.value : undefined}
           selectedText={visualLayer?.text ? styleEditor.textValue : undefined}
-          slotEditorReady={!canvasSlotEdit.busy}
           slotLayers={inspectorSlotLayers}
           generateDesignError={designGeneration.entryId === previewEntry?.id ? designGeneration.error : undefined}
           generatingDesign={designGeneration.entryId === previewEntry?.id}
           runtime={workspace.runtime}
           styles={workspace.styles}
-          candidatesForSlot={(slot) => sourceSlotCandidates(workspace, nodes, slot, requestedDevice, inspectorSourceOwnerEntry?.relativePath ?? entry?.relativePath ?? "")}
-          onApplySlot={(slot, candidate, action) => focusedOccurrence && canvasSlotEdit.applySlot(slot, focusedOccurrence, candidate, action)}
           onModeChange={setCanvasMode}
           onSelectedLayerMetrics={setSelectedLayerMetrics}
           onSelectLayer={(layerId, occurrence) => {

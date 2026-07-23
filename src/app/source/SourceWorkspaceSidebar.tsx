@@ -203,7 +203,6 @@ function FocusTreeRow(props: {
     : row.occurrence?.node;
   const ownerPath = sourceOwner?.implementations[props.device].entry?.relativePath ?? row.occurrence?.entry?.relativePath ?? "";
   const candidates = slot ? sourceSlotCandidates(props.workspace, props.nodes, slot, props.device, ownerPath) : [];
-  const triggerId = slot ? `source-slot-picker-${safeId(slot.id)}` : undefined;
   const componentEntry = occurrenceRow ? row.occurrence?.entry : undefined;
   const select = () => {
     if (occurrenceRow && row.occurrence) {
@@ -264,10 +263,6 @@ function FocusTreeRow(props: {
             });
             return;
           }
-          if (event.key === "Enter" && triggerId && active) {
-            event.preventDefault();
-            document.getElementById(triggerId)?.click();
-          }
         }}
         onDoubleClick={() => {
           if (!focusTarget || !occurrenceRow) return;
@@ -297,7 +292,6 @@ function FocusTreeRow(props: {
           candidates={candidates}
           isBusy={props.editingSourceOwnerId === sourceOwnerId && props.slotEditorReady === false}
           slot={slot}
-          triggerId={triggerId}
           onOpen={() => props.onPrepareSlotEdit?.(row.occurrence!)}
           onApply={(candidate, action) => props.onApplySlot?.(slot, row.occurrence!, candidate, action)}
         />
@@ -336,10 +330,6 @@ function SlotStatus({ layer }: { layer: SourceWorkspaceLayer }) {
       <span className="sr-only">{usage.validity}</span>
     </span>
   );
-}
-
-function safeId(value: string): string {
-  return value.replace(/[^A-Za-z0-9_-]/g, "-");
 }
 
 function MissingDeviceCluster(props: { implementations: SourceTreeNode["implementations"] }) {

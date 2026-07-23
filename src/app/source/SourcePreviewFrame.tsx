@@ -9,9 +9,7 @@ import type {
 } from "../../shared/source-workspace";
 import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
-import { SourceCanvasSlotPickers } from "./SourceCanvasSlotPickers";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
-import type { SourceComponentCandidate } from "./source-slot-composition";
 import { sourceLayerHitAtPreviewPoint, type SourceLayerHit } from "./source-preview-hit-testing";
 import { externalSourceLayerOwner } from "./source-layer-ownership";
 import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement } from "./source-preview-selection-overlay";
@@ -37,16 +35,13 @@ export function SourcePreviewFrame(props: {
   generateDesignError?: string;
   generatingDesign?: boolean;
   selectionMode?: boolean;
-  slotEditorReady?: boolean;
   slotLayers?: readonly SourceWorkspaceLayer[];
   mode?: SourcePreviewMode;
-  candidatesForSlot?: (slot: SourceWorkspaceLayer) => readonly SourceComponentCandidate[];
   onGenerateDesign?: () => void;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
   onSelectLayer?: (layerId: string, occurrence: number) => void;
   onOpenLayerOwner?: (entryId: string, layerId: string, occurrence: number) => void;
   onModeChange?: (mode: SourcePreviewMode) => void;
-  onApplySlot?: (slot: SourceWorkspaceLayer, candidate: SourceComponentCandidate, action: "add" | "replace") => void;
   onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
   revealSelectedLayerKey?: number;
 }) {
@@ -328,16 +323,6 @@ export function SourcePreviewFrame(props: {
                     onMouseLeave={() => setHoveredLayerHit(undefined)}
                     onMouseMove={hoverStaticLayer}
                   />
-                  {props.slotLayers?.length && props.candidatesForSlot && props.onApplySlot ? (
-                    <SourceCanvasSlotPickers
-                      candidatesForSlot={props.candidatesForSlot}
-                      frame={frameRef.current}
-                      isBusy={!props.slotEditorReady}
-                      revision={staticRevision}
-                      slots={props.slotLayers}
-                      onApply={props.onApplySlot}
-                    />
-                  ) : null}
                 </>
               ) : null}
             </>

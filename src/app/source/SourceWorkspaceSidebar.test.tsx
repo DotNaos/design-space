@@ -315,3 +315,19 @@ it("keeps a visible slot picker usable without selecting the slot row", async ()
   expect(await screen.findByRole("listbox", { name: "Compatible components" })).toBeVisible();
   expect(onSelect).not.toHaveBeenCalled();
 });
+
+it("selects a slot row without opening its component picker", async () => {
+  const onSelect = vi.fn();
+  render(<SourceWorkspaceSidebar {...callbacks} onSelect={onSelect} workspace={workspace} />);
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  const slot = screen.getByRole("button", { name: "content" });
+  await userEvent.click(slot);
+
+  expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({
+    kind: "slot",
+    layerId: "layout-dashboard-content",
+    slotName: "content",
+  }));
+  expect(screen.queryByRole("listbox", { name: "Compatible components" })).not.toBeInTheDocument();
+});

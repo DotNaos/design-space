@@ -72,16 +72,17 @@ function previewProps(
   const slots = { ...asRecord(values.slots) };
   for (const layer of props.slotLayers) {
     if (!layer.slot || (layer.slot.validity !== "missing" && !emptySlotValue(slots[layer.label]))) continue;
-    const marker = <SourceCanvasSlotMarker key={layer.id} label={layer.label} />;
+    const marker = <SourceCanvasSlotMarker key={layer.id} label={layer.label} layerId={layer.id} />;
     slots[layer.label] = layer.slot.contract.multiple ? [marker] : marker;
   }
   return { ...values, slots };
 }
 
-function SourceCanvasSlotMarker(props: { label: string }) {
+function SourceCanvasSlotMarker(props: { label: string; layerId: string }) {
   return (
     <span
       aria-hidden="true"
+      data-design-space-source-layer-id={props.layerId}
       data-design-space-source-slot-name={props.label}
       style={{
         backgroundColor: "rgba(46, 16, 70, .28)",

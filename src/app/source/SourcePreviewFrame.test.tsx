@@ -103,6 +103,55 @@ it("places a non-interactive selection surface over authored HTML in design mode
     .toHaveAttribute("data-design-space-canvas-action");
 });
 
+it("selects a canvas slot without opening a component picker", async () => {
+  const slotId = "slot.content";
+  const slot: SourceWorkspaceLayer = {
+    id: slotId,
+    label: "content",
+    kind: "slot",
+    source: { start: 10, end: 10 },
+    children: [],
+    slot: {
+      contract: { name: "content", type: "ComponentSlot<Panel>", required: true, multiple: false, accepts: ["Panel"], min: 1, max: 1 },
+      validity: "missing",
+      received: [],
+      edit: { kind: "missing-property", insertAt: 10 },
+    },
+  };
+  const entry = {
+    ...previewEntry("slot-owner", async () => previewDefinition("Slot owner")),
+    layers: [slot],
+    slots: [slot.slot!.contract],
+  };
+  const onSelectLayer = vi.fn();
+  render(
+    <SourcePreviewFrame
+      device="desktop"
+      entry={entry}
+      mode="design"
+      runtime="react"
+      slotLayers={[slot]}
+      styles={[]}
+      onSelectLayer={onSelectLayer}
+    />,
+  );
+  const frame = await screen.findByTitle("slot-owner desktop preview") as HTMLIFrameElement;
+  const surface = screen.getByTestId("source-preview-selection-surface");
+  const frameDocument = frame.contentDocument!;
+  const marker = frameDocument.createElement("span");
+  marker.dataset.designSpaceSourceLayerId = slotId;
+  frameDocument.body.append(marker);
+  Object.defineProperty(frameDocument.documentElement, "clientWidth", { configurable: true, value: 1280 });
+  Object.defineProperty(frameDocument.documentElement, "clientHeight", { configurable: true, value: 800 });
+  frame.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1280, height: 800 }) as DOMRect;
+  frameDocument.elementFromPoint = vi.fn(() => marker);
+
+  fireEvent.click(surface, { clientX: 20, clientY: 20 });
+
+  expect(onSelectLayer).toHaveBeenCalledWith(slotId, 0);
+  expect(screen.queryByRole("listbox", { name: "Compatible components" })).not.toBeInTheDocument();
+});
+
 it("requires a double click before opening a layer owned by another source file", async () => {
   const foreignLayerId = "jsx:src/Foreign.tsx:8";
   const current = {
@@ -246,6 +295,7 @@ it("renders empty typed slots as purple canvas insertion targets", async () => {
   container.innerHTML = markup;
   const target = container.querySelector<HTMLElement>('[data-design-space-source-slot-name="content"]');
   expect(target).toBeEmptyDOMElement();
+  expect(target).toHaveAttribute("data-design-space-source-layer-id", slot.id);
   expect(target?.style.backgroundImage).toContain("linear-gradient");
   expect(target?.style.borderColor).toContain("192");
 });
