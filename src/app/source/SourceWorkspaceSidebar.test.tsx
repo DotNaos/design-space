@@ -189,6 +189,50 @@ it("selects a nested component without replacing the canvas, then opens it expli
   expect(onFocus.mock.calls[0]?.[1]).toHaveProperty("sourceNodeId", expect.stringContaining("ProjectSummary"));
 });
 
+it("expands and scrolls to an explicitly opened component", async () => {
+  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+  const scrollIntoView = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: scrollIntoView,
+  });
+
+  function ControlledTree() {
+    const [focusId, setFocusId] = useState<string>();
+    const [selected, setSelected] = useState<SourceWorkspaceSelection>();
+    return (
+      <SourceWorkspaceSidebar
+        {...callbacks}
+        focusId={focusId}
+        selected={selected}
+        workspace={workspace}
+        onFocus={(nextFocusId, nextSelection) => {
+          setFocusId(nextFocusId);
+          setSelected(nextSelection);
+        }}
+        onSelect={setSelected}
+      />
+    );
+  }
+
+  try {
+    render(<ControlledTree />);
+    await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+    await userEvent.click(screen.getByRole("button", { name: "Expand content" }));
+    await userEvent.dblClick(screen.getAllByRole("button", { name: "ProjectSummary" })[0]!);
+
+    expect(await screen.findByRole("treeitem", { name: "<article>" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Collapse ProjectSummary" }))
+      .toHaveAttribute("aria-expanded", "true");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+  } finally {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: originalScrollIntoView,
+    });
+  }
+});
+
 it("does not expose a separate Layers mode", () => {
   render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();

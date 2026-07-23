@@ -262,6 +262,28 @@ it("serializes design content without keeping component handlers attached", asyn
   expect(onAction).not.toHaveBeenCalled();
 });
 
+it("centers an explicitly opened component inside the static canvas", async () => {
+  const markup = await renderStaticSourcePreviewMarkup({
+    caseName: "default",
+    centered: true,
+    definition: previewDefinition("Centered component"),
+    entry: previewEntry("centered", async () => previewDefinition("unused")),
+    matrix: false,
+  });
+  const container = document.createElement("div");
+  container.innerHTML = markup;
+  const layout = container.querySelector<HTMLElement>("div");
+
+  expect(layout).toHaveStyle({
+    alignItems: "center",
+    display: "flex",
+    justifyContent: "center",
+    minHeight: "100%",
+    width: "100%",
+  });
+  expect(container).toHaveTextContent("Centered component");
+});
+
 it("renders empty typed slots as purple canvas insertion targets", async () => {
   const slot: SourceWorkspaceLayer = {
     id: "slot.content",

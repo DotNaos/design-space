@@ -16,7 +16,7 @@ import {
   Type,
   TriangleAlert,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { designSpaceDevices, type DesignSpaceDevice, type RuntimeSourceWorkspace, type SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { suggestedSourceDesignPath } from "../../shared/source-design";
@@ -102,21 +102,26 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
   const rows = useMemo(() => sourceCompositionRows(graph, focusId), [focusId, graph]);
   const activeCanvasIds = useMemo(() => sourceOccurrenceSubtree(graph, focusId), [focusId, graph]);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => initiallyCollapsedSourceBranches(rows, focusId));
+  const previousFocusId = useRef(focusId);
   const visibleRows = useMemo(() => visibleSourceCompositionRows(rows, collapsed), [collapsed, rows]);
   useEffect(() => {
+    const focusChanged = previousFocusId.current !== focusId;
+    previousFocusId.current = focusId;
     const selectedIndex = rows.findIndex((row) => row.occurrence?.id === props.selected?.occurrenceId && (
       row.layer?.id === props.selected?.layerId
       || (!props.selected?.layerId && row.kind === "component")
     ));
     if (selectedIndex < 0) return;
-    const open = ancestorBranchKeys(rows, selectedIndex);
+    const open = new Set(ancestorBranchKeys(rows, selectedIndex));
+    const selectedRow = rows[selectedIndex];
+    if (focusChanged && selectedRow?.collapsible && selectedRow.occurrence?.id === focusId) open.add(selectedRow.key);
     setCollapsed((current) => {
       if (![...open].some((key) => current.has(key))) return current;
       const next = new Set(current);
       open.forEach((key) => next.delete(key));
       return next;
     });
-  }, [props.selected?.layerId, props.selected?.occurrenceId, rows]);
+  }, [focusId, props.selected?.layerId, props.selected?.occurrenceId, rows]);
   const toggleBranch = (key: string) => setCollapsed((current) => {
     const next = new Set(current);
     if (next.has(key)) next.delete(key);
@@ -187,7 +192,7 @@ function FocusTreeRow(props: {
       props.selected?.layerId === row.layer?.id
       || (row.kind === "slot" && props.selected?.slotName === row.layer?.label)
     )) || (!props.selected?.occurrenceId && occurrenceRow && row.occurrence?.id === props.activeCanvasId);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (active) rowButton.current?.scrollIntoView?.({ block: "nearest" });
   }, [active]);
   const withinCanvas = Boolean(row.occurrence && props.activeCanvasIds.has(row.occurrence.id));

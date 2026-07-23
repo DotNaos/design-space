@@ -67,6 +67,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     kind: "component",
   } : initial);
   const [focusId, setFocusId] = useState<string | undefined>(initialFocusId);
+  const [centeredFocusId, setCenteredFocusId] = useState<string>();
   const [draftSelection, setDraftSelection] = useState<{ start: number; end: number }>();
   const [rightMode, setRightMode] = useState<"code" | "design">("design");
   const [codeDocument, setCodeDocument] = useState<"source" | "design">("source");
@@ -342,6 +343,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       onCreateComponent={componentCreation.open}
       onFocus={(occurrenceId, next) => {
         setFocusId(occurrenceId);
+        setCenteredFocusId(occurrenceId);
         setSelection(next);
         setDraftSelection(undefined);
         setActivity("app");
@@ -440,6 +442,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           />
         ) : <SourcePreviewFrame
           device={requestedDevice}
+          centerContent={centeredFocusId === resolvedFocusId}
           entry={previewEntry}
           entries={workspace.entries}
           isolateSelectedLayer={false}
@@ -470,6 +473,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
             const nextOccurrence = next?.occurrenceId ? graph.occurrences.get(next.occurrenceId) : undefined;
             if (!nextOccurrence || nextOccurrence.entry?.id !== entryId) return;
             setFocusId(nextOccurrence.id);
+            setCenteredFocusId(nextOccurrence.id);
             setSelection({
               nodeId: nextOccurrence.node.id,
               sourceNodeId: nextOccurrence.node.id,
