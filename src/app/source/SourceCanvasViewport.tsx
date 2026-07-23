@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { DesignSpaceDevice } from "../../shared/source-workspace";
+import type { CanvasWorldRect } from "../canvas-transform";
 import { PreviewCanvas } from "../components/PreviewCanvas/PreviewCanvas";
 import { SourceViewportPicker } from "./SourceViewportPicker";
 import { SourcePreviewModeToggle } from "./SourcePreviewModeToggle";
@@ -19,6 +20,7 @@ export function SourceCanvasViewport(props: {
   selectedLayer?: boolean;
   selectionKey?: string;
   selectionLabel?: string;
+  revealTarget?: { key: string; rect: CanvasWorldRect };
   toolbarEnd?: React.ReactNode;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onModeChange?: (mode: SourcePreviewMode) => void;
@@ -50,6 +52,7 @@ export function SourceCanvasViewport(props: {
     <div className="relative flex h-full min-h-0 min-w-0 flex-1">
       <PreviewCanvas
         cameraKey={`${props.device}:${presetId}:${props.selectionKey ?? props.node?.id ?? "source"}`}
+        revealTarget={props.revealTarget}
         toolbar={(
           <SourceViewportPicker
             device={props.device}

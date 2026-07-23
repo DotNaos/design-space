@@ -263,6 +263,44 @@ describe("preview canvas", () => {
     expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(1.2)");
   });
 
+  it("pans the current canvas to reveal a tree-selected component without changing zoom", () => {
+    const { rerender } = render(
+      <PreviewCanvas
+        cameraKey="screen.one"
+        compact
+        preview={<div data-design-space-instance-id="one">One</div>}
+        rootInstanceId="one"
+        selectedComponentInstanceId="one"
+        selection={{ kind: "component", id: "one" }}
+        selectionLabel="One"
+        slots={[]}
+        onSelect={() => undefined}
+      />,
+    );
+    const canvas = screen.getByRole("main", { name: "Preview canvas" });
+    Object.defineProperties(canvas, {
+      clientWidth: { configurable: true, value: 400 },
+      clientHeight: { configurable: true, value: 300 },
+    });
+
+    rerender(
+      <PreviewCanvas
+        cameraKey="screen.one"
+        compact
+        preview={<div data-design-space-instance-id="one">One</div>}
+        revealTarget={{ key: "component.two:1", rect: { x: 600, y: 400, width: 100, height: 50 } }}
+        rootInstanceId="one"
+        selectedComponentInstanceId="one"
+        selection={{ kind: "component", id: "one" }}
+        selectionLabel="One"
+        slots={[]}
+        onSelect={() => undefined}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-world").style.transform).toBe("translate(-316px, -166px) scale(1)");
+  });
+
   it("pinches around two touch pointers and pans with one touch pointer", () => {
     render(
       <PreviewCanvas

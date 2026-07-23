@@ -1,7 +1,8 @@
 import { expect, it } from "vitest";
 
 import type { SourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
-import { sourceCanvasVisualLayer } from "./source-canvas-selection";
+import { sourceCanvasSelectionOccurrence, sourceCanvasVisualLayer } from "./source-canvas-selection";
+import type { SourceFocusGraph, SourceOccurrence } from "./source-focus-tree";
 
 const htmlLayer: SourceWorkspaceLayer = {
   id: "panel-root",
@@ -40,3 +41,42 @@ it("keeps an explicitly selected canvas layer", () => {
   const selected = { ...htmlLayer, id: "selected" };
   expect(sourceCanvasVisualLayer(entry, selected)).toBe(selected);
 });
+
+it("keeps repeated component occurrences aligned with their rendered match", () => {
+  const repeatedLayer: SourceWorkspaceLayer = {
+    id: "repeated-card",
+    kind: "component",
+    label: "Card",
+    source: { start: 12, end: 24 },
+    children: [],
+  };
+  const root = occurrence("root", ["first", "second"]);
+  const first = occurrence("first", [], repeatedLayer);
+  const second = occurrence("second", [], repeatedLayer);
+  const graph: SourceFocusGraph = {
+    roots: [root.id],
+    occurrences: new Map([[root.id, root], [first.id, first], [second.id, second]]),
+  };
+
+  expect(sourceCanvasSelectionOccurrence(graph, root.id, {
+    nodeId: "card",
+    sourceNodeId: "root",
+    device: "desktop",
+    occurrenceId: second.id,
+    layerId: repeatedLayer.id,
+    kind: "component",
+  })).toBe(1);
+});
+
+function occurrence(
+  id: string,
+  children: readonly string[],
+  usageLayer?: SourceWorkspaceLayer,
+): SourceOccurrence {
+  return {
+    id,
+    node: { id: id === "root" ? "root" : "card" } as SourceOccurrence["node"],
+    ...(usageLayer ? { usageLayer, usageOwnerId: "root" } : {}),
+    children,
+  };
+}

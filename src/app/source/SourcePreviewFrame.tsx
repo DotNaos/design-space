@@ -27,6 +27,7 @@ export function SourcePreviewFrame(props: {
   entries?: readonly RuntimeSourceWorkspaceEntry[];
   node?: SourceTreeNode;
   selectedLayer?: SourceWorkspaceLayer;
+  selectedLayerOccurrence?: number;
   selectedClassName?: string;
   selectedClassCss?: string;
   selectedText?: string;
@@ -47,6 +48,7 @@ export function SourcePreviewFrame(props: {
   onModeChange?: (mode: SourcePreviewMode) => void;
   onApplySlot?: (slot: SourceWorkspaceLayer, candidate: SourceComponentCandidate, action: "add" | "replace") => void;
   onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
+  revealSelectedLayerKey?: number;
 }) {
   const [mounts, setMounts] = useState<PreviewMounts>();
   const [loaded, setLoaded] = useState<LoadedDesign>();
@@ -57,6 +59,7 @@ export function SourcePreviewFrame(props: {
   const [staticRevision, setStaticRevision] = useState(0);
   const [hoveredLayerHit, setHoveredLayerHit] = useState<SourceLayerHit>();
   const [selectedLayerHit, setSelectedLayerHit] = useState<(SourceLayerHit & { entryId: string })>();
+  const [revealTarget, setRevealTarget] = useState<{ key: string; rect: SourceLayerMetrics }>();
   const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
   const previewEntries = useMemo(() => props.entries ?? (props.entry ? [props.entry] : []), [props.entries, props.entry]);
   const selectableLayerIds = useMemo(() => sourceLayerIds(previewEntries), [previewEntries]);
@@ -194,11 +197,14 @@ export function SourcePreviewFrame(props: {
     setHoveredLayerHit((current) => current?.layerId === hit?.layerId && current?.occurrence === hit?.occurrence ? current : hit);
   };
 
-  const selectedOccurrence = selectedLayerHit
+  const selectedOccurrence = props.selectedLayerOccurrence ?? (selectedLayerHit
     && selectedLayerHit.entryId === props.entry?.id
     && selectedLayerHit.layerId === props.selectedLayer?.id
     ? selectedLayerHit.occurrence
-    : 0;
+    : 0);
+  const revealKey = props.revealSelectedLayerKey !== undefined && props.selectedLayer?.kind === "component"
+    ? `${props.entry?.id ?? "source"}:${props.selectedLayer.id}:${selectedOccurrence}:${props.revealSelectedLayerKey}`
+    : undefined;
 
   useLayoutEffect(() => {
     if (!mounts || previewMode !== "design" || !props.selectedLayer) {
@@ -209,13 +215,16 @@ export function SourcePreviewFrame(props: {
       mounts.output,
       props.selectedLayer.id,
       props.selectedLayer.kind === "component" ? "component" : "layer",
-      props.onSelectedLayerMetrics,
+      (metrics) => {
+        props.onSelectedLayerMetrics?.(metrics);
+        if (metrics && revealKey) setRevealTarget({ key: revealKey, rect: metrics });
+      },
       props.selectedLayer.id === defaultVisualLayer?.id
         ? mounts.output.querySelector<HTMLElement>("[data-design-space-preview-entry-root]")
         : undefined,
       selectedOccurrence,
     );
-  }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer, selectedOccurrence, staticRevision]);
+  }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer, revealKey, selectedOccurrence, staticRevision]);
 
   useLayoutEffect(() => {
     if (!mounts || previewMode !== "design" || !hoveredLayerHit || (hoveredLayerHit.layerId === props.selectedLayer?.id && hoveredLayerHit.occurrence === selectedOccurrence)) return undefined;
@@ -263,6 +272,7 @@ export function SourcePreviewFrame(props: {
       mode={previewMode === "static" ? undefined : previewMode}
       node={props.node}
       selectedLayer={Boolean(props.selectedLayer)}
+      revealTarget={revealTarget?.key === revealKey ? revealTarget : undefined}
       selectionKey={props.entry?.id}
       selectionLabel={props.selectedLayer?.kind === "html" ? `<${props.selectedLayer.label}>` : props.node?.label}
       onDeviceChange={props.onDeviceChange ?? (() => undefined)}

@@ -10,6 +10,30 @@ export function sourceCanvasSelection(
   device: DesignSpaceDevice,
   occurrenceIndex = 0,
 ): SourceWorkspaceSelection | undefined {
+  const matches = sourceCanvasSelections(graph, canvasOccurrenceId, layerId, device);
+  return matches[occurrenceIndex] ?? matches[0];
+}
+
+export function sourceCanvasSelectionOccurrence(
+  graph: SourceFocusGraph,
+  canvasOccurrenceId: string | undefined,
+  selection: SourceWorkspaceSelection | undefined,
+): number {
+  if (!selection?.layerId) return 0;
+  const matches = sourceCanvasSelections(graph, canvasOccurrenceId, selection.layerId, selection.device);
+  const index = matches.findIndex((candidate) => (
+    candidate.occurrenceId === selection.occurrenceId
+    && candidate.kind === selection.kind
+  ));
+  return Math.max(0, index);
+}
+
+function sourceCanvasSelections(
+  graph: SourceFocusGraph,
+  canvasOccurrenceId: string | undefined,
+  layerId: string,
+  device: DesignSpaceDevice,
+): readonly SourceWorkspaceSelection[] {
   const matches: SourceWorkspaceSelection[] = [];
   for (const occurrenceId of sourceOccurrenceSubtree(graph, canvasOccurrenceId)) {
     const occurrence = graph.occurrences.get(occurrenceId);
@@ -39,7 +63,7 @@ export function sourceCanvasSelection(
       kind: layer.kind,
     });
   }
-  return matches[occurrenceIndex] ?? matches[0];
+  return matches;
 }
 
 export function sourceCanvasVisualLayer(

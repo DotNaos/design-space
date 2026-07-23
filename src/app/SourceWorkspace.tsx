@@ -47,7 +47,7 @@ import type { SourceDraftLocation } from "./source/source-draft-workspace";
 import { useSourceDraftFile, useSourceDraftWorkspace } from "./source/useSourceDraftWorkspace";
 import { useSourceChangeReview } from "./source/useSourceChangeReview";
 import { CodeDocumentSwitch, FileEvidencePanel, findSourceSlotLayer } from "./source/SourceWorkspaceDetails";
-import { sourceCanvasSelection, sourceCanvasVisualLayer } from "./source/source-canvas-selection";
+import { sourceCanvasSelection, sourceCanvasSelectionOccurrence, sourceCanvasVisualLayer } from "./source/source-canvas-selection";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source/source-layer-design";
 import { useCanvasSlotEdit } from "./source/useCanvasSlotEdit";
 
@@ -73,6 +73,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const [codeDocument, setCodeDocument] = useState<"source" | "design">("source");
   const [canvasMode, setCanvasMode] = useState<SourcePreviewMode>("design");
   const [selectedLayerMetrics, setSelectedLayerMetrics] = useState<SourceLayerMetrics>();
+  const [canvasRevealRequest, setCanvasRevealRequest] = useState<number>();
   const [selectedProjectFileId, setSelectedProjectFileId] = useState<string>();
   const [selectedLibraryComponent, setSelectedLibraryComponent] = useState(() => registeredWorkspace.library?.components[0]?.name);
   const [selectedLibraryLayerId, setSelectedLibraryLayerId] = useState<string>();
@@ -359,6 +360,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       onPrepareSlotEdit={prepareSlotEdit}
       onSelect={(next) => {
         setSelection(next);
+        if (next.kind === "component") setCanvasRevealRequest((current) => (current ?? 0) + 1);
         setDraftSelection(undefined);
         setActivity("app");
         setMobilePane(next.kind === "slot" ? "tree" : "canvas");
@@ -453,6 +455,8 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           mode={canvasMode}
           node={focusedOccurrence?.node ?? selectedNode}
           selectedLayer={visualLayer}
+          selectedLayerOccurrence={sourceCanvasSelectionOccurrence(graph, resolvedFocusId, selection)}
+          revealSelectedLayerKey={canvasRevealRequest}
           selectedClassCss={styleEditor.css}
           selectedClassName={visualLayer?.className ? styleEditor.value : undefined}
           selectedText={visualLayer?.text ? styleEditor.textValue : undefined}

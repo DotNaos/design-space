@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { StrictUiViolation } from "../../../shared/strict-ui";
-import { fitCanvas, zoomCanvasAt, type CanvasCamera } from "../../canvas-transform";
+import {
+  fitCanvas,
+  revealCanvasRect,
+  zoomCanvasAt,
+  type CanvasCamera,
+  type CanvasWorldRect,
+} from "../../canvas-transform";
 import { indexPreviewDom, type PreviewDomSnapshot } from "../../dom/dom-snapshot";
 import { StrictUiIndicator, strictUiOutlineTone } from "../../strict-ui/StrictUiIndicator";
 import {
@@ -50,6 +56,7 @@ type PreviewCanvasProps = {
   highlightedInternalHtmlComponentId?: string;
   htmlClassNames?: Readonly<Record<string, string>>;
   cameraKey?: string;
+  revealTarget?: { key: string; rect: CanvasWorldRect };
   strictUiViolations?: readonly StrictUiViolation[];
   compact?: boolean;
   staticPreview?: boolean;
@@ -71,6 +78,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const suppressClick = useRef(false);
   const cameraRef = useRef<CanvasCamera>({ x: 16, y: 56, scale: 1 });
   const lastCameraResetKey = useRef<string | undefined>(undefined);
+  const lastRevealKey = useRef<string | undefined>(undefined);
   const lastDomSnapshot = useRef("");
   const autoFit = useRef(true);
   const frame = useRef<number | undefined>(undefined);
@@ -237,6 +245,24 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     fit();
     scheduleMeasure();
   }, [fit, props.cameraKey, props.compact, scheduleMeasure, setCamera, touchGestures.resetTouchGestures]);
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    const target = props.revealTarget;
+    if (!viewport || !target || lastRevealKey.current === target.key) return;
+    if (viewport.clientWidth <= 0 || viewport.clientHeight <= 0) return;
+    lastRevealKey.current = target.key;
+    autoFit.current = false;
+    setShowGestureHint(false);
+    setCamera(revealCanvasRect(
+      cameraRef.current,
+      { width: viewport.clientWidth, height: viewport.clientHeight },
+      target.rect,
+      props.compact ? 16 : 24,
+      props.compact ? 48 : 72,
+    ));
+    scheduleMeasure();
+  }, [props.compact, props.revealTarget, scheduleMeasure, setCamera]);
 
   const reset = () => {
     const viewport = viewportRef.current;
