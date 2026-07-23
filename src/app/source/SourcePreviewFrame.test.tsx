@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
@@ -101,6 +101,66 @@ it("places a non-interactive selection surface over authored HTML in design mode
   expect(frame).toHaveProperty("inert", true);
   expect(screen.getByTestId("source-preview-selection-surface"))
     .toHaveAttribute("data-design-space-canvas-action");
+});
+
+it("requires a double click before opening a layer owned by another source file", async () => {
+  const foreignLayerId = "jsx:src/Foreign.tsx:8";
+  const current = {
+    ...previewEntry("current", async () => ({
+      ...previewDefinition("unused"),
+      render: () => <button data-design-space-source-layer-id={foreignLayerId}>Foreign action</button>,
+    })),
+    layers: [{
+      id: "jsx:src/Current.tsx:1",
+      label: "main",
+      kind: "html" as const,
+      source: { start: 0, end: 10 },
+      children: [],
+    }],
+  };
+  const foreign = {
+    ...previewEntry("foreign", async () => previewDefinition("foreign")),
+    relativePath: "src/Foreign.tsx",
+    layers: [{
+      id: foreignLayerId,
+      label: "button",
+      kind: "html" as const,
+      source: { start: 8, end: 9 },
+      children: [],
+    }],
+  };
+  const onSelectLayer = vi.fn();
+  const onOpenLayerOwner = vi.fn();
+  render(
+    <SourcePreviewFrame
+      device="desktop"
+      entries={[current, foreign]}
+      entry={current}
+      mode="design"
+      runtime="react"
+      styles={[]}
+      onOpenLayerOwner={onOpenLayerOwner}
+      onSelectLayer={onSelectLayer}
+    />,
+  );
+  const frame = await screen.findByTitle("current desktop preview") as HTMLIFrameElement;
+  const surface = screen.getByTestId("source-preview-selection-surface");
+  const frameDocument = frame.contentDocument!;
+  const foreignElement = frameDocument.createElement("button");
+  foreignElement.dataset.designSpaceSourceLayerId = foreignLayerId;
+  frameDocument.body.append(foreignElement);
+  Object.defineProperty(frameDocument.documentElement, "clientWidth", { configurable: true, value: 1280 });
+  Object.defineProperty(frameDocument.documentElement, "clientHeight", { configurable: true, value: 800 });
+  frame.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1280, height: 800 }) as DOMRect;
+  frameDocument.elementFromPoint = vi.fn(() => foreignElement);
+
+  fireEvent.mouseMove(surface, { clientX: 20, clientY: 20 });
+  fireEvent.click(surface, { clientX: 20, clientY: 20 });
+  expect(onSelectLayer).not.toHaveBeenCalled();
+  expect(onOpenLayerOwner).not.toHaveBeenCalled();
+
+  fireEvent.doubleClick(surface, { clientX: 20, clientY: 20 });
+  expect(onOpenLayerOwner).toHaveBeenCalledWith("foreign", foreignLayerId, 0);
 });
 
 it("separates design selection from playable component interactions", async () => {
@@ -396,13 +456,20 @@ it("mounts selection chrome outside the rendered preview DOM without changing it
 it("renders hover feedback as a lightweight outline without selection handles", () => {
   const output = document.createElement("div");
   document.body.append(output);
-  const dispose = mountSourceLayerHover(output, "hovered");
+  const dispose = mountSourceLayerHover(output, "hovered", undefined, 0, {
+    label: "ForeignPanel",
+    relativePath: "src/components/ForeignPanel.tsx",
+  });
   const overlay = document.querySelector<HTMLElement>("[data-design-space-source-hover]")!;
+  const tooltip = document.querySelector<HTMLElement>("[data-design-space-source-owner-tooltip]")!;
 
   expect(overlay.dataset.designSpaceSourceHover).toBe("hovered");
   expect(overlay.querySelector("span")).toBeNull();
   expect(overlay.style.borderWidth).toBe("0px");
   expect(overlay.parentElement).toHaveAttribute("id", "design-space-canvas-overlays");
+  expect(tooltip).toHaveTextContent("ForeignPanel");
+  expect(tooltip).toHaveTextContent("src/components/ForeignPanel.tsx");
+  expect(tooltip).toHaveTextContent("Double-click to open");
 
   dispose();
   output.remove();

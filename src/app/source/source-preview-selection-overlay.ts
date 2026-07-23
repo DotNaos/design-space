@@ -22,11 +22,16 @@ export function mountSourceLayerHover(
   layerId: string,
   fallback?: HTMLElement | null,
   occurrence = 0,
+  externalOwner?: {
+    label: string;
+    relativePath: string;
+  },
 ): () => void {
   return mountSourceLayerOutline(output, layerId, {
+    externalOwner,
     fallback,
     occurrence,
-    tone: "layer",
+    tone: externalOwner ? "component" : "layer",
     variant: "hover",
   });
 }
@@ -38,6 +43,10 @@ function mountSourceLayerOutline(
     fallback?: HTMLElement | null;
     onMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
     occurrence: number;
+    externalOwner?: {
+      label: string;
+      relativePath: string;
+    };
     tone: "component" | "layer";
     variant: "hover" | "selection";
   },
@@ -80,6 +89,9 @@ function mountSourceLayerOutline(
     }
   }
   overlayRoot.append(overlay);
+  const tooltip = options.variant === "hover" && options.externalOwner
+    ? sourceLayerOwnerTooltip(overlayRoot, options.externalOwner)
+    : undefined;
 
   let frame: number | undefined;
   let previous = "";
@@ -88,6 +100,7 @@ function mountSourceLayerOutline(
     const target = sourceLayerElement(output, layerId, options.occurrence) ?? options.fallback;
     if (!target) {
       overlay.style.display = "none";
+      if (tooltip) tooltip.style.display = "none";
       if (previous) options.onMetrics?.(undefined);
       previous = "";
       return;
@@ -103,6 +116,7 @@ function mountSourceLayerOutline(
     overlay.style.width = `${Math.max(1, rect.width)}px`;
     overlay.style.height = `${Math.max(1, rect.height)}px`;
     overlay.style.boxShadow = `0 0 0 ${outlineWidth}px ${color}`;
+    if (tooltip) positionSourceLayerOwnerTooltip(tooltip, rect, overlayRoot);
     if (options.variant === "selection") {
       const handleSize = 6;
       const handles = [...overlay.querySelectorAll<HTMLElement>("span")];
@@ -156,8 +170,67 @@ function mountSourceLayerOutline(
     previewDocument.removeEventListener("scroll", schedule, true);
     overlayRoot.ownerDocument.removeEventListener("scroll", schedule, true);
     overlay.remove();
+    tooltip?.remove();
     if (!overlayRoot.childElementCount) overlayRoot.remove();
   };
+}
+
+function sourceLayerOwnerTooltip(
+  overlayRoot: HTMLElement,
+  owner: { label: string; relativePath: string },
+): HTMLElement {
+  const tooltip = overlayRoot.ownerDocument.createElement("div");
+  tooltip.dataset.designSpaceSourceOwnerTooltip = owner.label;
+  tooltip.style.cssText = [
+    "position:absolute",
+    "display:none",
+    "max-width:280px",
+    "min-width:160px",
+    "padding:7px 9px",
+    "border:1px solid rgba(168,85,247,.55)",
+    "border-radius:7px",
+    "background:rgba(24,18,31,.96)",
+    "box-shadow:0 8px 24px rgba(0,0,0,.35)",
+    "color:#e4e4e7",
+    "font:500 11px/1.35 ui-sans-serif,system-ui,sans-serif",
+    "white-space:normal",
+    "overflow:hidden",
+    "pointer-events:none",
+  ].join(";");
+  const title = tooltip.ownerDocument.createElement("strong");
+  title.textContent = owner.label;
+  title.style.cssText = "display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d8b4fe;font-weight:650";
+  const path = tooltip.ownerDocument.createElement("span");
+  path.textContent = owner.relativePath;
+  path.style.cssText = "display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#a1a1aa;font:10px/1.35 ui-monospace,SFMono-Regular,monospace";
+  const hint = tooltip.ownerDocument.createElement("span");
+  hint.textContent = "Double-click to open";
+  hint.style.cssText = "display:block;margin-top:4px;color:#c4b5fd;font-size:10px";
+  tooltip.append(title, path, hint);
+  overlayRoot.append(tooltip);
+  return tooltip;
+}
+
+function positionSourceLayerOwnerTooltip(
+  tooltip: HTMLElement,
+  rect: Pick<DOMRect, "height" | "left" | "top" | "width">,
+  overlayRoot: HTMLElement,
+): void {
+  tooltip.style.display = "block";
+  const rootRect = overlayRoot.getBoundingClientRect();
+  const width = tooltip.offsetWidth || 220;
+  const height = tooltip.offsetHeight || 58;
+  const gap = 7;
+  const preferredTop = rect.top - height - gap;
+  const top = preferredTop >= gap
+    ? preferredTop
+    : Math.min(Math.max(gap, rect.top + rect.height + gap), Math.max(gap, rootRect.height - height - gap));
+  const left = Math.min(
+    Math.max(gap, rect.left),
+    Math.max(gap, rootRect.width - width - gap),
+  );
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
 }
 
 function sourceLayerOverlayRoot(previewDocument: Document): HTMLElement {

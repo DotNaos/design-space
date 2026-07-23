@@ -8,25 +8,28 @@ export function sourceCanvasSelection(
   canvasOccurrenceId: string | undefined,
   layerId: string,
   device: DesignSpaceDevice,
+  occurrenceIndex = 0,
 ): SourceWorkspaceSelection | undefined {
+  const matches: SourceWorkspaceSelection[] = [];
   for (const occurrenceId of sourceOccurrenceSubtree(graph, canvasOccurrenceId)) {
     const occurrence = graph.occurrences.get(occurrenceId);
     if (!occurrence) continue;
     if (occurrence.usageLayer?.id === layerId) {
-      return {
+      matches.push({
         nodeId: occurrence.node.id,
         sourceNodeId: occurrence.usageOwnerId ?? occurrence.node.id,
         device,
         occurrenceId,
         layerId,
         kind: "component",
-      };
+      });
+      continue;
     }
     const usageLayer = findSourceTreeLayer(occurrence.usageLayer ? [occurrence.usageLayer] : undefined, layerId);
     const localLayer = findSourceTreeLayer(occurrence.entry?.layers, layerId);
     const layer = usageLayer ?? localLayer;
     if (!layer) continue;
-    return {
+    matches.push({
       nodeId: occurrence.node.id,
       sourceNodeId: usageLayer ? occurrence.usageOwnerId ?? occurrence.node.id : occurrence.node.id,
       device,
@@ -34,9 +37,9 @@ export function sourceCanvasSelection(
       layerId,
       ...(layer.kind === "slot" ? { slotName: layer.label } : {}),
       kind: layer.kind,
-    };
+    });
   }
-  return undefined;
+  return matches[occurrenceIndex] ?? matches[0];
 }
 
 export function sourceCanvasVisualLayer(

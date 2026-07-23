@@ -466,12 +466,28 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           onApplySlot={(slot, candidate, action) => focusedOccurrence && canvasSlotEdit.applySlot(slot, focusedOccurrence, candidate, action)}
           onModeChange={setCanvasMode}
           onSelectedLayerMetrics={setSelectedLayerMetrics}
-          onSelectLayer={(layerId) => {
-            const next = sourceCanvasSelection(graph, resolvedFocusId, layerId, requestedDevice);
+          onSelectLayer={(layerId, occurrence) => {
+            const next = sourceCanvasSelection(graph, resolvedFocusId, layerId, requestedDevice, occurrence);
             if (!next) return;
             setSelection(next);
             setDraftSelection(undefined);
             setRightMode("design");
+          }}
+          onOpenLayerOwner={(entryId, layerId, occurrenceIndex) => {
+            const next = sourceCanvasSelection(graph, resolvedFocusId, layerId, requestedDevice, occurrenceIndex);
+            const nextOccurrence = next?.occurrenceId ? graph.occurrences.get(next.occurrenceId) : undefined;
+            if (!nextOccurrence || nextOccurrence.entry?.id !== entryId) return;
+            setFocusId(nextOccurrence.id);
+            setSelection({
+              nodeId: nextOccurrence.node.id,
+              sourceNodeId: nextOccurrence.node.id,
+              device: requestedDevice,
+              occurrenceId: nextOccurrence.id,
+              kind: "component",
+            });
+            setDraftSelection(undefined);
+            setActivity("app");
+            setMobilePane("canvas");
           }}
           onGenerateDesign={previewEntry ? () => void generateDesign("app", previewEntry.id) : undefined}
           onDeviceChange={(device) => selectedNode && setSelection((current) => ({

@@ -13,6 +13,7 @@ import { SourceCanvasSlotPickers } from "./SourceCanvasSlotPickers";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 import type { SourceComponentCandidate } from "./source-slot-composition";
 import { sourceLayerHitAtPreviewPoint, type SourceLayerHit } from "./source-preview-hit-testing";
+import { externalSourceLayerOwner } from "./source-layer-ownership";
 import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
 import { renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
@@ -41,7 +42,8 @@ export function SourcePreviewFrame(props: {
   candidatesForSlot?: (slot: SourceWorkspaceLayer) => readonly SourceComponentCandidate[];
   onGenerateDesign?: () => void;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
-  onSelectLayer?: (layerId: string) => void;
+  onSelectLayer?: (layerId: string, occurrence: number) => void;
+  onOpenLayerOwner?: (entryId: string, layerId: string, occurrence: number) => void;
   onModeChange?: (mode: SourcePreviewMode) => void;
   onApplySlot?: (slot: SourceWorkspaceLayer, candidate: SourceComponentCandidate, action: "add" | "replace") => void;
   onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
@@ -56,7 +58,13 @@ export function SourcePreviewFrame(props: {
   const [hoveredLayerHit, setHoveredLayerHit] = useState<SourceLayerHit>();
   const [selectedLayerHit, setSelectedLayerHit] = useState<(SourceLayerHit & { entryId: string })>();
   const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
-  const selectableLayerIds = useMemo(() => sourceLayerIds(props.entries ?? (props.entry ? [props.entry] : [])), [props.entries, props.entry]);
+  const previewEntries = useMemo(() => props.entries ?? (props.entry ? [props.entry] : []), [props.entries, props.entry]);
+  const selectableLayerIds = useMemo(() => sourceLayerIds(previewEntries), [previewEntries]);
+  const hoveredExternalOwner = useMemo(() => (
+    hoveredLayerHit && props.onOpenLayerOwner
+      ? externalSourceLayerOwner(props.entry, previewEntries, hoveredLayerHit.layerId)
+      : undefined
+  ), [hoveredLayerHit, previewEntries, props.entry, props.onOpenLayerOwner]);
   const defaultVisualLayer = sourceCanvasVisualLayer(props.entry, undefined);
   const designId = props.entry?.design?.fileId;
   useEffect(() => {
@@ -156,13 +164,27 @@ export function SourcePreviewFrame(props: {
 
   const selectStaticLayer = (event: ReactMouseEvent<HTMLDivElement>) => {
     const frame = frameRef.current;
-    if (!frame || !props.onSelectLayer) return;
+    if (!frame) return;
     const hit = sourceLayerHitAtPreviewPoint(frame, event, selectableLayerIds, defaultVisualLayer?.id);
     if (!hit) return;
     event.preventDefault();
     event.stopPropagation();
+    if (props.onOpenLayerOwner && externalSourceLayerOwner(props.entry, previewEntries, hit.layerId)) return;
+    if (!props.onSelectLayer) return;
     setSelectedLayerHit({ ...hit, entryId: props.entry?.id ?? "" });
-    props.onSelectLayer(hit.layerId);
+    props.onSelectLayer(hit.layerId, hit.occurrence);
+  };
+
+  const openStaticLayerOwner = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const frame = frameRef.current;
+    if (!frame || !props.onOpenLayerOwner) return;
+    const hit = sourceLayerHitAtPreviewPoint(frame, event, selectableLayerIds, defaultVisualLayer?.id);
+    if (!hit) return;
+    const owner = externalSourceLayerOwner(props.entry, previewEntries, hit.layerId);
+    if (!owner) return;
+    event.preventDefault();
+    event.stopPropagation();
+    props.onOpenLayerOwner(owner.entryId, hit.layerId, hit.occurrence);
   };
 
   const hoverStaticLayer = (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -204,8 +226,9 @@ export function SourcePreviewFrame(props: {
         ? mounts.output.querySelector<HTMLElement>("[data-design-space-preview-entry-root]")
         : undefined,
       hoveredLayerHit.occurrence,
+      hoveredExternalOwner,
     );
-  }, [defaultVisualLayer?.id, hoveredLayerHit, mounts, previewMode, props.selectedLayer?.id, selectedOccurrence, staticRevision]);
+  }, [defaultVisualLayer?.id, hoveredExternalOwner, hoveredLayerHit, mounts, previewMode, props.selectedLayer?.id, selectedOccurrence, staticRevision]);
 
   useEffect(() => {
     setHoveredLayerHit(undefined);
@@ -291,6 +314,7 @@ export function SourcePreviewFrame(props: {
                     data-design-space-canvas-action
                     data-testid="source-preview-selection-surface"
                     onClick={selectStaticLayer}
+                    onDoubleClick={openStaticLayerOwner}
                     onMouseLeave={() => setHoveredLayerHit(undefined)}
                     onMouseMove={hoverStaticLayer}
                   />
