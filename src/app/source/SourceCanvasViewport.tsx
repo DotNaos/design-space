@@ -20,6 +20,7 @@ export function SourceCanvasViewport(props: {
   selectedLayer?: boolean;
   selectionKey?: string;
   selectionLabel?: string;
+  hud?: React.ReactNode;
   revealTarget?: { key: string; rect: CanvasWorldRect };
   toolbarEnd?: React.ReactNode;
   onDeviceChange: (device: DesignSpaceDevice) => void;
@@ -89,6 +90,7 @@ export function SourceCanvasViewport(props: {
         selectedComponentInstanceId={sourcePreviewId}
         selection={props.selectedLayer ? undefined : { kind: "component", id: sourcePreviewId }}
         selectionLabel={props.selectionLabel ?? `${preset.label.replace("Responsive", `Responsive · ${responsiveWidth} × ${preset.height}`)}`}
+        hud={props.hud}
         slots={[]}
         staticPreview
         forcedInteractionMode={props.mode === "play" ? "interact" : "select"}

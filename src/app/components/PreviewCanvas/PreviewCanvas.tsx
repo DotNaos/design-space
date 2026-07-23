@@ -53,6 +53,7 @@ type PreviewCanvasProps = {
   slots: readonly SlotState[];
   selection?: Selection;
   hoveredSelection?: Selection;
+  hud?: React.ReactNode;
   highlightedInternalHtmlComponentId?: string;
   htmlClassNames?: Readonly<Record<string, string>>;
   cameraKey?: string;
@@ -576,12 +577,16 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         ))}
       </div>
 
-      {showGestureHint && !props.compact && (
+      {props.hud ? (
+        <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 max-w-[calc(100%-2rem)] -translate-x-1/2">
+          {props.hud}
+        </div>
+      ) : showGestureHint && !props.compact ? (
         <div data-design-space-gesture-hint className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-white/10 bg-[#17181b]/90 px-3 py-2 text-[10px] text-zinc-400 shadow-xl">
           <span className="lg:hidden">Drag to pan · pinch to zoom</span>
           <span className="hidden lg:inline">Trackpad scroll to pan · pinch to zoom</span>
         </div>
-      )}
+      ) : null}
     </main>
   );
 }

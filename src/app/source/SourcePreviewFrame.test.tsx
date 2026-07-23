@@ -103,6 +103,48 @@ it("places a non-interactive selection surface over authored HTML in design mode
     .toHaveAttribute("data-design-space-canvas-action");
 });
 
+it("identifies the owning component and source file in a hover-only canvas HUD", async () => {
+  const layerId = "jsx:src/app/components/Panel.tsx:12";
+  const entry = {
+    ...previewEntry("Panel", async () => previewDefinition("Panel design")),
+    relativePath: "src/app/components/Panel.tsx",
+    layers: [{
+      id: layerId,
+      label: "section",
+      kind: "html" as const,
+      source: { start: 12, end: 24 },
+      children: [],
+    }],
+  };
+  render(
+    <SourcePreviewFrame
+      device="desktop"
+      entry={entry}
+      mode="design"
+      runtime="react"
+      styles={[]}
+      onSelectLayer={vi.fn()}
+    />,
+  );
+  const frame = await screen.findByTitle("Panel desktop preview") as HTMLIFrameElement;
+  const surface = screen.getByTestId("source-preview-selection-surface");
+  const marker = frame.contentDocument!.createElement("section");
+  marker.dataset.designSpaceSourceLayerId = layerId;
+  frame.contentDocument!.body.append(marker);
+  Object.defineProperty(frame.contentDocument!.documentElement, "clientWidth", { configurable: true, value: 1280 });
+  Object.defineProperty(frame.contentDocument!.documentElement, "clientHeight", { configurable: true, value: 800 });
+  frame.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1280, height: 800 }) as DOMRect;
+  frame.contentDocument!.elementFromPoint = vi.fn(() => marker);
+
+  fireEvent.mouseMove(surface, { clientX: 20, clientY: 20 });
+
+  const hud = await screen.findByTestId("canvas-hover-identity-hud");
+  expect(hud).toHaveTextContent("Panel");
+  expect(hud).toHaveTextContent("src/app/components/Panel.tsx");
+  expect(hud).not.toHaveTextContent("Double-click to open");
+  expect(document.querySelector("[data-design-space-gesture-hint]")).toBeNull();
+});
+
 it("selects a canvas slot without opening a component picker", async () => {
   const slotId = "slot.content";
   const slot: SourceWorkspaceLayer = {
@@ -204,12 +246,19 @@ it("requires a double click before opening a layer owned by another source file"
   frameDocument.elementFromPoint = vi.fn(() => foreignElement);
 
   fireEvent.mouseMove(surface, { clientX: 20, clientY: 20 });
+  const hud = await screen.findByTestId("canvas-hover-identity-hud");
+  expect(hud).toHaveTextContent("foreign");
+  expect(hud).toHaveTextContent("src/Foreign.tsx");
+  expect(hud).toHaveTextContent("Double-click to open");
   fireEvent.click(surface, { clientX: 20, clientY: 20 });
   expect(onSelectLayer).not.toHaveBeenCalled();
   expect(onOpenLayerOwner).not.toHaveBeenCalled();
 
   fireEvent.doubleClick(surface, { clientX: 20, clientY: 20 });
   expect(onOpenLayerOwner).toHaveBeenCalledWith("foreign", foreignLayerId, 0);
+
+  fireEvent.mouseMove(document.body);
+  expect(screen.queryByTestId("canvas-hover-identity-hud")).not.toBeInTheDocument();
 });
 
 it("separates design selection from playable component interactions", async () => {
@@ -533,15 +582,12 @@ it("renders hover feedback as a lightweight outline without selection handles", 
     relativePath: "src/components/ForeignPanel.tsx",
   });
   const overlay = document.querySelector<HTMLElement>("[data-design-space-source-hover]")!;
-  const tooltip = document.querySelector<HTMLElement>("[data-design-space-source-owner-tooltip]")!;
 
   expect(overlay.dataset.designSpaceSourceHover).toBe("hovered");
   expect(overlay.querySelector("span")).toBeNull();
   expect(overlay.style.borderWidth).toBe("0px");
   expect(overlay.parentElement).toHaveAttribute("id", "design-space-canvas-overlays");
-  expect(tooltip).toHaveTextContent("ForeignPanel");
-  expect(tooltip).toHaveTextContent("src/components/ForeignPanel.tsx");
-  expect(tooltip).toHaveTextContent("Double-click to open");
+  expect(document.querySelector("[data-design-space-source-owner-tooltip]")).toBeNull();
 
   dispose();
   output.remove();

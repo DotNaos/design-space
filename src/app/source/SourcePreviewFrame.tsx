@@ -9,9 +9,10 @@ import type {
 } from "../../shared/source-workspace";
 import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
+import { SourceHoverIdentityHud } from "./SourceHoverIdentityHud";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 import { sourceLayerHitAtPreviewPoint, type SourceLayerHit } from "./source-preview-hit-testing";
-import { externalSourceLayerOwner } from "./source-layer-ownership";
+import { externalSourceLayerOwner, sourceLayerOwner } from "./source-layer-ownership";
 import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
 import { renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
@@ -58,11 +59,14 @@ export function SourcePreviewFrame(props: {
   const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
   const previewEntries = useMemo(() => props.entries ?? (props.entry ? [props.entry] : []), [props.entries, props.entry]);
   const selectableLayerIds = useMemo(() => sourceLayerIds(previewEntries), [previewEntries]);
+  const hoveredOwner = useMemo(() => (
+    hoveredLayerHit ? sourceLayerOwner(previewEntries, hoveredLayerHit.layerId) : undefined
+  ), [hoveredLayerHit, previewEntries]);
   const hoveredExternalOwner = useMemo(() => (
-    hoveredLayerHit && props.onOpenLayerOwner
-      ? externalSourceLayerOwner(props.entry, previewEntries, hoveredLayerHit.layerId)
+    hoveredOwner && props.onOpenLayerOwner && hoveredOwner.fileId !== props.entry?.fileId
+      ? hoveredOwner
       : undefined
-  ), [hoveredLayerHit, previewEntries, props.entry, props.onOpenLayerOwner]);
+  ), [hoveredOwner, props.entry?.fileId, props.onOpenLayerOwner]);
   const defaultVisualLayer = sourceCanvasVisualLayer(props.entry, undefined);
   const designId = props.entry?.design?.fileId;
   useEffect(() => {
@@ -102,6 +106,7 @@ export function SourcePreviewFrame(props: {
   const matrixAvailable = Boolean(props.entry?.props.some((property) => (property.values?.length ?? 0) > 1));
   const matrix = Boolean(designId && matrixByDesign[designId] && !props.selectedLayer);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const selectionSurfaceRef = useRef<HTMLDivElement | null>(null);
   const previewState = unavailablePreviewState({
     ...props,
     definition,
@@ -239,6 +244,22 @@ export function SourcePreviewFrame(props: {
   }, [props.entry?.id, previewMode]);
 
   useEffect(() => {
+    if (!hoveredLayerHit) return undefined;
+    const clearOutsideSurface = (event: MouseEvent | PointerEvent) => {
+      const surface = selectionSurfaceRef.current;
+      if (!surface || !(event.target instanceof Node) || !surface.contains(event.target)) {
+        setHoveredLayerHit(undefined);
+      }
+    };
+    document.addEventListener("mousemove", clearOutsideSurface, true);
+    document.addEventListener("pointermove", clearOutsideSurface, true);
+    return () => {
+      document.removeEventListener("mousemove", clearOutsideSurface, true);
+      document.removeEventListener("pointermove", clearOutsideSurface, true);
+    };
+  }, [hoveredLayerHit]);
+
+  useEffect(() => {
     if (mounts) mounts.styles.textContent = [props.styles.join("\n"), props.selectedClassCss ?? ""].join("\n");
   }, [mounts, props.selectedClassCss, props.styles]);
 
@@ -270,6 +291,9 @@ export function SourcePreviewFrame(props: {
       revealTarget={revealTarget?.key === revealKey ? revealTarget : undefined}
       selectionKey={props.entry?.id}
       selectionLabel={props.selectedLayer?.kind === "html" ? `<${props.selectedLayer.label}>` : props.node?.label}
+      hud={hoveredOwner ? (
+        <SourceHoverIdentityHud external={Boolean(hoveredExternalOwner)} owner={hoveredOwner} />
+      ) : undefined}
       onDeviceChange={props.onDeviceChange ?? (() => undefined)}
       onModeChange={props.onModeChange}
       toolbarEnd={definition && selectedCase ? (
@@ -314,6 +338,7 @@ export function SourcePreviewFrame(props: {
               {previewMode === "design" ? (
                 <>
                   <div
+                    ref={selectionSurfaceRef}
                     aria-label="Select layers in static preview"
                     className="absolute inset-0 z-10 cursor-default touch-none"
                     data-design-space-canvas-action
@@ -322,6 +347,7 @@ export function SourcePreviewFrame(props: {
                     onDoubleClick={openStaticLayerOwner}
                     onMouseLeave={() => setHoveredLayerHit(undefined)}
                     onMouseMove={hoverStaticLayer}
+                    onPointerLeave={() => setHoveredLayerHit(undefined)}
                   />
                 </>
               ) : null}
