@@ -186,7 +186,7 @@ it("renders empty typed slots as purple canvas insertion targets", async () => {
   container.innerHTML = markup;
   const target = container.querySelector<HTMLElement>('[data-design-space-source-slot-name="content"]');
   expect(target).toBeEmptyDOMElement();
-  expect(target?.style.backgroundImage).toContain("radial-gradient");
+  expect(target?.style.backgroundImage).toContain("linear-gradient");
   expect(target?.style.borderColor).toContain("192");
 });
 

@@ -84,11 +84,11 @@ function SourceCanvasSlotMarker(props: { label: string }) {
       aria-hidden="true"
       data-design-space-source-slot-name={props.label}
       style={{
-        backgroundColor: "rgba(46, 16, 70, .72)",
-        backgroundImage: "radial-gradient(circle, rgba(216, 180, 254, .38) 1.4px, transparent 1.7px)",
-        backgroundPosition: "0 0",
-        backgroundSize: "12px 12px",
-        border: "1px solid rgba(192, 132, 252, .44)",
+        backgroundColor: "rgba(46, 16, 70, .28)",
+        backgroundImage: "linear-gradient(45deg, rgba(216, 180, 254, .055) 25%, transparent 25%, transparent 75%, rgba(216, 180, 254, .055) 75%), linear-gradient(45deg, rgba(216, 180, 254, .055) 25%, transparent 25%, transparent 75%, rgba(216, 180, 254, .055) 75%)",
+        backgroundPosition: "0 0, 8px 8px",
+        backgroundSize: "16px 16px",
+        border: "1px solid rgba(192, 132, 252, .24)",
         boxSizing: "border-box",
         display: "block",
         minHeight: 56,
