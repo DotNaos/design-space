@@ -9,7 +9,9 @@ import type {
 } from "../../shared/source-workspace";
 import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
+import { SourceCanvasSlotPickers } from "./SourceCanvasSlotPickers";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
+import type { SourceComponentCandidate } from "./source-slot-composition";
 import { sourceLayerHitAtPreviewPoint, type SourceLayerHit } from "./source-preview-hit-testing";
 import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
@@ -33,11 +35,15 @@ export function SourcePreviewFrame(props: {
   generateDesignError?: string;
   generatingDesign?: boolean;
   selectionMode?: boolean;
+  slotEditorReady?: boolean;
+  slotLayers?: readonly SourceWorkspaceLayer[];
   mode?: SourcePreviewMode;
+  candidatesForSlot?: (slot: SourceWorkspaceLayer) => readonly SourceComponentCandidate[];
   onGenerateDesign?: () => void;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
   onSelectLayer?: (layerId: string) => void;
   onModeChange?: (mode: SourcePreviewMode) => void;
+  onApplySlot?: (slot: SourceWorkspaceLayer, candidate: SourceComponentCandidate, action: "add" | "replace") => void;
   onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
 }) {
   const [mounts, setMounts] = useState<PreviewMounts>();
@@ -129,6 +135,7 @@ export function SourcePreviewFrame(props: {
       definition,
       entry: props.entry,
       matrix,
+      slotLayers: props.slotLayers,
     }).then((markup) => {
       if (!active) return;
       mounts.staging.innerHTML = markup;
@@ -145,7 +152,7 @@ export function SourcePreviewFrame(props: {
       showStaticPreviewMessage(mounts.output, error instanceof Error ? error.message : "The static design could not be rendered.", true);
     });
     return () => { active = false; };
-  }, [definition, matrix, mounts, previewMode, projectionKey, props.centerContent, props.entry, props.selectedLayer, selectedCase]);
+  }, [definition, matrix, mounts, previewMode, projectionKey, props.centerContent, props.entry, props.selectedLayer, props.slotLayers, selectedCase]);
 
   const selectStaticLayer = (event: ReactMouseEvent<HTMLDivElement>) => {
     const frame = frameRef.current;
@@ -277,15 +284,27 @@ export function SourcePreviewFrame(props: {
                 title={`${props.entry?.label ?? props.node?.label ?? "Source"} ${props.device} preview`}
               />
               {previewMode === "design" ? (
-                <div
-                  aria-label="Select layers in static preview"
-                  className="absolute inset-0 z-10 cursor-default touch-none"
-                  data-design-space-canvas-action
-                  data-testid="source-preview-selection-surface"
-                  onClick={selectStaticLayer}
-                  onMouseLeave={() => setHoveredLayerHit(undefined)}
-                  onMouseMove={hoverStaticLayer}
-                />
+                <>
+                  <div
+                    aria-label="Select layers in static preview"
+                    className="absolute inset-0 z-10 cursor-default touch-none"
+                    data-design-space-canvas-action
+                    data-testid="source-preview-selection-surface"
+                    onClick={selectStaticLayer}
+                    onMouseLeave={() => setHoveredLayerHit(undefined)}
+                    onMouseMove={hoverStaticLayer}
+                  />
+                  {props.slotLayers?.length && props.candidatesForSlot && props.onApplySlot ? (
+                    <SourceCanvasSlotPickers
+                      candidatesForSlot={props.candidatesForSlot}
+                      frame={frameRef.current}
+                      isBusy={!props.slotEditorReady}
+                      revision={staticRevision}
+                      slots={props.slotLayers}
+                      onApply={props.onApplySlot}
+                    />
+                  ) : null}
+                </>
               ) : null}
             </>
           ))}
@@ -336,7 +355,7 @@ type PreviewMounts = {
   styles: HTMLElement;
 };
 
-const previewDocument = '<!doctype html><html class="dark" data-theme="dark" data-resolved-theme="dark" data-component-library="shadcn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style id="design-space-preview-styles"></style><style>html,body,#design-space-preview-root{height:100%;margin:0;background:#0d0e10;color:#f4f4f5}#design-space-preview-staging{position:fixed;left:-100000px;top:0;width:100%;visibility:hidden;pointer-events:none}</style></head><body><div id="design-space-preview-staging"></div><div id="design-space-preview-root"></div></body></html>';
+const previewDocument = '<!doctype html><html class="dark" data-theme="dark" data-resolved-theme="dark" data-component-library="shadcn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style id="design-space-preview-styles"></style><style>html,body,#design-space-preview-root{height:100%;margin:0;background:transparent;color:#f4f4f5}#design-space-preview-staging{position:fixed;left:-100000px;top:0;width:100%;visibility:hidden;pointer-events:none}</style></head><body><div id="design-space-preview-staging"></div><div id="design-space-preview-root"></div></body></html>';
 
 function SourceDesignControls(props: {
   caseNames: readonly string[];

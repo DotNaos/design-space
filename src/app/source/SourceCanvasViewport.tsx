@@ -70,8 +70,12 @@ export function SourceCanvasViewport(props: {
         preview={(
           <div
             data-design-space-instance-id={sourcePreviewId}
-            className="overflow-hidden rounded-md border border-white/20 bg-white shadow-2xl"
-            style={{ width: frame.width, height: frame.height }}
+            className="overflow-hidden rounded-md border border-white/15 bg-[#111216] shadow-2xl"
+            style={{
+              backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.055) 0, rgba(255,255,255,.055) 9px, rgba(255,255,255,.012) 9px, rgba(255,255,255,.012) 20px)",
+              height: frame.height,
+              width: frame.width,
+            }}
           >
             {props.children(frame)}
           </div>

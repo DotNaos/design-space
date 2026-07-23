@@ -1,8 +1,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 
-import type { RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace";
+import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import {
   applySourceLayerClassName,
   applySourceLayerClassNameById,
@@ -150,6 +151,43 @@ it("serializes design content without keeping component handlers attached", asyn
 
   expect(button).toHaveTextContent("Run action");
   expect(onAction).not.toHaveBeenCalled();
+});
+
+it("renders empty typed slots as purple canvas insertion targets", async () => {
+  const slot: SourceWorkspaceLayer = {
+    id: "slot.content",
+    label: "content",
+    kind: "slot",
+    source: { start: 10, end: 10 },
+    children: [],
+    slot: {
+      contract: { name: "content", type: "ComponentSlot<Panel>", required: true, multiple: false, accepts: ["Panel"], min: 1, max: 1 },
+      validity: "missing",
+      received: [],
+      edit: { kind: "missing-property", insertAt: 10 },
+    },
+  };
+  const entry = {
+    ...previewEntry("shell", async () => previewDefinition("unused")),
+    slots: [slot.slot!.contract],
+  };
+  const markup = await renderStaticSourcePreviewMarkup({
+    caseName: "default",
+    definition: {
+      ...previewDefinition("unused"),
+      defaults: { slots: {} },
+      render: (props) => <section>{(props.slots as Record<string, ReactNode>).content}</section>,
+    },
+    entry,
+    matrix: false,
+    slotLayers: [slot],
+  });
+  const container = document.createElement("div");
+  container.innerHTML = markup;
+  const target = container.querySelector<HTMLElement>('[data-design-space-source-slot-name="content"]');
+  expect(target).toHaveTextContent("+content");
+  expect(target?.style.backgroundImage).toContain("repeating-linear-gradient");
+  expect(target?.style.borderColor).toContain("192");
 });
 
 it("shows a checking state while switching between asynchronously loaded designs", async () => {

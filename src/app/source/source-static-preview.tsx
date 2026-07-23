@@ -2,7 +2,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
 import type { ComponentDesignDefinition } from "../../shared/component-design";
-import type { RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace";
+import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { PreviewBoundary } from "../PreviewBoundary";
 import { SourcePreviewRuntimeContext } from "./SourcePreviewRuntime";
 
@@ -12,6 +12,7 @@ export type SourcePreviewContentProps = {
   definition: ComponentDesignDefinition;
   entry: RuntimeSourceWorkspaceEntry;
   matrix: boolean;
+  slotLayers?: readonly SourceWorkspaceLayer[];
 };
 
 export function renderStaticSourcePreviewMarkup(props: SourcePreviewContentProps): Promise<string> {
@@ -47,11 +48,7 @@ export function SourcePreviewContent(props: SourcePreviewContentProps) {
               {cases.length > 1 ? <p style={{ margin: "0 0 8px", color: "#71717a", font: "10px/1.4 ui-monospace,monospace" }}>{propertyCase.label}</p> : null}
               <div style={cases.length > 1 && props.centered ? { alignItems: "center", display: "flex", justifyContent: "center", minHeight: 120 } : undefined}>
                 <span data-design-space-preview-entry-root style={{ display: "contents" }}>
-                  {props.definition.render({
-                    ...props.definition.defaults,
-                    ...props.definition.cases[props.caseName],
-                    ...propertyCase.values,
-                  })}
+                  {props.definition.render(previewProps(props, propertyCase.values))}
                 </span>
               </div>
             </section>
@@ -60,6 +57,63 @@ export function SourcePreviewContent(props: SourcePreviewContentProps) {
       </SourcePreviewRuntimeContext.Provider>
     </PreviewBoundary>
   );
+}
+
+function previewProps(
+  props: SourcePreviewContentProps,
+  propertyValues: Readonly<Record<string, boolean | number | string>>,
+): Readonly<Record<string, unknown>> {
+  const values: Record<string, unknown> = {
+    ...props.definition.defaults,
+    ...props.definition.cases[props.caseName],
+    ...propertyValues,
+  };
+  if (!props.slotLayers?.length) return values;
+  const slots = { ...asRecord(values.slots) };
+  for (const layer of props.slotLayers) {
+    if (!layer.slot || (layer.slot.validity !== "missing" && !emptySlotValue(slots[layer.label]))) continue;
+    const marker = <SourceCanvasSlotMarker key={layer.id} label={layer.label} />;
+    slots[layer.label] = layer.slot.contract.multiple ? [marker] : marker;
+  }
+  return { ...values, slots };
+}
+
+function SourceCanvasSlotMarker(props: { label: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-design-space-source-slot-name={props.label}
+      style={{
+        alignItems: "center",
+        backgroundColor: "rgba(46, 16, 70, .82)",
+        backgroundImage: "repeating-linear-gradient(135deg, rgba(192, 132, 252, .26) 0, rgba(192, 132, 252, .26) 10px, rgba(88, 28, 135, .12) 10px, rgba(88, 28, 135, .12) 22px)",
+        border: "1px dashed rgba(192, 132, 252, .72)",
+        boxSizing: "border-box",
+        color: "#d8b4fe",
+        display: "flex",
+        font: "600 11px/1 ui-sans-serif, system-ui, sans-serif",
+        gap: 8,
+        justifyContent: "center",
+        minHeight: 56,
+        minWidth: 96,
+        padding: 12,
+        width: "100%",
+      }}
+    >
+      <span style={{ fontSize: 18, fontWeight: 400 }}>+</span>
+      <span>{props.label}</span>
+    </span>
+  );
+}
+
+function emptySlotValue(value: unknown): boolean {
+  return value === undefined || value === null || (Array.isArray(value) && value.length === 0);
+}
+
+function asRecord(value: unknown): Readonly<Record<string, unknown>> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Readonly<Record<string, unknown>>
+    : {};
 }
 
 type PropertyCase = { label: string; values: Readonly<Record<string, boolean | number | string>> };

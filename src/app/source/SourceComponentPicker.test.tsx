@@ -36,6 +36,26 @@ it("explains the accepted types when search has no compatible result", async () 
   expect(await screen.findByText("This slot accepts StatusNotice.")).toBeVisible();
 });
 
+it("uses a full-size purple insertion target and applies a compatible component on the canvas", async () => {
+  const onApply = vi.fn();
+  render(
+    <SourceComponentPicker
+      appearance="canvas"
+      candidates={[
+        { id: "notice", name: "StatusNotice", group: "Project components", source: "src/StatusNotice.tsx", compatible: true, insertable: true, deviceState: "available" },
+      ]}
+      slot={missingSlot}
+      onApply={onApply}
+    />,
+  );
+  const trigger = screen.getByRole("button", { name: "Add to notice slot" });
+  expect(trigger).toHaveClass("h-full", "w-full", "border-violet-300/70");
+  expect(trigger.querySelector("svg")).not.toBeNull();
+  await userEvent.click(trigger);
+  await userEvent.click(await screen.findByRole("button", { name: "StatusNotice, compatible" }));
+  expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ name: "StatusNotice" }), "add");
+});
+
 const missingSlot: SourceWorkspaceLayer = {
   id: "slot.notice",
   label: "notice",
