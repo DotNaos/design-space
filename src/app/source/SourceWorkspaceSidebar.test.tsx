@@ -334,6 +334,66 @@ it("reveals and highlights a layer selected from the canvas", async () => {
   expect(screen.getByRole("button", { name: "Collapse Dashboard" })).toHaveAttribute("aria-expanded", "true");
 });
 
+it("highlights only the selected rendered instance of a repeated source layer", async () => {
+  const repeatedButton = {
+    id: "shared-button-body",
+    label: "Button",
+    kind: "component" as const,
+    source: { start: 10, end: 20 },
+    children: [],
+  };
+  const repeatedEntry: RuntimeSourceWorkspaceEntry = {
+    ...desktopLayout,
+    id: "repeated-layout",
+    label: "RepeatedLayout",
+    fileId: "file-repeated-layout",
+    relativePath: "src/app/repeated/layout.tsx",
+    uses: [],
+    layers: [{
+      id: "repeated-nav",
+      label: "nav",
+      kind: "html",
+      source: { start: 1, end: 30 },
+      children: [
+        { id: "first-rail", label: "RailButton", kind: "component", source: { start: 2, end: 3 }, children: [repeatedButton] },
+        { id: "second-rail", label: "RailButton", kind: "component", source: { start: 4, end: 5 }, children: [repeatedButton] },
+      ],
+    }],
+  };
+  const repeatedWorkspace: RuntimeSourceWorkspace = {
+    ...workspace,
+    entries: [repeatedEntry],
+  };
+  const graph = sourceFocusGraph(sourceTreeNodes(repeatedWorkspace), "desktop");
+  const occurrenceId = graph.roots[0]!;
+  const occurrence = graph.occurrences.get(occurrenceId)!;
+
+  const renderSidebar = (renderedLayerOccurrence: number) => (
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      selected={{
+        device: "desktop",
+        kind: "component",
+        layerId: repeatedButton.id,
+        nodeId: occurrence.node.id,
+        occurrenceId,
+        renderedLayerOccurrence,
+        sourceNodeId: occurrence.node.id,
+      }}
+      workspace={repeatedWorkspace}
+    />
+  );
+  const view = render(renderSidebar(0));
+
+  expect(screen.getByRole("treeitem", { name: "Button" })).toHaveAttribute("aria-selected", "true");
+
+  view.rerender(renderSidebar(1));
+  const buttons = screen.getAllByRole("treeitem", { name: "Button" });
+  expect(buttons).toHaveLength(2);
+  expect(buttons[0]).toHaveAttribute("aria-selected", "false");
+  expect(buttons[1]).toHaveAttribute("aria-selected", "true");
+});
+
 it("changes branch visibility only from the chevron", async () => {
   const onFocus = vi.fn();
   render(<SourceWorkspaceSidebar {...callbacks} onFocus={onFocus} workspace={workspace} />);

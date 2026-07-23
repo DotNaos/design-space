@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 
 import type { SourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
-import { sourceCanvasSelectionOccurrence, sourceCanvasVisualLayer } from "./source-canvas-selection";
+import { sourceCanvasSelection, sourceCanvasSelectionOccurrence, sourceCanvasVisualLayer } from "./source-canvas-selection";
 import type { SourceFocusGraph, SourceOccurrence } from "./source-focus-tree";
 
 const htmlLayer: SourceWorkspaceLayer = {
@@ -66,6 +66,30 @@ it("keeps repeated component occurrences aligned with their rendered match", () 
     layerId: repeatedLayer.id,
     kind: "component",
   })).toBe(1);
+});
+
+it("preserves a rendered loop instance when the source body exists only once", () => {
+  const repeatedLayer: SourceWorkspaceLayer = {
+    id: "loop-button",
+    kind: "html",
+    label: "button",
+    source: { start: 12, end: 24 },
+    children: [],
+  };
+  const root = {
+    ...occurrence("root", []),
+    entry: { ...entry, layers: [repeatedLayer], component: () => null } as SourceOccurrence["entry"],
+  };
+  const graph: SourceFocusGraph = {
+    roots: [root.id],
+    occurrences: new Map([[root.id, root]]),
+  };
+
+  const selection = sourceCanvasSelection(graph, root.id, repeatedLayer.id, "desktop", 4);
+
+  expect(selection?.occurrenceId).toBe(root.id);
+  expect(selection?.renderedLayerOccurrence).toBe(4);
+  expect(sourceCanvasSelectionOccurrence(graph, root.id, selection)).toBe(4);
 });
 
 function occurrence(

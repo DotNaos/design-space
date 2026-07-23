@@ -112,6 +112,34 @@ describe("focused source tree", () => {
     ]);
   });
 
+  it("shows a repeated source body once and leaves rendered instances to the navigator", () => {
+    const repeated = { ...component("RailButton"), id: "component.RailButton.repeated" };
+    const app = node("App", entry("App", [repeated, repeated]));
+    const railButton = node("RailButton", entry("RailButton"));
+    const graph = sourceFocusGraph([app, railButton], "desktop");
+
+    const rows = sourceCompositionRows(graph).filter((row) => row.label === "RailButton");
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.renderedLayerOccurrence).toBe(0);
+  });
+
+  it("assigns reused component internals to their exact rendered instance", () => {
+    const firstRail = { ...component("RailButton"), id: "component.RailButton.first" };
+    const secondRail = { ...component("RailButton"), id: "component.RailButton.second" };
+    const tooltip = { ...component("Tooltip"), id: "component.Tooltip.body" };
+    const app = node("App", entry("App", [firstRail, secondRail]));
+    const railButton = node("RailButton", entry("RailButton", [tooltip]));
+    const tooltipNode = node("Tooltip", entry("Tooltip"));
+    const graph = sourceFocusGraph([app, railButton, tooltipNode], "desktop");
+
+    const rows = sourceCompositionRows(graph).filter((row) => row.label === "Tooltip");
+
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.renderedLayerOccurrence)).toEqual([0, 1]);
+    expect(rows[0]?.occurrence?.id).not.toBe(rows[1]?.occurrence?.id);
+  });
+
   it("starts at the first component with an explicit slot composition", () => {
     const heading = node("Heading", entry("Heading"));
     const panel = node("Panel", entry("Panel"));

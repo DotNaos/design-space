@@ -22,6 +22,7 @@ export interface SourceFocusRow {
   depth: number;
   kind: "component" | "html" | "slot";
   label: string;
+  renderedLayerOccurrence?: number;
   occurrence?: SourceOccurrence;
   targetOccurrence?: SourceOccurrence;
   sourceOwnerId?: string;
@@ -81,7 +82,7 @@ export function sourceFocusGraph(
       ownerId: string,
       prefix: string,
     ) => {
-      layers.forEach((layer, index) => {
+      uniqueSourceLayers(layers).forEach((layer, index) => {
         if (layer.kind === "html") {
           appendLayers(layer.children, slot, ownerId, `${prefix}.h${index}`);
           return;
@@ -97,7 +98,8 @@ export function sourceFocusGraph(
         childIds.push(child.id);
       });
     };
-    const usageSlots = usageLayer?.children.filter((layer) => layer.kind === "slot" && layer.slot) ?? [];
+    const usageSlots = uniqueSourceLayers(usageLayer?.children ?? [])
+      .filter((layer) => layer.kind === "slot" && layer.slot);
     usageSlots.forEach((slot, index) => appendLayers(slot.children, slot, usageOwnerId ?? parent?.node.id ?? node.id, `u${index}`));
     appendLayers(entry?.layers ?? [], undefined, node.id, "d");
     mutable.set(id, { ...occurrence, children: childIds });
@@ -146,22 +148,45 @@ export function sourceCompositionRows(
   selectedOccurrenceId?: string,
 ): readonly SourceFocusRow[] {
   const rows: SourceFocusRow[] = [];
+  const renderedLayerCursors = new Map<string, number>();
 
-  const appendOccurrence = (occurrence: SourceOccurrence, depth: number) => {
+  const appendOccurrence = (
+    occurrence: SourceOccurrence,
+    depth: number,
+    rowKey = occurrence.id,
+  ) => {
     const usageSlots = occurrenceSlots(occurrence);
-    const localLayers = occurrence.entry?.layers ?? [];
+    const localLayers = uniqueSourceLayers(occurrence.entry?.layers ?? []);
+    const targetCursors = new Map<string, number>();
     rows.push(componentRow(
       occurrence,
       depth,
       occurrence.id === selectedOccurrenceId ? "focus" : undefined,
       usageSlots.length > 0 || localLayers.length > 0,
+      undefined,
+      nextRenderedLayerOccurrence(renderedLayerCursors, occurrence.usageLayer),
+      rowKey,
     ));
 
     for (const slot of usageSlots) {
-      appendLayer(slot, occurrence, occurrence.usageOwnerId ?? occurrence.node.id, depth + 1);
+      appendLayer(
+        slot,
+        occurrence,
+        occurrence.usageOwnerId ?? occurrence.node.id,
+        depth + 1,
+        targetCursors,
+        `${rowKey}/usage:${slot.id}`,
+      );
     }
     for (const layer of localLayers) {
-      appendLayer(layer, occurrence, occurrence.node.id, depth + 1);
+      appendLayer(
+        layer,
+        occurrence,
+        occurrence.node.id,
+        depth + 1,
+        targetCursors,
+        `${rowKey}/local:${layer.id}`,
+      );
     }
   };
 
@@ -170,30 +195,62 @@ export function sourceCompositionRows(
     owner: SourceOccurrence,
     sourceOwnerId: string,
     depth: number,
+    targetCursors: Map<string, number>,
+    rowKey: string,
   ) => {
     if (layer.kind === "component") {
-      const target = owner.children
-        .map((id) => graph.occurrences.get(id))
-        .find((candidate) => candidate?.usageLayer?.id === layer.id);
+      const target = nextTargetOccurrence(graph, owner, layer, targetCursors);
       if (target) {
-        appendOccurrence(target, depth);
+        appendOccurrence(target, depth, `${rowKey}/component:${target.id}`);
       } else {
         rows.push({
-          ...layerRow(layer, depth, owner, sourceOwnerId),
-          key: `${owner.id}/${layer.id}`,
+          ...layerRow(
+            layer,
+            depth,
+            owner,
+            sourceOwnerId,
+            undefined,
+            nextRenderedLayerOccurrence(renderedLayerCursors, layer),
+          ),
+          key: rowKey,
           collapsible: layer.children.length > 0,
         });
-        for (const child of layer.children) appendLayer(child, owner, sourceOwnerId, depth + 1);
+        for (const child of uniqueSourceLayers(layer.children)) {
+          appendLayer(
+            child,
+            owner,
+            sourceOwnerId,
+            depth + 1,
+            targetCursors,
+            `${rowKey}/${child.kind}:${child.id}`,
+          );
+        }
       }
       return;
     }
 
     rows.push({
-      ...layerRow(layer, depth, owner, sourceOwnerId),
-      key: `${owner.id}/${layer.id}`,
+      ...layerRow(
+        layer,
+        depth,
+        owner,
+        sourceOwnerId,
+        undefined,
+        nextRenderedLayerOccurrence(renderedLayerCursors, layer),
+      ),
+      key: rowKey,
       collapsible: layer.children.length > 0,
     });
-    for (const child of layer.children) appendLayer(child, owner, sourceOwnerId, depth + 1);
+    for (const child of uniqueSourceLayers(layer.children)) {
+      appendLayer(
+        child,
+        owner,
+        sourceOwnerId,
+        depth + 1,
+        targetCursors,
+        `${rowKey}/${child.kind}:${child.id}`,
+      );
+    }
   };
 
   for (const rootId of graph.roots) {
@@ -270,7 +327,7 @@ function compositionRows(
         visit(child, depth + 2);
       }
     }
-    appendLocalLayers(rows, graph, occurrence, localLayers, depth + 1);
+    appendLocalLayers(rows, graph, occurrence, localLayers, depth + 1, new Map());
     for (const child of children.filter((candidate) => !candidate.usageSlot && occurrence.id !== focus.id)) {
       visit(child, depth + 1);
     }
@@ -296,7 +353,8 @@ function occurrencePath(graph: SourceFocusGraph, focus: SourceOccurrence): reado
 }
 
 function occurrenceSlots(occurrence: SourceOccurrence): readonly SourceWorkspaceLayer[] {
-  return occurrence.usageLayer?.children.filter((layer) => layer.kind === "slot" && layer.slot) ?? [];
+  return uniqueSourceLayers(occurrence.usageLayer?.children ?? [])
+    .filter((layer) => layer.kind === "slot" && layer.slot);
 }
 
 function compositionChildren(
@@ -318,16 +376,30 @@ function appendLocalLayers(
   owner: SourceOccurrence,
   layers: readonly SourceWorkspaceLayer[],
   depth: number,
+  targetCursors: Map<string, number>,
 ): void {
   for (const layer of layers) {
     const targetOccurrence = layer.kind === "component"
-      ? owner.children
-        .map((id) => graph.occurrences.get(id))
-        .find((candidate) => candidate?.usageLayer?.id === layer.id)
+      ? nextTargetOccurrence(graph, owner, layer, targetCursors)
       : undefined;
     rows.push(layerRow(layer, depth, owner, owner.node.id, targetOccurrence));
-    appendLocalLayers(rows, graph, owner, layer.children, depth + 1);
+    appendLocalLayers(rows, graph, owner, layer.children, depth + 1, targetCursors);
   }
+}
+
+function nextTargetOccurrence(
+  graph: SourceFocusGraph,
+  owner: SourceOccurrence,
+  layer: SourceWorkspaceLayer,
+  cursors: Map<string, number>,
+): SourceOccurrence | undefined {
+  const candidates = owner.children.flatMap((id) => {
+    const candidate = graph.occurrences.get(id);
+    return candidate?.usageLayer?.id === layer.id ? [candidate] : [];
+  });
+  const index = cursors.get(layer.id) ?? 0;
+  cursors.set(layer.id, index + 1);
+  return candidates[index];
 }
 
 function childrenForSlot(graph: SourceFocusGraph, owner: SourceOccurrence, slot: SourceWorkspaceLayer) {
@@ -343,8 +415,20 @@ function componentRow(
   role?: SourceFocusRow["role"],
   collapsible?: boolean,
   expanded?: boolean,
+  renderedLayerOccurrence?: number,
+  key = occurrence.id,
 ): SourceFocusRow {
-  return { key: occurrence.id, depth, kind: "component", label: occurrence.node.label, occurrence, role, collapsible, expanded };
+  return {
+    key,
+    depth,
+    kind: "component",
+    label: occurrence.node.label,
+    renderedLayerOccurrence,
+    occurrence,
+    role,
+    collapsible,
+    expanded,
+  };
 }
 
 function layerRow(
@@ -353,6 +437,7 @@ function layerRow(
   occurrence?: SourceOccurrence,
   sourceOwnerId?: string,
   targetOccurrence?: SourceOccurrence,
+  renderedLayerOccurrence?: number,
 ): SourceFocusRow {
   return {
     key: layer.id,
@@ -362,6 +447,26 @@ function layerRow(
     layer,
     occurrence,
     targetOccurrence,
+    renderedLayerOccurrence,
     sourceOwnerId,
   };
+}
+
+function uniqueSourceLayers(layers: readonly SourceWorkspaceLayer[]): readonly SourceWorkspaceLayer[] {
+  const seen = new Set<string>();
+  return layers.filter((layer) => {
+    if (seen.has(layer.id)) return false;
+    seen.add(layer.id);
+    return true;
+  });
+}
+
+function nextRenderedLayerOccurrence(
+  cursors: Map<string, number>,
+  layer: SourceWorkspaceLayer | undefined,
+): number | undefined {
+  if (!layer) return undefined;
+  const occurrence = cursors.get(layer.id) ?? 0;
+  cursors.set(layer.id, occurrence + 1);
+  return occurrence;
 }

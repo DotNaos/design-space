@@ -10,10 +10,11 @@ import type {
 import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
 import { SourceHoverIdentityHud } from "./SourceHoverIdentityHud";
+import { SourceInstanceNavigator } from "./SourceInstanceNavigator";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 import { sourceLayerHitAtPreviewPoint, type SourceLayerHit } from "./source-preview-hit-testing";
 import { externalSourceLayerOwner, sourceLayerOwner } from "./source-layer-ownership";
-import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement } from "./source-preview-selection-overlay";
+import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement, sourceLayerElements } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
 import { renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
 import type { SourceTreeNode } from "./source-workspace-tree";
@@ -55,6 +56,7 @@ export function SourcePreviewFrame(props: {
   const [staticRevision, setStaticRevision] = useState(0);
   const [hoveredLayerHit, setHoveredLayerHit] = useState<SourceLayerHit>();
   const [selectedLayerHit, setSelectedLayerHit] = useState<(SourceLayerHit & { entryId: string })>();
+  const [selectedLayerOccurrenceCount, setSelectedLayerOccurrenceCount] = useState(0);
   const [revealTarget, setRevealTarget] = useState<{ key: string; rect: SourceLayerMetrics }>();
   const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
   const previewEntries = useMemo(() => props.entries ?? (props.entry ? [props.entry] : []), [props.entries, props.entry]);
@@ -208,6 +210,14 @@ export function SourcePreviewFrame(props: {
 
   useLayoutEffect(() => {
     if (!mounts || previewMode !== "design" || !props.selectedLayer) {
+      setSelectedLayerOccurrenceCount(0);
+      return;
+    }
+    setSelectedLayerOccurrenceCount(sourceLayerElements(mounts.output, props.selectedLayer.id).length);
+  }, [mounts, previewMode, props.selectedLayer, staticRevision]);
+
+  useLayoutEffect(() => {
+    if (!mounts || previewMode !== "design" || !props.selectedLayer) {
       props.onSelectedLayerMetrics?.(undefined);
       return undefined;
     }
@@ -268,18 +278,18 @@ export function SourcePreviewFrame(props: {
     if (projectionKey) {
       applySourceLayerClassName(mounts.output, props.selectedClassName);
     } else if (!projectionKey && props.selectedLayer) {
-      applySourceLayerClassNameById(mounts.output, props.selectedLayer.id, props.selectedClassName);
+      applySourceLayerClassNameById(mounts.output, props.selectedLayer.id, props.selectedClassName, selectedOccurrence);
     }
-  }, [mounts, projectionKey, props.selectedClassName, props.selectedLayer, staticRevision]);
+  }, [mounts, projectionKey, props.selectedClassName, props.selectedLayer, selectedOccurrence, staticRevision]);
 
   useEffect(() => {
     if (!mounts || props.selectedText === undefined) return;
     if (projectionKey) {
       applySourceLayerText(mounts.output, props.selectedText);
     } else if (!projectionKey && props.selectedLayer) {
-      applySourceLayerTextById(mounts.output, props.selectedLayer.id, props.selectedText);
+      applySourceLayerTextById(mounts.output, props.selectedLayer.id, props.selectedText, selectedOccurrence);
     }
-  }, [mounts, projectionKey, props.selectedLayer, props.selectedText, staticRevision]);
+  }, [mounts, projectionKey, props.selectedLayer, props.selectedText, selectedOccurrence, staticRevision]);
 
   return (
     <SourceCanvasViewport
@@ -293,6 +303,12 @@ export function SourcePreviewFrame(props: {
       selectionLabel={props.selectedLayer?.kind === "html" ? `<${props.selectedLayer.label}>` : props.node?.label}
       hud={hoveredOwner ? (
         <SourceHoverIdentityHud external={Boolean(hoveredExternalOwner)} owner={hoveredOwner} />
+      ) : props.selectedLayer && selectedLayerOccurrenceCount > 1 ? (
+        <SourceInstanceNavigator
+          count={selectedLayerOccurrenceCount}
+          index={selectedOccurrence}
+          onChange={(occurrence) => props.onSelectLayer?.(props.selectedLayer!.id, occurrence)}
+        />
       ) : undefined}
       onDeviceChange={props.onDeviceChange ?? (() => undefined)}
       onModeChange={props.onModeChange}
@@ -510,8 +526,8 @@ export function applySourceLayerClassName(output: HTMLElement, className: string
   return true;
 }
 
-export function applySourceLayerClassNameById(output: HTMLElement, layerId: string, className: string): boolean {
-  const selected = sourceLayerElement(output, layerId);
+export function applySourceLayerClassNameById(output: HTMLElement, layerId: string, className: string, occurrence = 0): boolean {
+  const selected = sourceLayerElement(output, layerId, occurrence);
   if (!selected) return false;
   selected.setAttribute("class", className);
   return true;
@@ -523,8 +539,8 @@ export function applySourceLayerText(output: HTMLElement, text: string): boolean
   return replaceDirectText(selected, text);
 }
 
-export function applySourceLayerTextById(output: HTMLElement, layerId: string, text: string): boolean {
-  const selected = sourceLayerElement(output, layerId);
+export function applySourceLayerTextById(output: HTMLElement, layerId: string, text: string, occurrence = 0): boolean {
+  const selected = sourceLayerElement(output, layerId, occurrence);
   return selected ? replaceDirectText(selected, text) : false;
 }
 

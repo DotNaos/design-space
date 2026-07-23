@@ -12,6 +12,7 @@ import {
   projectSourceLayer,
   SourcePreviewFrame,
 } from "./SourcePreviewFrame";
+import { SourceInstanceNavigator } from "./SourceInstanceNavigator";
 import { scalePreviewEventPoint, sourceLayerHitAtPreviewPoint, sourceLayerIdAtPreviewPoint, sourceLayerIdFromElement } from "./source-preview-hit-testing";
 import { measureSourceLayer, mountSourceLayerHover, mountSourceLayerSelection, sourceLayerBounds, sourceLayerElement } from "./source-preview-selection-overlay";
 import { renderStaticSourcePreviewMarkup } from "./source-static-preview";
@@ -512,6 +513,15 @@ it("distinguishes repeated DOM occurrences created from the same source layer", 
   frame.remove();
 });
 
+it("navigates repeated runtime instances without duplicating the source layer", async () => {
+  const onChange = vi.fn();
+  render(<SourceInstanceNavigator count={3} index={0} onChange={onChange} />);
+
+  expect(screen.getByTestId("source-instance-navigator")).toHaveTextContent("Instance 1 / 3");
+  await userEvent.click(screen.getByRole("button", { name: "Next instance" }));
+  expect(onChange).toHaveBeenCalledWith(1);
+});
+
 it("falls back to the component boundary when an external primitive has no source marker", () => {
   const frame = document.createElement("iframe");
   document.body.append(frame);
@@ -650,6 +660,21 @@ it("projects a visual draft into one nested layer while keeping the full compone
   expect(output.querySelector("h2")).toHaveClass("text-lg");
   expect(output.querySelector("h2")).toHaveTextContent("New badge");
   expect(output.querySelector("span")).toHaveTextContent("badge");
+});
+
+it("applies visual drafts only to the selected rendered occurrence", () => {
+  const output = document.createElement("div");
+  output.innerHTML = [
+    '<button data-design-space-source-layer-id="loop-button">First</button>',
+    '<button data-design-space-source-layer-id="loop-button">Second</button>',
+  ].join("");
+
+  expect(applySourceLayerClassNameById(output, "loop-button", "selected", 1)).toBe(true);
+  expect(applySourceLayerTextById(output, "loop-button", "Changed", 1)).toBe(true);
+  expect(output.children[0]).not.toHaveClass("selected");
+  expect(output.children[0]).toHaveTextContent("First");
+  expect(output.children[1]).toHaveClass("selected");
+  expect(output.children[1]).toHaveTextContent("Changed");
 });
 
 function previewDefinition(label: string) {

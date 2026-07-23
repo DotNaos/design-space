@@ -239,6 +239,10 @@ export function measureSourceLayer(
 }
 
 export function sourceLayerElement(output: HTMLElement, layerId: string, occurrence = 0): HTMLElement | null {
+  return sourceLayerElements(output, layerId)[occurrence] ?? null;
+}
+
+export function sourceLayerElements(output: HTMLElement, layerId: string): readonly HTMLElement[] {
   return [...output.querySelectorAll<HTMLElement>("[data-design-space-source-layer-id]")]
-    .filter((element) => element.dataset.designSpaceSourceLayerId === layerId)[occurrence] ?? null;
+    .filter((element) => element.dataset.designSpaceSourceLayerId === layerId);
 }

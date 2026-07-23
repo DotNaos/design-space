@@ -11,7 +11,8 @@ export function sourceCanvasSelection(
   occurrenceIndex = 0,
 ): SourceWorkspaceSelection | undefined {
   const matches = sourceCanvasSelections(graph, canvasOccurrenceId, layerId, device);
-  return matches[occurrenceIndex] ?? matches[0];
+  const match = matches[occurrenceIndex] ?? matches[0];
+  return match ? { ...match, renderedLayerOccurrence: occurrenceIndex } : undefined;
 }
 
 export function sourceCanvasSelectionOccurrence(
@@ -20,6 +21,7 @@ export function sourceCanvasSelectionOccurrence(
   selection: SourceWorkspaceSelection | undefined,
 ): number {
   if (!selection?.layerId) return 0;
+  if (selection.renderedLayerOccurrence !== undefined) return selection.renderedLayerOccurrence;
   const matches = sourceCanvasSelections(graph, canvasOccurrenceId, selection.layerId, selection.device);
   const index = matches.findIndex((candidate) => (
     candidate.occurrenceId === selection.occurrenceId

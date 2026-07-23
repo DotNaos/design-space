@@ -38,6 +38,7 @@ import { sourceTreeNodes, type SourceImplementation, type SourceTreeNode, type S
 
 export interface SourceWorkspaceSelection extends SourceTreeSelection {
   occurrenceId?: string;
+  renderedLayerOccurrence?: number;
   sourceNodeId?: string;
   slotName?: string;
   kind?: "component" | "html" | "slot";
@@ -110,7 +111,7 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
     const selectedIndex = rows.findIndex((row) => row.occurrence?.id === props.selected?.occurrenceId && (
       row.layer?.id === props.selected?.layerId
       || (!props.selected?.layerId && row.kind === "component")
-    ));
+    ) && renderedOccurrenceMatches(props.selected, row));
     if (selectedIndex < 0) return;
     const open = new Set(ancestorBranchKeys(rows, selectedIndex));
     const selectedRow = rows[selectedIndex];
@@ -121,7 +122,13 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
       open.forEach((key) => next.delete(key));
       return next;
     });
-  }, [focusId, props.selected?.layerId, props.selected?.occurrenceId, rows]);
+  }, [
+    focusId,
+    props.selected?.layerId,
+    props.selected?.occurrenceId,
+    props.selected?.renderedLayerOccurrence,
+    rows,
+  ]);
   const toggleBranch = (key: string) => setCollapsed((current) => {
     const next = new Set(current);
     if (next.has(key)) next.delete(key);
@@ -187,11 +194,14 @@ function FocusTreeRow(props: {
   const occurrenceRow = row.kind === "component" && !row.layer;
   const focusTarget = row.targetOccurrence ?? (occurrenceRow ? row.occurrence : undefined);
   const active = (occurrenceRow
-    ? props.selected?.occurrenceId === row.occurrence?.id && props.selected?.kind === "component"
+    ? props.selected?.occurrenceId === row.occurrence?.id
+      && props.selected?.kind === "component"
+      && renderedOccurrenceMatches(props.selected, row)
     : props.selected?.occurrenceId === row.occurrence?.id && props.selected?.kind === row.kind && (
       props.selected?.layerId === row.layer?.id
       || (row.kind === "slot" && props.selected?.slotName === row.layer?.label)
-    )) || (!props.selected?.occurrenceId && occurrenceRow && row.occurrence?.id === props.activeCanvasId);
+    ) && renderedOccurrenceMatches(props.selected, row))
+    || (!props.selected?.occurrenceId && occurrenceRow && row.occurrence?.id === props.activeCanvasId);
   useLayoutEffect(() => {
     if (active) rowButton.current?.scrollIntoView?.({ block: "nearest" });
   }, [active]);
@@ -217,6 +227,9 @@ function FocusTreeRow(props: {
         device: props.device,
         occurrenceId: row.occurrence.id,
         ...(row.occurrence.usageLayer ? { layerId: row.occurrence.usageLayer.id } : {}),
+        ...(row.renderedLayerOccurrence !== undefined
+          ? { renderedLayerOccurrence: row.renderedLayerOccurrence }
+          : {}),
         kind: "component",
       });
       return;
@@ -229,12 +242,25 @@ function FocusTreeRow(props: {
         occurrenceId: row.occurrence.id,
         layerId: row.layer.id,
         ...(row.kind === "slot" ? { slotName: row.layer.label } : {}),
+        ...(row.renderedLayerOccurrence !== undefined
+          ? { renderedLayerOccurrence: row.renderedLayerOccurrence }
+          : {}),
         kind: row.kind,
       });
     }
   };
   return (
-    <div aria-label={row.label} className="relative flex min-h-10 items-center pr-2 transition-[padding,opacity,transform] duration-150 ease-out motion-reduce:transition-none" role="treeitem" aria-level={row.depth + 1} aria-selected={active} style={{ paddingLeft: 8 + row.depth * 18 }}>
+    <div
+      aria-label={row.label}
+      aria-level={row.depth + 1}
+      aria-selected={active}
+      className="relative flex min-h-10 items-center pr-2 transition-[padding,opacity,transform] duration-150 ease-out motion-reduce:transition-none"
+      data-source-occurrence={row.occurrence?.id}
+      data-source-row={row.key}
+      data-source-runtime-occurrence={row.renderedLayerOccurrence}
+      role="treeitem"
+      style={{ paddingLeft: 8 + row.depth * 18 }}
+    >
       {row.depth > 0 && <span aria-hidden="true" className="absolute bottom-0 top-0 border-l border-white/[0.07]" style={{ left: 20 + (row.depth - 1) * 18 }} />}
       {row.collapsible ? (
         <Button
@@ -264,6 +290,9 @@ function FocusTreeRow(props: {
               sourceNodeId: focusTarget.node.id,
               device: props.device,
               occurrenceId: focusTarget.id,
+              ...(row.renderedLayerOccurrence !== undefined
+                ? { renderedLayerOccurrence: row.renderedLayerOccurrence }
+                : {}),
               kind: "component",
             });
             return;
@@ -276,6 +305,9 @@ function FocusTreeRow(props: {
             sourceNodeId: focusTarget.node.id,
             device: props.device,
             occurrenceId: focusTarget.id,
+            ...(row.renderedLayerOccurrence !== undefined
+              ? { renderedLayerOccurrence: row.renderedLayerOccurrence }
+              : {}),
             kind: "component",
           });
         }}
@@ -303,6 +335,15 @@ function FocusTreeRow(props: {
       )}
     </div>
   );
+}
+
+function renderedOccurrenceMatches(
+  selected: SourceWorkspaceSelection | undefined,
+  row: SourceFocusRow,
+): boolean {
+  return selected?.renderedLayerOccurrence === undefined
+    || row.renderedLayerOccurrence === undefined
+    || selected.renderedLayerOccurrence === row.renderedLayerOccurrence;
 }
 
 function ancestorBranchKeys(rows: readonly SourceFocusRow[], selectedIndex: number): ReadonlySet<string> {
