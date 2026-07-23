@@ -72,7 +72,9 @@ export function SourceCanvasViewport(props: {
             data-design-space-instance-id={sourcePreviewId}
             className="overflow-hidden rounded-md border border-white/15 bg-[#111216] shadow-2xl"
             style={{
-              backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.055) 0, rgba(255,255,255,.055) 9px, rgba(255,255,255,.012) 9px, rgba(255,255,255,.012) 20px)",
+              backgroundImage: "linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px)",
+              backgroundPosition: "-1px -1px",
+              backgroundSize: "24px 24px",
               height: frame.height,
               width: frame.width,
             }}

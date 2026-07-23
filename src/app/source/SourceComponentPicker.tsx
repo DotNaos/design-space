@@ -50,10 +50,10 @@ export function SourceComponentPicker(props: {
         className={props.appearance === "field"
           ? "h-8 w-full min-w-0 justify-between gap-2 rounded-md border border-white/[0.08] bg-black/15 px-2.5 text-[10px] text-zinc-400 hover:border-white/15 hover:bg-white/[0.035] hover:text-zinc-200"
           : props.appearance === "canvas"
-            ? "h-full w-full min-w-0 rounded-none border border-dashed border-violet-300/70 bg-violet-950/30 bg-[repeating-linear-gradient(135deg,rgba(192,132,252,0.24)_0,rgba(192,132,252,0.24)_10px,rgba(88,28,135,0.1)_10px,rgba(88,28,135,0.1)_22px)] text-violet-200 shadow-[inset_0_0_0_1px_rgba(168,85,247,0.12)] hover:border-violet-200 hover:bg-violet-900/40 hover:text-white"
+            ? "h-full w-full min-w-0 rounded-none border border-transparent bg-transparent text-violet-200 hover:border-violet-300/80 hover:bg-violet-300/[0.08] hover:text-white"
             : "grid size-6 min-w-6 shrink-0 place-items-center rounded text-zinc-600 hover:bg-white/[0.06] hover:text-zinc-300"}
         fullWidth={props.appearance === "field"}
-        isIconOnly={props.appearance !== "field"}
+        isIconOnly={props.appearance === "action"}
         isDisabled={full}
         size="sm"
         variant="ghost"
@@ -66,7 +66,10 @@ export function SourceComponentPicker(props: {
             <ChevronDown aria-hidden="true" className="shrink-0" size={11} />
           </>
         ) : props.appearance === "canvas" ? (
-          <Plus aria-hidden="true" className="drop-shadow" size={18} strokeWidth={1.75} />
+          <span className="flex items-center gap-2 text-xs font-semibold">
+            <Plus aria-hidden="true" className="drop-shadow" size={16} strokeWidth={1.75} />
+            <span>{props.slot.label}</span>
+          </span>
         ) : (
           <ChevronDown
             aria-hidden="true"

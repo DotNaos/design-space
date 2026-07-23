@@ -49,7 +49,8 @@ it("uses a full-size purple insertion target and applies a compatible component 
     />,
   );
   const trigger = screen.getByRole("button", { name: "Add to notice slot" });
-  expect(trigger).toHaveClass("h-full", "w-full", "border-violet-300/70");
+  expect(trigger).toHaveClass("h-full", "w-full", "bg-transparent");
+  expect(trigger).toHaveTextContent("notice");
   expect(trigger.querySelector("svg")).not.toBeNull();
   await userEvent.click(trigger);
   await userEvent.click(await screen.findByRole("button", { name: "StatusNotice, compatible" }));
