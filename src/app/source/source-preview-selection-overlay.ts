@@ -74,18 +74,36 @@ function mountSourceLayerOutline(
 
   let frame: number | undefined;
   let previous = "";
+  let cachedTarget: HTMLElement | null | undefined;
+  let cachedSourceRect: Pick<DOMRect, "height" | "left" | "top" | "width"> | undefined;
+  let cachedMetrics: SourceLayerMetrics | undefined;
+  let sourceGeometryDirty = true;
   const update = () => {
     frame = undefined;
-    const target = sourceLayerElement(output, layerId, options.occurrence) ?? options.fallback;
+    const target = cachedTarget?.isConnected
+      ? cachedTarget
+      : sourceLayerElement(output, layerId, options.occurrence) ?? options.fallback;
     if (!target) {
       overlay.style.display = "none";
       if (previous) options.onMetrics?.(undefined);
       previous = "";
+      cachedTarget = null;
+      cachedSourceRect = undefined;
+      cachedMetrics = undefined;
       return;
     }
-    const sourceRect = sourceLayerBounds(target);
+    if (cachedTarget !== target) {
+      cachedTarget = target;
+      sourceGeometryDirty = true;
+    }
+    if (sourceGeometryDirty || !cachedSourceRect || !cachedMetrics) {
+      cachedSourceRect = sourceLayerBounds(target);
+      cachedMetrics = measureSourceLayer(cachedSourceRect, output.getBoundingClientRect());
+      sourceGeometryDirty = false;
+    }
+    const sourceRect = cachedSourceRect;
     const rect = sourceLayerOverlayBounds(sourceRect, output, overlayRoot);
-    const metrics = measureSourceLayer(sourceRect, output.getBoundingClientRect());
+    const metrics = cachedMetrics;
     const serialized = `${metrics.x}:${metrics.y}:${metrics.width}:${metrics.height}`;
     overlay.style.display = "block";
     overlay.style.left = `${rect.left}px`;
@@ -105,7 +123,12 @@ function mountSourceLayerOutline(
     if (!ownerWindow || frame !== undefined) return;
     frame = ownerWindow.requestAnimationFrame(update);
   };
-  const mutationObserver = ownerWindow ? new ownerWindow.MutationObserver(schedule) : undefined;
+  const invalidateSourceGeometry = () => {
+    sourceGeometryDirty = true;
+    cachedTarget = undefined;
+    schedule();
+  };
+  const mutationObserver = ownerWindow ? new ownerWindow.MutationObserver(invalidateSourceGeometry) : undefined;
   mutationObserver?.observe(output, { attributes: true, childList: true, subtree: true, characterData: true });
   const frameElement = ownerWindow?.frameElement as HTMLElement | null | undefined;
   const parentMutationObserver = hostWindow
@@ -115,7 +138,7 @@ function mountSourceLayerOutline(
     parentMutationObserver?.observe(current, { attributes: true, attributeFilter: ["class", "style"] });
   }
   const resizeObserver = ownerWindow && "ResizeObserver" in ownerWindow
-    ? new ownerWindow.ResizeObserver(schedule)
+    ? new ownerWindow.ResizeObserver(invalidateSourceGeometry)
     : undefined;
   resizeObserver?.observe(output);
   const hostResizeObserver = hostWindow && "ResizeObserver" in hostWindow
@@ -123,9 +146,9 @@ function mountSourceLayerOutline(
     : undefined;
   hostResizeObserver?.observe(overlayRoot);
   if (frameElement) hostResizeObserver?.observe(frameElement);
-  ownerWindow?.addEventListener("resize", schedule);
+  ownerWindow?.addEventListener("resize", invalidateSourceGeometry);
   hostWindow?.addEventListener("resize", schedule);
-  previewDocument.addEventListener("scroll", schedule, true);
+  previewDocument.addEventListener("scroll", invalidateSourceGeometry, true);
   overlayRoot.ownerDocument.addEventListener("scroll", schedule, true);
   schedule();
   return () => {
@@ -134,9 +157,9 @@ function mountSourceLayerOutline(
     parentMutationObserver?.disconnect();
     resizeObserver?.disconnect();
     hostResizeObserver?.disconnect();
-    ownerWindow?.removeEventListener("resize", schedule);
+    ownerWindow?.removeEventListener("resize", invalidateSourceGeometry);
     hostWindow?.removeEventListener("resize", schedule);
-    previewDocument.removeEventListener("scroll", schedule, true);
+    previewDocument.removeEventListener("scroll", invalidateSourceGeometry, true);
     overlayRoot.ownerDocument.removeEventListener("scroll", schedule, true);
     overlay.remove();
     if (!overlayRoot.childElementCount) overlayRoot.remove();
@@ -217,6 +240,6 @@ export function sourceLayerElement(output: HTMLElement, layerId: string, occurre
 }
 
 export function sourceLayerElements(output: HTMLElement, layerId: string): readonly HTMLElement[] {
-  return [...output.querySelectorAll<HTMLElement>("[data-design-space-source-layer-id]")]
-    .filter((element) => element.dataset.designSpaceSourceLayerId === layerId);
+  const escapedLayerId = layerId.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+  return [...output.querySelectorAll<HTMLElement>(`[data-design-space-source-layer-id="${escapedLayerId}"]`)];
 }

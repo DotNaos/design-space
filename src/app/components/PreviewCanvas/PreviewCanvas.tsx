@@ -40,6 +40,13 @@ import { CanvasViewportControls } from "../CanvasViewport/CanvasViewportControls
 import { defaultCanvasLayoutGrid, type CanvasGridMode } from "../CanvasGrid/canvas-grid-types";
 import { useCanvasTrackpadGestures } from "./use-canvas-trackpad-gestures";
 import { useCanvasTouchGestures } from "./use-canvas-touch-gestures";
+import {
+  applyCanvasCamera,
+  canvasWorldTransform,
+  sameKeyedViewRects,
+  sameViewRect,
+  sameViewRectMap,
+} from "./preview-canvas-performance";
 
 export type { CanvasContextMenuRequest } from "./canvas-target-selection";
 
@@ -76,6 +83,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const worldWidth = props.worldWidth ?? defaultWorldWidth;
   const viewportRef = useRef<HTMLElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
+  const overlayChromeRef = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(false);
   const cameraRef = useRef<CanvasCamera>({ x: 16, y: 56, scale: 1 });
   const lastCameraResetKey = useRef<string | undefined>(undefined);
@@ -83,6 +91,8 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const lastDomSnapshot = useRef("");
   const autoFit = useRef(true);
   const frame = useRef<number | undefined>(undefined);
+  const cameraCommitTimer = useRef<number | undefined>(undefined);
+  const pendingGestureCamera = useRef<CanvasCamera | undefined>(undefined);
   const [camera, setCameraState] = useState(cameraRef.current);
   const [selectionRect, setSelectionRect] = useState<ViewRect>();
   const [pointerHoveredSelection, setPointerHoveredSelection] = useState<Selection>();
@@ -102,11 +112,43 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     () => buildStrictUiCanvasTargets(props.strictUiViolations ?? [], props.rootInstanceId),
     [props.rootInstanceId, props.strictUiViolations],
   );
+  const needsCameraMeasurement = gridVisible
+    || layoutGrid.enabled
+    || Boolean(
+      props.selection
+      || pointerHoveredSelection
+      || props.hoveredSelection
+      || props.highlightedInternalHtmlComponentId
+      || props.slots.some((slot) => slot.count === 0)
+      || strictUiTargets.length,
+    );
 
   const setCamera = useCallback((next: CanvasCamera) => {
+    if (cameraCommitTimer.current !== undefined) window.clearTimeout(cameraCommitTimer.current);
+    cameraCommitTimer.current = undefined;
+    pendingGestureCamera.current = undefined;
+    if (overlayChromeRef.current) overlayChromeRef.current.style.visibility = "";
     cameraRef.current = next;
     setCameraState(next);
   }, []);
+
+  const commitPendingGestureCamera = useCallback(() => {
+    cameraCommitTimer.current = undefined;
+    const next = pendingGestureCamera.current;
+    pendingGestureCamera.current = undefined;
+    if (overlayChromeRef.current) overlayChromeRef.current.style.visibility = "";
+    if (next) setCameraState(next);
+  }, []);
+
+  const setGestureCamera = useCallback((next: CanvasCamera) => {
+    cameraRef.current = next;
+    pendingGestureCamera.current = next;
+    const world = worldRef.current;
+    if (world) applyCanvasCamera(world, next);
+    if (overlayChromeRef.current) overlayChromeRef.current.style.visibility = "hidden";
+    if (cameraCommitTimer.current !== undefined) window.clearTimeout(cameraCommitTimer.current);
+    cameraCommitTimer.current = window.setTimeout(commitPendingGestureCamera, 80);
+  }, [commitPendingGestureCamera]);
 
   const beginCameraInteraction = useCallback(() => {
     autoFit.current = false;
@@ -117,7 +159,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     enabled: activeInteractionMode === "select",
     viewportRef,
     cameraRef,
-    setCamera,
+    setCamera: setGestureCamera,
     onInteraction: beginCameraInteraction,
   });
   const touchGestures = useCanvasTouchGestures({
@@ -158,29 +200,44 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         ? current
         : rootRect);
     } else setGridRootRect((current) => current === undefined ? current : undefined);
-    setSelectionRect(props.selection
-      ? measureCanvasSelector(world, selectorForSelection(props.selection), viewportRect)
-      : undefined);
+    setSelectionRect((current) => sameViewRect(
+      current,
+      props.selection
+        ? measureCanvasSelector(world, selectorForSelection(props.selection), viewportRect)
+        : undefined,
+    ));
     const hoveredSelection = pointerHoveredSelection ?? props.hoveredSelection;
-    setHoveredRect(hoveredSelection && (!props.selection || !sameSelection(hoveredSelection, props.selection))
-      ? measureCanvasSelector(world, selectorForSelection(hoveredSelection), viewportRect)
-      : undefined);
-    setInternalHtmlRect(props.highlightedInternalHtmlComponentId
-      ? measureCanvasSelector(world, selectorForInternalHtml(props.highlightedInternalHtmlComponentId), viewportRect)
-        ?? measureCanvasSelector(world, selectorForSelection({ kind: "component", id: props.highlightedInternalHtmlComponentId }), viewportRect)
-      : undefined);
-    setEmptyRects(Object.fromEntries(props.slots.filter((slot) => slot.count === 0).flatMap((slot) => {
+    setHoveredRect((current) => sameViewRect(
+      current,
+      hoveredSelection && (!props.selection || !sameSelection(hoveredSelection, props.selection))
+        ? measureCanvasSelector(world, selectorForSelection(hoveredSelection), viewportRect)
+        : undefined,
+    ));
+    setInternalHtmlRect((current) => sameViewRect(
+      current,
+      props.highlightedInternalHtmlComponentId
+        ? measureCanvasSelector(world, selectorForInternalHtml(props.highlightedInternalHtmlComponentId), viewportRect)
+          ?? measureCanvasSelector(world, selectorForSelection({ kind: "component", id: props.highlightedInternalHtmlComponentId }), viewportRect)
+        : undefined,
+    ));
+    const nextEmptyRects = Object.fromEntries(props.slots.filter((slot) => slot.count === 0).flatMap((slot) => {
       const rect = measureCanvasSelector(
         world,
         selectorForSelection({ kind: "slot", id: slot.selectionId, componentInstanceId: props.selectedComponentInstanceId, slotId: slot.id }),
         viewportRect,
       );
       return rect ? [[slot.selectionId, rect]] : [];
-    })));
-    setStrictUiRects(strictUiTargets.flatMap((target) => {
+    }));
+    setEmptyRects((current) => sameViewRectMap(current, nextEmptyRects));
+    const nextStrictUiRects = strictUiTargets.flatMap((target) => {
       const rect = measureCanvasSelector(world, selectorForStrictUiTarget(target), viewportRect);
       return rect ? [{ target, rect }] : [];
-    }));
+    });
+    setStrictUiRects((current) => sameKeyedViewRects(
+      current,
+      nextStrictUiRects,
+      (value) => value.target.marker.key,
+    ));
   }, [pointerHoveredSelection, props.highlightedInternalHtmlComponentId, props.hoveredSelection, props.htmlClassNames, props.onDomSnapshot, props.rootInstanceId, props.selectedComponentInstanceId, props.selection, props.slots, strictUiTargets]);
 
   const scheduleMeasure = useCallback(() => {
@@ -211,7 +268,14 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     });
     resizeObserver?.observe(viewport);
     resizeObserver?.observe(world);
-    const mutationObserver = new MutationObserver(scheduleMeasure);
+    const mutationObserver = new MutationObserver((mutations) => {
+      if (mutations.every((mutation) => (
+        mutation.type === "attributes"
+        && mutation.target === world
+        && (mutation.attributeName === "style" || mutation.attributeName === "data-canvas-scale")
+      ))) return;
+      scheduleMeasure();
+    });
     mutationObserver.observe(world, { attributes: true, childList: true, subtree: true, characterData: true });
     window.addEventListener("resize", scheduleMeasure);
     if (autoFit.current) fit();
@@ -222,10 +286,13 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       mutationObserver.disconnect();
       window.removeEventListener("resize", scheduleMeasure);
       if (frame.current !== undefined) cancelAnimationFrame(frame.current);
+      if (cameraCommitTimer.current !== undefined) window.clearTimeout(cameraCommitTimer.current);
     };
   }, [fit, scheduleMeasure]);
 
-  useLayoutEffect(scheduleMeasure, [camera, props.preview, scheduleMeasure]);
+  useLayoutEffect(() => {
+    if (needsCameraMeasurement) scheduleMeasure();
+  }, [camera, needsCameraMeasurement, props.preview, scheduleMeasure]);
 
   useLayoutEffect(() => {
     if (!props.selection) setSelectionRect(undefined);
@@ -493,19 +560,19 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 
       <div
         ref={worldRef}
+        data-canvas-scale={cameraRef.current.scale}
         data-testid="canvas-world"
         className="absolute left-0 top-0"
         style={{
           width: worldWidth,
-          transform: `translate(${camera.x / camera.scale}px, ${camera.y / camera.scale}px)`,
+          transform: canvasWorldTransform(cameraRef.current),
           transformOrigin: "0 0",
-          zoom: camera.scale,
         }}
       >
         {props.preview}
       </div>
 
-      <div className="pointer-events-none absolute inset-0 z-10">
+      <div ref={overlayChromeRef} className="pointer-events-none absolute inset-0 z-10">
         {strictUiRects.map(({ target, rect }) => (
           <div
             key={target.marker.key}

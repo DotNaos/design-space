@@ -435,5 +435,5 @@ function rect(left: number, top: number, width: number, height: number): DOMRect
 }
 
 function canvasScale(): number {
-  return Number(screen.getByTestId("canvas-world").style.zoom || 1);
+  return Number(screen.getByTestId("canvas-world").dataset.canvasScale || 1);
 }

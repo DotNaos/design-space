@@ -696,6 +696,40 @@ it("measures display-contents roots from their visible descendants", () => {
   expect(sourceLayerBounds(root)).toEqual({ left: 10, top: 30, width: 240, height: 170 });
 });
 
+it("reuses source geometry while only the host canvas moves", () => {
+  const canvas = document.createElement("main");
+  canvas.dataset.designSpaceCanvasViewport = "";
+  const frame = document.createElement("iframe");
+  canvas.append(frame);
+  document.body.append(canvas);
+  const previewDocument = frame.contentDocument!;
+  const output = previewDocument.createElement("div");
+  const root = previewDocument.createElement("div");
+  const child = previewDocument.createElement("span");
+  root.dataset.designSpaceSourceLayerId = "selected";
+  root.append(child);
+  output.append(root);
+  previewDocument.body.append(output);
+  root.getBoundingClientRect = vi.fn(() => ({ left: 0, top: 0, width: 0, height: 0 }) as DOMRect);
+  child.getBoundingClientRect = vi.fn(() => ({ left: 20, top: 30, width: 100, height: 40 }) as DOMRect);
+  const ownerWindow = previewDocument.defaultView!;
+  const requestFrame = vi.spyOn(ownerWindow, "requestAnimationFrame")
+    .mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+
+  const dispose = mountSourceLayerSelection(output, "selected", "layer");
+  expect(child.getBoundingClientRect).toHaveBeenCalledOnce();
+
+  document.dispatchEvent(new Event("scroll"));
+
+  expect(child.getBoundingClientRect).toHaveBeenCalledOnce();
+  dispose();
+  requestFrame.mockRestore();
+  canvas.remove();
+});
+
 it("ignores host and design-fixture markers while selecting registered source layers", () => {
   const source = document.createElement("button");
   source.dataset.designSpaceSourceLayerId = "jsx:src/components/Button.tsx:42";
