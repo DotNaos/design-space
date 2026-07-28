@@ -29,9 +29,12 @@ interface SourceLibraryProps {
   selectedClassName?: string;
   selectedClassCss?: string;
   selectedText?: string;
+  selectedDesignCase?: string;
   selectionMode?: boolean;
   previewMode?: SourcePreviewMode;
+  treeStateKey?: string;
   onDeviceChange: (device: DesignSpaceDevice) => void;
+  onDesignCaseChange?: (caseName: string) => void;
   onModeChange: (mode: SourceLibraryMode) => void;
   onSelectLayer?: (layerId: string | undefined) => void;
   onPreviewModeChange?: (mode: SourcePreviewMode) => void;
@@ -119,6 +122,7 @@ export function SourceLibrarySidebar(props: SourceLibraryProps & { onSelect: (na
           rootLabels={rootLabels}
           rootNodeIds={rootNodeIds}
           selected={treeSelection}
+          treeStateKey={props.treeStateKey}
           trailingRows={unresolvedRoots.length ? (
             <MissingLibraryRoots
               components={unresolvedRoots}
@@ -222,6 +226,7 @@ export function SourceLibraryCanvas(props: SourceLibraryProps) {
       runtime="react"
       selectedClassCss={props.selectedClassCss}
       selectedClassName={props.selectedClassName}
+      selectedDesignCase={props.selectedDesignCase}
       selectedLayer={props.selectedLayer}
       selectedText={props.selectedText}
       isolateSelectedLayer={false}
@@ -230,6 +235,7 @@ export function SourceLibraryCanvas(props: SourceLibraryProps) {
       styles={source?.styles ?? []}
       onGenerateDesign={props.mode === "development" && props.onGenerateDesign ? () => props.onGenerateDesign?.(component.entry!) : undefined}
       onDeviceChange={props.onDeviceChange}
+      onDesignCaseChange={props.onDesignCaseChange}
       onModeChange={props.onPreviewModeChange}
       onSelectLayer={props.onSelectLayer}
       onSelectedLayerMetrics={props.onSelectedLayerMetrics}

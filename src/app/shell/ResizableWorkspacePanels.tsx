@@ -1,4 +1,12 @@
 import {
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+} from "lucide-react";
+import { Button, Tooltip } from "@heroui/react";
+
+import {
   useCallback,
   useEffect,
   useId,
@@ -10,6 +18,7 @@ import {
 } from "react";
 
 import { useWorkspacePanelWidths } from "./use-workspace-panel-widths";
+import { useWorkspacePanelVisibility } from "./use-workspace-panel-visibility";
 import {
   clampPanelWidth,
   fitWorkspacePanelWidths,
@@ -51,8 +60,22 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
   const rightBounds = normalizePanelBounds(props.right, RIGHT_PANEL_DEFAULTS);
   const bounds = { left: leftBounds, right: rightBounds };
   const { widths, setWidths } = useWorkspacePanelWidths(props.namespace, bounds);
+  const { visibility, toggle } = useWorkspacePanelVisibility(props.namespace);
   const [layoutWidth, setLayoutWidth] = useState(viewportWidth);
-  const displayWidths = fitWorkspacePanelWidths(widths, bounds, layoutWidth, MINIMUM_CANVAS_WIDTH, SEPARATOR_WIDTH);
+  const fittedWidths = visibility.left && visibility.right
+    ? fitWorkspacePanelWidths(widths, bounds, layoutWidth, MINIMUM_CANVAS_WIDTH, SEPARATOR_WIDTH)
+    : {
+      left: visibility.left
+        ? clampPanelWidth(widths.left, { ...leftBounds, maxWidth: Math.min(leftBounds.maxWidth, layoutWidth - MINIMUM_CANVAS_WIDTH - SEPARATOR_WIDTH) })
+        : 0,
+      right: visibility.right
+        ? clampPanelWidth(widths.right, { ...rightBounds, maxWidth: Math.min(rightBounds.maxWidth, layoutWidth - MINIMUM_CANVAS_WIDTH - SEPARATOR_WIDTH) })
+        : 0,
+    };
+  const displayWidths = {
+    left: visibility.left ? fittedWidths.left : 0,
+    right: visibility.right ? fittedWidths.right : 0,
+  };
   const dragCleanup = useRef<(() => void) | undefined>(undefined);
 
   useEffect(() => () => dragCleanup.current?.(), []);
@@ -76,8 +99,9 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
 
   const resizePanel = useCallback((side: keyof WorkspacePanelWidths, requestedWidth: number) => {
     const other = side === "left" ? "right" : "left";
+    const otherMinimum = visibility[other] ? bounds[other].minWidth : 0;
     const panelBudget = Math.max(
-      bounds.left.minWidth + bounds.right.minWidth,
+      bounds[side].minWidth + otherMinimum,
       layoutWidth - MINIMUM_CANVAS_WIDTH - SEPARATOR_WIDTH,
     );
     const available = Math.max(bounds[side].minWidth, panelBudget - displayWidths[other]);
@@ -85,8 +109,8 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
       minWidth: bounds[side].minWidth,
       maxWidth: Math.min(bounds[side].maxWidth, available),
     });
-    setWidths({ ...displayWidths, [side]: width });
-  }, [bounds, displayWidths, layoutWidth, setWidths]);
+    setWidths({ ...widths, [side]: width });
+  }, [bounds, displayWidths, layoutWidth, setWidths, visibility, widths]);
 
   const startResize = useCallback((side: keyof WorkspacePanelWidths, event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0) return;
@@ -142,7 +166,12 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
       data-workspace-panel-layout="desktop"
       style={{ gridTemplateColumns: `${displayWidths.left}px 1px minmax(${MINIMUM_CANVAS_WIDTH}px, 1fr) 1px ${displayWidths.right}px` }}
     >
-      <section id={leftPanelId} aria-label={props.left.label} className={`min-h-0 min-w-0 overflow-hidden ${props.left.className ?? ""}`}>
+      <section
+        id={leftPanelId}
+        aria-label={props.left.label}
+        aria-hidden={!visibility.left}
+        className={`min-h-0 min-w-0 overflow-hidden ${props.left.className ?? ""}`}
+      >
         {props.left.content}
       </section>
       <WorkspacePanelSeparator
@@ -151,6 +180,8 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
         label={props.left.label}
         side="left"
         value={displayWidths.left}
+        visible={visibility.left}
+        onToggle={() => toggle("left")}
         onPointerDown={(event) => startResize("left", event)}
         onReset={() => resizePanel("left", leftBounds.defaultWidth)}
         onResize={(width) => resizePanel("left", width)}
@@ -162,11 +193,18 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
         label={props.right.label}
         side="right"
         value={displayWidths.right}
+        visible={visibility.right}
+        onToggle={() => toggle("right")}
         onPointerDown={(event) => startResize("right", event)}
         onReset={() => resizePanel("right", rightBounds.defaultWidth)}
         onResize={(width) => resizePanel("right", width)}
       />
-      <section id={rightPanelId} aria-label={props.right.label} className={`min-h-0 min-w-0 overflow-hidden ${props.right.className ?? ""}`}>
+      <section
+        id={rightPanelId}
+        aria-label={props.right.label}
+        aria-hidden={!visibility.right}
+        className={`min-h-0 min-w-0 overflow-hidden ${props.right.className ?? ""}`}
+      >
         {props.right.content}
       </section>
     </div>
@@ -179,6 +217,8 @@ function WorkspacePanelSeparator(props: {
   label: string;
   side: keyof WorkspacePanelWidths;
   value: number;
+  visible: boolean;
+  onToggle: () => void;
   onPointerDown: (event: PointerEvent<HTMLElement>) => void;
   onReset: () => void;
   onResize: (width: number) => void;
@@ -196,23 +236,49 @@ function WorkspacePanelSeparator(props: {
   };
 
   return (
-    <div
-      aria-label={`Resize ${props.label}`}
-      aria-controls={props.controls}
-      aria-orientation="vertical"
-      aria-valuemax={props.bounds.maxWidth}
-      aria-valuemin={props.bounds.minWidth}
-      aria-valuenow={Math.round(props.value)}
-      aria-valuetext={`${Math.round(props.value)} pixels`}
-      className="group relative z-20 w-px touch-none cursor-col-resize bg-white/10 outline-none before:absolute before:inset-y-0 before:-inset-x-1 before:content-[''] hover:bg-cyan-400/70 focus-visible:bg-cyan-300"
-      onDoubleClick={props.onReset}
-      onKeyDown={resizeFromKeyboard}
-      onPointerDown={props.onPointerDown}
-      role="separator"
-      tabIndex={0}
-      title="Drag or use arrow keys to resize. Double-click to reset."
-    />
+    <div className="relative z-30 w-px">
+      <div
+        aria-label={`Resize ${props.label}`}
+        aria-controls={props.controls}
+        aria-orientation="vertical"
+        aria-valuemax={props.visible ? props.bounds.maxWidth : undefined}
+        aria-valuemin={props.visible ? props.bounds.minWidth : undefined}
+        aria-valuenow={props.visible ? Math.round(props.value) : undefined}
+        aria-valuetext={props.visible ? `${Math.round(props.value)} pixels` : "Collapsed"}
+        className={`group absolute inset-y-0 left-0 w-px touch-none outline-none before:absolute before:inset-y-0 before:-inset-x-1 before:content-[''] ${props.visible ? "cursor-col-resize bg-white/10 hover:bg-cyan-400/70 focus-visible:bg-cyan-300" : "bg-white/[0.06]"}`}
+        onDoubleClick={props.visible ? props.onReset : undefined}
+        onKeyDown={props.visible ? resizeFromKeyboard : undefined}
+        onPointerDown={props.visible ? props.onPointerDown : undefined}
+        role="separator"
+        tabIndex={props.visible ? 0 : -1}
+        title={props.visible ? "Drag or use arrow keys to resize. Double-click to reset." : undefined}
+      />
+      <Tooltip delay={350} closeDelay={80}>
+        <Button
+          isIconOnly
+          aria-controls={props.controls}
+          aria-expanded={props.visible}
+          aria-label={`${props.visible ? "Hide" : "Show"} ${props.label}`}
+          className={`absolute top-2 size-7 min-w-7 rounded-md border border-white/10 bg-[#17181b]/95 text-zinc-500 shadow-lg shadow-black/20 backdrop-blur hover:bg-[#202126] hover:text-zinc-200 ${props.side === "left" ? "left-1.5" : "right-1.5"}`}
+          size="sm"
+          variant="ghost"
+          onPress={props.onToggle}
+        >
+          <PanelToggleIcon side={props.side} visible={props.visible} />
+        </Button>
+        <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+          {props.visible ? "Hide" : "Show"} {props.label}
+        </Tooltip.Content>
+      </Tooltip>
+    </div>
   );
+}
+
+function PanelToggleIcon(props: { side: keyof WorkspacePanelWidths; visible: boolean }) {
+  const Icon = props.side === "left"
+    ? props.visible ? PanelLeftClose : PanelLeftOpen
+    : props.visible ? PanelRightClose : PanelRightOpen;
+  return <Icon aria-hidden="true" size={14} />;
 }
 
 function useDesktopWorkspace() {

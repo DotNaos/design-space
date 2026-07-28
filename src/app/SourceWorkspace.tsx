@@ -1,41 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
-import { Button } from "@heroui/react";
-import { Code2, SlidersHorizontal } from "lucide-react";
-
+import { useMemo, useState } from "react";
 import type { TargetModule } from "../shared/target-module";
-import type { GeneratedSourceDesign } from "../shared/contracts";
-import type { SourceDesignScope } from "../shared/source-design";
 import type { SourceWorkspaceLayer } from "../shared/source-workspace";
-import { runLocalOperation } from "./api";
 import { ProjectFileBrowser } from "./documents/ProjectFileBrowser";
 import { ResizableWorkspacePanels } from "./shell/ResizableWorkspacePanels";
-import { MobileDock, type MobilePane } from "./shell/MobileDock";
-import { WorkspaceActivityRail, type WorkspaceActivity } from "./shell/WorkspaceActivityRail";
+import { WorkspaceActivityRail } from "./shell/WorkspaceActivityRail";
 import { WorkspaceTopBar } from "./shell/WorkspaceTopBar";
 import { SourceComponentInspector } from "./source/SourceComponentInspector";
 import { SourceCodeCanvas } from "./source/SourceCodeCanvas";
-import { SourcePreviewFrame } from "./source/SourcePreviewFrame";
-import {
-  SourceWorkspaceSidebar,
-  type SourceWorkspaceSelection,
-} from "./source/SourceWorkspaceSidebar";
-import {
-  findSourceTreeLayer,
-  initialSourceTreeSelection,
-  sourceTreeNodes,
-} from "./source/source-workspace-tree";
+import { SourceAppCanvas } from "./source/SourceAppCanvas";
+import { SourceWorkspaceSidebar, type SourceWorkspaceSelection } from "./source/SourceWorkspaceSidebar";
+import { findSourceTreeLayer, initialSourceTreeSelection, sourceTreeNodes } from "./source/source-workspace-tree";
 import { initialFocusOccurrence, sourceFocusGraph, type SourceOccurrence } from "./source/source-focus-tree";
 import { applySourceSlotCandidate, sourceSlotCandidates, type SourceComponentCandidate } from "./source/source-slot-composition";
 import { useSourceDraftAnalysis } from "./source/useSourceDraftAnalysis";
 import { useSourceFileEditor } from "./source/useSourceFileEditor";
 import { useSourceLayerClassEditor } from "./source/useSourceLayerClassEditor";
 import { DiffSheet } from "./components/DiffSheet/DiffSheet";
-import {
-  selectedSourceLibraryComponent,
-  SourceLibraryCanvas,
-  SourceLibraryInspector,
-  SourceLibrarySidebar,
-} from "./source/SourceLibraryWorkspace";
+import { selectedSourceLibraryComponent, SourceLibraryCanvas, SourceLibraryInspector, SourceLibrarySidebar } from "./source/SourceLibraryWorkspace";
 import { findSourceLibraryLayerOwner } from "./source/source-library-selection";
 import { SourceLibraryEditorPanel } from "./source/SourceLibraryEditorPanel";
 import { SourceComponentCreateSheet } from "./source/SourceComponentCreateSheet";
@@ -48,7 +29,15 @@ import { useSourceDraftFile, useSourceDraftWorkspace } from "./source/useSourceD
 import { useSourceChangeReview } from "./source/useSourceChangeReview";
 import { CodeDocumentSwitch, FileEvidencePanel, findSourceSlotLayer } from "./source/SourceWorkspaceDetails";
 import { sourceCanvasSelection, sourceCanvasSelectionOccurrence, sourceCanvasVisualLayer } from "./source/source-canvas-selection";
-import type { SourceLayerMetrics, SourcePreviewMode } from "./source/source-layer-design";
+import type { SourceLayerMetrics } from "./source/source-layer-design";
+import { useSourceWorkspaceUiState } from "./source/useSourceWorkspaceUiState";
+import { sourceEntrySlotLayers } from "./source/source-entry-layers";
+import { SourceWorkspaceCodeOverlay } from "./source/SourceWorkspaceCodeOverlay";
+import { useSourceDraftSynchronization } from "./source/useSourceDraftSynchronization";
+import { useSourceDesignGeneration } from "./source/useSourceDesignGeneration";
+import { useSynchronizedSourceDesignSelection } from "./source/useSynchronizedSourceDesignSelection";
+import { SourceWorkspaceMobile } from "./source/SourceWorkspaceMobile";
+import { sourceSelectionAtOffset } from "./source/source-code-selection";
 
 export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
   const registeredWorkspace = target.sourceWorkspace;
@@ -58,32 +47,48 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const initialGraph = useMemo(() => sourceFocusGraph(registeredNodes, initial?.device ?? "desktop"), [initial?.device, registeredNodes]);
   const initialFocusId = initialFocusOccurrence(initialGraph);
   const initialFocus = initialFocusId ? initialGraph.occurrences.get(initialFocusId) : undefined;
-  const [activity, setActivity] = useState<WorkspaceActivity>("app");
-  const [mobilePane, setMobilePane] = useState<MobilePane>("canvas");
-  const [selection, setSelection] = useState<SourceWorkspaceSelection | undefined>(() => initial && initialFocusId ? {
+  const defaultSelection: SourceWorkspaceSelection | undefined = initial && initialFocusId ? {
     ...initial,
     nodeId: initialFocus?.node.id ?? initial.nodeId,
     occurrenceId: initialFocusId,
     kind: "component",
-  } : initial);
-  const [focusId, setFocusId] = useState<string | undefined>(initialFocusId);
-  const [centeredFocusId, setCenteredFocusId] = useState<string>();
+  } : initial;
+  const {
+    activity, appCodeHeight, appCodeOpen, canvasMode, codeDocument, designCases, designRootId, designSelection,
+    focusId, mobilePane, previewRuntime, previewSelection, rightMode,
+    selectedLibraryComponent, selectedLibraryLayerId, selectedProjectFileId,
+    selection, workspaceMode, setActivity, setAppCodeHeight, setAppCodeOpen, setCanvasMode, setCodeDocument,
+    setDesignCases, setDesignRootId, setDesignSelection, setFocusId, setMobilePane, setPreviewRuntime,
+    setPreviewSelection, setRightMode, setSelectedLibraryComponent, setSelectedLibraryLayerId,
+    setSelectedProjectFileId, setSelection, setWorkspaceMode,
+  } = useSourceWorkspaceUiState({
+    defaultFocusId: initialFocusId,
+    defaultLibraryComponent: registeredWorkspace.library?.components[0]?.name,
+    defaultSelection,
+    fileIds: new Set(target.files.map((file) => file.id)),
+    focusIds: new Set(initialGraph.occurrences.keys()),
+    nodeIds: new Set(registeredNodes.map((node) => node.id)),
+    projectId: target.project.id,
+  });
   const [draftSelection, setDraftSelection] = useState<{ start: number; end: number }>();
-  const [rightMode, setRightMode] = useState<"code" | "design">("design");
-  const [codeDocument, setCodeDocument] = useState<"source" | "design">("source");
-  const [canvasMode, setCanvasMode] = useState<SourcePreviewMode>("design");
+  const [hoveredTreeSelection, setHoveredTreeSelection] = useState<SourceWorkspaceSelection>();
   const [selectedLayerMetrics, setSelectedLayerMetrics] = useState<SourceLayerMetrics>();
   const [canvasRevealRequest, setCanvasRevealRequest] = useState<number>();
-  const [selectedProjectFileId, setSelectedProjectFileId] = useState<string>();
-  const [selectedLibraryComponent, setSelectedLibraryComponent] = useState(() => registeredWorkspace.library?.components[0]?.name);
-  const [selectedLibraryLayerId, setSelectedLibraryLayerId] = useState<string>();
-  const [designGeneration, setDesignGeneration] = useState<{ entryId?: string; error?: string }>({});
   const [draftWorkspace] = useState(createLocalSourceDraftWorkspace);
   const { state: draftWorkspaceState } = useSourceDraftWorkspace(draftWorkspace);
   const libraryRootId = `${target.project.id}:${target.sourceLibrary?.packageName ?? "library-development"}`;
   const componentCreation = useSourceComponentCreation();
-  const registeredSourceNode = registeredNodes.find((candidate) => candidate.id === (selection?.sourceNodeId ?? selection?.nodeId)) ?? registeredNodes[0];
   const requestedDevice = selection?.device ?? initial?.device ?? "desktop";
+  const registeredGraph = useMemo(
+    () => sourceFocusGraph(registeredNodes, requestedDevice),
+    [registeredNodes, requestedDevice],
+  );
+  const registeredDesignOccurrence = workspaceMode === "design"
+    ? registeredGraph.occurrences.get(designRootId ?? focusId ?? "")
+    : undefined;
+  const registeredSourceNode = registeredDesignOccurrence?.node
+    ?? registeredNodes.find((candidate) => candidate.id === (selection?.sourceNodeId ?? selection?.nodeId))
+    ?? registeredNodes[0];
   const registeredCodeEntry = registeredSourceNode?.implementations[requestedDevice].entry;
   const editorLocation = useMemo<SourceDraftLocation | undefined>(() => registeredCodeEntry ? ({
     scope: "app",
@@ -96,14 +101,28 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const libraryRuntime = useSourceLibraryRuntime(target.sourceLibrary);
   const nodes = useMemo(() => sourceTreeNodes(workspace), [workspace]);
   const graph = useMemo(() => sourceFocusGraph(nodes, requestedDevice), [nodes, requestedDevice]);
-  const definitionSelected = selection?.kind === "component" && !selection.occurrenceId;
-  const resolvedFocusId = definitionSelected
-    ? undefined
-    : graph.occurrences.has(focusId ?? "") ? focusId : initialFocusOccurrence(graph);
-  const focusedOccurrence = resolvedFocusId ? graph.occurrences.get(resolvedFocusId) : undefined;
+  const appRootId = graph.roots[0] ?? initialFocusOccurrence(graph);
+  const requestedDesignRootId = designRootId ?? focusId;
+  const resolvedFocusId = workspaceMode === "design" && graph.occurrences.has(requestedDesignRootId ?? "")
+    ? requestedDesignRootId
+    : appRootId;
+  const focusedOccurrence = useSynchronizedSourceDesignSelection({
+    device: requestedDevice,
+    focusId: resolvedFocusId,
+    graph,
+    mode: workspaceMode,
+    selection,
+    setDesignSelection,
+    setSelection,
+  });
+  const parentDesignOccurrence = focusedOccurrence?.parentId
+    ? graph.occurrences.get(focusedOccurrence.parentId)
+    : undefined;
   const selectedOccurrence = selection?.occurrenceId ? graph.occurrences.get(selection.occurrenceId) : undefined;
   const selectedNode = nodes.find((candidate) => candidate.id === selection?.nodeId) ?? focusedOccurrence?.node ?? nodes[0];
-  const sourceNode = nodes.find((candidate) => candidate.id === (selection?.sourceNodeId ?? selectedNode?.id)) ?? selectedNode;
+  const sourceNode = workspaceMode === "design"
+    ? focusedOccurrence?.node ?? selectedNode
+    : nodes.find((candidate) => candidate.id === (selection?.sourceNodeId ?? selectedNode?.id)) ?? selectedNode;
   const entry = sourceNode?.implementations[requestedDevice].entry;
   const designEditorLocation = useMemo<SourceDraftLocation | undefined>(() => entry?.design ? ({
     scope: "app",
@@ -115,13 +134,34 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const codeEditor = activeCodeDocument === "design" ? designEditor : editor;
   const inspectorEntry = selectedOccurrence?.entry ?? focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
   const previewEntry = focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
+  const selectedAppDesignCase = previewEntry?.design
+    ? designCases[previewEntry.design.fileId]
+    : undefined;
   const selectedLayer = findSourceTreeLayer(entry?.layers, selection?.layerId)
     ?? (selection?.kind === "slot" && selection.slotName
       ? findSourceSlotLayer(entry?.layers, selection.slotName)
       : undefined);
   const visualLayer = sourceCanvasVisualLayer(previewEntry, selectedLayer);
+  const hoveredSourceNode = nodes.find((candidate) => (
+    candidate.id === (hoveredTreeSelection?.sourceNodeId ?? hoveredTreeSelection?.nodeId)
+  ));
+  const hoveredSourceEntry = hoveredSourceNode?.implementations[requestedDevice].entry;
+  const hoveredSelectedLayer = findSourceTreeLayer(hoveredSourceEntry?.layers, hoveredTreeSelection?.layerId)
+    ?? (hoveredTreeSelection?.kind === "slot" && hoveredTreeSelection.slotName
+      ? findSourceSlotLayer(hoveredSourceEntry?.layers, hoveredTreeSelection.slotName)
+      : undefined);
+  const hoveredVisualLayer = hoveredTreeSelection
+    ? hoveredSelectedLayer ?? (
+      hoveredTreeSelection.occurrenceId === resolvedFocusId
+        ? sourceCanvasVisualLayer(previewEntry, undefined)
+        : undefined
+    )
+    : undefined;
   const appReviewLayer = findSourceTreeLayer(registeredCodeEntry?.layers, visualLayer?.id);
-  const inspectorSlotLayers = focusedOccurrence?.usageLayer?.children.filter((layer) => layer.kind === "slot" && layer.slot) ?? [];
+  const previewSlotLayers = useMemo(
+    () => sourceEntrySlotLayers(previewEntry),
+    [previewEntry],
+  );
   const inspectorSourceOwner = focusedOccurrence?.usageOwnerId
     ? nodes.find((node) => node.id === focusedOccurrence.usageOwnerId)
     : undefined;
@@ -174,6 +214,9 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     selected: selectedLibraryComponent,
   });
   const libraryPreviewEntry = libraryComponent?.entry;
+  const selectedLibraryDesignCase = libraryPreviewEntry?.design
+    ? designCases[libraryPreviewEntry.design.fileId]
+    : undefined;
   const libraryEntry = libraryRuntime.mode === "development"
     ? findSourceLibraryLayerOwner(effectiveLibraryCatalog?.development, selectedLibraryLayerId) ?? libraryPreviewEntry
     : libraryPreviewEntry;
@@ -201,11 +244,11 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     ? fileEditor
     : activity === "library"
       ? rightMode === "code" && codeDocument === "design" && libraryEntry?.design ? libraryDesignEditor : libraryEditor
-      : rightMode === "code" ? codeEditor : editor;
+      : appCodeOpen ? codeEditor : editor;
   const activeEditable = activity === "files"
     ? Boolean(selectedProjectFile?.editable)
     : activity === "app"
-      ? activeCodeDocument === "design" && rightMode === "code"
+      ? activeCodeDocument === "design" && appCodeOpen
         ? Boolean(entry?.design)
         : Boolean(entry)
       : libraryRuntime.mode === "development" && Boolean(libraryEntry);
@@ -223,51 +266,22 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         ? ["App", selectedNode.label, ...(selectedLayer ? [selectedLabel ?? selectedLayer.label] : [])]
         : ["App"];
 
-  useEffect(() => {
-    if (!editorLocation || !editor.dirty) return;
-    draftWorkspace.setValidation(
-      editorLocation,
-      draftAnalysis.analyzing ? "validating" : draftAnalysis.error ? "invalid" : "valid",
-      draftAnalysis.error,
-    );
-  }, [draftAnalysis.analyzing, draftAnalysis.error, draftWorkspace, editor.dirty, editor.draft, editorLocation]);
+  useSourceDraftSynchronization({
+    analysis: draftAnalysis, draftWorkspace, editor, location: editorLocation,
+    previewEntry, reviewLayer: appReviewLayer, styleEditor,
+  });
+  useSourceDraftSynchronization({
+    analysis: libraryDraftAnalysis, draftWorkspace, editor: libraryEditor,
+    location: libraryEditorLocation, previewEntry: libraryPreviewEntry,
+    reviewLayer: libraryReviewLayer, styleEditor: libraryStyleEditor,
+  });
 
-  useEffect(() => {
-    if (!libraryEditorLocation || !libraryEditor.dirty) return;
-    draftWorkspace.setValidation(
-      libraryEditorLocation,
-      libraryDraftAnalysis.analyzing ? "validating" : libraryDraftAnalysis.error ? "invalid" : "valid",
-      libraryDraftAnalysis.error,
-    );
-  }, [draftWorkspace, libraryDraftAnalysis.analyzing, libraryDraftAnalysis.error, libraryEditor.dirty, libraryEditor.draft, libraryEditorLocation]);
-
-  useEffect(() => {
-    const changed = Boolean(appReviewLayer && (
-      (appReviewLayer.className && styleEditor.value !== appReviewLayer.className.value)
-      || (appReviewLayer.text && styleEditor.textValue !== appReviewLayer.text.value)
-    ));
-    if (!editorLocation || !editor.dirty || !appReviewLayer || !changed) return;
-    draftWorkspace.setVisualReview(editorLocation, {
-      layerId: appReviewLayer.id,
-      ...(previewEntry ? { previewEntryId: previewEntry.id } : {}),
-      ...(appReviewLayer.className ? { className: styleEditor.value, css: styleEditor.css } : {}),
-      ...(appReviewLayer.text ? { text: styleEditor.textValue } : {}),
-    });
-  }, [appReviewLayer, draftWorkspace, editor.dirty, editorLocation, previewEntry, styleEditor.css, styleEditor.textValue, styleEditor.value]);
-
-  useEffect(() => {
-    const changed = Boolean(libraryReviewLayer && (
-      (libraryReviewLayer.className && libraryStyleEditor.value !== libraryReviewLayer.className.value)
-      || (libraryReviewLayer.text && libraryStyleEditor.textValue !== libraryReviewLayer.text.value)
-    ));
-    if (!libraryEditorLocation || !libraryEditor.dirty || !libraryReviewLayer || !changed) return;
-    draftWorkspace.setVisualReview(libraryEditorLocation, {
-      layerId: libraryReviewLayer.id,
-      ...(libraryPreviewEntry ? { previewEntryId: libraryPreviewEntry.id } : {}),
-      ...(libraryReviewLayer.className ? { className: libraryStyleEditor.value, css: libraryStyleEditor.css } : {}),
-      ...(libraryReviewLayer.text ? { text: libraryStyleEditor.textValue } : {}),
-    });
-  }, [draftWorkspace, libraryEditor.dirty, libraryEditorLocation, libraryPreviewEntry, libraryReviewLayer, libraryStyleEditor.css, libraryStyleEditor.textValue, libraryStyleEditor.value]);
+  const designGeneration = useSourceDesignGeneration({
+    onAppGenerated: () => {
+      setCodeDocument("design");
+      setAppCodeOpen(true);
+    },
+  });
 
   const currentDraftChanges = useMemo(() => draftWorkspaceState.changes.filter((change) => (
     (change.scope === "app" && change.rootId === target.project.id)
@@ -296,17 +310,6 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     libraryWorkspace: target.sourceLibrary?.development ?? registeredWorkspace,
   });
 
-  const generateDesign = async (scope: SourceDesignScope, entryId: string) => {
-    if (designGeneration.entryId && !designGeneration.error) return;
-    setDesignGeneration({ entryId });
-    try {
-      await runLocalOperation<GeneratedSourceDesign>({ type: "generate-source-design", scope, entryId });
-      setDesignGeneration({});
-    } catch (error) {
-      setDesignGeneration({ entryId, error: error instanceof Error ? error.message : "The design file could not be generated." });
-    }
-  };
-
   const prepareSlotEdit = (occurrence: SourceOccurrence) => {
     const sourceOwnerId = occurrence.usageOwnerId ?? occurrence.node.id;
     setSelection((current) => current ? { ...current, sourceNodeId: sourceOwnerId } : {
@@ -332,32 +335,91 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       return;
     }
   };
+  const openDesign = (occurrenceId: string, next: SourceWorkspaceSelection) => {
+    if (workspaceMode === "preview") setPreviewSelection(selection);
+    setWorkspaceMode("design");
+    setPreviewRuntime("static");
+    setDesignRootId(occurrenceId);
+    setDesignSelection(next);
+    setFocusId(occurrenceId);
+    setSelection(next);
+    setCanvasRevealRequest(undefined);
+    setDraftSelection(undefined);
+    setActivity("app");
+    setMobilePane("canvas");
+  };
+  const returnToPreview = () => {
+    setDesignSelection(selection);
+    setWorkspaceMode("preview");
+    setPreviewRuntime("static");
+    setCanvasRevealRequest(undefined);
+    setSelection(previewSelection ?? defaultSelection);
+  };
   const appSidebar = (
     <SourceWorkspaceSidebar
       className="flex h-full w-full border-r-0"
+      designNavigation={workspaceMode === "design" ? {
+        onExit: returnToPreview,
+        ...(parentDesignOccurrence ? {
+          parentLabel: parentDesignOccurrence.node.label,
+          onOpenParent: () => openDesign(parentDesignOccurrence.id, {
+            nodeId: parentDesignOccurrence.node.id,
+            sourceNodeId: parentDesignOccurrence.node.id,
+            device: requestedDevice,
+            occurrenceId: parentDesignOccurrence.id,
+            kind: "component",
+          }),
+        } : {}),
+      } : undefined}
       focusId={resolvedFocusId}
       selected={selection}
+      treeStateKey={`${target.project.id}:app:${requestedDevice}`}
       workspace={workspace}
       editingSourceOwnerId={selection?.sourceNodeId}
       slotEditorReady={slotEditorReady}
       onCreateComponent={componentCreation.open}
       onFocus={(occurrenceId, next) => {
-        setFocusId(occurrenceId);
-        setCenteredFocusId(occurrenceId);
-        setSelection(next);
-        setDraftSelection(undefined);
-        setActivity("app");
-        setMobilePane("canvas");
+        openDesign(occurrenceId, next);
       }}
+      onHover={setHoveredTreeSelection}
       onApplySlot={applySlot}
       onPrepareSlotEdit={prepareSlotEdit}
       onSelect={(next) => {
         setSelection(next);
+        if (workspaceMode === "preview") setPreviewSelection(next);
+        else setDesignSelection(next);
         if (next.kind === "component") setCanvasRevealRequest((current) => (current ?? 0) + 1);
         setDraftSelection(undefined);
         setActivity("app");
         setMobilePane(next.kind === "slot" ? "tree" : "canvas");
       }}
+    />
+  );
+  const appCodePanel = (
+    <SourceCodeCanvas
+      editable={activeCodeDocument === "design" ? Boolean(entry?.design) : Boolean(entry)}
+      editor={codeEditor}
+      label={activeCodeDocument === "design" ? `${entry?.label ?? selectedNode?.label ?? "Component"} design` : entry?.label ?? selectedNode?.label ?? "Source"}
+      path={activeCodeDocument === "design" ? entry?.design?.relativePath : entry?.relativePath}
+      selection={activeCodeDocument === "source" ? draftSelection ?? selectedLayer?.source ?? entry?.source : undefined}
+      toolbar={entry?.design ? (
+        <CodeDocumentSwitch value={activeCodeDocument} onChange={setCodeDocument} />
+      ) : undefined}
+      onCursorOffsetChange={activeCodeDocument === "source" && entry ? (offset) => {
+        const next = sourceSelectionAtOffset({
+          device: requestedDevice,
+          entry,
+          focusId: resolvedFocusId,
+          graph,
+          offset,
+          selected: selection,
+        });
+        if (!next || sameSourceSelection(selection, next)) return;
+        setSelection(next);
+        if (workspaceMode === "preview") setPreviewSelection(next);
+        else setDesignSelection(next);
+        setDraftSelection(undefined);
+      } : undefined}
     />
   );
   const fileSidebar = (
@@ -380,10 +442,11 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       mode={libraryRuntime.mode}
       selected={selectedLibraryComponent}
       selectedLayer={librarySelectedLayer}
+      treeStateKey={`${target.project.id}:library:${libraryRuntime.mode}:${requestedDevice}`}
       generateDesignError={designGeneration.error}
       generatingDesignEntryId={designGeneration.entryId}
       onDeviceChange={() => undefined}
-      onGenerateDesign={(selectedEntry) => void generateDesign("library-development", selectedEntry.id)}
+      onGenerateDesign={(selectedEntry) => void designGeneration.generate("library-development", selectedEntry.id)}
       onModeChange={libraryRuntime.setMode}
       onSelectLayer={(layerId) => {
         setSelectedLibraryLayerId(layerId);
@@ -396,7 +459,21 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       }}
     />
   );
-  const left = activity === "files" ? fileSidebar : activity === "library" ? librarySidebar : appSidebar;
+  const left = activity === "files"
+    ? fileSidebar
+    : activity === "library"
+      ? librarySidebar
+      : (
+        <SourceWorkspaceCodeOverlay
+          code={appCodePanel}
+          height={appCodeHeight}
+          open={appCodeOpen}
+          onHeightChange={setAppCodeHeight}
+          onOpenChange={setAppCodeOpen}
+        >
+          {appSidebar}
+        </SourceWorkspaceCodeOverlay>
+      );
   const canvas = activity === "library" ? (
     <SourceLibraryCanvas
       catalog={effectiveLibraryCatalog}
@@ -404,6 +481,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       library={workspace.library}
       mode={libraryRuntime.mode}
       selected={selectedLibraryComponent}
+      selectedDesignCase={selectedLibraryDesignCase}
       selectedLayer={libraryVisualLayer}
       selectedClassCss={libraryStyleEditor.css}
       selectedClassName={libraryVisualLayer?.className ? libraryStyleEditor.value : undefined}
@@ -413,7 +491,11 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       generateDesignError={designGeneration.error}
       generatingDesignEntryId={designGeneration.entryId}
       onDeviceChange={(device) => setSelection((current) => current ? { ...current, device } : current)}
-      onGenerateDesign={(selectedEntry) => void generateDesign("library-development", selectedEntry.id)}
+      onDesignCaseChange={(caseName) => libraryPreviewEntry?.design && setDesignCases((current) => ({
+        ...current,
+        [libraryPreviewEntry.design!.fileId]: caseName,
+      }))}
+      onGenerateDesign={(selectedEntry) => void designGeneration.generate("library-development", selectedEntry.id)}
       onModeChange={libraryRuntime.setMode}
       onPreviewModeChange={setCanvasMode}
       onSelectLayer={(layerId) => {
@@ -430,70 +512,68 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       label={selectedProjectFile?.label ?? "Select a project file"}
     />
   ) : (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-      <div className="relative flex min-h-0 min-w-0 flex-1">
-        {nestedPreview ? (
-          <SourceCodeCanvas
-            editable={false}
-            editor={editor}
-            label={entry?.label ?? selectedNode?.label ?? "Source"}
-            path={entry?.relativePath}
-            selection={draftSelection ?? selectedLayer?.source ?? entry?.source}
-          />
-        ) : <SourcePreviewFrame
-          device={requestedDevice}
-          centerContent={centeredFocusId === resolvedFocusId}
-          entry={previewEntry}
-          entries={workspace.entries}
-          isolateSelectedLayer={false}
-          mode={canvasMode}
-          node={focusedOccurrence?.node ?? selectedNode}
-          selectedLayer={visualLayer}
-          selectedLayerOccurrence={sourceCanvasSelectionOccurrence(graph, resolvedFocusId, selection)}
-          revealSelectedLayerKey={canvasRevealRequest}
-          selectedClassCss={styleEditor.css}
-          selectedClassName={visualLayer?.className ? styleEditor.value : undefined}
-          selectedText={visualLayer?.text ? styleEditor.textValue : undefined}
-          slotLayers={inspectorSlotLayers}
-          generateDesignError={designGeneration.entryId === previewEntry?.id ? designGeneration.error : undefined}
-          generatingDesign={designGeneration.entryId === previewEntry?.id}
-          runtime={workspace.runtime}
-          styles={workspace.styles}
-          onModeChange={setCanvasMode}
-          onSelectedLayerMetrics={setSelectedLayerMetrics}
-          onSelectLayer={(layerId, occurrence) => {
-            const next = sourceCanvasSelection(graph, resolvedFocusId, layerId, requestedDevice, occurrence);
-            if (!next) return;
-            setSelection(next);
-            setDraftSelection(undefined);
-            setRightMode("design");
-          }}
-          onOpenLayerOwner={(entryId, layerId, occurrenceIndex) => {
-            const next = sourceCanvasSelection(graph, resolvedFocusId, layerId, requestedDevice, occurrenceIndex);
-            const nextOccurrence = next?.occurrenceId ? graph.occurrences.get(next.occurrenceId) : undefined;
-            if (!nextOccurrence || nextOccurrence.entry?.id !== entryId) return;
-            setFocusId(nextOccurrence.id);
-            setCenteredFocusId(nextOccurrence.id);
-            setSelection({
-              nodeId: nextOccurrence.node.id,
-              sourceNodeId: nextOccurrence.node.id,
-              device: requestedDevice,
-              occurrenceId: nextOccurrence.id,
-              kind: "component",
-            });
-            setDraftSelection(undefined);
-            setActivity("app");
-            setMobilePane("canvas");
-          }}
-          onGenerateDesign={previewEntry ? () => void generateDesign("app", previewEntry.id) : undefined}
-          onDeviceChange={(device) => selectedNode && setSelection((current) => ({
-            ...(current ?? {}),
-            nodeId: selectedNode.id,
-            device,
-          }))}
-        />}
-      </div>
-    </div>
+    <SourceAppCanvas
+      centerContent={workspaceMode === "design"}
+      device={requestedDevice}
+      draftSelection={draftSelection}
+      editor={editor}
+      entry={entry}
+      entries={workspace.entries}
+      generateDesignError={designGeneration.entryId === previewEntry?.id ? designGeneration.error : undefined}
+      generatingDesign={designGeneration.entryId === previewEntry?.id}
+      hoveredLayer={hoveredVisualLayer}
+      hoveredLayerOccurrence={hoveredTreeSelection
+        ? sourceCanvasSelectionOccurrence(graph, resolvedFocusId, hoveredTreeSelection)
+        : undefined}
+      mode={previewRuntime === "play" ? "play" : "design"}
+      nestedPreview={nestedPreview}
+      node={focusedOccurrence?.node ?? selectedNode}
+      previewEntry={previewEntry}
+      revealSelectedLayerKey={canvasRevealRequest}
+      runtime={workspace.runtime}
+      selectedClassCss={styleEditor.css}
+      selectedClassName={visualLayer?.className ? styleEditor.value : undefined}
+      selectedDesignCase={selectedAppDesignCase}
+      selectedLayer={visualLayer}
+      selectedLayerOccurrence={sourceCanvasSelectionOccurrence(graph, resolvedFocusId, selection)}
+      selectedText={visualLayer?.text ? styleEditor.textValue : undefined}
+      slotLayers={previewSlotLayers}
+      styles={workspace.styles}
+      workspaceMode={workspaceMode}
+      onModeChange={(mode) => setPreviewRuntime(mode === "play" ? "play" : "static")}
+      onDesignCaseChange={(caseName) => previewEntry?.design && setDesignCases((current) => ({
+        ...current,
+        [previewEntry.design!.fileId]: caseName,
+      }))}
+      onReturnToPreview={returnToPreview}
+      onSelectedLayerMetrics={setSelectedLayerMetrics}
+      onSelectLayer={(layerId, occurrence) => {
+        const next = sourceCanvasSelection(graph, resolvedFocusId, layerId, requestedDevice, occurrence);
+        if (!next) return;
+        setSelection(next);
+        if (workspaceMode === "preview") setPreviewSelection(next);
+        else setDesignSelection(next);
+        setDraftSelection(undefined);
+      }}
+      onOpenLayerOwner={(entryId, layerId, occurrenceIndex) => {
+        const next = sourceCanvasSelection(graph, resolvedFocusId, layerId, requestedDevice, occurrenceIndex);
+        const occurrence = next?.occurrenceId ? graph.occurrences.get(next.occurrenceId) : undefined;
+        if (!occurrence || occurrence.entry?.id !== entryId) return;
+        openDesign(occurrence.id, {
+          nodeId: occurrence.node.id,
+          sourceNodeId: occurrence.node.id,
+          device: requestedDevice,
+          occurrenceId: occurrence.id,
+          kind: "component",
+        });
+      }}
+      onGenerateDesign={previewEntry ? () => void designGeneration.generate("app", previewEntry.id) : undefined}
+      onDeviceChange={(device) => selectedNode && setSelection((current) => ({
+        ...(current ?? {}),
+        nodeId: selectedNode.id,
+        device,
+      }))}
+    />
   );
   const right = activity === "library"
     ? (
@@ -515,8 +595,13 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         selectedLayer={librarySelectedLayer}
         designLayer={libraryVisualLayer}
         selectedLayerMetrics={selectedLayerMetrics}
+        selectedDesignCase={selectedLibraryDesignCase}
         sourceEditor={libraryEditor}
         styleEditor={libraryStyleEditor}
+        onDesignCaseChange={(caseName) => libraryPreviewEntry?.design && setDesignCases((current) => ({
+          ...current,
+          [libraryPreviewEntry.design!.fileId]: caseName,
+        }))}
         onActiveTabChange={setRightMode}
         onCodeDocumentChange={setCodeDocument}
       />
@@ -524,59 +609,35 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     : activity === "files"
       ? <FileEvidencePanel editable={Boolean(selectedProjectFile?.editable)} label={selectedProjectFile?.label} />
       : (
-        <div className="flex h-full min-h-0 w-full flex-col bg-[#141518]">
-          <nav aria-label="Source detail" className="flex h-10 shrink-0 items-center gap-1 border-b border-white/10 px-2">
-            <Button className={`h-7 min-w-0 gap-1.5 rounded-md px-2.5 text-[10px] ${rightMode === "code" ? "bg-sky-400/10 text-sky-200" : "text-zinc-500"}`} size="sm" variant="ghost" onPress={() => setRightMode("code")}><Code2 aria-hidden="true" size={12} />Code</Button>
-            <Button className={`h-7 min-w-0 gap-1.5 rounded-md px-2.5 text-[10px] ${rightMode === "design" ? "bg-sky-400/10 text-sky-200" : "text-zinc-500"}`} size="sm" variant="ghost" onPress={() => setRightMode("design")}><SlidersHorizontal aria-hidden="true" size={12} />Design</Button>
-          </nav>
-          <div className="min-h-0 flex-1">
-            {rightMode === "code" ? (
-              <SourceCodeCanvas
-                editable={activeCodeDocument === "design" ? Boolean(entry?.design) : Boolean(entry)}
-                editor={codeEditor}
-                label={activeCodeDocument === "design" ? `${entry?.label ?? selectedNode?.label ?? "Component"} design` : entry?.label ?? selectedNode?.label ?? "Source"}
-                path={activeCodeDocument === "design" ? entry?.design?.relativePath : entry?.relativePath}
-                selection={activeCodeDocument === "source" ? draftSelection ?? selectedLayer?.source ?? entry?.source : undefined}
-                toolbar={entry?.design ? (
-                  <CodeDocumentSwitch value={activeCodeDocument} onChange={setCodeDocument} />
-                ) : undefined}
-              />
-            ) : (
-              <SourceComponentInspector
-                className="flex h-full w-full border-l-0"
-                entry={inspectorEntry}
-                layer={visualLayer}
-                layerMetrics={selectedLayerMetrics}
-                slotLayers={inspectorSlotLayers}
-                slotEditorReady={selection?.sourceNodeId === focusedOccurrence?.usageOwnerId && slotEditorReady}
-                styleEditor={styleEditor}
-                candidatesForSlot={(slot) => sourceSlotCandidates(workspace, nodes, slot, requestedDevice, inspectorSourceOwnerEntry?.relativePath ?? entry?.relativePath ?? "")}
-                onApplySlot={(slot, candidate, action) => focusedOccurrence && applySlot(slot, focusedOccurrence, candidate, action)}
-                onPrepareSlotEdit={() => focusedOccurrence && prepareSlotEdit(focusedOccurrence)}
-              />
-            )}
-          </div>
-        </div>
+        <SourceComponentInspector
+          className="flex h-full w-full border-l-0"
+          entry={inspectorEntry}
+          layer={visualLayer}
+          layerMetrics={selectedLayerMetrics}
+          selectedDesignCase={inspectorEntry?.design ? designCases[inspectorEntry.design.fileId] : undefined}
+          slotLayers={sourceEntrySlotLayers(inspectorEntry)}
+          slotEditorReady={selection?.sourceNodeId === focusedOccurrence?.usageOwnerId && slotEditorReady}
+          styleEditor={styleEditor}
+          candidatesForSlot={(slot) => sourceSlotCandidates(workspace, nodes, slot, requestedDevice, inspectorSourceOwnerEntry?.relativePath ?? entry?.relativePath ?? "")}
+          onApplySlot={(slot, candidate, action) => focusedOccurrence && applySlot(slot, focusedOccurrence, candidate, action)}
+          onDesignCaseChange={(caseName) => inspectorEntry?.design && setDesignCases((current) => ({
+            ...current,
+            [inspectorEntry.design!.fileId]: caseName,
+          }))}
+          onPrepareSlotEdit={() => focusedOccurrence && prepareSlotEdit(focusedOccurrence)}
+        />
       );
   const mobile = (
-    <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-      <div className="absolute inset-0 flex min-h-0 min-w-0">{canvas}</div>
-      {mobilePane !== "canvas" && (
-        <section aria-label="Source workspace drawer" className="absolute inset-x-2 bottom-0 z-40 flex h-[72dvh] min-h-72 flex-col overflow-hidden rounded-t-2xl border border-b-0 border-white/10 bg-[#141518] shadow-2xl">
-          {mobilePane === "inspect" ? right : mobilePane === "tree" ? appSidebar : (
-            <>
-              <nav aria-label="Mobile source areas" className="grid h-12 shrink-0 grid-cols-3 gap-1 border-b border-white/10 p-1">
-                {(["app", "files", "library"] as const).map((next) => (
-                  <Button key={next} className={`rounded-lg text-[10px] capitalize ${activity === next ? "bg-white/10 text-zinc-100" : "text-zinc-500"}`} variant="ghost" onPress={() => setActivity(next)}>{next}</Button>
-                ))}
-              </nav>
-              <div className="flex min-h-0 flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))]">{left}</div>
-            </>
-          )}
-        </section>
-      )}
-      <MobileDock active={mobilePane} onChange={setMobilePane} />
-    </div>
+    <SourceWorkspaceMobile
+      activity={activity}
+      appSidebar={appSidebar}
+      canvas={canvas}
+      left={left}
+      mobilePane={mobilePane}
+      right={right}
+      onActivityChange={setActivity}
+      onPaneChange={setMobilePane}
+    />
   );
 
   return (
@@ -630,7 +691,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         <ResizableWorkspacePanels
           namespace={{ projectId: target.project.id, documentId: `${focusedOccurrence?.node.id ?? selectedNode?.id ?? "empty"}:${requestedDevice}` }}
           left={{ label: "TypeScript app structure", content: left, defaultWidth: 300, minWidth: 260, maxWidth: 480 }}
-          right={{ label: "Source code and component design", content: right, defaultWidth: 480, minWidth: 360, maxWidth: 760 }}
+          right={{ label: "Component properties", content: right, defaultWidth: 480, minWidth: 360, maxWidth: 760 }}
           mobile={mobile}
           contentClassName="flex"
         >
@@ -673,4 +734,18 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       />
     </div>
   );
+}
+
+function sameSourceSelection(
+  current: SourceWorkspaceSelection | undefined,
+  next: SourceWorkspaceSelection,
+): boolean {
+  return current?.device === next.device
+    && current.nodeId === next.nodeId
+    && current.sourceNodeId === next.sourceNodeId
+    && current.occurrenceId === next.occurrenceId
+    && current.layerId === next.layerId
+    && current.renderedLayerOccurrence === next.renderedLayerOccurrence
+    && current.slotName === next.slotName
+    && current.kind === next.kind;
 }

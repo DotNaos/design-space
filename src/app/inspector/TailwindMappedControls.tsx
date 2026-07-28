@@ -1,12 +1,5 @@
 import { Button, Label, Slider, ToggleButton, Tooltip } from "@heroui/react";
 import {
-  AlignCenterVertical,
-  AlignEndVertical,
-  AlignHorizontalJustifyCenter,
-  AlignHorizontalJustifyEnd,
-  AlignHorizontalJustifyStart,
-  AlignHorizontalSpaceBetween,
-  AlignStartVertical,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -21,12 +14,16 @@ import {
   Scaling,
   Sparkles,
   Square,
-  StretchHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
 
 import { EditorSelectField, type EditorSelectOption } from "../components/EditorSelectField/EditorSelectField";
+import { TailwindAlignmentControl } from "./TailwindAlignmentControl";
+import { TailwindBoxModelControl } from "./TailwindBoxModelControl";
+import { parseTailwindToken, replaceTailwindUtilityGroup } from "./tailwind-utility";
+
+export { replaceTailwindUtilityGroup } from "./tailwind-utility";
 
 type UtilityOption = { label: string; value: string; icon?: LucideIcon };
 type UtilityGroup = {
@@ -59,43 +56,33 @@ const segmentedGroups: readonly UtilityGroup[] = [
     ],
     matches: match(/^flex-(?:row|row-reverse|col|col-reverse)$/),
   },
-  {
-    id: "align",
-    label: "Align",
-    options: [
-      { label: "Start", value: "items-start", icon: AlignStartVertical },
-      { label: "Center", value: "items-center", icon: AlignCenterVertical },
-      { label: "End", value: "items-end", icon: AlignEndVertical },
-      { label: "Stretch", value: "items-stretch", icon: StretchHorizontal },
-    ],
-    matches: match(/^items-(?:start|end(?:-safe)?|center(?:-safe)?|baseline(?:-last)?|stretch)$/),
-  },
-  {
-    id: "justify",
-    label: "Justify",
-    options: [
-      { label: "Start", value: "justify-start", icon: AlignHorizontalJustifyStart },
-      { label: "Center", value: "justify-center", icon: AlignHorizontalJustifyCenter },
-      { label: "End", value: "justify-end", icon: AlignHorizontalJustifyEnd },
-      { label: "Space between", value: "justify-between", icon: AlignHorizontalSpaceBetween },
-    ],
-    matches: match(/^justify-(?:normal|start|end(?:-safe)?|center(?:-safe)?|between|around|evenly|stretch|baseline)$/),
-  },
 ];
 
 const spacingGroups: readonly UtilityGroup[] = [
   scaleGroup("gap", "Gap", "gap", /^gap-(?![xy]-).+$/),
   scaleGroup("gap-x", "Gap X", "gap-x", /^gap-x-.+$/),
   scaleGroup("gap-y", "Gap Y", "gap-y", /^gap-y-.+$/),
-  scaleGroup("padding", "Padding", "p", /^p-.+$/),
-  scaleGroup("padding-x", "Padding X", "px", /^px-.+$/),
-  scaleGroup("padding-y", "Padding Y", "py", /^py-.+$/),
 ];
 
 const sizeGroups: readonly UtilityGroup[] = [
   keywordGroup("width", "Width", "w", /^w-.+$/),
   keywordGroup("height", "Height", "h", /^h-.+$/),
 ];
+
+const gridColumnsGroup: UtilityGroup = {
+  id: "grid-columns",
+  label: "Columns",
+  options: labeledOptions([
+    ["1", "grid-cols-1"],
+    ["2", "grid-cols-2"],
+    ["3", "grid-cols-3"],
+    ["4", "grid-cols-4"],
+    ["5", "grid-cols-5"],
+    ["6", "grid-cols-6"],
+    ["12", "grid-cols-12"],
+  ]),
+  matches: match(/^grid-cols-.+$/),
+};
 
 const appearanceGroups: readonly UtilityGroup[] = [
   {
@@ -141,20 +128,35 @@ const appearanceGroups: readonly UtilityGroup[] = [
   },
 ];
 
-export function TailwindMappedControls(props: { value: string; onChange: (value: string) => void }) {
+export function TailwindMappedControls(props: {
+  value: string;
+  onChange: (value: string) => void;
+  onPreviewChange?: (value?: string) => void;
+}) {
+  const layout = baseLayoutDisplay(props.value);
   return (
     <fieldset>
       <legend className="sr-only">Visual Tailwind controls</legend>
       <div className="divide-y divide-white/[0.06]">
         <ControlSection initialOpen icon={LayoutGrid} title="Layout">
           <div className="grid grid-cols-1 gap-y-3">
-            {segmentedGroups.map((group) => (
-              <SegmentedUtilityControl key={group.id} current={props.value} group={group} onChange={props.onChange} />
-            ))}
+            <SegmentedUtilityControl current={props.value} group={segmentedGroups[0]!} onChange={props.onChange} onPreviewChange={props.onPreviewChange} />
+            {layout === "flex" && (
+              <SegmentedUtilityControl current={props.value} group={segmentedGroups[1]!} onChange={props.onChange} onPreviewChange={props.onPreviewChange} />
+            )}
+            {layout === "grid" && (
+              <SelectGrid current={props.value} groups={[gridColumnsGroup]} onChange={props.onChange} />
+            )}
+            {(layout === "flex" || layout === "grid") && (
+              <TailwindAlignmentControl value={props.value} onChange={props.onChange} onPreviewChange={props.onPreviewChange} />
+            )}
           </div>
         </ControlSection>
         <ControlSection initialOpen icon={MoveDiagonal2} title="Spacing">
           <SliderGrid current={props.value} groups={spacingGroups} onChange={props.onChange} />
+          <div className="mt-4">
+            <TailwindBoxModelControl value={props.value} onChange={props.onChange} />
+          </div>
         </ControlSection>
         <ControlSection icon={Scaling} title="Size">
           <SelectGrid current={props.value} groups={sizeGroups} onChange={props.onChange} />
@@ -167,39 +169,15 @@ export function TailwindMappedControls(props: { value: string; onChange: (value:
   );
 }
 
-export function replaceTailwindUtilityGroup(
-  current: string,
-  group: readonly string[],
-  next: string,
-  matches: (utility: string) => boolean = (utility) => group.includes(utility),
-): string {
-  const candidates = new Set(group);
-  const tokens = current.split(/\s+/).filter(Boolean);
-  const result: string[] = [];
-  let replaced = false;
-
-  for (const token of tokens) {
-    const parsed = parseTailwindToken(token);
-    const belongsToGroup = !parsed.modified && (candidates.has(parsed.utility) || matches(parsed.utility));
-    if (!belongsToGroup) {
-      result.push(token);
-      continue;
-    }
-    if (!replaced && next) result.push(withImportance(next, parsed.importance));
-    replaced = true;
-  }
-
-  if (!replaced && next) result.push(next);
-  return result.join(" ");
-}
-
 function SegmentedUtilityControl(props: {
   current: string;
   group: UtilityGroup;
   onChange: (value: string) => void;
+  onPreviewChange?: (value?: string) => void;
 }) {
   const selection = findBaseSelection(props.current, props.group);
-  const change = (next: string) => props.onChange(replaceSegmentedUtility(props.current, props.group, next));
+  const valueFor = (next: string) => replaceSegmentedUtility(props.current, props.group, next);
+  const change = (next: string) => props.onChange(valueFor(next));
   return (
     <div className="min-w-0">
       <div className="mb-1 flex min-h-4 items-center gap-1.5">
@@ -211,6 +189,8 @@ function SegmentedUtilityControl(props: {
           active={!selection.token}
           icon={Minus}
           label={`${props.group.label}: Auto`}
+          onPreview={() => props.onPreviewChange?.(valueFor(""))}
+          onPreviewEnd={() => props.onPreviewChange?.()}
           onPress={() => change("")}
         />
         {props.group.options.map((option) => (
@@ -219,6 +199,8 @@ function SegmentedUtilityControl(props: {
             active={!selection.custom && selection.utility === option.value}
             icon={option.icon ?? Square}
             label={`${props.group.label}: ${option.label}`}
+            onPreview={() => props.onPreviewChange?.(valueFor(option.value))}
+            onPreviewEnd={() => props.onPreviewChange?.()}
             onPress={() => change(option.value)}
           />
         ))}
@@ -230,8 +212,6 @@ function SegmentedUtilityControl(props: {
 function replaceSegmentedUtility(current: string, group: UtilityGroup, next: string): string {
   let prepared = current;
   if (next && group.id === "direction" && !hasBaseLayoutDisplay(current, /^(?:flex|inline-flex)$/)) {
-    prepared = replaceDisplayUtility(current, "flex");
-  } else if (next && (group.id === "align" || group.id === "justify") && !hasBaseLayoutDisplay(current, /^(?:flex|inline-flex|grid|inline-grid)$/)) {
     prepared = replaceDisplayUtility(current, "flex");
   }
   return replaceTailwindUtilityGroup(prepared, optionValues(group), next, group.matches);
@@ -249,7 +229,20 @@ function hasBaseLayoutDisplay(current: string, pattern: RegExp): boolean {
   });
 }
 
-function SegmentButton(props: { active: boolean; icon: LucideIcon; label: string; onPress: () => void }) {
+function baseLayoutDisplay(current: string): "flex" | "grid" | "other" {
+  if (hasBaseLayoutDisplay(current, /^(?:flex|inline-flex)$/)) return "flex";
+  if (hasBaseLayoutDisplay(current, /^(?:grid|inline-grid)$/)) return "grid";
+  return "other";
+}
+
+function SegmentButton(props: {
+  active: boolean;
+  icon: LucideIcon;
+  label: string;
+  onPreview?: () => void;
+  onPreviewEnd?: () => void;
+  onPress: () => void;
+}) {
   const Icon = props.icon;
   return (
     <Tooltip delay={350} closeDelay={80}>
@@ -260,6 +253,8 @@ function SegmentButton(props: { active: boolean; icon: LucideIcon; label: string
         isSelected={props.active}
         size="sm"
         variant="ghost"
+        onPointerEnter={props.onPreview}
+        onPointerLeave={props.onPreviewEnd}
         onChange={props.onPress}
       >
         <Icon aria-hidden="true" size={14} strokeWidth={1.7} />
@@ -402,29 +397,6 @@ function optionValues(group: UtilityGroup): string[] {
   return group.options.map((option) => option.value);
 }
 
-function parseTailwindToken(token: string) {
-  let bracketDepth = 0;
-  let variantEnd = -1;
-  for (let index = 0; index < token.length; index += 1) {
-    if (token[index] === "[") bracketDepth += 1;
-    else if (token[index] === "]") bracketDepth = Math.max(0, bracketDepth - 1);
-    else if (token[index] === ":" && bracketDepth === 0) variantEnd = index;
-  }
-  const rawUtility = token.slice(variantEnd + 1);
-  const importance = rawUtility.startsWith("!") ? "prefix" : rawUtility.endsWith("!") ? "suffix" : undefined;
-  return {
-    modified: variantEnd >= 0,
-    utility: rawUtility.replace(/^!/, "").replace(/!$/, ""),
-    importance,
-  } as const;
-}
-
-function withImportance(value: string, importance: "prefix" | "suffix" | undefined): string {
-  if (importance === "prefix") return `!${value}`;
-  if (importance === "suffix") return `${value}!`;
-  return value;
-}
-
 function scaleGroup(id: string, label: string, prefix: string, pattern: RegExp): UtilityGroup {
   return {
     id,
@@ -451,6 +423,7 @@ function keywordGroup(id: string, label: string, prefix: string, pattern: RegExp
     options: labeledOptions([
       ["CSS auto", `${prefix}-auto`],
       ["Full", `${prefix}-full`],
+      ["Screen", `${prefix}-screen`],
       ["Fit content", `${prefix}-fit`],
       ["Min content", `${prefix}-min`],
       ["Max content", `${prefix}-max`],

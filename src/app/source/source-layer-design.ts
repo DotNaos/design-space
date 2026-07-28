@@ -1,4 +1,5 @@
 export type SourcePreviewMode = "design" | "play";
+export type SourceWorkspaceMode = "preview" | "design";
 
 export interface SourceLayerMetrics {
   x: number;
@@ -11,14 +12,16 @@ export type SourceLayerPaint = {
   fill: string;
   stroke: string;
   strokeWidth: number;
+  textColor: string;
 };
 
 export function sourceLayerPaint(className: string): SourceLayerPaint {
   const tokens = baseUtilities(className);
   return {
-    fill: arbitraryValue(tokens.find((token) => /^bg-/.test(token)), "bg") ?? "",
-    stroke: arbitraryValue(tokens.find((token) => borderColorPattern.test(token)), "border") ?? "",
+    fill: utilityValue(findLast(tokens, backgroundColorPattern), "bg") ?? "",
+    stroke: utilityValue(findLast(tokens, borderColorPattern), "border") ?? "",
     strokeWidth: borderWidth(tokens),
+    textColor: utilityValue(findLast(tokens, textColorPattern), "text") ?? "",
   };
 }
 
@@ -28,7 +31,7 @@ export function setSourceLayerDimension(className: string, axis: "width" | "heig
 }
 
 export function setSourceLayerFill(className: string, value: string): string {
-  return replaceBaseUtility(className, /^bg-.+$/, colorUtility("bg", value));
+  return replaceBaseUtility(className, backgroundColorPattern, colorUtility("bg", value));
 }
 
 export function setSourceLayerStroke(className: string, value: string): string {
@@ -44,15 +47,21 @@ export function setSourceLayerStrokeWidth(className: string, value: number): str
   );
 }
 
-function colorUtility(prefix: "bg" | "border", value: string): string {
-  const normalized = value.trim();
-  return normalized ? `${prefix}-[${normalized}]` : "";
+export function setSourceLayerTextColor(className: string, value: string): string {
+  return replaceBaseUtility(className, textColorPattern, colorUtility("text", value));
 }
 
-function arbitraryValue(token: string | undefined, prefix: string): string | undefined {
+function colorUtility(prefix: "bg" | "border" | "text", value: string): string {
+  const normalized = value.trim();
+  if (!normalized) return "";
+  if (/^(?:#|(?:rgb|hsl|oklch|color|var)\()/.test(normalized)) return `${prefix}-[${normalized}]`;
+  return `${prefix}-${normalized}`;
+}
+
+function utilityValue(token: string | undefined, prefix: string): string | undefined {
   if (!token) return undefined;
   const match = token.match(new RegExp(`^${prefix}-\\[(.+)\\]$`));
-  return match?.[1];
+  return match?.[1] ?? token.slice(prefix.length + 1);
 }
 
 function borderWidth(tokens: readonly string[]): number {
@@ -65,6 +74,10 @@ function borderWidth(tokens: readonly string[]): number {
 
 function baseUtilities(className: string): string[] {
   return className.split(/\s+/).filter((token) => token && !hasVariant(token));
+}
+
+function findLast(tokens: readonly string[], pattern: RegExp): string | undefined {
+  return [...tokens].reverse().find((token) => pattern.test(token));
 }
 
 function replaceBaseUtility(className: string, matches: RegExp, next: string): string {
@@ -93,4 +106,8 @@ function hasVariant(token: string): boolean {
   return false;
 }
 
-const borderColorPattern = /^border-(?!(?:0|2|4|8|\[[0-9.]+px\]|x|y|t|r|b|l|solid|dashed|dotted|double|hidden|none)(?:$|-)).+$/;
+const colorName = "(?:inherit|current|transparent|black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)";
+const colorValue = `(?:${colorName}(?:-\\d{2,3})?(?:\\/(?:\\d{1,3}|\\[[^\\]]+\\]))?|\\[(?:#|(?:rgb|hsl|oklch|color|var)\\().+\\]|\\(--[^)]+\\))`;
+const backgroundColorPattern = new RegExp(`^bg-${colorValue}$`);
+const borderColorPattern = new RegExp(`^border-${colorValue}$`);
+const textColorPattern = new RegExp(`^text-${colorValue}$`);

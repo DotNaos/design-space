@@ -267,6 +267,38 @@ Selection is authoritative and synchronized:
 - switching Desktop, Tablet, or Mobile changes the implementation, not the workspace;
 - opening a component definition is explicit and preserves the previous selection and canvas state.
 
+### Preview, Play, and isolated Design
+
+The canvas has two persistent workspace modes and one temporary runtime state:
+
+```text
+Preview · Static ── Play ──> Preview · Live
+      │                         │
+      └─ open component ──> Design · Isolated
+```
+
+`Preview · Static` is the safe default. It MUST render the complete application from the configured entry
+root. Selecting any Component, HTML, or Slot in the tree or canvas MUST only change the synchronized
+selection and inspector; it MUST NOT replace the canvas root. The target application MUST NOT execute
+JavaScript inside the static canvas. Design Space MAY execute a colocated design in its controlled renderer
+to produce the snapshot, but it MUST transfer only HTML and CSS into the script-free canvas.
+
+`Preview · Live` is entered only through an explicit Play action. It MAY execute the target UI and deliver
+pointer and keyboard input to it. Stop or Escape MUST return to the same static Preview context without
+losing tree expansion, selection, device, pan, or zoom. The live state MUST NOT survive reloads or target
+changes.
+
+`Design · Isolated` is entered by explicitly opening a Component, normally by double-clicking its tree or
+canvas occurrence. The canvas MUST then render only that Component through its colocated `.design.tsx`.
+The selected design case supplies typed props and Slots; concrete props from an application occurrence MUST
+NOT leak into the isolated design. A single click within the isolated Component selects its Component, HTML,
+or Slot layer without changing the design root. Opening a nested Component MAY replace the isolated design
+root. Returning to Preview MUST restore the previous Preview selection and canvas state.
+
+Preview and Design MUST remember independent selection and canvas state. The HUD MUST always identify the
+current context and provide a direct way to enter Play, stop Play, or return from isolated Design to Preview.
+The Source Tree remains available in both workspace modes.
+
 Code edits MUST update the preview immediately. Invalid code MUST keep the last valid preview visible and
 show exact diagnostics. Save, undo, redo, reset, stale-source detection, exact diff, and compile recovery
 are required IDE behavior, not optional polish.

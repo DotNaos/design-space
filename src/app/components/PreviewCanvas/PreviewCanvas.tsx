@@ -245,6 +245,11 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     setCamera({ x: 16, y: props.compact ? 44 : 56, scale: 1 });
     fit();
     scheduleMeasure();
+    const settleFrame = requestAnimationFrame(() => {
+      if (autoFit.current) fit();
+      scheduleMeasure();
+    });
+    return () => cancelAnimationFrame(settleFrame);
   }, [fit, props.cameraKey, props.compact, scheduleMeasure, setCamera, touchGestures.resetTouchGestures]);
 
   useLayoutEffect(() => {
@@ -490,7 +495,12 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         ref={worldRef}
         data-testid="canvas-world"
         className="absolute left-0 top-0"
-        style={{ width: worldWidth, transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`, transformOrigin: "0 0" }}
+        style={{
+          width: worldWidth,
+          transform: `translate(${camera.x / camera.scale}px, ${camera.y / camera.scale}px)`,
+          transformOrigin: "0 0",
+          zoom: camera.scale,
+        }}
       >
         {props.preview}
       </div>
@@ -578,7 +588,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       </div>
 
       {props.hud ? (
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 max-w-[calc(100%-2rem)] -translate-x-1/2">
+        <div data-testid="canvas-hud" className="pointer-events-auto absolute bottom-4 left-1/2 z-20 max-w-[calc(100%-2rem)] -translate-x-1/2">
           {props.hud}
         </div>
       ) : showGestureHint && !props.compact ? (

@@ -6,7 +6,10 @@ import {
   loadWorkspacePanelWidths,
   normalizePanelBounds,
   saveWorkspacePanelWidths,
+  loadWorkspacePanelVisibility,
+  saveWorkspacePanelVisibility,
   workspacePanelStorageKey,
+  workspacePanelVisibilityStorageKey,
   type WorkspacePanelBounds,
 } from "./workspace-panel-state";
 
@@ -19,6 +22,20 @@ describe("workspace panel state", () => {
   it("creates a project and document scoped storage key", () => {
     expect(workspacePanelStorageKey({ projectId: "demo/project", documentId: "screen:home" }))
       .toBe("design-space:workspace-panels:v1:demo%2Fproject:screen%3Ahome");
+    expect(workspacePanelVisibilityStorageKey({ projectId: "demo/project", documentId: "screen:home" }))
+      .toBe("design-space:workspace-panel-visibility:v1:demo%2Fproject:screen%3Ahome");
+  });
+
+  it("persists independent panel visibility and falls back safely", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+
+    expect(loadWorkspacePanelVisibility(storage, "visibility")).toEqual({ left: true, right: true });
+    saveWorkspacePanelVisibility(storage, "visibility", { left: false, right: true });
+    expect(loadWorkspacePanelVisibility(storage, "visibility")).toEqual({ left: false, right: true });
   });
 
   it("clamps persisted values and falls back when storage is invalid", () => {

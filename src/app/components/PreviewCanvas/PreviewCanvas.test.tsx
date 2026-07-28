@@ -6,6 +6,25 @@ import { PreviewCanvas } from "./PreviewCanvas";
 afterEach(cleanup);
 
 describe("preview canvas", () => {
+  it("keeps HUD controls interactive above the canvas surface", () => {
+    render(
+      <PreviewCanvas
+        compact
+        hud={<button type="button">HUD action</button>}
+        preview={<div data-design-space-instance-id="one">One</div>}
+        rootInstanceId="one"
+        selectedComponentInstanceId="one"
+        selection={{ kind: "component", id: "one" }}
+        selectionLabel="One"
+        slots={[]}
+        onSelect={() => undefined}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-hud")).toHaveClass("pointer-events-auto");
+    expect(screen.getByTestId("canvas-hud")).not.toHaveClass("pointer-events-none");
+  });
+
   it("keeps supplied viewport controls and canvas controls in one toolbar", () => {
     render(
       <PreviewCanvas
@@ -210,7 +229,7 @@ describe("preview canvas", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(1.2)");
+    expect(screen.getByTestId("canvas-world").style.zoom).toBe("1.2");
 
     rerender(
       <PreviewCanvas
@@ -226,7 +245,7 @@ describe("preview canvas", () => {
       />,
     );
 
-    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(1)");
+    expect(screen.getByTestId("canvas-world").style.zoom).toBe("1");
   });
 
   it("keeps the camera when the current document rerenders", () => {
@@ -244,7 +263,7 @@ describe("preview canvas", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(1.2)");
+    expect(screen.getByTestId("canvas-world").style.zoom).toBe("1.2");
 
     rerender(
       <PreviewCanvas
@@ -260,7 +279,7 @@ describe("preview canvas", () => {
       />,
     );
 
-    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(1.2)");
+    expect(screen.getByTestId("canvas-world").style.zoom).toBe("1.2");
   });
 
   it("pans the current canvas to reveal a tree-selected component without changing zoom", () => {
@@ -298,7 +317,8 @@ describe("preview canvas", () => {
       />,
     );
 
-    expect(screen.getByTestId("canvas-world").style.transform).toBe("translate(-316px, -166px) scale(1)");
+    expect(screen.getByTestId("canvas-world").style.transform).toBe("translate(-316px, -166px)");
+    expect(screen.getByTestId("canvas-world").style.zoom).toBe("1");
   });
 
   it("pinches around two touch pointers and pans with one touch pointer", () => {
@@ -325,7 +345,7 @@ describe("preview canvas", () => {
     dispatchPointer(canvas, "pointerdown", 2, 200, 100);
     dispatchPointer(canvas, "pointermove", 2, 300, 100);
 
-    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(2)");
+    expect(screen.getByTestId("canvas-world").style.zoom).toBe("2");
 
     dispatchPointer(canvas, "pointerup", 2, 300, 100);
     const beforePan = screen.getByTestId("canvas-world").style.transform;
@@ -365,7 +385,7 @@ describe("preview canvas", () => {
     dispatchPointer(overlay, "pointerdown", 2, 200, 80);
     dispatchPointer(overlay, "pointermove", 2, 300, 80);
 
-    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(2)");
+    expect(screen.getByTestId("canvas-world").style.zoom).toBe("2");
   });
 
   it("scales and pans the dot grid with the canvas world", () => {
@@ -549,7 +569,7 @@ describe("preview canvas", () => {
 
     expect(start.defaultPrevented).toBe(true);
     expect(change.defaultPrevented).toBe(true);
-    expect(screen.getByTestId("canvas-world").style.transform).toContain("scale(2)");
+    expect(screen.getByTestId("canvas-world").style.zoom).toBe("2");
   });
 
   it("measures descendants of a display-contents adapter anchor", async () => {
@@ -638,7 +658,5 @@ function gestureEvent(type: string, scale: number, clientX: number, clientY: num
 }
 
 function canvasScale(): number {
-  const match = screen.getByTestId("canvas-world").style.transform.match(/scale\(([^)]+)\)/);
-  if (!match) throw new Error("Canvas transform does not contain a scale");
-  return Number(match[1]);
+  return Number(screen.getByTestId("canvas-world").style.zoom || 1);
 }

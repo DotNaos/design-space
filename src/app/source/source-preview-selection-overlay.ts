@@ -59,6 +59,7 @@ function mountSourceLayerOutline(
   if (options.variant === "selection") overlay.dataset.designSpaceSourceSelection = layerId;
   else overlay.dataset.designSpaceSourceHover = layerId;
   const color = options.tone === "component" ? "#a855f7" : "#38bdf8";
+  const outlineWidth = options.variant === "selection" ? 1.5 : 1;
   overlay.style.cssText = [
     "position:absolute",
     "pointer-events:none",
@@ -67,27 +68,8 @@ function mountSourceLayerOutline(
     "padding:0",
     "box-sizing:border-box",
     "display:none",
+    `box-shadow:inset 0 0 0 ${outlineWidth}px ${color}`,
   ].join(";");
-  if (options.variant === "selection") {
-    for (const position of [
-      "top:0;left:0;transform:translate(0,0)",
-      "top:0;right:0;transform:translate(0,0)",
-      "bottom:0;left:0;transform:translate(0,0)",
-      "bottom:0;right:0;transform:translate(0,0)",
-    ]) {
-      const handle = overlayRoot.ownerDocument.createElement("span");
-      handle.style.cssText = [
-        position,
-        "position:absolute",
-        "display:block",
-        "margin:0",
-        "padding:0",
-        "background:#f4f4f5",
-        "box-sizing:border-box",
-      ].join(";");
-      overlay.append(handle);
-    }
-  }
   overlayRoot.append(overlay);
 
   let frame: number | undefined;
@@ -105,23 +87,15 @@ function mountSourceLayerOutline(
     const rect = sourceLayerOverlayBounds(sourceRect, output, overlayRoot);
     const metrics = measureSourceLayer(sourceRect, output.getBoundingClientRect());
     const serialized = `${metrics.x}:${metrics.y}:${metrics.width}:${metrics.height}`;
-    const outlineWidth = options.variant === "selection" ? 1.5 : 1;
     overlay.style.display = "block";
     overlay.style.left = `${rect.left}px`;
     overlay.style.top = `${rect.top}px`;
     overlay.style.width = `${Math.max(1, rect.width)}px`;
     overlay.style.height = `${Math.max(1, rect.height)}px`;
-    overlay.style.boxShadow = `0 0 0 ${outlineWidth}px ${color}`;
-    if (options.variant === "selection") {
-      const handleSize = 6;
-      const handles = [...overlay.querySelectorAll<HTMLElement>("span")];
-      for (const [index, handle] of handles.entries()) {
-        handle.style.width = `${handleSize}px`;
-        handle.style.height = `${handleSize}px`;
-        handle.style.border = `1px solid ${color}`;
-        handle.style.transform = `translate(${index % 2 ? "-100%" : "0"},${index > 1 ? "-100%" : "0"})`;
-      }
-    }
+    // Draw the chrome inside its measured rectangle. An outer shadow loses its
+    // right and bottom edges whenever the target touches the clipped canvas
+    // boundary, which makes ordinary borders look truncated in self-hosted
+    // previews.
     if (serialized !== previous) {
       previous = serialized;
       options.onMetrics?.(metrics);

@@ -1,5 +1,6 @@
 import { Braces, ChevronRight, CircleAlert, Component, FileCode2 } from "lucide-react";
 import { Button, Chip } from "@heroui/react";
+import { useEffect, useState } from "react";
 
 import type {
   SourceComponentProp,
@@ -8,7 +9,9 @@ import type {
   SourceWorkspaceLayer,
 } from "../../shared/source-workspace";
 import { SourceComponentPicker } from "./SourceComponentPicker";
+import { SourceDesignCaseControl } from "./SourceDesignCaseControl";
 import { SourceLayerDesignInspector } from "./SourceLayerDesignInspector";
+import { TailwindClassField } from "../inspector/TailwindClassField";
 import type { SourceComponentCandidate } from "./source-slot-composition";
 import type { SourceLayerMetrics } from "./source-layer-design";
 import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
@@ -22,11 +25,17 @@ export interface SourceComponentInspectorProps {
   slotEditorReady?: boolean;
   styleEditor?: SourceLayerClassEditor;
   candidatesForSlot?: (slot: SourceWorkspaceLayer) => readonly SourceComponentCandidate[];
+  selectedDesignCase?: string;
   onApplySlot?: (slot: SourceWorkspaceLayer, candidate: SourceComponentCandidate, action: "add" | "replace") => void;
   onPrepareSlotEdit?: () => void;
+  onDesignCaseChange?: (caseName: string) => void;
 }
 
 export function SourceComponentInspector(props: SourceComponentInspectorProps) {
+  const committedClassName = props.styleEditor?.value ?? props.layer?.className?.value ?? "";
+  const [previewClassName, setPreviewClassName] = useState<string>();
+  useEffect(() => setPreviewClassName(undefined), [props.layer?.id, committedClassName]);
+
   if (!props.entry) {
     return (
       <aside
@@ -56,6 +65,28 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="sticky top-0 z-20 bg-[#141518]/95 shadow-[0_1px_0_rgba(255,255,255,0.08),0_8px_20px_rgba(0,0,0,0.18)] backdrop-blur">
+          <SourceDesignCaseControl
+            entry={props.entry}
+            selectedCase={props.selectedDesignCase}
+            onCaseChange={props.onDesignCaseChange}
+          />
+          {props.layer?.className ? (
+            <section aria-label="Tailwind classes" className="border-b border-white/10 bg-sky-400/[0.025] px-4 py-3 shadow-[inset_2px_0_0_rgba(56,189,248,0.24)]">
+              <TailwindClassField
+                compileError={props.styleEditor?.error}
+                disabled={!props.styleEditor?.editable}
+                label="className"
+                previewValue={previewClassName}
+                value={committedClassName}
+                onChange={(value) => {
+                  setPreviewClassName(undefined);
+                  props.styleEditor?.change(value);
+                }}
+              />
+            </section>
+          ) : null}
+        </div>
         {props.entry.findings.length > 0 && (
           <section aria-label="Strict UI findings" className="border-b border-red-400/20 bg-red-400/[0.04] px-4 py-3">
             <header className="flex items-center gap-2 text-red-300">
@@ -73,7 +104,12 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
           </section>
         )}
         {props.layer && (
-          <SourceLayerDesignInspector layer={props.layer} metrics={props.layerMetrics} styleEditor={props.styleEditor} />
+          <SourceLayerDesignInspector
+            layer={props.layer}
+            metrics={props.layerMetrics}
+            styleEditor={props.styleEditor}
+            onClassNamePreviewChange={setPreviewClassName}
+          />
         )}
         <ContractSection
           emptyMessage="No non-slot props are declared."

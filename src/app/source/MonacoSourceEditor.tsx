@@ -14,6 +14,7 @@ type MonacoSourceEditorProps = {
   value: string;
   selection?: SourceLayerBinding;
   onChange: (value: string) => void;
+  onCursorOffsetChange?: (offset: number) => void;
 };
 
 export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
@@ -22,12 +23,17 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined);
   const modelRef = useRef<monaco.editor.ITextModel | undefined>(undefined);
   const onChangeRef = useRef(props.onChange);
+  const onCursorOffsetChangeRef = useRef(props.onCursorOffsetChange);
   const synchronizing = useRef(false);
   const decorationsRef = useRef<string[]>([]);
 
   useEffect(() => {
     onChangeRef.current = props.onChange;
   }, [props.onChange]);
+
+  useEffect(() => {
+    onCursorOffsetChangeRef.current = props.onCursorOffsetChange;
+  }, [props.onCursorOffsetChange]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -55,11 +61,15 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
     const subscription = model.onDidChangeContent(() => {
       if (!synchronizing.current) onChangeRef.current(model.getValue());
     });
+    const cursorSubscription = editor.onDidChangeCursorPosition((event) => {
+      onCursorOffsetChangeRef.current?.(model.getOffsetAt(event.position));
+    });
 
     modelRef.current = model;
     editorRef.current = editor;
     return () => {
       subscription.dispose();
+      cursorSubscription.dispose();
       editor.dispose();
       model.dispose();
       editorRef.current = undefined;

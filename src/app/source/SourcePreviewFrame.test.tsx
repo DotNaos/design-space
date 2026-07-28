@@ -11,6 +11,7 @@ import {
   applySourceLayerTextById,
   projectSourceLayer,
   SourcePreviewFrame,
+  sourceStaticProjectionLayerId,
 } from "./SourcePreviewFrame";
 import { SourceInstanceNavigator } from "./SourceInstanceNavigator";
 import { scalePreviewEventPoint, sourceLayerHitAtPreviewPoint, sourceLayerIdAtPreviewPoint, sourceLayerIdFromElement } from "./source-preview-hit-testing";
@@ -91,6 +92,48 @@ it("renders source previews as static, non-focusable UI", async () => {
   expect(frame).toHaveProperty("inert", true);
   expect(screen.queryByRole("button", { name: "Switch to interact mode" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Zoom in" })).toBeVisible();
+});
+
+it("does not key the full static preview to layer selection", () => {
+  const firstLayer: SourceWorkspaceLayer = {
+    id: "first-layer",
+    label: "section",
+    kind: "html",
+    source: { start: 1, end: 2 },
+    children: [],
+  };
+  const secondLayer: SourceWorkspaceLayer = {
+    id: "second-layer",
+    label: "aside",
+    kind: "html",
+    source: { start: 3, end: 4 },
+    children: [],
+  };
+  const entry = {
+    ...previewEntry("stable-preview", async () => ({
+      ...previewDefinition("unused"),
+      render: () => <main />,
+    })),
+    layers: [firstLayer, secondLayer],
+  };
+  expect(sourceStaticProjectionLayerId({
+    entry,
+    isolateSelectedLayer: false,
+    selectedCase: "default",
+    selectedLayer: firstLayer,
+  })).toBeUndefined();
+  expect(sourceStaticProjectionLayerId({
+    entry,
+    isolateSelectedLayer: false,
+    selectedCase: "default",
+    selectedLayer: secondLayer,
+  })).toBeUndefined();
+  expect(sourceStaticProjectionLayerId({
+    entry,
+    isolateSelectedLayer: true,
+    selectedCase: "default",
+    selectedLayer: firstLayer,
+  })).toBe(firstLayer.id);
 });
 
 it("places a non-interactive selection surface over authored HTML in design mode", async () => {
@@ -286,6 +329,45 @@ it("separates design selection from playable component interactions", async () =
   await userEvent.click(screen.getByRole("button", { name: "Run action" }));
   expect(screen.getByRole("button", { name: "Play mode" })).toHaveAttribute("aria-pressed", "true");
   expect(onAction).toHaveBeenCalledOnce();
+});
+
+it("uses the bottom HUD for safe Preview, temporary Play, and isolated Design", async () => {
+  const onModeChange = vi.fn();
+  const onReturnToPreview = vi.fn();
+  const entry = previewEntry("context", async () => previewDefinition("Context"));
+  const view = render(
+    <SourcePreviewFrame
+      device="desktop"
+      entry={entry}
+      mode="design"
+      runtime="react"
+      styles={[]}
+      workspaceMode="preview"
+      onModeChange={onModeChange}
+      onReturnToPreview={onReturnToPreview}
+    />,
+  );
+
+  expect(screen.getByLabelText("Canvas context")).toHaveTextContent("Preview");
+  expect(screen.queryByRole("button", { name: "Design mode" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Play interactive preview" }));
+  expect(onModeChange).toHaveBeenCalledWith("play");
+
+  view.rerender(
+    <SourcePreviewFrame
+      device="desktop"
+      entry={entry}
+      mode="design"
+      runtime="react"
+      styles={[]}
+      workspaceMode="design"
+      onModeChange={onModeChange}
+      onReturnToPreview={onReturnToPreview}
+    />,
+  );
+  expect(screen.getByLabelText("Canvas context")).toHaveTextContent("Design · context");
+  await userEvent.click(screen.getByRole("button", { name: "Back to app preview" }));
+  expect(onReturnToPreview).toHaveBeenCalledOnce();
 });
 
 it("serializes design content without keeping component handlers attached", async () => {
@@ -568,10 +650,8 @@ it("mounts selection chrome outside the rendered preview DOM without changing it
   const renderedMarkup = output.innerHTML;
   const dispose = mountSourceLayerSelection(output, "selected", "layer");
   const overlay = document.querySelector<HTMLElement>("[data-design-space-source-selection]")!;
-  const handles = [...overlay.querySelectorAll<HTMLElement>("span")];
 
-  expect(handles).toHaveLength(4);
-  expect(handles.every((handle) => !handle.style.cssText.includes("translate(-50%"))).toBe(true);
+  expect(overlay.querySelector("span")).toBeNull();
   expect(overlay.parentElement).toHaveAttribute("id", "design-space-canvas-overlays");
   expect(overlay.parentElement?.parentElement).toBe(canvas);
   expect(overlay.parentElement).toHaveStyle({ overflow: "hidden", position: "absolute", zIndex: "10" });
@@ -579,6 +659,7 @@ it("mounts selection chrome outside the rendered preview DOM without changing it
   expect(previewDocument.querySelector("[data-design-space-source-selection]")).toBeNull();
   expect(overlay.style.position).toBe("absolute");
   expect(overlay.style.borderWidth).toBe("0px");
+  expect(overlay.style.boxShadow).toContain("inset");
 
   dispose();
   canvas.remove();

@@ -134,8 +134,9 @@ it("edits a selected HTML layer through its source-derived Tailwind binding", ()
   );
 
   const design = screen.getByRole("region", { name: "Design" });
-  const classes = within(design).getByRole("combobox", { name: "Tailwind classes" });
+  const classes = screen.getByRole("combobox", { name: "className" });
   expect(classes).toHaveValue("p-4");
+  expect(classes.compareDocumentPosition(design) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   fireEvent.change(classes, { target: { value: "p-6 rounded-xl" } });
   expect(change).toHaveBeenCalledWith("p-6 rounded-xl");
 

@@ -9,15 +9,30 @@ import type {
 } from "../../shared/source-workspace";
 import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
+import { SourceCanvasContextHud } from "./SourceCanvasContextHud";
 import { SourceHoverIdentityHud } from "./SourceHoverIdentityHud";
 import { SourceInstanceNavigator } from "./SourceInstanceNavigator";
-import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
+import type { SourceLayerMetrics, SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
 import { sourceLayerHitAtPreviewPoint, type SourceLayerHit } from "./source-preview-hit-testing";
 import { externalSourceLayerOwner, sourceLayerOwner } from "./source-layer-ownership";
 import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement, sourceLayerElements } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
 import { renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
 import type { SourceTreeNode } from "./source-workspace-tree";
+
+export function sourceStaticProjectionLayerId(options: {
+  entry?: RuntimeSourceWorkspaceEntry;
+  isolateSelectedLayer?: boolean;
+  selectedCase?: string;
+  selectedLayer?: SourceWorkspaceLayer;
+}): string | undefined {
+  return options.isolateSelectedLayer !== false
+    && options.entry
+    && options.selectedLayer?.kind === "html"
+    && options.selectedCase
+    ? options.selectedLayer.id
+    : undefined;
+}
 
 export function SourcePreviewFrame(props: {
   device: DesignSpaceDevice;
@@ -26,8 +41,11 @@ export function SourcePreviewFrame(props: {
   styles: readonly string[];
   entries?: readonly RuntimeSourceWorkspaceEntry[];
   node?: SourceTreeNode;
+  hoveredLayer?: SourceWorkspaceLayer;
+  hoveredLayerOccurrence?: number;
   selectedLayer?: SourceWorkspaceLayer;
   selectedLayerOccurrence?: number;
+  selectedDesignCase?: string;
   selectedClassName?: string;
   selectedClassCss?: string;
   selectedText?: string;
@@ -39,11 +57,14 @@ export function SourcePreviewFrame(props: {
   selectionMode?: boolean;
   slotLayers?: readonly SourceWorkspaceLayer[];
   mode?: SourcePreviewMode;
+  workspaceMode?: SourceWorkspaceMode;
   onGenerateDesign?: () => void;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
   onSelectLayer?: (layerId: string, occurrence: number) => void;
+  onDesignCaseChange?: (caseName: string) => void;
   onOpenLayerOwner?: (entryId: string, layerId: string, occurrence: number) => void;
   onModeChange?: (mode: SourcePreviewMode) => void;
+  onReturnToPreview?: () => void;
   onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
   revealSelectedLayerKey?: number;
 }) {
@@ -61,9 +82,14 @@ export function SourcePreviewFrame(props: {
   const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
   const previewEntries = useMemo(() => props.entries ?? (props.entry ? [props.entry] : []), [props.entries, props.entry]);
   const selectableLayerIds = useMemo(() => sourceLayerIds(previewEntries), [previewEntries]);
+  const externallyHoveredLayerHit = useMemo(() => props.hoveredLayer ? {
+    layerId: props.hoveredLayer.id,
+    occurrence: props.hoveredLayerOccurrence ?? 0,
+  } : undefined, [props.hoveredLayer, props.hoveredLayerOccurrence]);
+  const visibleHoveredLayerHit = hoveredLayerHit ?? externallyHoveredLayerHit;
   const hoveredOwner = useMemo(() => (
-    hoveredLayerHit ? sourceLayerOwner(previewEntries, hoveredLayerHit.layerId) : undefined
-  ), [hoveredLayerHit, previewEntries]);
+    visibleHoveredLayerHit ? sourceLayerOwner(previewEntries, visibleHoveredLayerHit.layerId) : undefined
+  ), [previewEntries, visibleHoveredLayerHit]);
   const hoveredExternalOwner = useMemo(() => (
     hoveredOwner && props.onOpenLayerOwner && hoveredOwner.fileId !== props.entry?.fileId
       ? hoveredOwner
@@ -102,8 +128,9 @@ export function SourcePreviewFrame(props: {
   const activeLoaded = loaded?.designId === designId ? loaded : undefined;
   const definition = activeLoaded?.definition;
   const caseNames = useMemo(() => Object.keys(definition?.cases ?? {}), [definition]);
-  const selectedCase = definition && caseNames.includes(caseByDesign[designId ?? ""] ?? "")
-    ? caseByDesign[designId ?? ""]!
+  const requestedCase = props.selectedDesignCase ?? caseByDesign[designId ?? ""];
+  const selectedCase = definition && caseNames.includes(requestedCase ?? "")
+    ? requestedCase!
     : definition?.initialCase;
   const matrixAvailable = Boolean(props.entry?.props.some((property) => (property.values?.length ?? 0) > 1));
   const matrix = Boolean(designId && matrixByDesign[designId] && !props.selectedLayer);
@@ -115,8 +142,14 @@ export function SourcePreviewFrame(props: {
     loadMessage,
     loadState,
   });
-  const projectionKey = props.isolateSelectedLayer !== false && props.entry && props.selectedLayer?.kind === "html" && selectedCase
-    ? `${props.entry.id}:${props.selectedLayer.id}:${selectedCase}`
+  const projectionLayerId = sourceStaticProjectionLayerId({
+    entry: props.entry,
+    isolateSelectedLayer: props.isolateSelectedLayer,
+    selectedCase,
+    selectedLayer: props.selectedLayer,
+  });
+  const projectionKey = projectionLayerId && props.entry && selectedCase
+    ? `${props.entry.id}:${projectionLayerId}:${selectedCase}`
     : undefined;
   const loadFrame = useCallback((node: HTMLIFrameElement | null) => {
     frameRef.current = node;
@@ -152,8 +185,8 @@ export function SourcePreviewFrame(props: {
     }).then((markup) => {
       if (!active) return;
       mounts.staging.innerHTML = markup;
-      if (projectionKey && props.selectedLayer) {
-        if (!projectSourceLayer(mounts.staging, mounts.output, props.selectedLayer.id)) {
+      if (projectionLayerId) {
+        if (!projectSourceLayer(mounts.staging, mounts.output, projectionLayerId)) {
           showStaticPreviewMessage(mounts.output, "This HTML layer is not rendered in the current state.");
         }
       } else {
@@ -165,7 +198,7 @@ export function SourcePreviewFrame(props: {
       showStaticPreviewMessage(mounts.output, error instanceof Error ? error.message : "The static design could not be rendered.", true);
     });
     return () => { active = false; };
-  }, [definition, matrix, mounts, previewMode, projectionKey, props.centerContent, props.entry, props.selectedLayer, props.slotLayers, selectedCase]);
+  }, [definition, matrix, mounts, previewMode, projectionLayerId, props.centerContent, props.entry, props.slotLayers, selectedCase]);
 
   const selectStaticLayer = (event: ReactMouseEvent<HTMLDivElement>) => {
     const frame = frameRef.current;
@@ -237,21 +270,32 @@ export function SourcePreviewFrame(props: {
   }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer, revealKey, selectedOccurrence, staticRevision]);
 
   useLayoutEffect(() => {
-    if (!mounts || previewMode !== "design" || !hoveredLayerHit || (hoveredLayerHit.layerId === props.selectedLayer?.id && hoveredLayerHit.occurrence === selectedOccurrence)) return undefined;
+    if (!mounts || previewMode !== "design" || !visibleHoveredLayerHit || (visibleHoveredLayerHit.layerId === props.selectedLayer?.id && visibleHoveredLayerHit.occurrence === selectedOccurrence)) return undefined;
     return mountSourceLayerHover(
       mounts.output,
-      hoveredLayerHit.layerId,
-      hoveredLayerHit.layerId === defaultVisualLayer?.id
+      visibleHoveredLayerHit.layerId,
+      visibleHoveredLayerHit.layerId === defaultVisualLayer?.id
         ? mounts.output.querySelector<HTMLElement>("[data-design-space-preview-entry-root]")
         : undefined,
-      hoveredLayerHit.occurrence,
+      visibleHoveredLayerHit.occurrence,
       hoveredExternalOwner,
     );
-  }, [defaultVisualLayer?.id, hoveredExternalOwner, hoveredLayerHit, mounts, previewMode, props.selectedLayer?.id, selectedOccurrence, staticRevision]);
+  }, [defaultVisualLayer?.id, hoveredExternalOwner, mounts, previewMode, props.selectedLayer?.id, selectedOccurrence, staticRevision, visibleHoveredLayerHit]);
 
   useEffect(() => {
     setHoveredLayerHit(undefined);
   }, [props.entry?.id, previewMode]);
+
+  useEffect(() => {
+    if (props.workspaceMode !== "preview" || previewMode !== "play" || !props.onModeChange) return undefined;
+    const stop = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      props.onModeChange?.("design");
+    };
+    window.addEventListener("keydown", stop);
+    return () => window.removeEventListener("keydown", stop);
+  }, [previewMode, props.onModeChange, props.workspaceMode]);
 
   useEffect(() => {
     if (!hoveredLayerHit) return undefined;
@@ -298,10 +342,21 @@ export function SourcePreviewFrame(props: {
       mode={previewMode === "static" ? undefined : previewMode}
       node={props.node}
       selectedLayer={Boolean(props.selectedLayer)}
+      showModeToggle={!props.workspaceMode}
       revealTarget={revealTarget?.key === revealKey ? revealTarget : undefined}
       selectionKey={props.entry?.id}
       selectionLabel={props.selectedLayer?.kind === "html" ? `<${props.selectedLayer.label}>` : props.node?.label}
-      hud={hoveredOwner ? (
+      hud={props.workspaceMode ? (
+        <SourceCanvasContextHud
+          contextLabel={props.node?.label ?? props.entry?.label ?? "Component"}
+          mode={props.workspaceMode}
+          playing={previewMode === "play"}
+          onPlayChange={(playing) => props.onModeChange?.(playing ? "play" : "design")}
+          onReturnToPreview={props.onReturnToPreview}
+        >
+          {hoveredOwner ? <SourceHoverIdentityHud external={Boolean(hoveredExternalOwner)} owner={hoveredOwner} /> : null}
+        </SourceCanvasContextHud>
+      ) : hoveredOwner ? (
         <SourceHoverIdentityHud external={Boolean(hoveredExternalOwner)} owner={hoveredOwner} />
       ) : props.selectedLayer && selectedLayerOccurrenceCount > 1 ? (
         <SourceInstanceNavigator
@@ -320,7 +375,10 @@ export function SourcePreviewFrame(props: {
           matrixAvailable={matrixAvailable}
           selectedCase={selectedCase}
           stale={loadState === "invalid"}
-          onCaseChange={(next) => designId && setCaseByDesign((current) => ({ ...current, [designId]: next }))}
+          onCaseChange={(next) => {
+            if (designId) setCaseByDesign((current) => ({ ...current, [designId]: next }));
+            props.onDesignCaseChange?.(next);
+          }}
           onMatrixChange={() => designId && setMatrixByDesign((current) => ({ ...current, [designId]: !current[designId] }))}
         />
       ) : undefined}
@@ -431,9 +489,9 @@ function SourceDesignControls(props: {
   return (
     <div className="flex min-w-0 items-center gap-1">
       {props.stale ? <span className="hidden text-[9px] text-amber-300 xl:inline">Last valid</span> : null}
-      <span className="hidden text-[9px] text-zinc-600 xl:inline">{props.isStateful ? "State" : "Design"}</span>
+      <span className="hidden text-[9px] text-zinc-600 xl:inline">{props.isStateful ? "State" : "Variant"}</span>
       <Select
-        aria-label={props.isStateful ? "Component state" : "Component design"}
+        aria-label={props.isStateful ? "Component state" : "Component variant"}
         className="w-24 min-w-0 shrink-0"
         selectedKey={props.selectedCase}
         onSelectionChange={(key) => props.onCaseChange(String(key))}

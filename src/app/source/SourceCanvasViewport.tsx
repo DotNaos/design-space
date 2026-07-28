@@ -17,6 +17,7 @@ export function SourceCanvasViewport(props: {
   device: DesignSpaceDevice;
   node?: SourceTreeNode;
   mode?: SourcePreviewMode;
+  showModeToggle?: boolean;
   selectedLayer?: boolean;
   selectionKey?: string;
   selectionLabel?: string;
@@ -65,7 +66,7 @@ export function SourceCanvasViewport(props: {
             onResponsiveWidthChange={(width) => setResponsiveWidth(Math.max(320, Math.min(1440, width)))}
             after={(
               <>
-                {props.mode && props.onModeChange ? <SourcePreviewModeToggle mode={props.mode} onChange={props.onModeChange} /> : null}
+                {props.showModeToggle !== false && props.mode && props.onModeChange ? <SourcePreviewModeToggle mode={props.mode} onChange={props.onModeChange} /> : null}
                 {props.toolbarEnd}
               </>
             )}

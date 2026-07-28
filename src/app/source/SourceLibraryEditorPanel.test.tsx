@@ -84,7 +84,7 @@ describe("SourceLibraryEditorPanel", () => {
     const inspector = screen.getByRole("complementary", { name: "TypeScript component contract" });
     expect(within(inspector).getByRole("region", { name: "Props" })).toHaveTextContent("tone");
     expect(within(inspector).getByRole("region", { name: "Slots" })).toHaveTextContent("icon");
-    const classes = within(inspector).getByRole("combobox", { name: "Tailwind classes" });
+    const classes = within(inspector).getByRole("combobox", { name: "className" });
     fireEvent.change(classes, { target: { value: "rounded-xl px-4" } });
     expect(change).toHaveBeenCalledWith("rounded-xl px-4");
     fireEvent.change(within(inspector).getByRole("textbox", { name: "Static text" }), { target: { value: "Continue" } });

@@ -31,7 +31,7 @@ export class SourceDesignGeneration {
     if (!helper) {
       throw new DesignSpaceError("INVALID_REGISTRATION", "No local defineComponentDesign helper is registered for this source project");
     }
-    const source = generatedDesignSource(entry, sourcePath, designPath, helper.absolutePath);
+    const source = generatedDesignSource(entry, sourcePath, designPath, helper.absolutePath, scope);
     assertEditedTypeScriptCompiles(workspace.root, designPath, source);
     await commitGeneratedDesign(workspace.root, sourcePath, designPath, source);
     return { state: "source-design-generated", scope, entryId, relativePath };
@@ -66,38 +66,75 @@ export function generatedDesignSource(
   sourcePath: string,
   designPath: string,
   helperPath: string,
+  scope: SourceDesignScope = "app",
 ): string {
+  const acceptsProps = entry.props.length > 0 || entry.slots.length > 0;
   const componentImport = entry.exportName === "default"
     ? `import ComponentUnderDesign from ${JSON.stringify(relativeImport(designPath, sourcePath))};`
     : `import { ${entry.exportName} as ComponentUnderDesign } from ${JSON.stringify(relativeImport(designPath, sourcePath))};`;
-  const defaults = generatedDefaults(entry);
+  const defaults = generatedDefaults(entry, scope);
   return [
-    'import type { ComponentProps } from "react";',
+    ...(acceptsProps ? ['import type { ComponentProps } from "react";'] : []),
+    ...(defaults.usesTarget ? ['import target from "virtual:design-space-target";'] : []),
     "",
     `import { defineComponentDesign } from ${JSON.stringify(relativeImport(designPath, helperPath))};`,
     componentImport,
     "",
     "export default defineComponentDesign(ComponentUnderDesign, {",
     "  isStateful: false,",
-    `  defaults: ${defaults} as ComponentProps<typeof ComponentUnderDesign>,`,
+    acceptsProps
+      ? `  defaults: ${defaults.source} as unknown as ComponentProps<typeof ComponentUnderDesign>,`
+      : "  defaults: {},",
     "  designs: { default: {} },",
-    "  render: (props: ComponentProps<typeof ComponentUnderDesign>) => <ComponentUnderDesign {...props} />,",
+    acceptsProps
+      ? "  render: (props: ComponentProps<typeof ComponentUnderDesign>) => <ComponentUnderDesign {...props} />,"
+      : "  render: () => <ComponentUnderDesign />,",
     "});",
     "",
   ].join("\n");
 }
 
-function generatedDefaults(entry: SourceWorkspaceEntry): string {
-  const values = entry.props.filter((property) => property.required).map((property) => (
-    `    ${propertyKey(property.name)}: ${defaultValue(property)}`
-  ));
+function generatedDefaults(
+  entry: SourceWorkspaceEntry,
+  scope: SourceDesignScope,
+): Readonly<{ source: string; usesTarget: boolean }> {
+  let usesTarget = false;
+  const values = entry.props.flatMap((property) => {
+    const targetValue = targetDefaultValue(property, entry, scope);
+    if (targetValue) {
+      usesTarget = true;
+      return [`    ${propertyKey(property.name)}: ${targetValue}`];
+    }
+    return property.required
+      ? [`    ${propertyKey(property.name)}: ${defaultValue(property)}`]
+      : [];
+  });
   if (entry.slots.length) {
     const slots = entry.slots.filter((slot) => slot.required).map((slot) => (
       `      ${propertyKey(slot.name)}: undefined as never`
     ));
     values.push(slots.length ? `    slots: {\n${slots.join(",\n")},\n    }` : "    slots: {}");
   }
-  return values.length ? `{\n${values.join(",\n")},\n  }` : "{}";
+  return {
+    source: values.length ? `{\n${values.join(",\n")},\n  }` : "{}",
+    usesTarget,
+  };
+}
+
+function targetDefaultValue(
+  property: SourceComponentProp,
+  entry: SourceWorkspaceEntry,
+  scope: SourceDesignScope,
+): string | undefined {
+  const workspace = scope === "app"
+    ? "target.sourceWorkspace"
+    : "target.sourceLibrary?.development";
+  if (/\b(?:Runtime)?SourceWorkspaceEntry\b/.test(property.type)) {
+    return `${workspace}?.entries.find((entry) => entry.relativePath === ${JSON.stringify(entry.relativePath)} && entry.exportName === ${JSON.stringify(entry.exportName)})`;
+  }
+  if (/\bRuntimeSourceWorkspace\b/.test(property.type)) return workspace;
+  if (/\bTargetModule\b/.test(property.type)) return "target";
+  return undefined;
 }
 
 function defaultValue(property: SourceComponentProp): string {

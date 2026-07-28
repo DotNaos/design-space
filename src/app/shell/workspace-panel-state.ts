@@ -8,6 +8,11 @@ export type WorkspacePanelWidths = {
   right: number;
 };
 
+export type WorkspacePanelVisibility = {
+  left: boolean;
+  right: boolean;
+};
+
 export type WorkspacePanelBounds = {
   left: PanelWidthBounds;
   right: PanelWidthBounds;
@@ -24,9 +29,14 @@ type PersistedWorkspacePanelWidths = WorkspacePanelWidths & {
 };
 
 const STORAGE_PREFIX = "design-space:workspace-panels:v1";
+const VISIBILITY_STORAGE_PREFIX = "design-space:workspace-panel-visibility:v1";
 
 export function workspacePanelStorageKey(namespace: WorkspacePanelNamespace) {
   return `${STORAGE_PREFIX}:${encodeURIComponent(namespace.projectId)}:${encodeURIComponent(namespace.documentId)}`;
+}
+
+export function workspacePanelVisibilityStorageKey(namespace: WorkspacePanelNamespace) {
+  return `${VISIBILITY_STORAGE_PREFIX}:${encodeURIComponent(namespace.projectId)}:${encodeURIComponent(namespace.documentId)}`;
 }
 
 export function normalizePanelBounds(bounds: Partial<PanelWidthBounds> | undefined, fallback: PanelWidthBounds): PanelWidthBounds {
@@ -115,6 +125,36 @@ export function saveWorkspacePanelWidths(
     storage.setItem(key, JSON.stringify({ version: 1, ...widths } satisfies PersistedWorkspacePanelWidths));
   } catch {
     // Panel sizing remains usable when storage is unavailable or full.
+  }
+}
+
+export function loadWorkspacePanelVisibility(
+  storage: Pick<Storage, "getItem"> | undefined,
+  key: string,
+): WorkspacePanelVisibility {
+  if (!storage) return { left: true, right: true };
+  try {
+    const parsed = JSON.parse(storage.getItem(key) ?? "null") as Partial<WorkspacePanelVisibility> & { version?: number } | null;
+    if (!parsed || parsed.version !== 1) return { left: true, right: true };
+    return {
+      left: typeof parsed.left === "boolean" ? parsed.left : true,
+      right: typeof parsed.right === "boolean" ? parsed.right : true,
+    };
+  } catch {
+    return { left: true, right: true };
+  }
+}
+
+export function saveWorkspacePanelVisibility(
+  storage: Pick<Storage, "setItem"> | undefined,
+  key: string,
+  visibility: WorkspacePanelVisibility,
+) {
+  if (!storage) return;
+  try {
+    storage.setItem(key, JSON.stringify({ version: 1, ...visibility }));
+  } catch {
+    // Panel visibility remains usable when storage is unavailable or full.
   }
 }
 

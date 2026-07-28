@@ -30,7 +30,7 @@ export function sourceCanvasSelectionOccurrence(
   return Math.max(0, index);
 }
 
-function sourceCanvasSelections(
+export function sourceCanvasSelections(
   graph: SourceFocusGraph,
   canvasOccurrenceId: string | undefined,
   layerId: string,

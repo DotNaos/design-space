@@ -12,7 +12,10 @@ import { initialFocusOccurrence, sourceFocusGraph } from "./source-focus-tree";
 import { sourceTreeNodes } from "./source-workspace-tree";
 import { SourceWorkspaceSidebar, type SourceWorkspaceSelection } from "./SourceWorkspaceSidebar";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 const desktopLayout: RuntimeSourceWorkspaceEntry = {
   id: "layout-desktop",
@@ -148,6 +151,44 @@ it("offers target-owned component creation from the focused tree", async () => {
   expect(onCreateComponent).toHaveBeenCalledOnce();
 });
 
+it("offers parent and exit navigation only while designing a component", async () => {
+  const onExit = vi.fn();
+  const onOpenParent = vi.fn();
+  const view = render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      designNavigation={{
+        parentLabel: "Dashboard",
+        onExit,
+        onOpenParent,
+      }}
+      workspace={workspace}
+    />,
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: "Open parent Dashboard" }));
+  await userEvent.click(screen.getByRole("button", { name: "Exit component design" }));
+  expect(onOpenParent).toHaveBeenCalledOnce();
+  expect(onExit).toHaveBeenCalledOnce();
+
+  view.rerender(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
+  expect(screen.queryByRole("button", { name: "Open parent Dashboard" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Exit component design" })).not.toBeInTheDocument();
+});
+
+it("keeps exit available at the top of the component hierarchy", () => {
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      designNavigation={{ onExit: vi.fn() }}
+      workspace={workspace}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Exit component design" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: /Open parent/ })).not.toBeInTheDocument();
+});
+
 it("shows composition, typed slots, components, and HTML in one expandable tree", async () => {
   render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
 
@@ -162,6 +203,50 @@ it("shows composition, typed slots, components, and HTML in one expandable tree"
   await userEvent.click(within(tree).getByRole("button", { name: "Expand <section>" }));
   expect(within(tree).getAllByRole("treeitem", { name: "ProjectSummary" })).toHaveLength(2);
   expect(screen.queryByText("Shared components")).not.toBeInTheDocument();
+});
+
+it("reports the hovered tree layer without changing the selection", async () => {
+  const onHover = vi.fn();
+  const onSelect = vi.fn();
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      onHover={onHover}
+      onSelect={onSelect}
+      workspace={workspace}
+    />,
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  const section = screen.getByRole("treeitem", { name: "<section>" });
+  await userEvent.hover(section);
+  expect(onHover).toHaveBeenLastCalledWith(expect.objectContaining({
+    kind: "html",
+    layerId: "dashboard-section",
+  }));
+  expect(onSelect).not.toHaveBeenCalled();
+
+  await userEvent.unhover(section);
+  expect(onHover).toHaveBeenLastCalledWith(undefined);
+});
+
+it("mutes layers owned by a different source file", async () => {
+  render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  const section = screen.getByRole("treeitem", { name: "<section>" });
+  expect(section).toHaveAttribute("data-source-file-scope", "current");
+  expect(section).not.toHaveClass("opacity-40");
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand content" }));
+  const summary = screen.getAllByRole("treeitem", { name: "ProjectSummary" })[0]!;
+  expect(summary).toHaveAttribute("data-source-file-scope", "external");
+  expect(summary).toHaveClass("opacity-40");
+
+  await userEvent.click(within(summary).getByRole("button", { name: "Expand ProjectSummary" }));
+  const article = screen.getByRole("treeitem", { name: "<article>" });
+  expect(article).toHaveAttribute("data-source-file-scope", "external");
+  expect(article).toHaveClass("opacity-40");
 });
 
 it("selects a nested component without replacing the canvas, then opens it explicitly", async () => {
@@ -222,8 +307,18 @@ it("expands and scrolls to an explicitly opened component", async () => {
     await userEvent.dblClick(screen.getAllByRole("button", { name: "ProjectSummary" })[0]!);
 
     expect(await screen.findByRole("treeitem", { name: "<article>" })).toBeVisible();
+    expect(screen.getByRole("treeitem", { name: "ProjectSummary" }))
+      .toHaveAttribute("data-source-file-scope", "current");
     expect(screen.getByRole("button", { name: "Collapse ProjectSummary" }))
       .toHaveAttribute("aria-expanded", "true");
+    for (const parentLabel of ["DesktopLayout", "Dashboard", "content"]) {
+      const parent = screen.getByRole("treeitem", { name: parentLabel });
+      expect(parent).toHaveAttribute("data-source-active-path", "true");
+      expect(parent).toHaveClass("opacity-70");
+      expect(parent).not.toHaveClass("opacity-40");
+    }
+    expect(screen.getByRole("treeitem", { name: "ProjectSummary" }))
+      .not.toHaveAttribute("data-source-active-path");
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
   } finally {
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -238,6 +333,25 @@ it("does not expose a separate Layers mode", () => {
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   expect(screen.queryByRole("navigation", { name: "Source tree views" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Show (component layers|composition tree)/ })).not.toBeInTheDocument();
+});
+
+it("collapses outside the active component without closing its path", async () => {
+  render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  await userEvent.click(screen.getByRole("button", {
+    name: "Collapse outside active component",
+  }));
+
+  expect(screen.getByRole("button", { name: "Collapse Dashboard" }))
+    .toHaveAttribute("aria-expanded", "true");
+});
+
+it("uses indentation without vertical guide borders", () => {
+  render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
+
+  const tree = screen.getByRole("tree", { name: "Source tree" });
+  expect(tree.querySelector("span.absolute.border-l")).toBeNull();
 });
 
 it("shows missing design evidence inline without an audit menu", () => {
@@ -405,6 +519,32 @@ it("changes branch visibility only from the chevron", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Collapse Dashboard" }));
   expect(screen.queryByRole("treeitem", { name: "content" })).not.toBeInTheDocument();
   expect(onFocus).not.toHaveBeenCalled();
+});
+
+it("restores expanded branches after the tree remounts", async () => {
+  const first = render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      treeStateKey="project:app:desktop"
+      workspace={workspace}
+    />,
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  expect(screen.getByRole("treeitem", { name: "content" })).toBeVisible();
+  first.unmount();
+
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      treeStateKey="project:app:desktop"
+      workspace={workspace}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Collapse Dashboard" }))
+    .toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("treeitem", { name: "content" })).toBeVisible();
 });
 
 it("keeps a visible slot picker usable without selecting the slot row", async () => {

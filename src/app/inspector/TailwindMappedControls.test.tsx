@@ -4,6 +4,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { replaceTailwindUtilityGroup, snapSliderIndex, TailwindMappedControls } from "./TailwindMappedControls";
+import { readBoxValue, setBoxValue } from "./TailwindBoxModelControl";
 
 afterEach(cleanup);
 
@@ -67,9 +68,6 @@ describe("TailwindMappedControls", () => {
     ["Gap", "gap"],
     ["Gap X", "gap-x"],
     ["Gap Y", "gap-y"],
-    ["Padding", "p"],
-    ["Padding X", "px"],
-    ["Padding Y", "py"],
   ])("emits only named Tailwind spacing tokens for %s", (name, prefix) => {
     for (let index = 0; index <= 9; index += 1) {
       const onChange = vi.fn();
@@ -112,6 +110,19 @@ describe("TailwindMappedControls", () => {
     expect(onChange).toHaveBeenCalledWith("flex sm:flex p-4");
   });
 
+  it("previews a hovered layout choice without applying it", () => {
+    const onChange = vi.fn();
+    const onPreviewChange = vi.fn();
+    render(<TailwindMappedControls value="block p-4" onChange={onChange} onPreviewChange={onPreviewChange} />);
+
+    const flex = screen.getByRole("button", { name: "Display: Flex" });
+    fireEvent.pointerEnter(flex);
+    expect(onPreviewChange).toHaveBeenCalledWith("flex p-4");
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.pointerLeave(flex);
+    expect(onPreviewChange).toHaveBeenLastCalledWith();
+  });
+
   it("replaces valid display utilities that are not exposed as visual presets", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -123,65 +134,42 @@ describe("TailwindMappedControls", () => {
     expect(onChange).toHaveBeenCalledWith("flex p-4");
   });
 
-  it("replaces safe alignment utilities without leaving conflicting classes", async () => {
+  it("uses a compact 3×3 alignment control and omits the default left utility", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<TailwindMappedControls value="flex items-center-safe justify-center-safe gap-4" onChange={onChange} />);
 
-    await user.click(screen.getByRole("button", { name: "Align: Start" }));
-    expect(onChange).toHaveBeenCalledWith("flex items-start justify-center-safe gap-4");
-
-    onChange.mockClear();
-    await user.click(screen.getByRole("button", { name: "Justify: End" }));
-    expect(onChange).toHaveBeenCalledWith("flex items-center-safe justify-end gap-4");
+    await user.click(screen.getByRole("button", { name: "Alignment: Top Left" }));
+    expect(onChange).toHaveBeenCalledWith("flex items-start gap-4");
   });
 
-  it("turns on flex layout when a direction is chosen on a normal element", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    render(<TailwindMappedControls value="min-w-0" onChange={onChange} />);
-
-    await user.click(screen.getByRole("button", { name: "Direction: Column" }));
-
-    expect(onChange).toHaveBeenCalledWith("min-w-0 flex flex-col");
-  });
-
-  it("turns on flex layout for alignment but preserves an existing grid", async () => {
+  it("shows only controls relevant to the selected display mode", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const { rerender } = render(<TailwindMappedControls value="block" onChange={onChange} />);
 
-    await user.click(screen.getByRole("button", { name: "Align: End" }));
-    expect(onChange).toHaveBeenLastCalledWith("flex items-end");
+    expect(screen.queryByText("Direction")).not.toBeInTheDocument();
+    expect(screen.queryByText("Alignment")).not.toBeInTheDocument();
 
-    onChange.mockClear();
+    rerender(<TailwindMappedControls value="flex" onChange={onChange} />);
+    expect(screen.getByText("Direction")).toBeInTheDocument();
+    expect(screen.getByText("Alignment")).toBeInTheDocument();
+
     rerender(<TailwindMappedControls value="grid" onChange={onChange} />);
-    await user.click(screen.getByRole("button", { name: "Justify: Center" }));
-    expect(onChange).toHaveBeenLastCalledWith("grid justify-center");
+    expect(screen.queryByText("Direction")).not.toBeInTheDocument();
+    expect(screen.getByText("Columns")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Alignment: Middle Center" }));
+    expect(onChange).toHaveBeenLastCalledWith("grid items-center justify-center");
   });
 
-  it("shows arbitrary base values as Custom and replaces them in place", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    render(<TailwindMappedControls value="flex p-[18px] sm:p-8 text-sm" onChange={onChange} />);
-
-    expect(screen.getByText("Custom · p-[18px]")).toBeInTheDocument();
-    moveSlider("Padding", 7);
-
-    expect(onChange).toHaveBeenCalledWith("flex p-6 sm:p-8 text-sm");
-  });
-
-  it("edits uniform and axis spacing independently", async () => {
-    const user = userEvent.setup();
+  it("keeps gap controls and the box model independent", () => {
     const onChange = vi.fn();
     render(<TailwindMappedControls value="gap-4 gap-x-2 gap-y-3 p-4 px-8 py-2" onChange={onChange} />);
 
     moveSlider("Gap", 7);
     expect(onChange).toHaveBeenCalledWith("gap-6 gap-x-2 gap-y-3 p-4 px-8 py-2");
-
-    onChange.mockClear();
-    moveSlider("Padding X", 4);
-    expect(onChange).toHaveBeenCalledWith("gap-4 gap-x-2 gap-y-3 p-4 px-3 py-2");
+    expect(screen.getByRole("textbox", { name: "padding top" })).toHaveValue("8px");
+    expect(screen.getByRole("textbox", { name: "padding right" })).toHaveValue("32px");
   });
 
   it("does not let uniform appearance controls consume directional utilities", async () => {
@@ -220,6 +208,29 @@ describe("TailwindMappedControls", () => {
       expect(onChange).toHaveBeenCalledWith("shadow-md shadow-[#50d71e]");
     },
   );
+});
+
+describe("Tailwind box model", () => {
+  it("resolves side, axis, and uniform values in cascade order", () => {
+    const value = "p-4 px-8 pt-[10px] m-[var(--space)] border border-r-2";
+    expect(readBoxValue(value, "padding", "top")).toBe("10px");
+    expect(readBoxValue(value, "padding", "right")).toBe("32px");
+    expect(readBoxValue(value, "padding", "bottom")).toBe("16px");
+    expect(readBoxValue(value, "margin", "left")).toBe("var(--space)");
+    expect(readBoxValue(value, "border", "right")).toBe("2px");
+  });
+
+  it("writes one side without removing uniform or responsive utilities", () => {
+    expect(setBoxValue("p-4 sm:pt-8 text-sm", "padding", "top", "12px"))
+      .toBe("p-4 sm:pt-8 text-sm pt-3");
+    expect(setBoxValue("m-4 mt-[12px] hover:mt-8", "margin", "top", "var(--space)"))
+      .toBe("m-4 mt-[var(--space)] hover:mt-8");
+  });
+
+  it("preserves directional border colors when changing border width", () => {
+    expect(setBoxValue("border-t-red-500 border-t-2 border-white/10", "border", "top", "4px"))
+      .toBe("border-t-red-500 border-t-[4px] border-white/10");
+  });
 });
 
 describe("snapSliderIndex", () => {

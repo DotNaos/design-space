@@ -435,7 +435,5 @@ function rect(left: number, top: number, width: number, height: number): DOMRect
 }
 
 function canvasScale(): number {
-  const match = screen.getByTestId("canvas-world").style.transform.match(/scale\(([^)]+)\)/);
-  if (!match) throw new Error("Canvas transform does not contain a scale");
-  return Number(match[1]);
+  return Number(screen.getByTestId("canvas-world").style.zoom || 1);
 }

@@ -22,10 +22,12 @@ export type SourceLibraryEditorPanelProps = {
   designLayer?: SourceWorkspaceLayer;
   selectedLayer?: SourceWorkspaceLayer;
   selectedLayerMetrics?: SourceLayerMetrics;
+  selectedDesignCase?: string;
   sourceEditor: SourceCodeEditor;
   styleEditor?: SourceLayerClassEditor;
   onActiveTabChange: (tab: SourceLibraryEditorTab) => void;
   onCodeDocumentChange: (document: SourceLibraryCodeDocument) => void;
+  onDesignCaseChange?: (caseName: string) => void;
 };
 
 export function SourceLibraryEditorPanel(props: SourceLibraryEditorPanelProps) {
@@ -61,7 +63,9 @@ export function SourceLibraryEditorPanel(props: SourceLibraryEditorPanelProps) {
             entry={props.entry}
             layer={props.designLayer ?? props.selectedLayer}
             layerMetrics={props.selectedLayerMetrics}
+            selectedDesignCase={props.selectedDesignCase}
             styleEditor={props.styleEditor}
+            onDesignCaseChange={props.onDesignCaseChange}
           />
         )}
       </div>

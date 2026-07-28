@@ -7,6 +7,7 @@ import { runLocalOperation } from "../api";
 
 export function TailwindClassField(props: {
   value: string;
+  previewValue?: string;
   label?: string;
   disabled?: boolean;
   compileError?: string;
@@ -27,6 +28,9 @@ export function TailwindClassField(props: {
   const completions = currentResult?.completions.slice(0, 50) ?? [];
   const open = focused && completions.length > 0;
   const diagnostic = props.compileError ?? currentResult?.diagnostics[0]?.message;
+  const previewDiff = props.previewValue && props.previewValue !== props.value
+    ? classTokenDiff(props.value, props.previewValue)
+    : undefined;
 
   const markFocused = () => {
     if (blurTimer.current !== undefined) window.clearTimeout(blurTimer.current);
@@ -94,48 +98,70 @@ export function TailwindClassField(props: {
             {unavailable ? "Compile checks only" : "IntelliSense"}
           </span>
         </span>
-        <Input
-          ref={inputRef}
-          aria-autocomplete="list"
-          aria-controls={open ? listboxId : undefined}
-          aria-expanded={open}
-          aria-label={props.label ?? "Tailwind classes"}
-          autoCapitalize="none"
-          autoComplete="off"
-          autoCorrect="off"
-          className={`mt-1 min-h-11 w-full rounded-lg border bg-black/20 px-3 font-mono text-base text-zinc-100 outline-none lg:text-xs ${diagnostic ? "border-rose-400/60 focus:border-rose-300" : "border-white/10 focus:border-sky-400"}`}
-          role="combobox"
-          spellCheck={false}
-          onBlur={() => {
-            blurTimer.current = window.setTimeout(() => {
-              blurTimer.current = undefined;
-              setFocused(false);
-            }, 100);
-          }}
-          onClick={(event) => {
-            markFocused();
-            setCursor(event.currentTarget.selectionStart ?? props.value.length);
-          }}
-          onFocus={(event) => {
-            markFocused();
-            setCursor(event.currentTarget.selectionStart ?? props.value.length);
-          }}
-          onKeyDown={(event) => {
-            if (!open) return;
-            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-              event.preventDefault();
-              const direction = event.key === "ArrowDown" ? 1 : -1;
-              setActiveIndex((index) => (index + direction + completions.length) % completions.length);
-            } else if (event.key === "Tab" || event.key === "Enter") {
-              event.preventDefault();
-              accept(completions[activeIndex]);
-            } else if (event.key === "Escape") {
-              event.preventDefault();
-              setResult(undefined);
-            }
-          }}
-          onSelect={(event) => setCursor(event.currentTarget.selectionStart ?? props.value.length)}
-        />
+        <div className="relative mt-1">
+          <Input
+            ref={inputRef}
+            aria-autocomplete="list"
+            aria-controls={open ? listboxId : undefined}
+            aria-expanded={open}
+            aria-label={props.label ?? "Tailwind classes"}
+            autoCapitalize="none"
+            autoComplete="off"
+            autoCorrect="off"
+            className={`min-h-11 w-full rounded-lg border bg-black/20 px-3 font-mono text-base outline-none lg:text-xs ${previewDiff ? "caret-transparent text-transparent" : "text-zinc-100"} ${diagnostic ? "border-rose-400/60 focus:border-rose-300" : "border-white/10 focus:border-sky-400"}`}
+            role="combobox"
+            spellCheck={false}
+            onBlur={() => {
+              blurTimer.current = window.setTimeout(() => {
+                blurTimer.current = undefined;
+                setFocused(false);
+              }, 100);
+            }}
+            onClick={(event) => {
+              markFocused();
+              setCursor(event.currentTarget.selectionStart ?? props.value.length);
+            }}
+            onFocus={(event) => {
+              markFocused();
+              setCursor(event.currentTarget.selectionStart ?? props.value.length);
+            }}
+            onKeyDown={(event) => {
+              if (!open) return;
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                const direction = event.key === "ArrowDown" ? 1 : -1;
+                setActiveIndex((index) => (index + direction + completions.length) % completions.length);
+              } else if (event.key === "Tab" || event.key === "Enter") {
+                event.preventDefault();
+                accept(completions[activeIndex]);
+              } else if (event.key === "Escape") {
+                event.preventDefault();
+                setResult(undefined);
+              }
+            }}
+            onSelect={(event) => setCursor(event.currentTarget.selectionStart ?? props.value.length)}
+          />
+          {previewDiff ? (
+            <div
+              aria-label={`${props.label ?? "Tailwind classes"} preview diff`}
+              className="pointer-events-none absolute inset-0 flex items-center gap-1 overflow-hidden whitespace-nowrap rounded-lg px-3 font-mono text-base lg:text-xs"
+              role="status"
+            >
+              {previewDiff.map((part, index) => (
+                <span
+                  key={`${part.kind}:${part.token}:${index}`}
+                  className={part.kind === "removed"
+                    ? "text-rose-300 line-through decoration-rose-400/80"
+                    : part.kind === "added"
+                      ? "text-emerald-300"
+                      : "text-zinc-400"}
+                >
+                  {part.kind === "removed" ? "−" : part.kind === "added" ? "+" : ""}{part.token}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </TextField>
 
       {open && (
@@ -166,4 +192,44 @@ export function TailwindClassField(props: {
       </p>
     </div>
   );
+}
+
+type ClassTokenDiffPart = {
+  kind: "unchanged" | "removed" | "added";
+  token: string;
+};
+
+function classTokenDiff(before: string, after: string): ClassTokenDiffPart[] {
+  const previous = before.split(/\s+/).filter(Boolean);
+  const next = after.split(/\s+/).filter(Boolean);
+  const lengths = Array.from({ length: previous.length + 1 }, () => Array<number>(next.length + 1).fill(0));
+
+  for (let previousIndex = previous.length - 1; previousIndex >= 0; previousIndex -= 1) {
+    for (let nextIndex = next.length - 1; nextIndex >= 0; nextIndex -= 1) {
+      lengths[previousIndex]![nextIndex] = previous[previousIndex] === next[nextIndex]
+        ? lengths[previousIndex + 1]![nextIndex + 1]! + 1
+        : Math.max(lengths[previousIndex + 1]![nextIndex]!, lengths[previousIndex]![nextIndex + 1]!);
+    }
+  }
+
+  const parts: ClassTokenDiffPart[] = [];
+  let previousIndex = 0;
+  let nextIndex = 0;
+  while (previousIndex < previous.length || nextIndex < next.length) {
+    if (previous[previousIndex] === next[nextIndex]) {
+      parts.push({ kind: "unchanged", token: previous[previousIndex]! });
+      previousIndex += 1;
+      nextIndex += 1;
+    } else if (
+      previousIndex < previous.length
+      && (nextIndex >= next.length || lengths[previousIndex + 1]![nextIndex]! >= lengths[previousIndex]![nextIndex + 1]!)
+    ) {
+      parts.push({ kind: "removed", token: previous[previousIndex]! });
+      previousIndex += 1;
+    } else if (nextIndex < next.length) {
+      parts.push({ kind: "added", token: next[nextIndex]! });
+      nextIndex += 1;
+    }
+  }
+  return parts;
 }

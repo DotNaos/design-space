@@ -1,14 +1,14 @@
 import { Input, Label, NumberField, TextArea, TextField } from "@heroui/react";
-import { BoxSelect, Move, PaintBucket, SquareDashed, Type } from "lucide-react";
+import { BoxSelect, Code2, Move, PaintBucket, SquareDashed, Type } from "lucide-react";
 
 import type { SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { TailwindMappedControls } from "../inspector/TailwindMappedControls";
-import { TailwindClassField } from "../inspector/TailwindClassField";
 import {
   setSourceLayerDimension,
   setSourceLayerFill,
   setSourceLayerStroke,
   setSourceLayerStrokeWidth,
+  setSourceLayerTextColor,
   sourceLayerPaint,
   type SourceLayerMetrics,
 } from "./source-layer-design";
@@ -18,6 +18,7 @@ export function SourceLayerDesignInspector(props: {
   layer: SourceWorkspaceLayer;
   metrics?: SourceLayerMetrics;
   styleEditor?: SourceLayerClassEditor;
+  onClassNamePreviewChange?: (value?: string) => void;
 }) {
   const editor = props.styleEditor;
   const className = editor?.value ?? props.layer.className?.value ?? "";
@@ -55,7 +56,11 @@ export function SourceLayerDesignInspector(props: {
 
         {props.layer.className ? (
           <div className="px-4 py-1">
-            <TailwindMappedControls value={className} onChange={(value) => editor?.change(value)} />
+            <TailwindMappedControls
+              value={className}
+              onChange={(value) => editor?.change(value)}
+              onPreviewChange={props.onClassNamePreviewChange}
+            />
           </div>
         ) : props.layer.classNameDynamic ? (
           <InspectorSection icon={SquareDashed} title="Layout">
@@ -64,29 +69,36 @@ export function SourceLayerDesignInspector(props: {
         ) : null}
 
         {props.layer.className && (
-          <InspectorSection icon={PaintBucket} title="Fill and stroke">
-            <div className="grid grid-cols-2 gap-2">
+          <InspectorSection icon={PaintBucket} title="Colors and border">
+            <div className="divide-y divide-white/[0.05]">
               <PaintField
                 disabled={!editable}
                 label="Fill"
-                placeholder="#141518"
+                placeholder="none"
                 value={paint.fill}
                 onChange={(value) => editor?.change(setSourceLayerFill(className, value))}
               />
               <PaintField
                 disabled={!editable}
                 label="Stroke"
-                placeholder="#ffffff"
+                placeholder="none"
                 value={paint.stroke}
                 onChange={(value) => editor?.change(setSourceLayerStroke(className, value))}
+                trailing={(
+                  <DimensionField
+                    disabled={!editable}
+                    label="px"
+                    value={paint.strokeWidth}
+                    onChange={(value) => editor?.change(setSourceLayerStrokeWidth(className, value))}
+                  />
+                )}
               />
-            </div>
-            <div className="mt-2 w-1/2 pr-1">
-              <DimensionField
+              <PaintField
                 disabled={!editable}
-                label="Stroke px"
-                value={paint.strokeWidth}
-                onChange={(value) => editor?.change(setSourceLayerStrokeWidth(className, value))}
+                label="Text"
+                placeholder="inherit"
+                value={paint.textColor}
+                onChange={(value) => editor?.change(setSourceLayerTextColor(className, value))}
               />
             </div>
           </InspectorSection>
@@ -102,23 +114,29 @@ export function SourceLayerDesignInspector(props: {
         )}
 
         {props.layer.className && (
-          <details className="group px-4 py-2">
-            <summary className="cursor-pointer list-none py-1 text-[9px] text-zinc-600 hover:text-zinc-400">Advanced Tailwind classes</summary>
-            <div className="pb-3 pt-2">
-              <TailwindClassField compileError={editor?.error} disabled={!editable} label="Tailwind classes" value={className} onChange={(value) => editor?.change(value)} />
-            </div>
-          </details>
+          <InspectorSection accent icon={Code2} title="Generated Tailwind">
+            <code
+              aria-label="Generated Tailwind classes"
+              className="block min-h-10 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-md border border-sky-300/20 bg-sky-950/25 px-3 py-2.5 font-mono text-[10px] font-medium leading-4 text-sky-100 shadow-[inset_0_1px_0_rgba(125,211,252,0.06)]"
+            >
+              {className || "No utilities"}
+            </code>
+            {editor?.error && <p className="mt-2 text-[9px] leading-4 text-red-300">{editor.error}</p>}
+          </InspectorSection>
         )}
       </div>
     </section>
   );
 }
 
-function InspectorSection(props: { children: React.ReactNode; icon: typeof Move; title: string }) {
+function InspectorSection(props: { accent?: boolean; children: React.ReactNode; icon: typeof Move; title: string }) {
   const Icon = props.icon;
   return (
-    <section className="px-4 py-3">
-      <h4 className="mb-2.5 flex items-center gap-1.5 text-[10px] font-medium text-zinc-400"><Icon aria-hidden="true" className="text-zinc-600" size={12} />{props.title}</h4>
+    <section className={`px-4 py-3 ${props.accent ? "bg-sky-400/[0.035] shadow-[inset_2px_0_0_rgba(56,189,248,0.32)]" : ""}`}>
+      <h4 className={`mb-2.5 flex items-center gap-1.5 text-[10px] font-medium ${props.accent ? "text-sky-200" : "text-zinc-400"}`}>
+        <Icon aria-hidden="true" className={props.accent ? "text-sky-400" : "text-zinc-600"} size={12} />
+        {props.title}
+      </h4>
       {props.children}
     </section>
   );
@@ -152,13 +170,54 @@ function DimensionField(props: { disabled: boolean; label: string; value?: numbe
   );
 }
 
-function PaintField(props: { disabled: boolean; label: string; placeholder: string; value: string; onChange: (value: string) => void }) {
+function PaintField(props: {
+  disabled: boolean;
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  trailing?: React.ReactNode;
+}) {
   return (
-    <TextField isDisabled={props.disabled} value={props.value} onChange={props.onChange}>
-      <Label className="mb-1 block text-[9px] text-zinc-600">{props.label}</Label>
-      <Input aria-label={props.label} className="h-8 w-full rounded-md border border-white/[0.08] bg-black/20 px-2 font-mono text-[10px] text-zinc-300 outline-none" placeholder={props.placeholder} />
-    </TextField>
+    <div className={`grid min-h-10 items-center gap-2 py-1.5 ${props.trailing ? "grid-cols-[3.5rem_minmax(0,1fr)_4.5rem]" : "grid-cols-[3.5rem_minmax(0,1fr)]"}`}>
+      <span className="text-[9px] text-zinc-500">{props.label}</span>
+      <TextField isDisabled={props.disabled} value={props.value} onChange={props.onChange}>
+        <Label className="sr-only">{props.label}</Label>
+        <div className="flex h-8 items-center gap-2 rounded-md border border-white/[0.08] bg-black/20 px-2 focus-within:border-sky-300/30">
+          <span
+            aria-label={`${props.label} swatch`}
+            className="size-3.5 shrink-0 rounded-sm border border-white/15 bg-[linear-gradient(135deg,transparent_45%,rgba(244,63,94,.8)_46%,rgba(244,63,94,.8)_54%,transparent_55%)]"
+            role="img"
+            style={tailwindColorStyle(props.value)}
+          />
+          <Input aria-label={props.label} className="h-full min-w-0 flex-1 bg-transparent px-0 font-mono text-[10px] text-zinc-300 outline-none" placeholder={props.placeholder} />
+        </div>
+      </TextField>
+      <div className="min-w-0">{props.trailing}</div>
+    </div>
   );
+}
+
+function tailwindColorStyle(value: string): React.CSSProperties | undefined {
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  if (validCssColor(normalized)) return { background: normalized };
+  const match = normalized.match(/^([a-z]+(?:-\d{2,3})?)(?:\/(?:\[(\d*\.?\d+)\]|(\d{1,3})))?$/);
+  if (!match) return undefined;
+  const opacity = match[2] !== undefined
+    ? Math.max(0, Math.min(1, Number(match[2]))) * 100
+    : match[3] !== undefined
+      ? Math.max(0, Math.min(100, Number(match[3])))
+      : 100;
+  return {
+    background: opacity === 100
+      ? `var(--color-${match[1]})`
+      : `color-mix(in srgb, var(--color-${match[1]}) ${opacity}%, transparent)`,
+  };
+}
+
+function validCssColor(value: string): boolean {
+  return /^(?:#|(?:rgb|hsl|oklch|color|var)\()/.test(value);
 }
 
 function formatMetric(value: number | undefined): string {

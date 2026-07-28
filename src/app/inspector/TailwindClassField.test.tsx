@@ -100,3 +100,23 @@ it("keeps IntelliSense active when the field is refocused before the delayed blu
   expect(await screen.findByRole("option", { name: "p-4" })).toBeInTheDocument();
   vi.useRealTimers();
 });
+
+it("renders a stable inline token diff without replacing the editable value", () => {
+  const onChange = vi.fn();
+  render(
+    <TailwindClassField
+      label="className"
+      previewValue="border-b border-white/10 block"
+      value="border-b border-white/10 flex"
+      onChange={onChange}
+    />,
+  );
+
+  expect(screen.getByRole("combobox", { name: "className" })).toHaveValue("border-b border-white/10 flex");
+  const diff = screen.getByRole("status", { name: "className preview diff" });
+  expect(diff).toHaveTextContent("border-b");
+  expect(diff).toHaveTextContent("−flex");
+  expect(diff).toHaveTextContent("+block");
+  expect(screen.queryByText(/Preview only/)).not.toBeInTheDocument();
+  expect(onChange).not.toHaveBeenCalled();
+});

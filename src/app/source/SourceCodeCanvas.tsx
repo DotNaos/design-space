@@ -17,6 +17,7 @@ export function SourceCodeCanvas(props: {
   path?: string;
   selection?: SourceLayerBinding;
   toolbar?: React.ReactNode;
+  onCursorOffsetChange?: (offset: number) => void;
   onPreview?: () => void;
 }) {
   const editor = props.editor;
@@ -48,6 +49,7 @@ export function SourceCodeCanvas(props: {
                 selection={props.selection}
                 value={editor.draft}
                 onChange={editor.setDraft}
+                onCursorOffsetChange={props.onCursorOffsetChange}
               />
             </Suspense>
           </div>

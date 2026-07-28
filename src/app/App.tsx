@@ -9,7 +9,7 @@ import { ActivityRail, type WorkspaceMode } from "./components/ActivityRail/Acti
 import { CatalogPanel } from "./components/CatalogPanel/CatalogPanel";
 import { ComponentTree } from "./components/ComponentTree/ComponentTree";
 import { DiffSheet } from "./components/DiffSheet/DiffSheet";
-import { WorkspaceShell } from "./components/WorkspaceShell";
+import { WorkspaceShell, WorkspaceStatus } from "./components/WorkspaceShell";
 import { FileBrowser } from "./components/FileBrowser/FileBrowser";
 import { Inspector } from "./components/Inspector/Inspector";
 import { MobileItemEditor } from "./components/MobileItemEditor/MobileItemEditor";
@@ -46,18 +46,18 @@ export function App() {
   const previewRuntime = useSourcePreviewRuntime();
   if (target.sourceWorkspace) {
     return <WorkspaceShell slots={{
-      status: undefined as never,
+      status: <WorkspaceStatus />,
       content: <SourceWorkspace nestedPreview={previewRuntime} target={target} />,
     }} />;
   }
   if (usesDocumentWorkspace(target)) {
     return <WorkspaceShell slots={{
-      status: undefined as never,
+      status: <WorkspaceStatus />,
       content: <DocumentWorkspace target={target} />,
     }} />;
   }
   return <WorkspaceShell slots={{
-    status: undefined as never,
+    status: <WorkspaceStatus />,
     content: <LegacyWorkspace />,
   }} />;
 }

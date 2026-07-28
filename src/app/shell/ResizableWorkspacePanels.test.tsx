@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ResizableWorkspacePanels } from "./ResizableWorkspacePanels";
-import { workspacePanelStorageKey } from "./workspace-panel-state";
+import { workspacePanelStorageKey, workspacePanelVisibilityStorageKey } from "./workspace-panel-state";
 
 const originalMatchMedia = window.matchMedia;
 const originalInnerWidth = window.innerWidth;
@@ -34,6 +34,30 @@ describe("ResizableWorkspacePanels", () => {
     expect(left).toHaveAttribute("aria-valuetext", "260 pixels");
     expect(left).toHaveAttribute("aria-controls", screen.getByRole("region", { name: "Project panel" }).id);
     expect(screen.getByRole("separator", { name: "Resize Inspector panel" })).toHaveAttribute("aria-valuenow", "300");
+  });
+
+  it("collapses each panel independently and restores the state for the same document", async () => {
+    const first = renderWorkspace();
+    await fireEvent.click(screen.getByRole("button", { name: "Hide Project panel" }));
+
+    const showProject = screen.getByRole("button", { name: "Show Project panel" });
+    expect(document.getElementById(showProject.getAttribute("aria-controls")!)).toHaveAttribute("aria-hidden", "true");
+    expect(showProject).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("region", { name: "Inspector panel" })).toHaveAttribute("aria-hidden", "false");
+
+    const key = workspacePanelVisibilityStorageKey({ projectId: "demo", documentId: "home" });
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem(key) ?? "{}")).toMatchObject({
+      version: 1,
+      left: false,
+      right: true,
+    }));
+
+    first.unmount();
+    renderWorkspace();
+    expect(screen.getByRole("button", { name: "Show Project panel" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Hide Inspector panel" }));
+    const showInspector = screen.getByRole("button", { name: "Show Inspector panel" });
+    expect(document.getElementById(showInspector.getAttribute("aria-controls")!)).toHaveAttribute("aria-hidden", "true");
   });
 
   it("resizes both panels by pointer and clamps them to their limits", () => {
