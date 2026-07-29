@@ -21,6 +21,12 @@ const sourceProjectConfigSchema = z.object({
       root: z.string().min(1).max(1_024),
     }).strict().optional(),
   }).strict().optional(),
+  approvals: z.object({
+    policy: z.string()
+      .regex(/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+\.ya?ml$/)
+      .max(1_024)
+      .optional(),
+  }).strict().optional(),
 }).strict();
 
 export function parseSourceProjectConfig(value: unknown): DesignSpaceProjectConfig {

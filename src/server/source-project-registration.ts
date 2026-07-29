@@ -6,6 +6,7 @@ import { runnerImport } from "vite";
 
 import { DesignSpaceError } from "./errors";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
+import { verifySourceComponentApprovals } from "./source-approval-registration";
 import { indexSourceWorkspace } from "./source-file-index";
 import { parseSourceProjectConfig } from "./source-project-config";
 import { registerSourceComponentStore } from "./source-component-creation";
@@ -17,7 +18,7 @@ export async function registerSourceProject(
 ): Promise<RegisteredTarget> {
   const root = await canonicalRoot(unsafeRoot);
   const registrationPath = await canonicalRegisteredFile(root, ".designspace.ts");
-  const sourceWorkspace = await indexSourceWorkspace(root, config);
+  const sourceWorkspace = await indexRegisteredSourceWorkspace(root, config);
   const sourceLibrary = await registerSourceLibrary(root, config, sourceWorkspace.manifest.library);
   const sourceComponentStore = await registerSourceComponentStore(
     root,
@@ -81,7 +82,19 @@ async function loadLibraryWorkspace(root: string) {
     root,
     logLevel: "silent",
   });
-  return indexSourceWorkspace(root, parseSourceProjectConfig(module.default ?? module.designSpace));
+  return indexRegisteredSourceWorkspace(root, parseSourceProjectConfig(module.default ?? module.designSpace));
+}
+
+async function indexRegisteredSourceWorkspace(root: string, config: DesignSpaceProjectConfig) {
+  const workspace = await indexSourceWorkspace(root, config);
+  const approvals = await verifySourceComponentApprovals(root, config, workspace.manifest.entries);
+  return {
+    ...workspace,
+    manifest: Object.freeze({
+      ...workspace.manifest,
+      approvals,
+    }),
+  };
 }
 
 async function resolveLibraryDesignModule(root: string, packageName: string): Promise<string | undefined> {

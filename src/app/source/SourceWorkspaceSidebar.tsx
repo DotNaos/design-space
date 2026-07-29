@@ -1,8 +1,6 @@
-import { Button, Tooltip } from "@heroui/react";
+import { Button } from "@heroui/react";
 import {
-  ArrowDown,
   ArrowUpToLine,
-  ArrowUp,
   ChevronDown,
   ChevronRight,
   Component,
@@ -13,7 +11,6 @@ import {
   House,
   Image,
   ListCollapse,
-  LocateFixed,
   Monitor,
   PanelTop,
   Square,
@@ -21,6 +18,7 @@ import {
   Tablet,
   Type,
   TriangleAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -33,7 +31,10 @@ import {
 } from "../../shared/source-workspace";
 import { suggestedSourceDesignPath } from "../../shared/source-design";
 import { SourceComponentPicker } from "./SourceComponentPicker";
+import { SourceApprovalStatus, sourceApprovalModeLabel } from "./SourceApprovalStatus";
 import { SourceDesignStatus } from "./SourceDesignStatus";
+import { centerSourceTreeRow, SourceTreeAnchorControls } from "./SourceTreeAnchorControls";
+import { SourceTreeHeaderAction } from "./SourceTreeHeaderAction";
 import {
   initialFocusOccurrence,
   sourceCompositionRows,
@@ -93,6 +94,7 @@ export interface SourceWorkspaceSidebarProps {
 
 export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   const [collapseOutsideRequest, setCollapseOutsideRequest] = useState(0);
+  const [approvalReview, setApprovalReview] = useState(false);
   return (
     <aside aria-label="Source workspace" className={`${props.className ?? "flex w-80"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
       <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
@@ -107,6 +109,15 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
             onPress={() => setCollapseOutsideRequest((current) => current + 1)}
           >
             <ListCollapse aria-hidden="true" size={14} />
+          </SourceTreeHeaderAction>
+        )}
+        {props.workspace.entries.length > 0 && (
+          <SourceTreeHeaderAction
+            active={approvalReview}
+            label={sourceApprovalModeLabel(props.workspace.approvals, props.workspace.entries)}
+            onPress={() => setApprovalReview((current) => !current)}
+          >
+            <ShieldCheck aria-hidden="true" size={14} />
           </SourceTreeHeaderAction>
         )}
         {props.designNavigation?.onOpenParent && (
@@ -130,36 +141,15 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
       </header>
       <SourceWorkspaceTree
         {...props}
+        approvalReview={approvalReview}
         collapseOutsideRequest={collapseOutsideRequest}
       />
     </aside>
   );
 }
 
-function SourceTreeHeaderAction(props: { children: ReactNode; label: string; onPress: () => void }) {
-  return (
-    <Tooltip closeDelay={80} delay={350}>
-      <Button
-        aria-label={props.label}
-        className="grid size-8 place-items-center rounded-md text-zinc-500 hover:text-zinc-100"
-        isIconOnly
-        size="sm"
-        variant="ghost"
-        onPress={props.onPress}
-      >
-        {props.children}
-      </Button>
-      <Tooltip.Content
-        className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl"
-        placement="bottom"
-      >
-        {props.label}
-      </Tooltip.Content>
-    </Tooltip>
-  );
-}
-
 export interface SourceWorkspaceTreeProps extends Omit<SourceWorkspaceSidebarProps, "className" | "onCreateComponent"> {
+  approvalReview?: boolean;
   collapseOutsideRequest?: number;
   emptyMessage?: string;
   focusNodeId?: string;
@@ -308,6 +298,7 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
                 activeCanvasIds={activeCanvasIds}
                 activeCanvasId={focusId}
                 activePath={activePathKeys.has(row.key)}
+                approvalReview={props.approvalReview}
                 selected={props.selected}
                 workspace={props.workspace}
                 onApplySlot={props.onApplySlot}
@@ -334,60 +325,6 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
         onScrollToActive={virtual.scrollToAnchor}
         onScrollToSelected={revealSelected}
       />
-    </div>
-  );
-}
-
-function centerSourceTreeRow(scroll: HTMLElement, row: HTMLElement) {
-  const scrollRect = scroll.getBoundingClientRect();
-  const rowRect = row.getBoundingClientRect();
-  const rowTop = rowRect.top - scrollRect.top + scroll.scrollTop;
-  const next = Math.max(
-    0,
-    Math.min(
-      scroll.scrollHeight - scroll.clientHeight,
-      rowTop - (scroll.clientHeight - rowRect.height) / 2,
-    ),
-  );
-  scroll.scrollTop = next;
-}
-
-function SourceTreeAnchorControls(props: {
-  activeDirection?: "above" | "below";
-  hasSelection: boolean;
-  selectedDirection?: "above" | "below";
-  onScrollToActive: () => void;
-  onScrollToSelected: () => void;
-}) {
-  if (!props.activeDirection && !props.hasSelection) return null;
-  return (
-    <div className="absolute right-3 top-3 z-30 flex gap-1">
-      {props.activeDirection ? (
-        <Button
-          isIconOnly
-          aria-label={`Scroll to active component ${props.activeDirection}`}
-          className="size-8 min-w-8 rounded-full border border-white bg-white text-black shadow-lg shadow-black/30 hover:bg-zinc-200"
-          size="sm"
-          variant="secondary"
-          onClick={props.onScrollToActive}
-        >
-          {props.activeDirection === "above"
-            ? <ArrowUp aria-hidden="true" size={14} />
-            : <ArrowDown aria-hidden="true" size={14} />}
-        </Button>
-      ) : null}
-      {props.hasSelection ? (
-        <Button
-          isIconOnly
-          aria-label="Scroll to current selection"
-          className="size-8 min-w-8 rounded-full border border-violet-300/50 bg-violet-500 text-white shadow-lg shadow-black/30 hover:bg-violet-400"
-          size="sm"
-          variant="secondary"
-          onClick={props.onScrollToSelected}
-        >
-          <LocateFixed aria-hidden="true" size={14} />
-        </Button>
-      ) : null}
     </div>
   );
 }
@@ -442,6 +379,7 @@ function FocusTreeRow(props: {
   activeCanvasIds: ReadonlySet<string>;
   activeCanvasId?: string;
   activePath: boolean;
+  approvalReview?: boolean;
   selected?: SourceWorkspaceSelection;
   workspace: RuntimeSourceWorkspace;
   onApplySlot: SourceWorkspaceSidebarProps["onApplySlot"];
@@ -620,6 +558,9 @@ function FocusTreeRow(props: {
           designPath={suggestedSourceDesignPath(componentEntry, props.workspace.entries)}
           label={componentEntry.label}
         />
+      ) : null}
+      {componentEntry && props.approvalReview ? (
+        <SourceApprovalStatus approvals={props.workspace.approvals} entry={componentEntry} />
       ) : null}
       {slot && row.occurrence && props.onApplySlot && (
         <SourceComponentPicker

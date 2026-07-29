@@ -41,6 +41,23 @@ describe("source project config", () => {
     })).toMatchObject({ library: { package: "@dotnaos/react-ui" } });
   });
 
+  it("accepts a project-local approval policy without embedding trust material", () => {
+    expect(parseSourceProjectConfig({
+      project: { id: "approved-ui", label: "Approved UI" },
+      approvals: { policy: ".project/approvals/ui.yaml" },
+    })).toMatchObject({
+      approvals: { policy: ".project/approvals/ui.yaml" },
+    });
+    expect(() => parseSourceProjectConfig({
+      project: { id: "unsafe", label: "Unsafe" },
+      approvals: { policy: "../outside.yaml" },
+    })).toThrow("valid Design Space project config");
+    expect(() => parseSourceProjectConfig({
+      project: { id: "unsafe", label: "Unsafe" },
+      approvals: { policy: "/tmp/policy.yaml" },
+    })).toThrow("valid Design Space project config");
+  });
+
   it("rejects generated component, slot or file manifests", () => {
     expect(() => parseSourceProjectConfig({
       project: { id: "demo", label: "Demo" },

@@ -117,6 +117,11 @@ It cannot send repository roots, file paths, commands, shell text, executable pa
 
 Review approval remains outside Design Space. The signed Project CLI is the approval authority; browser state and local storage are never approval evidence.
 
+Projects may opt into the read-only Source Tree approval checklist described in
+[Cryptographic component approvals](docs/cryptographic-component-approvals.md).
+The checklist maps each component export to a stable Project approval scope and
+fails closed whenever policy or trusted verification evidence is unavailable.
+
 ## Local-only proof
 
 `bun run verify:local-only` builds the representative target production entry separately, verifies that it consumes the saved screen and authored-component documents, rejects Design Space application/server modules from the bundle graph, scans for runtime endpoint markers, and fails if hosting configuration appears in this repository. Design Space is a development tool only; do not add it to a target production entry.

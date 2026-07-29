@@ -189,6 +189,58 @@ it("keeps exit available at the top of the component hierarchy", () => {
   expect(screen.queryByRole("button", { name: /Open parent/ })).not.toBeInTheDocument();
 });
 
+it("reveals the cryptographic approval checklist without replacing the source tree", async () => {
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      workspace={{
+        ...workspace,
+        approvals: {
+          status: "not-configured",
+          reason: "Cryptographic component approvals are not configured.",
+          components: {},
+        },
+      }}
+    />,
+  );
+
+  const toggle = screen.getByRole("button", { name: /Show approval checklist/ });
+  expect(toggle).toHaveAttribute("aria-pressed", "false");
+  expect(screen.queryAllByRole("img", { name: /Unreviewed/ })).toHaveLength(0);
+
+  await userEvent.click(toggle);
+
+  expect(toggle).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("tree", { name: "Source tree" })).toBeVisible();
+  expect(screen.getAllByRole("img", { name: /Unreviewed · approvals not configured/ }).length).toBeGreaterThan(0);
+});
+
+it("shows verified component approvals in checklist mode", async () => {
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      workspace={{
+        ...workspace,
+        approvals: {
+          status: "verified",
+          policyId: "ui-components",
+          components: {
+            [desktopLayout.id]: {
+              scopeId: "component:src/app/desktop/layout.tsx#default",
+              label: "DesktopLayout",
+              state: "approved",
+              attestation: "SHA256:verified",
+            },
+          },
+        },
+      }}
+    />,
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: /Show approval checklist/ }));
+  expect(screen.getByRole("img", { name: "Approved · DesktopLayout" })).toBeVisible();
+});
+
 it("shows composition, typed slots, components, and HTML in one expandable tree", async () => {
   render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
 

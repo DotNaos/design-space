@@ -36,6 +36,15 @@ export interface DesignSpaceProjectConfig {
       root: string;
     };
   };
+  /**
+   * Optional server-owned cryptographic approval verification.
+   * The external trust root is intentionally supplied through
+   * PROJECT_APPROVAL_TRUST_ROOT, never through browser state or this repository.
+   */
+  approvals?: {
+    /** Project-relative policy path. Defaults to .project/approvals/policy.yaml. */
+    policy?: string;
+  };
 }
 
 /** Keeps .designspace.ts type-safe without introducing a generated manifest. */
@@ -99,6 +108,23 @@ export interface SourceWorkspaceEntry {
   previewable?: boolean;
   /** Colocated executable preview evidence. Missing means the component is not previewable. */
   design?: SourceComponentDesign;
+}
+
+export type SourceApprovalState = "approved" | "missing" | "stale" | "invalid";
+
+export interface SourceComponentApproval {
+  scopeId: string;
+  label: string;
+  state: SourceApprovalState;
+  attestation: string;
+  reason?: string;
+}
+
+export interface SourceApprovalEvidence {
+  status: "verified" | "not-configured" | "unavailable";
+  policyId?: string;
+  reason?: string;
+  components: Readonly<Record<string, SourceComponentApproval>>;
 }
 
 export interface SourceWorkspaceLayer {
@@ -173,6 +199,7 @@ export interface SourceWorkspaceManifest {
   capabilities?: {
     createComponents: boolean;
   };
+  approvals?: SourceApprovalEvidence;
 }
 
 export interface SourceWorkspaceLibrary {
