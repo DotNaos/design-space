@@ -5,6 +5,20 @@
 @source "../examples/demo-target";
 @source inline("rounded-none rounded-xl rounded-2xl rounded-3xl p-4 p-6 p-8 shadow-none shadow-lg shadow-2xl bg-slate-900 bg-zinc-950 border border-zinc-700");
 
+@theme {
+  --color-sky-50: #eff8ff;
+  --color-sky-100: #dff1ff;
+  --color-sky-200: #b9e2ff;
+  --color-sky-300: #72bfff;
+  --color-sky-400: #0d99ff;
+  --color-sky-500: #0c8ce9;
+  --color-sky-600: #0875c4;
+  --color-sky-950: #05253d;
+  --color-cyan-300: #72bfff;
+  --color-cyan-400: #0d99ff;
+  --color-cyan-500: #0c8ce9;
+}
+
 html,
 body {
   height: 100%;
@@ -19,10 +33,10 @@ body {
 }
 
 .monaco-editor .design-space-source-selection {
-  background: rgb(14 165 233 / 0.1) !important;
+  background: rgb(13 153 255 / 0.1) !important;
 }
 
 .monaco-editor .design-space-source-selection-gutter {
-  border-left: 2px solid rgb(56 189 248 / 0.8);
+  border-left: 2px solid rgb(13 153 255 / 0.8);
   box-sizing: border-box;
 }

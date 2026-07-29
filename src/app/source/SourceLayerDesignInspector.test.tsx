@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import type { SourceWorkspaceLayer } from "../../shared/source-workspace";
+import design from "./SourceLayerDesignInspector.design";
 import { SourceLayerDesignInspector } from "./SourceLayerDesignInspector";
 import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
 
@@ -21,6 +22,15 @@ const layer: SourceWorkspaceLayer = {
   children: [],
 };
 
+it("renders its isolated design defaults without runtime context", () => {
+  render(<>{design.render(design.defaults)}</>);
+
+  expect(screen.getByRole("heading", { name: "Selected layer" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Generated Tailwind classes")).toHaveTextContent(
+    "flex min-h-10 items-center",
+  );
+});
+
 it("shows distinct Tailwind paint values and previews visual control output", () => {
   const change = vi.fn();
   const preview = vi.fn();
@@ -31,6 +41,9 @@ it("shows distinct Tailwind paint values and previews visual control output", ()
     css: "",
     editable: true,
     error: undefined,
+    previewCss: "",
+    previewTextValue: undefined,
+    previewValue: undefined,
     reset: vi.fn(),
     textBinding: undefined,
     textEditable: false,

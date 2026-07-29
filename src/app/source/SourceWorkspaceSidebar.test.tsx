@@ -205,6 +205,20 @@ it("shows composition, typed slots, components, and HTML in one expandable tree"
   expect(screen.queryByText("Shared components")).not.toBeInTheDocument();
 });
 
+it("keeps deeply nested tree labels readable through horizontal scrolling", () => {
+  render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
+
+  const tree = screen.getByRole("tree", { name: "Source tree" });
+  const scrollViewport = tree.parentElement;
+  const label = within(tree).getByText("DesktopLayout");
+
+  expect(scrollViewport).toHaveAttribute("data-source-tree-scroll");
+  expect(scrollViewport).toHaveClass("overflow-auto");
+  expect(tree).toHaveClass("min-w-max");
+  expect(label).toHaveClass("whitespace-nowrap");
+  expect(label).not.toHaveClass("truncate");
+});
+
 it("reports the hovered tree layer without changing the selection", async () => {
   const onHover = vi.fn();
   const onSelect = vi.fn();
@@ -251,8 +265,17 @@ it("mutes layers owned by a different source file", async () => {
 
 it("selects a nested component without replacing the canvas, then opens it explicitly", async () => {
   const onFocus = vi.fn();
+  const onOpenComponent = vi.fn();
   const onSelect = vi.fn();
-  render(<SourceWorkspaceSidebar {...callbacks} onFocus={onFocus} onSelect={onSelect} workspace={workspace} />);
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      onFocus={onFocus}
+      onOpenComponent={onOpenComponent}
+      onSelect={onSelect}
+      workspace={workspace}
+    />,
+  );
 
   await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
   await userEvent.click(screen.getByRole("button", { name: "Expand content" }));
@@ -265,13 +288,112 @@ it("selects a nested component without replacing the canvas, then opens it expli
   }));
   expect(onFocus).not.toHaveBeenCalled();
   await userEvent.dblClick(summary);
-  expect(onFocus).toHaveBeenCalledWith(expect.stringContaining("pages:Dashboard"), expect.objectContaining({
-    device: "desktop",
-    nodeId: expect.stringContaining("ProjectSummary"),
-    kind: "component",
+  expect(onFocus).not.toHaveBeenCalled();
+  expect(onOpenComponent).toHaveBeenCalledWith({
+    selection: expect.objectContaining({
+      device: "desktop",
+      nodeId: expect.stringContaining("ProjectSummary"),
+      sourceNodeId: expect.stringContaining("ProjectSummary"),
+      kind: "component",
+    }),
+    source: summaryDesktop.source,
+  });
+});
+
+it("opens a same-file component definition without requiring design evidence", async () => {
+  const onFocus = vi.fn();
+  const onOpenComponent = vi.fn();
+  const localWorkspace: RuntimeSourceWorkspace = {
+    ...workspace,
+    entries: [{
+      ...desktopLayout,
+      id: "local-root",
+      label: "LocalRoot",
+      uses: [],
+      layers: [{
+        id: "local-section",
+        label: "section",
+        kind: "html",
+        source: { start: 20, end: 90 },
+        children: [{
+          id: "local-control-section",
+          label: "ControlSection",
+          kind: "component",
+          source: { start: 42, end: 60 },
+          definition: { start: 4, end: 18 },
+          children: [{
+            id: "local-control-html",
+            label: "section",
+            kind: "html",
+            source: { start: 8, end: 17 },
+            children: [],
+          }],
+        }],
+      }],
+    }],
+  };
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      onFocus={onFocus}
+      onOpenComponent={onOpenComponent}
+      workspace={localWorkspace}
+    />,
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand LocalRoot" }));
+  await userEvent.click(screen.getByRole("button", { name: "Expand <section>" }));
+  const localComponent = screen.getByRole("button", { name: "ControlSection" });
+  await userEvent.dblClick(localComponent);
+
+  expect(onFocus).not.toHaveBeenCalled();
+  expect(onOpenComponent).toHaveBeenCalledWith({
+    selection: expect.objectContaining({
+      device: "desktop",
+      layerId: "local-control-section",
+      kind: "component",
+    }),
+    source: { start: 4, end: 18 },
+  });
+});
+
+it("opens isolated design only when the exact component has design evidence", async () => {
+  const onOpenComponent = vi.fn();
+  const designedSummary = {
+    ...summaryDesktop,
+    design: {
+      fileId: "summary-design",
+      relativePath: "src/app/components/ProjectSummary/desktop.design.tsx",
+      load: async () => ({
+        component: summaryDesktop.component,
+        defaults: {},
+        initialCase: "default",
+        isStateful: false,
+        cases: { default: {} },
+        render: () => null,
+      }),
+    },
+  };
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      onOpenComponent={onOpenComponent}
+      workspace={{
+        ...workspace,
+        entries: workspace.entries.map((entry) => entry.id === summaryDesktop.id ? designedSummary : entry),
+      }}
+    />,
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand Dashboard" }));
+  await userEvent.click(screen.getByRole("button", { name: "Expand content" }));
+  await userEvent.dblClick(screen.getAllByRole("button", { name: "ProjectSummary" })[0]!);
+
+  expect(onOpenComponent).toHaveBeenCalledWith(expect.objectContaining({
+    designOccurrenceId: expect.stringContaining("ProjectSummary"),
+    selection: expect.objectContaining({ sourceNodeId: expect.stringContaining("ProjectSummary") }),
+    source: summaryDesktop.source,
   }));
-  expect(onFocus.mock.calls[0]?.[1]).not.toHaveProperty("layerId");
-  expect(onFocus.mock.calls[0]?.[1]).toHaveProperty("sourceNodeId", expect.stringContaining("ProjectSummary"));
 });
 
 it("expands and scrolls to an explicitly opened component", async () => {
@@ -446,6 +568,34 @@ it("reveals and highlights a layer selected from the canvas", async () => {
   const selectedLayer = await screen.findByRole("treeitem", { name: "<section>" });
   expect(selectedLayer).toHaveAttribute("aria-selected", "true");
   expect(screen.getByRole("button", { name: "Collapse Dashboard" })).toHaveAttribute("aria-expanded", "true");
+});
+
+it("scrolls the source tree back to the current selection from its header", async () => {
+  const graph = sourceFocusGraph(sourceTreeNodes(workspace), "desktop");
+  const occurrenceId = initialFocusOccurrence(graph)!;
+  const occurrence = graph.occurrences.get(occurrenceId)!;
+  const view = render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      selected={{
+        device: "desktop",
+        kind: "html",
+        layerId: "dashboard-section",
+        nodeId: occurrence.node.id,
+        occurrenceId,
+        sourceNodeId: occurrence.node.id,
+      }}
+      workspace={workspace}
+    />,
+  );
+  const scroll = view.container.querySelector<HTMLElement>("[data-source-tree-scroll]");
+  expect(scroll).not.toBeNull();
+  Object.defineProperty(scroll!, "clientHeight", { configurable: true, value: 80 });
+
+  await userEvent.click(screen.getByRole("button", { name: "Scroll to current selection" }));
+
+  expect(scroll!.scrollTop).toBeGreaterThan(0);
+  expect(screen.getByRole("treeitem", { name: "<section>" })).toHaveAttribute("aria-selected", "true");
 });
 
 it("highlights only the selected rendered instance of a repeated source layer", async () => {

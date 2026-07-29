@@ -38,6 +38,67 @@ it("applies a canvas class edit to the latest Monaco draft instead of the earlie
   );
 });
 
+it("does not expose source classes as preview overrides until the user edits them", () => {
+  const initial = 'export const Panel = () => <section className="p-4">Panel</section>;';
+  const setDraft = vi.fn();
+  const editor = (draft: string) => ({
+    draft,
+    dirty: draft !== initial,
+    loading: false,
+    snapshot: { fileId: "panel", label: "Panel", source: initial, version: "v1" },
+    setDraft,
+    reset: vi.fn(),
+  });
+  const { result, rerender } = renderHook(
+    ({ draft }: { draft: string }) => useSourceLayerClassEditor({
+      connected: false,
+      editor: editor(draft),
+      layer: layerFor(initial),
+      scope: "app",
+    }),
+    { initialProps: { draft: initial } },
+  );
+
+  expect(result.current.value).toBe("p-4");
+  expect(result.current.previewValue).toBeUndefined();
+  expect(result.current.previewCss).toBe("");
+
+  act(() => result.current.change("p-6"));
+  const changed = setDraft.mock.lastCall?.[0] as string;
+  rerender({ draft: changed });
+
+  expect(result.current.previewValue).toBe("p-6");
+});
+
+it("clears a visual preview override when Monaco changes the draft independently", () => {
+  const initial = 'export const Panel = () => <section className="p-4">Panel</section>;';
+  const setDraft = vi.fn();
+  const editor = (draft: string) => ({
+    draft,
+    dirty: draft !== initial,
+    loading: false,
+    snapshot: { fileId: "panel", label: "Panel", source: initial, version: "v1" },
+    setDraft,
+    reset: vi.fn(),
+  });
+  const { result, rerender } = renderHook(
+    ({ draft }: { draft: string }) => useSourceLayerClassEditor({
+      connected: false,
+      editor: editor(draft),
+      layer: layerFor(initial),
+      scope: "app",
+    }),
+    { initialProps: { draft: initial } },
+  );
+
+  act(() => result.current.change("p-6"));
+  rerender({ draft: setDraft.mock.lastCall?.[0] as string });
+  expect(result.current.previewValue).toBe("p-6");
+
+  rerender({ draft: `// Monaco edit\n${initial}` });
+  expect(result.current.previewValue).toBeUndefined();
+});
+
 it("disables visual edits while the latest Monaco draft is still being analyzed", () => {
   const initial = 'export const Panel = () => <section className="p-4">Panel</section>;';
   const monacoDraft = `// Kept from Monaco\n${initial}`;

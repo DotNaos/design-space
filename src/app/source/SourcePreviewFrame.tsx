@@ -44,6 +44,7 @@ export function SourcePreviewFrame(props: {
   hoveredLayer?: SourceWorkspaceLayer;
   hoveredLayerOccurrence?: number;
   selectedLayer?: SourceWorkspaceLayer;
+  selectedLayerLabel?: string;
   selectedLayerOccurrence?: number;
   selectedDesignCase?: string;
   selectedClassName?: string;
@@ -87,6 +88,9 @@ export function SourcePreviewFrame(props: {
     occurrence: props.hoveredLayerOccurrence ?? 0,
   } : undefined, [props.hoveredLayer, props.hoveredLayerOccurrence]);
   const visibleHoveredLayerHit = hoveredLayerHit ?? externallyHoveredLayerHit;
+  const hoveredLayer = useMemo(() => (
+    visibleHoveredLayerHit ? findPreviewLayer(previewEntries, visibleHoveredLayerHit.layerId) : undefined
+  ), [previewEntries, visibleHoveredLayerHit]);
   const hoveredOwner = useMemo(() => (
     visibleHoveredLayerHit ? sourceLayerOwner(previewEntries, visibleHoveredLayerHit.layerId) : undefined
   ), [previewEntries, visibleHoveredLayerHit]);
@@ -207,7 +211,6 @@ export function SourcePreviewFrame(props: {
     if (!hit) return;
     event.preventDefault();
     event.stopPropagation();
-    if (props.onOpenLayerOwner && externalSourceLayerOwner(props.entry, previewEntries, hit.layerId)) return;
     if (!props.onSelectLayer) return;
     setSelectedLayerHit({ ...hit, entryId: props.entry?.id ?? "" });
     props.onSelectLayer(hit.layerId, hit.occurrence);
@@ -266,8 +269,9 @@ export function SourcePreviewFrame(props: {
         ? mounts.output.querySelector<HTMLElement>("[data-design-space-preview-entry-root]")
         : undefined,
       selectedOccurrence,
+      props.selectedLayerLabel ?? sourceCanvasLayerLabel(props.selectedLayer),
     );
-  }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer, revealKey, selectedOccurrence, staticRevision]);
+  }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer, props.selectedLayerLabel, revealKey, selectedOccurrence, staticRevision]);
 
   useLayoutEffect(() => {
     if (!mounts || previewMode !== "design" || !visibleHoveredLayerHit || (visibleHoveredLayerHit.layerId === props.selectedLayer?.id && visibleHoveredLayerHit.occurrence === selectedOccurrence)) return undefined;
@@ -279,8 +283,10 @@ export function SourcePreviewFrame(props: {
         : undefined,
       visibleHoveredLayerHit.occurrence,
       hoveredExternalOwner,
+      sourceCanvasLayerLabel(hoveredLayer),
+      hoveredLayer?.kind === "component" ? "component" : "layer",
     );
-  }, [defaultVisualLayer?.id, hoveredExternalOwner, mounts, previewMode, props.selectedLayer?.id, selectedOccurrence, staticRevision, visibleHoveredLayerHit]);
+  }, [defaultVisualLayer?.id, hoveredExternalOwner, hoveredLayer, mounts, previewMode, props.selectedLayer?.id, selectedOccurrence, staticRevision, visibleHoveredLayerHit]);
 
   useEffect(() => {
     setHoveredLayerHit(undefined);
@@ -345,7 +351,7 @@ export function SourcePreviewFrame(props: {
       showModeToggle={!props.workspaceMode}
       revealTarget={revealTarget?.key === revealKey ? revealTarget : undefined}
       selectionKey={props.entry?.id}
-      selectionLabel={props.selectedLayer?.kind === "html" ? `<${props.selectedLayer.label}>` : props.node?.label}
+      selectionLabel={props.selectedLayerLabel ?? sourceCanvasLayerLabel(props.selectedLayer) ?? props.node?.label}
       hud={props.workspaceMode ? (
         <SourceCanvasContextHud
           contextLabel={props.node?.label ?? props.entry?.label ?? "Component"}
@@ -575,6 +581,32 @@ function sourceLayerIds(entries: readonly RuntimeSourceWorkspaceEntry[]): Readon
   };
   for (const entry of entries) visit(entry.layers);
   return ids;
+}
+
+function findPreviewLayer(
+  entries: readonly RuntimeSourceWorkspaceEntry[],
+  layerId: string,
+): SourceWorkspaceLayer | undefined {
+  const visit = (layers: readonly SourceWorkspaceLayer[] | undefined): SourceWorkspaceLayer | undefined => {
+    for (const layer of layers ?? []) {
+      if (layer.id === layerId) return layer;
+      const nested = visit(layer.children);
+      if (nested) return nested;
+    }
+    return undefined;
+  };
+  for (const entry of entries) {
+    const layer = visit(entry.layers);
+    if (layer) return layer;
+  }
+  return undefined;
+}
+
+function sourceCanvasLayerLabel(layer: SourceWorkspaceLayer | undefined): string | undefined {
+  if (!layer) return undefined;
+  if (layer.kind === "html") return `<${layer.label}>`;
+  if (layer.kind === "slot") return `slot:${layer.label}`;
+  return layer.label;
 }
 
 export function applySourceLayerClassName(output: HTMLElement, className: string): boolean {

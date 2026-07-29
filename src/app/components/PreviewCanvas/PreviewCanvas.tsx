@@ -645,7 +645,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
           <span
             key={label.id}
             aria-hidden="true"
-            className={`absolute truncate rounded px-1.5 py-1 text-[10px] font-medium shadow-lg ${label.placement === "selection" ? "bg-sky-500 text-white" : "bg-emerald-500 text-emerald-950"}`}
+            className={`absolute truncate text-[11px] font-medium [text-shadow:0_1px_2px_rgba(0,0,0,0.95),0_0_8px_rgba(0,0,0,0.8)] ${label.placement === "selection" ? "text-sky-400" : "text-emerald-300"}`}
             data-testid="canvas-overlay-label"
             style={{ left: label.left, top: label.top, width: label.width, height: label.height }}
           >

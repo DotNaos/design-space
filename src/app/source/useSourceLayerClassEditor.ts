@@ -20,8 +20,13 @@ export function useSourceLayerClassEditor(options: {
   const [textValue, setTextValue] = useState(textBinding?.value ?? "");
   const [css, setCss] = useState("");
   const [error, setError] = useState<string>();
+  const [classPreview, setClassPreview] = useState<{ target: string; value: string }>();
+  const [textPreview, setTextPreview] = useState<{ target: string; value: string }>();
   const editBase = useRef(options.editor.draft);
   const lastCanvasDraft = useRef<string | undefined>(undefined);
+  const target = options.editor.snapshot && options.layer
+    ? `${options.editor.snapshot.fileId}:${options.layer.id}`
+    : undefined;
 
   useEffect(() => {
     setValue(binding?.value ?? "");
@@ -73,34 +78,50 @@ export function useSourceLayerClassEditor(options: {
   }, [binding, options.connected, options.scope, value]);
 
   const apply = useCallback((nextClassName: string, nextText: string) => {
-    if (options.ready === false) return;
+    if (options.ready === false) return false;
     const source = editBase.current;
-    if (source === undefined) return;
+    if (source === undefined) return false;
     const nextSource = sourceWithLayerVisualState(source, {
       ...(binding ? { className: { binding, value: nextClassName } } : {}),
       ...(textBinding ? { text: { binding: textBinding, value: nextText } } : {}),
     });
     lastCanvasDraft.current = nextSource;
     options.editor.setDraft(nextSource);
+    return true;
   }, [binding, options.editor, options.ready, textBinding]);
 
   const change = useCallback((next: string) => {
     setValue(next);
-    apply(next, textValue);
-  }, [apply, textValue]);
+    setCss("");
+    if (apply(next, textValue) && target) setClassPreview({ target, value: next });
+  }, [apply, target, textValue]);
 
   const changeText = useCallback((next: string) => {
     setTextValue(next);
-    apply(value, next);
-  }, [apply, value]);
+    if (apply(value, next) && target) setTextPreview({ target, value: next });
+  }, [apply, target, value]);
 
   const reset = useCallback(() => {
     setValue(binding?.value ?? "");
     setTextValue(textBinding?.value ?? "");
     setCss("");
     setError(undefined);
+    setClassPreview(undefined);
+    setTextPreview(undefined);
+    lastCanvasDraft.current = undefined;
     options.editor.reset();
   }, [binding?.value, options.editor, textBinding?.value]);
+
+  const previewCurrent = Boolean(
+    target
+    && options.editor.draft === lastCanvasDraft.current,
+  );
+  const previewValue = previewCurrent && classPreview && classPreview.target === target
+    ? classPreview.value
+    : undefined;
+  const previewTextValue = previewCurrent && textPreview && textPreview.target === target
+    ? textPreview.value
+    : undefined;
 
   return {
     binding,
@@ -110,6 +131,9 @@ export function useSourceLayerClassEditor(options: {
     error,
     reset,
     changeText,
+    previewCss: previewValue === undefined ? "" : css,
+    previewTextValue,
+    previewValue,
     textBinding,
     textEditable: Boolean(textBinding && options.editor.snapshot && options.ready !== false),
     textValue,

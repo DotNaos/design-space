@@ -295,7 +295,7 @@ it("requires a double click before opening a layer owned by another source file"
   expect(hud).toHaveTextContent("src/Foreign.tsx");
   expect(hud).toHaveTextContent("Double-click to open");
   fireEvent.click(surface, { clientX: 20, clientY: 20 });
-  expect(onSelectLayer).not.toHaveBeenCalled();
+  expect(onSelectLayer).toHaveBeenCalledWith(foreignLayerId, 0);
   expect(onOpenLayerOwner).not.toHaveBeenCalled();
 
   fireEvent.doubleClick(surface, { clientX: 20, clientY: 20 });
@@ -648,10 +648,12 @@ it("mounts selection chrome outside the rendered preview DOM without changing it
   output.innerHTML = '<section data-design-space-source-layer-id="selected"><span>Rendered content</span></section>';
   previewDocument.body.append(output);
   const renderedMarkup = output.innerHTML;
-  const dispose = mountSourceLayerSelection(output, "selected", "layer");
+  const dispose = mountSourceLayerSelection(output, "selected", "layer", undefined, undefined, 0, "Selected layer");
   const overlay = document.querySelector<HTMLElement>("[data-design-space-source-selection]")!;
+  const label = overlay.querySelector<HTMLElement>("[data-design-space-source-outline-label='selection']");
 
-  expect(overlay.querySelector("span")).toBeNull();
+  expect(label).toHaveTextContent("Selected layer");
+  expect(label).toHaveStyle({ backgroundColor: "", color: "rgb(13, 153, 255)" });
   expect(overlay.parentElement).toHaveAttribute("id", "design-space-canvas-overlays");
   expect(overlay.parentElement?.parentElement).toBe(canvas);
   expect(overlay.parentElement).toHaveStyle({ overflow: "hidden", position: "absolute", zIndex: "10" });
@@ -665,6 +667,21 @@ it("mounts selection chrome outside the rendered preview DOM without changing it
   canvas.remove();
 });
 
+it("uses the component color for selected component outlines and labels", () => {
+  const output = document.createElement("div");
+  document.body.append(output);
+  const dispose = mountSourceLayerSelection(output, "selected-component", "component", undefined, undefined, 0, "WorkspaceStatus");
+  const overlay = document.querySelector<HTMLElement>("[data-design-space-source-selection]")!;
+  const label = overlay.querySelector<HTMLElement>("[data-design-space-source-outline-label='selection']");
+
+  expect(label).toHaveTextContent("WorkspaceStatus");
+  expect(label).toHaveStyle({ color: "rgb(167, 139, 250)" });
+  expect(overlay.style.boxShadow).toContain("#a78bfa");
+
+  dispose();
+  output.remove();
+});
+
 it("renders hover feedback as a lightweight outline without selection handles", () => {
   const output = document.createElement("div");
   document.body.append(output);
@@ -673,9 +690,12 @@ it("renders hover feedback as a lightweight outline without selection handles", 
     relativePath: "src/components/ForeignPanel.tsx",
   });
   const overlay = document.querySelector<HTMLElement>("[data-design-space-source-hover]")!;
+  const label = overlay.querySelector<HTMLElement>("[data-design-space-source-outline-label='hover']");
 
   expect(overlay.dataset.designSpaceSourceHover).toBe("hovered");
-  expect(overlay.querySelector("span")).toBeNull();
+  expect(label).toHaveTextContent("ForeignPanel");
+  expect(label).toHaveStyle({ backgroundColor: "", color: "rgb(167, 139, 250)" });
+  expect(overlay.style.boxShadow).toContain("#a78bfa");
   expect(overlay.style.borderWidth).toBe("0px");
   expect(overlay.parentElement).toHaveAttribute("id", "design-space-canvas-overlays");
   expect(document.querySelector("[data-design-space-source-owner-tooltip]")).toBeNull();

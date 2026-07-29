@@ -7,9 +7,11 @@ export function mountSourceLayerSelection(
   onMetrics?: (metrics: SourceLayerMetrics | undefined) => void,
   fallback?: HTMLElement | null,
   occurrence = 0,
+  label?: string,
 ): () => void {
   return mountSourceLayerOutline(output, layerId, {
     fallback,
+    label,
     onMetrics,
     occurrence,
     tone,
@@ -26,12 +28,15 @@ export function mountSourceLayerHover(
     label: string;
     relativePath: string;
   },
+  label?: string,
+  tone?: "component" | "layer",
 ): () => void {
   return mountSourceLayerOutline(output, layerId, {
     externalOwner,
     fallback,
+    label: label ?? externalOwner?.label,
     occurrence,
-    tone: externalOwner ? "component" : "layer",
+    tone: tone ?? (externalOwner ? "component" : "layer"),
     variant: "hover",
   });
 }
@@ -47,6 +52,7 @@ function mountSourceLayerOutline(
       label: string;
       relativePath: string;
     };
+    label?: string;
     tone: "component" | "layer";
     variant: "hover" | "selection";
   },
@@ -58,7 +64,11 @@ function mountSourceLayerOutline(
   const overlay = overlayRoot.ownerDocument.createElement("div");
   if (options.variant === "selection") overlay.dataset.designSpaceSourceSelection = layerId;
   else overlay.dataset.designSpaceSourceHover = layerId;
-  const color = options.tone === "component" ? "#a855f7" : "#38bdf8";
+  const color = options.tone === "component"
+    ? "#a78bfa"
+    : options.variant === "selection"
+      ? "#0d99ff"
+      : "#72bfff";
   const outlineWidth = options.variant === "selection" ? 1.5 : 1;
   overlay.style.cssText = [
     "position:absolute",
@@ -70,6 +80,25 @@ function mountSourceLayerOutline(
     "display:none",
     `box-shadow:inset 0 0 0 ${outlineWidth}px ${color}`,
   ].join(";");
+  const label = options.label ? overlayRoot.ownerDocument.createElement("span") : undefined;
+  if (label) {
+    label.dataset.designSpaceSourceOutlineLabel = options.variant;
+    label.textContent = options.label ?? "";
+    label.style.cssText = [
+      "position:absolute",
+      "left:0",
+      "top:-19px",
+      "max-width:240px",
+      "overflow:hidden",
+      "text-overflow:ellipsis",
+      "white-space:nowrap",
+      "pointer-events:none",
+      "font:500 12px/16px Inter,ui-sans-serif,system-ui,sans-serif",
+      `color:${color}`,
+      "text-shadow:0 1px 2px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.8)",
+    ].join(";");
+    overlay.append(label);
+  }
   overlayRoot.append(overlay);
 
   let frame: number | undefined;
@@ -110,6 +139,7 @@ function mountSourceLayerOutline(
     overlay.style.top = `${rect.top}px`;
     overlay.style.width = `${Math.max(1, rect.width)}px`;
     overlay.style.height = `${Math.max(1, rect.height)}px`;
+    if (label) label.style.top = rect.top >= 19 ? "-19px" : "2px";
     // Draw the chrome inside its measured rectangle. An outer shadow loses its
     // right and bottom edges whenever the target touches the clipped canvas
     // boundary, which makes ordinary borders look truncated in self-hosted

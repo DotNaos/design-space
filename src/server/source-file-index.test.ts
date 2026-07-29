@@ -67,7 +67,7 @@ describe("TypeScript-first source index", () => {
       editable: false,
     });
     expect(result.manifest.library?.components).toEqual(expect.arrayContaining([
-      { name: "Scrollable", evidence: "package-export" },
+      { name: "Scrollable", evidence: "package-export", category: "primitive" },
     ]));
   });
 

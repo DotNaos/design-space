@@ -8,7 +8,11 @@ import { WorkspaceTopBar } from "./shell/WorkspaceTopBar";
 import { SourceComponentInspector } from "./source/SourceComponentInspector";
 import { SourceCodeCanvas } from "./source/SourceCodeCanvas";
 import { SourceAppCanvas } from "./source/SourceAppCanvas";
-import { SourceWorkspaceSidebar, type SourceWorkspaceSelection } from "./source/SourceWorkspaceSidebar";
+import {
+  SourceWorkspaceSidebar,
+  type SourceComponentOpenRequest,
+  type SourceWorkspaceSelection,
+} from "./source/SourceWorkspaceSidebar";
 import { findSourceTreeLayer, initialSourceTreeSelection, sourceTreeNodes } from "./source/source-workspace-tree";
 import { initialFocusOccurrence, sourceFocusGraph, type SourceOccurrence } from "./source/source-focus-tree";
 import { applySourceSlotCandidate, sourceSlotCandidates, type SourceComponentCandidate } from "./source/source-slot-composition";
@@ -134,6 +138,12 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const codeEditor = activeCodeDocument === "design" ? designEditor : editor;
   const inspectorEntry = selectedOccurrence?.entry ?? focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
   const previewEntry = focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
+  const externalInspectorEntry = selection?.kind === "component"
+    && selectedOccurrence?.entry
+    && previewEntry
+    && selectedOccurrence.entry.fileId !== previewEntry.fileId
+    ? selectedOccurrence.entry
+    : undefined;
   const selectedAppDesignCase = previewEntry?.design
     ? designCases[previewEntry.design.fileId]
     : undefined;
@@ -171,7 +181,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     ? `<${selectedLayer.label}>`
     : selectedLayer?.kind === "slot"
       ? `slot:${selectedLayer.label}`
-      : focusedOccurrence?.node.label ?? selectedNode?.label;
+      : selectedOccurrence?.node.label ?? focusedOccurrence?.node.label ?? selectedNode?.label;
   const styleEditor = useSourceLayerClassEditor({
     connected: workspace.runtime === "react",
     editor,
@@ -180,7 +190,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     scope: "app",
   });
   const baseLibraryComponent = selectedSourceLibraryComponent({
+    appWorkspace: workspace,
     catalog: target.sourceLibrary,
+    catalogKind: libraryRuntime.catalogKind,
+    device: requestedDevice,
     library: workspace.library,
     mode: libraryRuntime.mode,
     selected: selectedLibraryComponent,
@@ -208,7 +221,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     ...(target.sourceLibrary.development ? { development: libraryDraftAnalysis.workspace } : {}),
   }) : undefined, [libraryDraftAnalysis.workspace, target.sourceLibrary]);
   const libraryComponent = selectedSourceLibraryComponent({
+    appWorkspace: workspace,
     catalog: effectiveLibraryCatalog,
+    catalogKind: libraryRuntime.catalogKind,
+    device: requestedDevice,
     library: workspace.library,
     mode: libraryRuntime.mode,
     selected: selectedLibraryComponent,
@@ -348,6 +364,20 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     setActivity("app");
     setMobilePane("canvas");
   };
+  const openComponent = (request: SourceComponentOpenRequest) => {
+    if (request.designOccurrenceId) {
+      openDesign(request.designOccurrenceId, request.selection);
+    } else {
+      setSelection(request.selection);
+      if (workspaceMode === "preview") setPreviewSelection(request.selection);
+      else setDesignSelection(request.selection);
+      setActivity("app");
+      setMobilePane("canvas");
+    }
+    setCodeDocument("source");
+    setAppCodeOpen(true);
+    setDraftSelection(request.source);
+  };
   const returnToPreview = () => {
     setDesignSelection(selection);
     setWorkspaceMode("preview");
@@ -381,6 +411,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       onFocus={(occurrenceId, next) => {
         openDesign(occurrenceId, next);
       }}
+      onOpenComponent={openComponent}
       onHover={setHoveredTreeSelection}
       onApplySlot={applySlot}
       onPrepareSlotEdit={prepareSlotEdit}
@@ -436,7 +467,9 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   );
   const librarySidebar = (
     <SourceLibrarySidebar
+      appWorkspace={workspace}
       catalog={effectiveLibraryCatalog}
+      catalogKind={libraryRuntime.catalogKind}
       device={requestedDevice}
       library={workspace.library}
       mode={libraryRuntime.mode}
@@ -446,7 +479,15 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       generateDesignError={designGeneration.error}
       generatingDesignEntryId={designGeneration.entryId}
       onDeviceChange={() => undefined}
-      onGenerateDesign={(selectedEntry) => void designGeneration.generate("library-development", selectedEntry.id)}
+      onGenerateDesign={(selectedEntry) => void designGeneration.generate(
+        libraryRuntime.catalogKind === "app" ? "app" : "library-development",
+        selectedEntry.id,
+      )}
+      onCatalogKindChange={(kind) => {
+        libraryRuntime.setCatalogKind(kind);
+        setSelectedLibraryComponent(undefined);
+        setSelectedLibraryLayerId(undefined);
+      }}
       onModeChange={libraryRuntime.setMode}
       onSelectLayer={(layerId) => {
         setSelectedLibraryLayerId(layerId);
@@ -476,18 +517,20 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       );
   const canvas = activity === "library" ? (
     <SourceLibraryCanvas
+      appWorkspace={workspace}
       catalog={effectiveLibraryCatalog}
+      catalogKind={libraryRuntime.catalogKind}
       device={requestedDevice}
       library={workspace.library}
       mode={libraryRuntime.mode}
       selected={selectedLibraryComponent}
       selectedDesignCase={selectedLibraryDesignCase}
       selectedLayer={libraryVisualLayer}
-      selectedClassCss={libraryStyleEditor.css}
-      selectedClassName={libraryVisualLayer?.className ? libraryStyleEditor.value : undefined}
-      selectedText={libraryVisualLayer?.text ? libraryStyleEditor.textValue : undefined}
+      selectedClassCss={libraryStyleEditor.previewCss}
+      selectedClassName={libraryStyleEditor.previewValue}
+      selectedText={libraryStyleEditor.previewTextValue}
       previewMode={canvasMode}
-      selectionMode={libraryRuntime.mode === "development"}
+      selectionMode={libraryRuntime.catalogKind === "library" && libraryRuntime.mode === "development"}
       generateDesignError={designGeneration.error}
       generatingDesignEntryId={designGeneration.entryId}
       onDeviceChange={(device) => setSelection((current) => current ? { ...current, device } : current)}
@@ -495,7 +538,15 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         ...current,
         [libraryPreviewEntry.design!.fileId]: caseName,
       }))}
-      onGenerateDesign={(selectedEntry) => void designGeneration.generate("library-development", selectedEntry.id)}
+      onGenerateDesign={(selectedEntry) => void designGeneration.generate(
+        libraryRuntime.catalogKind === "app" ? "app" : "library-development",
+        selectedEntry.id,
+      )}
+      onCatalogKindChange={(kind) => {
+        libraryRuntime.setCatalogKind(kind);
+        setSelectedLibraryComponent(undefined);
+        setSelectedLibraryLayerId(undefined);
+      }}
       onModeChange={libraryRuntime.setMode}
       onPreviewModeChange={setCanvasMode}
       onSelectLayer={(layerId) => {
@@ -531,12 +582,13 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       previewEntry={previewEntry}
       revealSelectedLayerKey={canvasRevealRequest}
       runtime={workspace.runtime}
-      selectedClassCss={styleEditor.css}
-      selectedClassName={visualLayer?.className ? styleEditor.value : undefined}
+      selectedClassCss={styleEditor.previewCss}
+      selectedClassName={styleEditor.previewValue}
       selectedDesignCase={selectedAppDesignCase}
       selectedLayer={visualLayer}
+      selectedLayerLabel={selectedLabel}
       selectedLayerOccurrence={sourceCanvasSelectionOccurrence(graph, resolvedFocusId, selection)}
-      selectedText={visualLayer?.text ? styleEditor.textValue : undefined}
+      selectedText={styleEditor.previewTextValue}
       slotLayers={previewSlotLayers}
       styles={workspace.styles}
       workspaceMode={workspaceMode}
@@ -582,13 +634,20 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         codeDocument={codeDocument}
         designEditor={libraryDesignEditor}
         entry={libraryEntry}
-        mode={libraryRuntime.mode}
+        mode={libraryRuntime.catalogKind === "app" ? "release" : libraryRuntime.mode}
         releaseFallback={<SourceLibraryInspector
+          appWorkspace={workspace}
           catalog={effectiveLibraryCatalog}
+          catalogKind={libraryRuntime.catalogKind}
           device={requestedDevice}
           library={workspace.library}
           mode={libraryRuntime.mode}
           selected={selectedLibraryComponent}
+          onCatalogKindChange={(kind) => {
+            libraryRuntime.setCatalogKind(kind);
+            setSelectedLibraryComponent(undefined);
+            setSelectedLibraryLayerId(undefined);
+          }}
           onDeviceChange={() => undefined}
           onModeChange={libraryRuntime.setMode}
         />}
@@ -614,6 +673,20 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           entry={inspectorEntry}
           layer={visualLayer}
           layerMetrics={selectedLayerMetrics}
+          outsideCurrentFile={externalInspectorEntry && selectedOccurrence ? {
+            currentRelativePath: previewEntry?.relativePath,
+            onOpen: () => openComponent({
+              selection: {
+                nodeId: selectedOccurrence.node.id,
+                sourceNodeId: selectedOccurrence.node.id,
+                device: requestedDevice,
+                occurrenceId: selectedOccurrence.id,
+                kind: "component",
+              },
+              source: externalInspectorEntry.source,
+              ...(externalInspectorEntry.design ? { designOccurrenceId: selectedOccurrence.id } : {}),
+            }),
+          } : undefined}
           selectedDesignCase={inspectorEntry?.design ? designCases[inspectorEntry.design.fileId] : undefined}
           slotLayers={sourceEntrySlotLayers(inspectorEntry)}
           slotEditorReady={selection?.sourceNodeId === focusedOccurrence?.usageOwnerId && slotEditorReady}
@@ -690,7 +763,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         />
         <ResizableWorkspacePanels
           namespace={{ projectId: target.project.id, documentId: `${focusedOccurrence?.node.id ?? selectedNode?.id ?? "empty"}:${requestedDevice}` }}
-          left={{ label: "TypeScript app structure", content: left, defaultWidth: 300, minWidth: 260, maxWidth: 480 }}
+          left={{ label: "TypeScript app structure", content: left, defaultWidth: 300, minWidth: 260, maxWidth: 880 }}
           right={{ label: "Component properties", content: right, defaultWidth: 480, minWidth: 360, maxWidth: 760 }}
           mobile={mobile}
           contentClassName="flex"

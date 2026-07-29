@@ -33,9 +33,12 @@ describe("workspace panel state", () => {
       setItem: (key: string, value: string) => values.set(key, value),
     };
 
-    expect(loadWorkspacePanelVisibility(storage, "visibility")).toEqual({ left: true, right: true });
-    saveWorkspacePanelVisibility(storage, "visibility", { left: false, right: true });
-    expect(loadWorkspacePanelVisibility(storage, "visibility")).toEqual({ left: false, right: true });
+    expect(loadWorkspacePanelVisibility(storage, "visibility")).toEqual({ left: true, right: true, expanded: null });
+    saveWorkspacePanelVisibility(storage, "visibility", { left: false, right: true, expanded: "right" });
+    expect(loadWorkspacePanelVisibility(storage, "visibility")).toEqual({ left: false, right: true, expanded: "right" });
+
+    values.set("legacy", JSON.stringify({ version: 1, left: true, right: false }));
+    expect(loadWorkspacePanelVisibility(storage, "legacy")).toEqual({ left: true, right: false, expanded: null });
   });
 
   it("clamps persisted values and falls back when storage is invalid", () => {

@@ -27,6 +27,7 @@ export function SourceAppCanvas(props: {
   selectedClassName?: string;
   selectedDesignCase?: string;
   selectedLayer?: SourceWorkspaceLayer;
+  selectedLayerLabel?: string;
   selectedLayerOccurrence?: number;
   selectedText?: string;
   slotLayers: readonly SourceWorkspaceLayer[];
@@ -71,6 +72,7 @@ export function SourceAppCanvas(props: {
             selectedClassName={props.selectedClassName}
             selectedDesignCase={props.selectedDesignCase}
             selectedLayer={props.selectedLayer}
+            selectedLayerLabel={props.selectedLayerLabel}
             selectedLayerOccurrence={props.selectedLayerOccurrence}
             selectedText={props.selectedText}
             slotLayers={props.slotLayers}

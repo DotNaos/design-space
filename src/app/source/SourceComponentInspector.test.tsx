@@ -62,6 +62,30 @@ it("renders an honest empty selection state", () => {
   expect(screen.getByText("Select an exported component to inspect its TypeScript contract.")).toBeVisible();
 });
 
+it("keeps an external component selected without exposing stale properties", async () => {
+  const onOpen = vi.fn();
+  render(
+    <SourceComponentInspector
+      entry={entry}
+      outsideCurrentFile={{
+        currentRelativePath: "src/app/App.tsx",
+        onOpen,
+      }}
+    />,
+  );
+
+  expect(screen.getByText("Outside the current file")).toBeVisible();
+  const selectedComponent = screen.getByRole("region", { name: "Selected component" });
+  expect(selectedComponent).toHaveTextContent(entry.label);
+  expect(selectedComponent).toHaveTextContent(entry.relativePath);
+  expect(screen.getByText("Used from src/app/App.tsx")).toBeVisible();
+  expect(screen.queryByRole("region", { name: "Props" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Slots" })).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: "Open component file" }));
+  expect(onOpen).toHaveBeenCalledOnce();
+});
+
 it("fills every composed slot directly from the contract list", async () => {
   const onApplySlot = vi.fn();
   const onPrepareSlotEdit = vi.fn();
@@ -118,6 +142,9 @@ it("edits a selected HTML layer through its source-derived Tailwind binding", ()
     css: "",
     editable: true,
     error: undefined,
+    previewCss: "",
+    previewTextValue: undefined,
+    previewValue: undefined,
     reset: vi.fn(),
     textBinding,
     textEditable: true,

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -41,8 +41,8 @@ const library: SourceWorkspaceLibrary = {
   mode: "release",
   editable: false,
   components: [
-    { name: "Button", evidence: "package-export" },
-    { name: "Card", evidence: "package-export" },
+    { name: "Button", evidence: "package-export", category: "primitive" },
+    { name: "Card", evidence: "package-export", category: "component" },
   ],
 };
 
@@ -63,10 +63,12 @@ it("shows native development and release sources with a design coverage audit", 
   render(
     <SourceLibrarySidebar
       catalog={catalog}
+      catalogKind="library"
       device="desktop"
       library={library}
       mode="release"
       onDeviceChange={vi.fn()}
+      onCatalogKindChange={vi.fn()}
       onModeChange={change}
       onSelect={vi.fn()}
     />,
@@ -74,14 +76,14 @@ it("shows native development and release sources with a design coverage audit", 
 
   expect(screen.getByText("1/2")).toBeVisible();
   expect(screen.getByLabelText("Card design missing")).toBeVisible();
-  const tree = screen.getByRole("tree", { name: "Source tree" });
-  expect(within(tree).getByRole("treeitem", { name: "Button" })).toBeVisible();
-  expect(within(tree).getByRole("treeitem", { name: "Card" })).toBeVisible();
+  expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Button/ })).toBeVisible();
+  expect(screen.getByRole("button", { name: /Card/ })).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: /Development/ }));
   expect(change).toHaveBeenCalledWith("development");
 });
 
-it("shows library components as independent expandable source roots", async () => {
+it("searches the flat library catalog", async () => {
   const button = {
     ...entry,
     layers: [{
@@ -107,27 +109,49 @@ it("shows library components as independent expandable source roots", async () =
       source: { start: 2, end: 8 },
     }],
   };
-  const selectLayer = vi.fn();
   render(
     <SourceLibrarySidebar
       catalog={{ ...catalog, development: { ...catalog.development!, entries: [button, card] } }}
+      catalogKind="library"
       device="desktop"
       library={library}
       mode="development"
       selected="library.development.Button"
       onDeviceChange={vi.fn()}
+      onCatalogKindChange={vi.fn()}
       onModeChange={vi.fn()}
       onSelect={vi.fn()}
-      onSelectLayer={selectLayer}
     />,
   );
 
-  const tree = screen.getByRole("tree", { name: "Source tree" });
-  expect(within(tree).getByRole("treeitem", { name: "Button" })).toBeVisible();
-  expect(within(tree).getByRole("treeitem", { name: "Card" })).toBeVisible();
-  await userEvent.click(within(tree).getByRole("button", { name: "Expand Button" }));
-  await userEvent.click(within(tree).getByRole("button", { name: "<button>" }));
-  expect(selectLayer).toHaveBeenCalledWith("html.button");
+  const search = screen.getByRole("textbox", { name: "Search components" });
+  await userEvent.type(search, "Card");
+  expect(screen.getByRole("button", { name: /Card/ })).toBeVisible();
+  expect(screen.queryByRole("button", { name: /^Button/ })).not.toBeInTheDocument();
+});
+
+it("shows app-built components as a separate flat catalog", async () => {
+  const change = vi.fn();
+  render(
+    <SourceLibrarySidebar
+      appWorkspace={{ ...catalog.development!, entries: [entry] }}
+      catalog={catalog}
+      catalogKind="app"
+      device="desktop"
+      library={library}
+      mode="development"
+      onCatalogKindChange={change}
+      onDeviceChange={vi.fn()}
+      onModeChange={vi.fn()}
+      onSelect={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: /Button/ })).toBeVisible();
+  expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
+  expect(screen.getByText("src")).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: /UI library/ }));
+  expect(change).toHaveBeenCalledWith("library");
 });
 
 it("generates a missing design only for the attached development source", async () => {
@@ -136,11 +160,13 @@ it("generates a missing design only for the attached development source", async 
   render(
     <SourceLibraryCanvas
       catalog={{ ...catalog, development: { ...catalog.development!, entries: [missingEntry] } }}
+      catalogKind="library"
       device="desktop"
       library={{ ...library, components: [{ name: "Button", evidence: "package-export" }] }}
       mode="development"
       selected="library.development.Button"
       onDeviceChange={vi.fn()}
+      onCatalogKindChange={vi.fn()}
       onGenerateDesign={onGenerateDesign}
       onModeChange={vi.fn()}
     />,
@@ -153,11 +179,13 @@ it("explains when an installed export has no native design", () => {
   render(
     <SourceLibraryCanvas
       catalog={{ ...catalog, release: { version: "0.0.5", entries: [], styles: [] } }}
+      catalogKind="library"
       device="desktop"
       library={{ ...library, components: [{ name: "Card", evidence: "package-export" }] }}
       mode="release"
       selected="library.release.Card"
       onDeviceChange={vi.fn()}
+      onCatalogKindChange={vi.fn()}
       onModeChange={vi.fn()}
     />,
   );

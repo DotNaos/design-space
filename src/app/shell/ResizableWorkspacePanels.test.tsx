@@ -38,11 +38,14 @@ describe("ResizableWorkspacePanels", () => {
 
   it("collapses each panel independently and restores the state for the same document", async () => {
     const first = renderWorkspace();
-    await fireEvent.click(screen.getByRole("button", { name: "Hide Project panel" }));
+    const hideProject = screen.getByRole("button", { name: "Hide Project panel" });
+    expect(hideProject.closest("[data-workspace-panel='left']")).not.toBeNull();
+    await fireEvent.click(hideProject);
 
     const showProject = screen.getByRole("button", { name: "Show Project panel" });
     expect(document.getElementById(showProject.getAttribute("aria-controls")!)).toHaveAttribute("aria-hidden", "true");
     expect(showProject).toHaveAttribute("aria-expanded", "false");
+    expect(showProject.closest("[data-workspace-panel='left']")).toHaveAttribute("data-workspace-panel-collapsed", "true");
     expect(screen.getByRole("region", { name: "Inspector panel" })).toHaveAttribute("aria-hidden", "false");
 
     const key = workspacePanelVisibilityStorageKey({ projectId: "demo", documentId: "home" });
@@ -60,20 +63,73 @@ describe("ResizableWorkspacePanels", () => {
     expect(document.getElementById(showInspector.getAttribute("aria-controls")!)).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("snaps a panel closed when it is dragged beyond its minimum width", () => {
+    renderWorkspace();
+    const left = screen.getByRole("separator", { name: "Resize Project panel" });
+
+    dispatchPointer(left, "pointerdown", 1, 260);
+    dispatchPointer(window, "pointermove", 1, 180);
+    expect(left).toHaveAttribute("aria-valuenow", "200");
+    expect(left).toHaveAttribute("data-workspace-panel-snap", "resist-collapse");
+    expect(screen.getByRole("button", { name: "Hide Project panel" })).toBeVisible();
+    dispatchPointer(window, "pointermove", 1, 130);
+    expect(left).toHaveAttribute("data-workspace-panel-snap", "collapse");
+    const showProject = screen.getByRole("button", { name: "Show Project panel" });
+    expect(showProject).toHaveAttribute("aria-expanded", "false");
+    expect(document.getElementById(showProject.getAttribute("aria-controls")!)).toHaveAttribute("aria-hidden", "true");
+    expect(left).toHaveAttribute("aria-valuetext", "Collapsed");
+    dispatchPointer(window, "pointerup", 1, 130);
+  });
+
+  it("resists at the maximum before expanding and restores after an inward drag", () => {
+    renderWorkspace();
+    const layout = screen.getByText("Canvas").closest("[data-workspace-panel-layout]")!;
+    const left = screen.getByRole("separator", { name: "Resize Project panel" });
+
+    dispatchPointer(left, "pointerdown", 1, 260);
+    dispatchPointer(window, "pointermove", 1, 440);
+    expect(left).toHaveAttribute("aria-valuenow", "400");
+    expect(left).toHaveAttribute("data-workspace-panel-snap", "resist-expand");
+    expect(layout).not.toHaveAttribute("data-workspace-panel-expanded");
+
+    dispatchPointer(window, "pointermove", 1, 470);
+    expect(left).toHaveAttribute("data-workspace-panel-snap", "expand");
+    expect(layout).toHaveAttribute("data-workspace-panel-expanded", "left");
+    expect(left).toHaveAttribute("aria-valuetext", "Full width");
+    expect(left).toHaveAttribute("aria-valuenow", "1440");
+    expect(screen.getByText("Canvas").parentElement).toHaveAttribute("aria-hidden", "true");
+    const inspectorToggle = screen.getByRole("button", { name: "Hide Inspector panel" });
+    expect(document.getElementById(inspectorToggle.getAttribute("aria-controls")!)).toHaveAttribute("aria-hidden", "true");
+    dispatchPointer(window, "pointerup", 1, 470);
+
+    dispatchPointer(left, "pointerdown", 2, 1400);
+    dispatchPointer(window, "pointermove", 2, 1360);
+    expect(left).toHaveAttribute("data-workspace-panel-snap", "resist-restore");
+    dispatchPointer(window, "pointerup", 2, 1360);
+    expect(layout).toHaveAttribute("data-workspace-panel-expanded", "left");
+
+    dispatchPointer(left, "pointerdown", 3, 1400);
+    dispatchPointer(window, "pointermove", 3, 1320);
+    expect(left).toHaveAttribute("data-workspace-panel-snap", "restore");
+    expect(layout).not.toHaveAttribute("data-workspace-panel-expanded");
+    expect(left).toHaveAttribute("aria-valuenow", "400");
+    dispatchPointer(window, "pointerup", 3, 1320);
+  });
+
   it("resizes both panels by pointer and clamps them to their limits", () => {
     renderWorkspace();
     const left = screen.getByRole("separator", { name: "Resize Project panel" });
     const right = screen.getByRole("separator", { name: "Resize Inspector panel" });
 
     dispatchPointer(left, "pointerdown", 1, 200);
-    dispatchPointer(window, "pointermove", 1, 1000);
+    dispatchPointer(window, "pointermove", 1, 370);
     expect(left).toHaveAttribute("aria-valuenow", "400");
-    dispatchPointer(window, "pointerup", 1, 1000);
+    dispatchPointer(window, "pointerup", 1, 370);
 
     dispatchPointer(right, "pointerdown", 2, 700);
-    dispatchPointer(window, "pointermove", 2, 100);
+    dispatchPointer(window, "pointermove", 2, 500);
     expect(right).toHaveAttribute("aria-valuenow", "460");
-    dispatchPointer(window, "pointerup", 2, 100);
+    dispatchPointer(window, "pointerup", 2, 500);
   });
 
   it("supports arrow, Home, End, shifted steps, and double-click reset", () => {

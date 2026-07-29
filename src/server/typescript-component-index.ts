@@ -250,6 +250,7 @@ function jsxLayer(
       label,
       kind,
       source: { start: node.getStart(), end: node.getEnd() },
+      ...localComponentDefinition(label, kind, localComponents),
       ...jsxClassName(node.openingElement, kind, checker),
       ...jsxStaticText(node),
       children: [
@@ -267,6 +268,7 @@ function jsxLayer(
       label,
       kind,
       source: { start: node.getStart(), end: node.getEnd() },
+      ...localComponentDefinition(label, kind, localComponents),
       ...jsxClassName(node, kind, checker),
       children: [
         ...componentUsageSlots(node, componentContracts?.get(label), localComponents, path, relativePath, checker, componentContracts),
@@ -515,6 +517,18 @@ function localComponentLayers(
   const declaration = localComponents.get(label);
   if (!declaration) return [];
   return jsxLayers(declaration, localComponents, new Set(path).add(label), relativePath, new Set(), checker, componentContracts);
+}
+
+function localComponentDefinition(
+  label: string,
+  kind: SourceWorkspaceLayer["kind"],
+  localComponents: ReadonlyMap<string, ts.Declaration>,
+): Pick<SourceWorkspaceLayer, "definition"> {
+  if (kind !== "component") return {};
+  const declaration = localComponents.get(label);
+  return declaration
+    ? { definition: { start: declaration.getStart(), end: declaration.getEnd() } }
+    : {};
 }
 
 function localJsxDeclarations(sourceFile: ts.SourceFile): ReadonlyMap<string, ts.Declaration> {

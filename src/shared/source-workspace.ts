@@ -107,6 +107,8 @@ export interface SourceWorkspaceLayer {
   kind: "component" | "html" | "slot";
   children: readonly SourceWorkspaceLayer[];
   source: SourceLayerBinding;
+  /** Definition of a same-file component referenced by this JSX layer. */
+  definition?: SourceLayerBinding;
   /** Exact source binding for a static or currently absent JSX className. */
   className?: SourceLayerClassNameBinding;
   /** Dynamic className expressions stay code-only until their expression can be preserved. */
@@ -184,6 +186,8 @@ export interface SourceWorkspaceLibrary {
 export interface SourceLibraryComponent {
   name: string;
   evidence: "package-export" | "project-import";
+  /** Package-derived catalog grouping. Missing means a composed component. */
+  category?: "primitive" | "component";
 }
 
 export interface RuntimeSourceWorkspaceEntry extends SourceWorkspaceEntry {

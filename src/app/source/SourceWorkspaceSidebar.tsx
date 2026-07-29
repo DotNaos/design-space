@@ -22,9 +22,15 @@ import {
   Type,
   TriangleAlert,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { designSpaceDevices, type DesignSpaceDevice, type RuntimeSourceWorkspace, type SourceWorkspaceLayer } from "../../shared/source-workspace";
+import {
+  designSpaceDevices,
+  type DesignSpaceDevice,
+  type RuntimeSourceWorkspace,
+  type SourceLayerBinding,
+  type SourceWorkspaceLayer,
+} from "../../shared/source-workspace";
 import { suggestedSourceDesignPath } from "../../shared/source-design";
 import { SourceComponentPicker } from "./SourceComponentPicker";
 import { SourceDesignStatus } from "./SourceDesignStatus";
@@ -52,6 +58,12 @@ export interface SourceWorkspaceSelection extends SourceTreeSelection {
   kind?: "component" | "html" | "slot";
 }
 
+export interface SourceComponentOpenRequest {
+  selection: SourceWorkspaceSelection;
+  source: SourceLayerBinding;
+  designOccurrenceId?: string;
+}
+
 export interface SourceWorkspaceSidebarProps {
   className?: string;
   selected?: SourceWorkspaceSelection;
@@ -60,6 +72,7 @@ export interface SourceWorkspaceSidebarProps {
   onHover?: (selection: SourceWorkspaceSelection | undefined) => void;
   onSelect: (selection: SourceWorkspaceSelection) => void;
   onFocus: (occurrenceId: string, selection: SourceWorkspaceSelection) => void;
+  onOpenComponent?: (request: SourceComponentOpenRequest) => void;
   onApplySlot?: (
     slot: SourceWorkspaceLayer,
     occurrence: SourceOccurrence,
@@ -115,7 +128,10 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           </Button>
         )}
       </header>
-      <SourceWorkspaceTree {...props} collapseOutsideRequest={collapseOutsideRequest} />
+      <SourceWorkspaceTree
+        {...props}
+        collapseOutsideRequest={collapseOutsideRequest}
+      />
     </aside>
   );
 }
@@ -147,6 +163,7 @@ export interface SourceWorkspaceTreeProps extends Omit<SourceWorkspaceSidebarPro
   collapseOutsideRequest?: number;
   emptyMessage?: string;
   focusNodeId?: string;
+  revealSelectedRequest?: number;
   rootLabels?: Readonly<Record<string, string>>;
   rootNodeIds?: readonly string[];
   trailingRows?: ReactNode;
@@ -173,10 +190,13 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
   }, [focusId, rows]);
   const [collapsed, setCollapsed] = useSourceTreeCollapsedState(rows, focusId, props.treeStateKey);
   const previousCollapseOutsideRequest = useRef(props.collapseOutsideRequest);
+  const previousRevealSelectedRequest = useRef(props.revealSelectedRequest);
+  const handledRevealSelectedRevision = useRef(0);
   const previousFocusId = useRef(focusId);
+  const [revealSelectedRevision, setRevealSelectedRevision] = useState(0);
   const visibleRows = useMemo(() => visibleSourceCompositionRows(rows, collapsed), [collapsed, rows]);
   const selectedVisibleIndex = useMemo(
-    () => visibleRows.findIndex((row) => sourceRowMatchesSelection(row, props.selected, focusId)),
+    () => sourceRowIndexForSelection(visibleRows, props.selected, focusId),
     [focusId, props.selected, visibleRows],
   );
   const activeVisibleIndex = useMemo(
@@ -184,13 +204,22 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
     [focusId, visibleRows],
   );
   const virtual = useVirtualSourceTree(visibleRows.length, selectedVisibleIndex, activeVisibleIndex);
+  const revealSelected = useCallback(() => {
+    const selectedIndex = sourceRowIndexForSelection(rows, props.selected, focusId);
+    if (selectedIndex < 0) return;
+    const open = ancestorBranchKeys(rows, selectedIndex);
+    setCollapsed((current) => {
+      if (![...open].some((key) => current.has(key))) return current;
+      const next = new Set(current);
+      open.forEach((key) => next.delete(key));
+      return next;
+    });
+    setRevealSelectedRevision((current) => current + 1);
+  }, [focusId, props.selected, rows, setCollapsed]);
   useEffect(() => {
     const focusChanged = previousFocusId.current !== focusId;
     previousFocusId.current = focusId;
-    const selectedIndex = rows.findIndex((row) => row.occurrence?.id === props.selected?.occurrenceId && (
-      row.layer?.id === props.selected?.layerId
-      || (!props.selected?.layerId && row.kind === "component")
-    ) && renderedOccurrenceMatches(props.selected, row));
+    const selectedIndex = sourceRowIndexForSelection(rows, props.selected, focusId);
     if (selectedIndex < 0) return;
     const open = new Set(ancestorBranchKeys(rows, selectedIndex));
     const selectedRow = rows[selectedIndex];
@@ -203,11 +232,19 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
     });
   }, [
     focusId,
+    props.selected?.kind,
     props.selected?.layerId,
+    props.selected?.nodeId,
     props.selected?.occurrenceId,
     props.selected?.renderedLayerOccurrence,
+    props.selected?.sourceNodeId,
     rows,
   ]);
+  useEffect(() => {
+    if (previousRevealSelectedRequest.current === props.revealSelectedRequest) return;
+    previousRevealSelectedRequest.current = props.revealSelectedRequest;
+    revealSelected();
+  }, [props.revealSelectedRequest, revealSelected]);
   useEffect(() => {
     if (previousCollapseOutsideRequest.current === props.collapseOutsideRequest) return;
     previousCollapseOutsideRequest.current = props.collapseOutsideRequest;
@@ -224,15 +261,37 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
     else next.add(key);
     return next;
   });
+  useLayoutEffect(() => {
+    if (
+      revealSelectedRevision === 0
+      || handledRevealSelectedRevision.current === revealSelectedRevision
+      || selectedVisibleIndex < 0
+    ) return;
+    handledRevealSelectedRevision.current = revealSelectedRevision;
+    virtual.scrollToSelected();
+    const frame = requestAnimationFrame(() => {
+      const scroll = virtual.scrollRef.current;
+      const selectedRow = scroll?.querySelector<HTMLElement>('[role="treeitem"][aria-selected="true"]');
+      if (!scroll || !selectedRow) return;
+      centerSourceTreeRow(scroll, selectedRow);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [
+    revealSelectedRevision,
+    selectedVisibleIndex,
+    virtual.scrollRef,
+    virtual.scrollToSelected,
+  ]);
   return (
     <div className="relative min-h-0 flex-1">
       <div
         ref={virtual.scrollRef}
-        className="h-full min-h-0 overflow-y-auto py-2"
+        className="h-full min-h-0 overflow-auto py-2"
+        data-source-tree-scroll=""
         data-source-tree-virtualized={virtual.virtualized || undefined}
         onScroll={virtual.onScroll}
       >
-        <div aria-label="Source tree" role="tree">
+        <div aria-label="Source tree" className="min-w-max" role="tree">
           {virtual.topSpacer > 0 ? <div aria-hidden="true" style={{ height: virtual.topSpacer }} /> : null}
           {visibleRows.slice(virtual.start, virtual.end).map((row) => {
             const displayRow = row.depth === 0 && row.kind === "component" && row.occurrence
@@ -256,6 +315,7 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
                 slotEditorReady={props.slotEditorReady}
                 onPrepareSlotEdit={props.onPrepareSlotEdit}
                 onFocus={props.onFocus}
+                onOpenComponent={props.onOpenComponent}
                 onHover={props.onHover}
                 onSelect={props.onSelect}
                 onToggleBranch={toggleBranch}
@@ -269,61 +329,67 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
       </div>
       <SourceTreeAnchorControls
         activeDirection={virtual.anchorDirection}
+        hasSelection={Boolean(props.selected)}
         selectedDirection={virtual.selectedDirection}
         onScrollToActive={virtual.scrollToAnchor}
-        onScrollToSelected={virtual.scrollToSelected}
+        onScrollToSelected={revealSelected}
       />
     </div>
   );
 }
 
+function centerSourceTreeRow(scroll: HTMLElement, row: HTMLElement) {
+  const scrollRect = scroll.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  const rowTop = rowRect.top - scrollRect.top + scroll.scrollTop;
+  const next = Math.max(
+    0,
+    Math.min(
+      scroll.scrollHeight - scroll.clientHeight,
+      rowTop - (scroll.clientHeight - rowRect.height) / 2,
+    ),
+  );
+  scroll.scrollTop = next;
+}
+
 function SourceTreeAnchorControls(props: {
   activeDirection?: "above" | "below";
+  hasSelection: boolean;
   selectedDirection?: "above" | "below";
   onScrollToActive: () => void;
   onScrollToSelected: () => void;
 }) {
-  return (["above", "below"] as const).map((direction) => {
-    const showActive = props.activeDirection === direction;
-    const showSelected = props.selectedDirection === direction;
-    if (!showActive && !showSelected) return null;
-    return (
-      <div
-        key={direction}
-        className={`absolute right-3 z-30 flex gap-1 ${direction === "above" ? "top-3" : ""}`}
-        style={direction === "below"
-          ? { bottom: "calc(var(--source-code-overlay-height, 2.5rem) + 0.75rem)" }
-          : undefined}
-      >
-        {showActive ? (
-          <Button
-            isIconOnly
-            aria-label={`Scroll to active component ${direction}`}
-            className="size-8 min-w-8 rounded-full border border-sky-400/30 bg-[#1b1d21]/95 text-sky-300 shadow-lg shadow-black/30 backdrop-blur"
-            size="sm"
-            variant="secondary"
-            onClick={props.onScrollToActive}
-          >
-            {direction === "above"
-              ? <ArrowUp aria-hidden="true" size={14} />
-              : <ArrowDown aria-hidden="true" size={14} />}
-          </Button>
-        ) : null}
-        {showSelected ? (
-          <Button
-            isIconOnly
-            aria-label={`Scroll to selected layer ${direction}`}
-            className="size-8 min-w-8 rounded-full border border-violet-400/30 bg-[#1b1d21]/95 text-violet-300 shadow-lg shadow-black/30 backdrop-blur"
-            size="sm"
-            variant="secondary"
-            onClick={props.onScrollToSelected}
-          >
-            <LocateFixed aria-hidden="true" size={14} />
-          </Button>
-        ) : null}
-      </div>
-    );
-  });
+  if (!props.activeDirection && !props.hasSelection) return null;
+  return (
+    <div className="absolute right-3 top-3 z-30 flex gap-1">
+      {props.activeDirection ? (
+        <Button
+          isIconOnly
+          aria-label={`Scroll to active component ${props.activeDirection}`}
+          className="size-8 min-w-8 rounded-full border border-white bg-white text-black shadow-lg shadow-black/30 hover:bg-zinc-200"
+          size="sm"
+          variant="secondary"
+          onClick={props.onScrollToActive}
+        >
+          {props.activeDirection === "above"
+            ? <ArrowUp aria-hidden="true" size={14} />
+            : <ArrowDown aria-hidden="true" size={14} />}
+        </Button>
+      ) : null}
+      {props.hasSelection ? (
+        <Button
+          isIconOnly
+          aria-label="Scroll to current selection"
+          className="size-8 min-w-8 rounded-full border border-violet-300/50 bg-violet-500 text-white shadow-lg shadow-black/30 hover:bg-violet-400"
+          size="sm"
+          variant="secondary"
+          onClick={props.onScrollToSelected}
+        >
+          <LocateFixed aria-hidden="true" size={14} />
+        </Button>
+      ) : null}
+    </div>
+  );
 }
 
 function sourceRowMatchesSelection(
@@ -338,11 +404,33 @@ function sourceRowMatchesSelection(
   if (selected.occurrenceId !== row.occurrence?.id || !renderedOccurrenceMatches(selected, row)) {
     return false;
   }
-  if (occurrenceRow) return selected.kind === "component";
+  if (occurrenceRow) return selected.kind === "component" && !selected.layerId;
   return selected.kind === row.kind && (
     selected.layerId === row.layer?.id
     || (row.kind === "slot" && selected.slotName === row.layer?.label)
   );
+}
+
+function sourceRowIndexForSelection(
+  rows: readonly SourceFocusRow[],
+  selected: SourceWorkspaceSelection | undefined,
+  activeCanvasId: string | undefined,
+): number {
+  const exactIndex = rows.findIndex((row) => sourceRowMatchesSelection(row, selected, activeCanvasId));
+  if (exactIndex >= 0 || !selected) return exactIndex;
+  return rows.findIndex((row) => {
+    if (!renderedOccurrenceMatches(selected, row)) return false;
+    if (selected.kind === "component" && row.kind === "component") {
+      return row.occurrence?.node.id === selected.nodeId
+        || row.occurrence?.node.id === selected.sourceNodeId;
+    }
+    return row.kind === selected.kind
+      && row.layer?.id === selected.layerId
+      && (
+        row.occurrence?.node.id === selected.sourceNodeId
+        || row.sourceOwnerId === selected.sourceNodeId
+      );
+  });
 }
 
 function FocusTreeRow(props: {
@@ -361,6 +449,7 @@ function FocusTreeRow(props: {
   slotEditorReady?: boolean;
   onPrepareSlotEdit?: SourceWorkspaceSidebarProps["onPrepareSlotEdit"];
   onFocus: SourceWorkspaceSidebarProps["onFocus"];
+  onOpenComponent: SourceWorkspaceSidebarProps["onOpenComponent"];
   onHover: SourceWorkspaceSidebarProps["onHover"];
   onSelect: SourceWorkspaceSidebarProps["onSelect"];
   onToggleBranch: (key: string) => void;
@@ -439,12 +528,48 @@ function FocusTreeRow(props: {
     const next = selection();
     if (next) props.onSelect(next);
   };
+  const componentOpenRequest = (): SourceComponentOpenRequest | undefined => {
+    if (row.kind !== "component") return undefined;
+    if (occurrenceRow && focusTarget?.entry) {
+      return {
+        selection: {
+          nodeId: focusTarget.node.id,
+          sourceNodeId: focusTarget.node.id,
+          device: props.device,
+          occurrenceId: focusTarget.id,
+          ...(row.renderedLayerOccurrence !== undefined
+            ? { renderedLayerOccurrence: row.renderedLayerOccurrence }
+            : {}),
+          kind: "component",
+        },
+        source: focusTarget.entry.source,
+        ...(focusTarget.entry.design ? { designOccurrenceId: focusTarget.id } : {}),
+      };
+    }
+    const next = selection();
+    if (!next || !row.layer) return undefined;
+    return {
+      selection: next,
+      source: row.layer.definition ?? row.layer.source,
+    };
+  };
+  const openComponent = () => {
+    const request = componentOpenRequest();
+    if (!request) return;
+    if (props.onOpenComponent) {
+      props.onOpenComponent(request);
+      return;
+    }
+    if (occurrenceRow && focusTarget) {
+      props.onFocus(focusTarget.id, request.selection);
+    }
+  };
   return (
     <div
       aria-label={row.label}
       aria-level={row.depth + 1}
       aria-selected={active}
-      className={`relative flex min-h-10 items-center pr-2 transition-[padding,opacity,transform] duration-150 ease-out motion-reduce:transition-none ${mutedOpacity} ${props.activePath ? "bg-violet-500/[0.025]" : ""}`}
+      className={`relative flex min-h-10 w-full min-w-max items-center pr-2 transition-[padding,opacity,transform] duration-150 ease-out motion-reduce:transition-none ${mutedOpacity} ${props.activePath ? "bg-violet-500/[0.025]" : ""}`}
       data-source-active-path={props.activePath || undefined}
       data-source-file-scope={outsideActiveFile ? "external" : "current"}
       data-source-occurrence={row.occurrence?.id}
@@ -476,38 +601,17 @@ function FocusTreeRow(props: {
         size="sm"
         variant="ghost"
         onKeyDown={(event) => {
-          if (event.key === "Enter" && focusTarget && occurrenceRow) {
+          if (event.key === "Enter" && row.kind === "component") {
             event.preventDefault();
-            props.onFocus(focusTarget.id, {
-              nodeId: focusTarget.node.id,
-              sourceNodeId: focusTarget.node.id,
-              device: props.device,
-              occurrenceId: focusTarget.id,
-              ...(row.renderedLayerOccurrence !== undefined
-                ? { renderedLayerOccurrence: row.renderedLayerOccurrence }
-                : {}),
-              kind: "component",
-            });
+            openComponent();
             return;
           }
         }}
-        onDoubleClick={() => {
-          if (!focusTarget || !occurrenceRow) return;
-          props.onFocus(focusTarget.id, {
-            nodeId: focusTarget.node.id,
-            sourceNodeId: focusTarget.node.id,
-            device: props.device,
-            occurrenceId: focusTarget.id,
-            ...(row.renderedLayerOccurrence !== undefined
-              ? { renderedLayerOccurrence: row.renderedLayerOccurrence }
-              : {}),
-            kind: "component",
-          });
-        }}
+        onDoubleClick={openComponent}
         onPress={select}
       >
         <Icon aria-hidden="true" className={`shrink-0 ${row.kind === "component" ? withinCanvas && !outsideActiveFile ? "text-violet-400" : props.activePath ? "text-violet-400/65" : "text-violet-500/45" : ""}`} size={row.kind === "component" && !openedCanvas ? 12 : 13} />
-        <span className={`min-w-0 flex-1 truncate text-xs ${row.kind === "html" ? "font-mono text-[10px]" : ""}`}>{row.label}</span>
+        <span className={`flex-1 whitespace-nowrap text-xs ${row.kind === "html" ? "font-mono text-[10px]" : ""}`}>{row.label}</span>
         {row.kind === "component" && row.occurrence && <MissingDeviceCluster implementations={row.occurrence.node.implementations} />}
         {status && <SlotStatus layer={slot!} />}
       </Button>

@@ -11,6 +11,7 @@ export type WorkspacePanelWidths = {
 export type WorkspacePanelVisibility = {
   left: boolean;
   right: boolean;
+  expanded: keyof WorkspacePanelWidths | null;
 };
 
 export type WorkspacePanelBounds = {
@@ -132,16 +133,17 @@ export function loadWorkspacePanelVisibility(
   storage: Pick<Storage, "getItem"> | undefined,
   key: string,
 ): WorkspacePanelVisibility {
-  if (!storage) return { left: true, right: true };
+  if (!storage) return { left: true, right: true, expanded: null };
   try {
     const parsed = JSON.parse(storage.getItem(key) ?? "null") as Partial<WorkspacePanelVisibility> & { version?: number } | null;
-    if (!parsed || parsed.version !== 1) return { left: true, right: true };
+    if (!parsed || parsed.version !== 1) return { left: true, right: true, expanded: null };
     return {
       left: typeof parsed.left === "boolean" ? parsed.left : true,
       right: typeof parsed.right === "boolean" ? parsed.right : true,
+      expanded: parsed.expanded === "left" || parsed.expanded === "right" ? parsed.expanded : null,
     };
   } catch {
-    return { left: true, right: true };
+    return { left: true, right: true, expanded: null };
   }
 }
 

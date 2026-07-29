@@ -19,19 +19,35 @@ export function useWorkspacePanelVisibility(namespace: WorkspacePanelNamespace) 
 
   useEffect(() => {
     saveWorkspacePanelVisibility(browserStorage(), key, visibility);
-  }, [key, visibility.left, visibility.right]);
+  }, [key, visibility.expanded, visibility.left, visibility.right]);
 
-  const toggle = (side: keyof WorkspacePanelVisibility) => {
+  const setVisible = (side: "left" | "right", visible: boolean) => {
     setOverrides((current) => ({
       ...current,
       [key]: {
         ...(current[key] ?? restored),
-        [side]: !(current[key] ?? restored)[side],
+        [side]: visible,
+        expanded: visible ? (current[key] ?? restored).expanded : (current[key] ?? restored).expanded === side ? null : (current[key] ?? restored).expanded,
       },
     }));
   };
 
-  return { visibility, toggle };
+  const setExpanded = (side: "left" | "right" | null) => {
+    setOverrides((current) => ({
+      ...current,
+      [key]: {
+        ...(current[key] ?? restored),
+        ...(side ? { [side]: true } : {}),
+        expanded: side,
+      },
+    }));
+  };
+
+  const toggle = (side: "left" | "right") => {
+    setVisible(side, !visibility[side]);
+  };
+
+  return { visibility, setVisible, setExpanded, toggle };
 }
 
 function browserStorage() {

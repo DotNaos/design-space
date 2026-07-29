@@ -125,6 +125,31 @@ describe("TypeScript component index", () => {
     expect(plain?.className).toBeUndefined();
   });
 
+  it("maps same-file component layers to their exact definitions", async () => {
+    const root = await createProject();
+    const source = `
+      function ControlSection() {
+        return <section>Controls</section>;
+      }
+      export function Inspector() {
+        return <aside><ControlSection /></aside>;
+      }
+    `;
+    await writeFile(join(root, "src/components/Inspector.tsx"), source);
+
+    const components = await indexTypeScriptComponents({
+      filePaths: ["src/components/Inspector.tsx"],
+      projectRoot: root,
+    });
+    const controlSection = components[0]?.layers[0]?.children.find((layer) => layer.label === "ControlSection");
+
+    expect(controlSection?.definition).toEqual({
+      start: source.indexOf("function ControlSection"),
+      end: source.indexOf("export function Inspector") - 7,
+    });
+    expect(controlSection?.definition).not.toEqual(controlSection?.source);
+  });
+
   it("keeps rendered JSX layer IDs stable when an earlier source edit shifts offsets", async () => {
     const root = await createProject();
     const filePath = join(root, "src/components/StableLayers.tsx");

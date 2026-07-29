@@ -201,16 +201,24 @@ function resolvedLibraryComponents(
   const checker = program.getTypeChecker();
   const moduleSymbol = source && checker.getSymbolAtLocation(source);
   if (!moduleSymbol) return [];
-  const names = checker.getExportsOfModule(moduleSymbol).flatMap((symbol) => {
+  const components = checker.getExportsOfModule(moduleSymbol).flatMap((symbol) => {
     const name = symbol.getName();
     if (!/^[A-Z][A-Za-z0-9]*$/.test(name) || name === name.toUpperCase()) return [];
     const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
-    return target.flags & ts.SymbolFlags.Value ? [name] : [];
+    if (!(target.flags & ts.SymbolFlags.Value)) return [];
+    const primitive = target.declarations?.some((declaration) => (
+      /[/\\]primitives[/\\]/.test(declaration.getSourceFile().fileName)
+    ));
+    return [{
+      name,
+      evidence: "package-export" as const,
+      ...(primitive ? { category: "primitive" as const } : {}),
+    }];
   });
-  return Object.freeze([...new Set(names)].sort((left, right) => left.localeCompare(right, "en")).map((name) => ({
-    name,
-    evidence: "package-export" as const,
-  })));
+  return Object.freeze(
+    [...new Map(components.map((component) => [component.name, component])).values()]
+      .sort((left, right) => left.name.localeCompare(right.name, "en")),
+  );
 }
 
 async function importedLibraryComponents(

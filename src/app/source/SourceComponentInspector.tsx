@@ -1,4 +1,4 @@
-import { Braces, ChevronRight, CircleAlert, Component, FileCode2 } from "lucide-react";
+import { ArrowUpRight, Braces, ChevronRight, CircleAlert, Component, FileCode2 } from "lucide-react";
 import { Button, Chip } from "@heroui/react";
 import { useEffect, useState } from "react";
 
@@ -25,6 +25,10 @@ export interface SourceComponentInspectorProps {
   slotEditorReady?: boolean;
   styleEditor?: SourceLayerClassEditor;
   candidatesForSlot?: (slot: SourceWorkspaceLayer) => readonly SourceComponentCandidate[];
+  outsideCurrentFile?: {
+    currentRelativePath?: string;
+    onOpen: () => void;
+  };
   selectedDesignCase?: string;
   onApplySlot?: (slot: SourceWorkspaceLayer, candidate: SourceComponentCandidate, action: "add" | "replace") => void;
   onPrepareSlotEdit?: () => void;
@@ -47,6 +51,56 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
     );
   }
 
+  if (props.outsideCurrentFile) {
+    return (
+      <aside
+        aria-label="TypeScript component contract"
+        className={`${props.className ?? "flex w-72"} min-h-0 min-w-0 shrink-0 flex-col border-l border-white/10 bg-[#141518]`}
+      >
+        <ComponentInspectorHeader entry={props.entry} />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <section aria-label="Selected component" className="border-b border-white/10 px-4 py-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <Component aria-hidden="true" className="mt-0.5 shrink-0 text-violet-400" size={17} />
+              <div className="min-w-0">
+                <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-zinc-600">Selected component</p>
+                <h3 className="mt-1 truncate text-sm font-semibold text-violet-200">{props.entry.label}</h3>
+                <p className="mt-1 truncate font-mono text-[9px] text-zinc-600" title={props.entry.relativePath}>
+                  {props.entry.relativePath}
+                </p>
+              </div>
+            </div>
+          </section>
+          <section aria-labelledby="outside-current-file-title" className="px-4 py-4">
+            <div className="flex items-center gap-2 text-violet-300">
+              <FileCode2 aria-hidden="true" size={14} />
+              <h3 id="outside-current-file-title" className="text-[10px] font-medium uppercase tracking-[0.14em]">
+                Outside the current file
+              </h3>
+            </div>
+            <p className="mt-2 text-[11px] leading-5 text-zinc-500">
+              Its properties belong to another source file. Open that file to inspect and edit this component.
+            </p>
+          <Button
+            className="mt-4 w-full justify-center"
+            size="sm"
+            variant="primary"
+            onPress={props.outsideCurrentFile.onOpen}
+          >
+            Open component file
+            <ArrowUpRight aria-hidden="true" size={14} />
+          </Button>
+          {props.outsideCurrentFile.currentRelativePath ? (
+            <p className="mt-3 truncate text-[9px] text-zinc-700" title={props.outsideCurrentFile.currentRelativePath}>
+              Used from {props.outsideCurrentFile.currentRelativePath}
+            </p>
+          ) : null}
+          </section>
+        </div>
+      </aside>
+    );
+  }
+
   const regularProps = props.entry.props;
   const slots = props.entry.slots;
 
@@ -55,14 +109,7 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
       aria-label="TypeScript component contract"
       className={`${props.className ?? "flex w-72"} min-h-0 min-w-0 shrink-0 flex-col border-l border-white/10 bg-[#141518]`}
     >
-      <header className="shrink-0 border-b border-white/10 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <FileCode2 aria-hidden="true" className="shrink-0 text-sky-400" size={15} />
-          <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-100">{props.entry.label}</h2>
-        </div>
-        <p className="mt-1 truncate text-[10px] text-zinc-600" title={props.entry.relativePath}>{props.entry.relativePath}</p>
-        <p className="mt-0.5 text-[9px] text-zinc-700">Export: {props.entry.exportName}</p>
-      </header>
+      <ComponentInspectorHeader entry={props.entry} />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="sticky top-0 z-20 bg-[#141518]/95 shadow-[0_1px_0_rgba(255,255,255,0.08),0_8px_20px_rgba(0,0,0,0.18)] backdrop-blur">
@@ -130,6 +177,19 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
         />
       </div>
     </aside>
+  );
+}
+
+function ComponentInspectorHeader({ entry }: { entry: SourceWorkspaceEntry }) {
+  return (
+    <header className="shrink-0 border-b border-white/10 px-4 py-3">
+      <div className="flex items-center gap-2">
+        <FileCode2 aria-hidden="true" className="shrink-0 text-sky-400" size={15} />
+        <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-100">{entry.label}</h2>
+      </div>
+      <p className="mt-1 truncate text-[10px] text-zinc-600" title={entry.relativePath}>{entry.relativePath}</p>
+      <p className="mt-0.5 text-[9px] text-zinc-700">Export: {entry.exportName}</p>
+    </header>
   );
 }
 
