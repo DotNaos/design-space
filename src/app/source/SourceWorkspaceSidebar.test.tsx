@@ -207,12 +207,16 @@ it("reveals the cryptographic approval checklist without replacing the source tr
   const toggle = screen.getByRole("button", { name: /Show approval checklist/ });
   expect(toggle).toHaveAttribute("aria-pressed", "false");
   expect(screen.queryAllByRole("img", { name: /Unreviewed/ })).toHaveLength(0);
+  expect(screen.queryByRole("region", { name: "Approval review" })).not.toBeInTheDocument();
 
   await userEvent.click(toggle);
 
   expect(toggle).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("tree", { name: "Source tree" })).toBeVisible();
+  expect(screen.getByRole("region", { name: "Approval review" })).toHaveTextContent("0 / 5 approved");
+  expect(screen.getByRole("region", { name: "Approval review" })).toHaveTextContent("5 unreviewed");
   expect(screen.getAllByRole("img", { name: /Unreviewed · approvals not configured/ }).length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Unreviewed").length).toBeGreaterThan(0);
 });
 
 it("shows verified component approvals in checklist mode", async () => {
@@ -238,7 +242,9 @@ it("shows verified component approvals in checklist mode", async () => {
   );
 
   await userEvent.click(screen.getByRole("button", { name: /Show approval checklist/ }));
+  expect(screen.getByRole("region", { name: "Approval review" })).toHaveTextContent("1 / 5 approved");
   expect(screen.getByRole("img", { name: "Approved · DesktopLayout" })).toBeVisible();
+  expect(screen.getByText("Approved")).toBeVisible();
 });
 
 it("shows composition, typed slots, components, and HTML in one expandable tree", async () => {

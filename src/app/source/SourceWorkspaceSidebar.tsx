@@ -31,7 +31,12 @@ import {
 } from "../../shared/source-workspace";
 import { suggestedSourceDesignPath } from "../../shared/source-design";
 import { SourceComponentPicker } from "./SourceComponentPicker";
-import { SourceApprovalStatus, sourceApprovalModeLabel } from "./SourceApprovalStatus";
+import {
+  SourceApprovalReviewSummary,
+  SourceApprovalStatus,
+  sourceApprovalModeLabel,
+  sourceApprovalRowClassName,
+} from "./SourceApprovalStatus";
 import { SourceDesignStatus } from "./SourceDesignStatus";
 import { centerSourceTreeRow, SourceTreeAnchorControls } from "./SourceTreeAnchorControls";
 import { SourceTreeHeaderAction } from "./SourceTreeHeaderAction";
@@ -139,6 +144,12 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           </Button>
         )}
       </header>
+      {approvalReview && (
+        <SourceApprovalReviewSummary
+          approvals={props.workspace.approvals}
+          entries={props.workspace.entries}
+        />
+      )}
       <SourceWorkspaceTree
         {...props}
         approvalReview={approvalReview}
@@ -432,6 +443,9 @@ function FocusTreeRow(props: {
     : "";
   const candidates = slot ? sourceSlotCandidates(props.workspace, props.nodes, slot, props.device, ownerPath) : [];
   const componentEntry = occurrenceRow ? row.occurrence?.entry : undefined;
+  const approvalRowClassName = componentEntry && props.approvalReview
+    ? sourceApprovalRowClassName(props.workspace.approvals, componentEntry)
+    : "";
   const selection = (): SourceWorkspaceSelection | undefined => {
     if (occurrenceRow && row.occurrence) {
       return {
@@ -507,7 +521,7 @@ function FocusTreeRow(props: {
       aria-label={row.label}
       aria-level={row.depth + 1}
       aria-selected={active}
-      className={`relative flex min-h-10 w-full min-w-max items-center pr-2 transition-[padding,opacity,transform] duration-150 ease-out motion-reduce:transition-none ${mutedOpacity} ${props.activePath ? "bg-violet-500/[0.025]" : ""}`}
+      className={`relative flex min-h-10 w-full min-w-max items-center pr-2 transition-[padding,opacity,transform] duration-150 ease-out motion-reduce:transition-none ${mutedOpacity} ${props.activePath ? "bg-violet-500/[0.025]" : ""} ${approvalRowClassName}`}
       data-source-active-path={props.activePath || undefined}
       data-source-file-scope={outsideActiveFile ? "external" : "current"}
       data-source-occurrence={row.occurrence?.id}
