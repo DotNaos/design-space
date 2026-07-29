@@ -10,12 +10,10 @@ import type {
 type ApprovalTone = "approved" | "invalid" | "stale" | "unreviewed" | "unavailable";
 
 interface ApprovalAppearance {
-  badgeClassName: string;
   detail: string;
   icon: typeof ShieldCheck;
+  iconClassName: string;
   label: string;
-  rowClassName: string;
-  shortLabel: string;
   tone: ApprovalTone;
 }
 
@@ -38,41 +36,20 @@ export function SourceApprovalReviewSummary(props: {
   entries: readonly SourceWorkspaceEntry[];
 }) {
   const counts = approvalCounts(props.approvals, props.entries);
-  const configured = props.approvals?.status === "verified";
-  const unavailable = props.approvals?.status === "unavailable";
+  const toReview = counts.total - counts.approved;
   return (
     <section
       aria-label="Approval review"
-      className="shrink-0 border-b border-emerald-400/15 bg-emerald-500/[0.055] px-4 py-3"
+      className="flex min-h-9 shrink-0 items-center gap-2 border-b border-white/[0.06] bg-white/[0.015] px-4"
     >
-      <div className="flex items-center gap-2">
-        <ShieldCheck aria-hidden="true" className="text-emerald-300" size={15} />
-        <p className="text-[11px] font-semibold text-emerald-100">Approval review</p>
-        <p className="ml-auto font-mono text-[10px] tabular-nums text-emerald-300">
-          {counts.approved} / {counts.total} approved
-        </p>
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-medium uppercase tracking-[0.08em]">
-        {counts.approved > 0 && <span className="text-emerald-400">{counts.approved} approved</span>}
-        {counts.stale > 0 && <span className="text-amber-300">{counts.stale} changed</span>}
-        {counts.invalid > 0 && <span className="text-red-400">{counts.invalid} invalid</span>}
-        {counts.unreviewed > 0 && <span className="text-amber-300">{counts.unreviewed} unreviewed</span>}
-        {counts.unavailable > 0 && <span className="text-red-400">{counts.unavailable} unavailable</span>}
-      </div>
-      {!configured && (
-        <p className={`mt-1.5 text-[9px] leading-4 ${unavailable ? "text-red-300/80" : "text-amber-200/70"}`}>
-          {props.approvals?.reason ?? "Cryptographic component approvals are not configured."}
-        </p>
-      )}
+      <ShieldCheck aria-hidden="true" className="text-zinc-500" size={13} />
+      <p className="text-[10px] font-medium text-zinc-400">Approval</p>
+      <p className="ml-auto font-mono text-[9px] tabular-nums text-zinc-500">
+        <span className="text-emerald-400">{counts.approved} / {counts.total} approved</span>
+        {toReview > 0 && <span className="text-amber-300/80"> · {toReview} to review</span>}
+      </p>
     </section>
   );
-}
-
-export function sourceApprovalRowClassName(
-  approvals: SourceApprovalEvidence | undefined,
-  entry: SourceWorkspaceEntry,
-): string {
-  return approvalAppearance(approvals, approvals?.components[entry.id]).rowClassName;
 }
 
 export function SourceApprovalStatus(props: {
@@ -86,11 +63,10 @@ export function SourceApprovalStatus(props: {
     <Tooltip closeDelay={80} delay={300}>
       <span
         aria-label={appearance.label}
-        className={`inline-flex h-5 shrink-0 items-center gap-1 rounded px-1.5 text-[8px] font-semibold uppercase tracking-[0.06em] ${appearance.badgeClassName}`}
+        className={`grid size-5 shrink-0 place-items-center ${appearance.iconClassName}`}
         role="img"
       >
-        <Icon aria-hidden="true" size={10} />
-        <span>{appearance.shortLabel}</span>
+        <Icon aria-hidden="true" size={13} />
       </span>
       <Tooltip.Content
         className="max-w-72 rounded-md border border-white/10 bg-[#202126] px-2.5 py-2 text-[10px] leading-4 text-zinc-200 shadow-xl"
@@ -110,76 +86,62 @@ function approvalAppearance(
   if (!evidence || evidence.status === "not-configured") {
     return {
       icon: ShieldQuestion,
-      badgeClassName: "bg-amber-400/10 text-amber-300 ring-1 ring-inset ring-amber-400/20",
+      iconClassName: "text-amber-300/80",
       label: "Unreviewed · approvals not configured",
       detail: evidence?.reason ?? "This project has no cryptographic approval policy.",
-      rowClassName: "bg-amber-400/[0.035]",
-      shortLabel: "Unreviewed",
       tone: "unreviewed",
     };
   }
   if (evidence.status === "unavailable") {
     return {
       icon: ShieldX,
-      badgeClassName: "bg-red-400/10 text-red-300 ring-1 ring-inset ring-red-400/25",
+      iconClassName: "text-red-400",
       label: "Approval verification unavailable",
       detail: evidence.reason ?? "The trusted verifier could not produce evidence.",
-      rowClassName: "bg-red-400/[0.045]",
-      shortLabel: "Unavailable",
       tone: "unavailable",
     };
   }
   if (!approval) {
     return {
       icon: ShieldQuestion,
-      badgeClassName: "bg-amber-400/10 text-amber-300 ring-1 ring-inset ring-amber-400/20",
+      iconClassName: "text-amber-300/80",
       label: "Unreviewed · no approval scope",
       detail: "The verified policy does not contain a scope for this component.",
-      rowClassName: "bg-amber-400/[0.035]",
-      shortLabel: "Unreviewed",
       tone: "unreviewed",
     };
   }
   if (approval.state === "approved") {
     return {
       icon: ShieldCheck,
-      badgeClassName: "bg-emerald-400/10 text-emerald-300 ring-1 ring-inset ring-emerald-400/20",
+      iconClassName: "text-emerald-400",
       label: `Approved · ${approval.label}`,
       detail: approval.attestation,
-      rowClassName: "bg-emerald-400/[0.04]",
-      shortLabel: "Approved",
       tone: "approved",
     };
   }
   if (approval.state === "stale") {
     return {
       icon: ShieldAlert,
-      badgeClassName: "bg-amber-400/10 text-amber-300 ring-1 ring-inset ring-amber-400/25",
+      iconClassName: "text-amber-300",
       label: `Changed after approval · ${approval.label}`,
       detail: approval.reason ?? "The signed content no longer matches the current component.",
-      rowClassName: "bg-amber-400/[0.045]",
-      shortLabel: "Changed",
       tone: "stale",
     };
   }
   if (approval.state === "invalid") {
     return {
       icon: ShieldX,
-      badgeClassName: "bg-red-400/10 text-red-300 ring-1 ring-inset ring-red-400/25",
+      iconClassName: "text-red-400",
       label: `Invalid approval · ${approval.label}`,
       detail: approval.reason ?? "The cryptographic evidence is invalid.",
-      rowClassName: "bg-red-400/[0.045]",
-      shortLabel: "Invalid",
       tone: "invalid",
     };
   }
   return {
     icon: ShieldQuestion,
-    badgeClassName: "bg-amber-400/10 text-amber-300 ring-1 ring-inset ring-amber-400/20",
+    iconClassName: "text-amber-300/80",
     label: `Awaiting approval · ${approval.label}`,
     detail: approval.reason ?? "No valid signed attestation exists yet.",
-    rowClassName: "bg-amber-400/[0.035]",
-    shortLabel: "Awaiting",
     tone: "unreviewed",
   };
 }
