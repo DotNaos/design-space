@@ -1,5 +1,5 @@
-import { Label, ListBox, Select, Slider } from "@heroui/react";
-import { MonitorSmartphone } from "lucide-react";
+import { Label, ListBox, Select, Slider, ToggleButton, Tooltip } from "@heroui/react";
+import { Crop, MonitorSmartphone, Scan } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { DesignSpaceDevice } from "../../shared/source-workspace";
@@ -9,11 +9,13 @@ import { sourceViewportPresets } from "./source-viewports";
 
 export function SourceViewportPicker(props: {
   after?: ReactNode;
+  clipToScreen: boolean;
   device: DesignSpaceDevice;
   node?: SourceTreeNode;
   presetId: string;
   responsiveWidth: number;
   onDeviceChange: (device: DesignSpaceDevice) => void;
+  onClipToScreenChange: (clipToScreen: boolean) => void;
   onPresetChange: (id: string) => void;
   onResponsiveWidthChange: (width: number) => void;
 }) {
@@ -59,6 +61,22 @@ export function SourceViewportPicker(props: {
           </Slider>
         </>
       )}
+      <Tooltip delay={350} closeDelay={80}>
+        <ToggleButton
+          isIconOnly
+          aria-label={props.clipToScreen ? "Clip preview to selected screen" : "Hug preview content"}
+          className="size-6 min-w-6 rounded-md text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-300 data-[selected]:bg-sky-400/15 data-[selected]:text-sky-200"
+          isSelected={props.clipToScreen}
+          size="sm"
+          variant="ghost"
+          onChange={props.onClipToScreenChange}
+        >
+          {props.clipToScreen ? <Crop aria-hidden="true" size={12} /> : <Scan aria-hidden="true" size={12} />}
+        </ToggleButton>
+        <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+          {props.clipToScreen ? "Clip to selected screen" : "Hug rendered content"}
+        </Tooltip.Content>
+      </Tooltip>
       {props.after ? <><span aria-hidden="true" className="h-5 w-px shrink-0 bg-white/10" />{props.after}</> : null}
     </div>
   );

@@ -14,6 +14,7 @@ import { SourceHoverIdentityHud } from "./SourceHoverIdentityHud";
 import { SourceInstanceNavigator } from "./SourceInstanceNavigator";
 import type { SourceLayerMetrics, SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
 import { sourceLayerHitAtPreviewPoint, type SourceLayerHit } from "./source-preview-hit-testing";
+import { measureSourcePreviewContent, type SourcePreviewContentSize } from "./source-preview-content-size";
 import { externalSourceLayerOwner, sourceLayerOwner } from "./source-layer-ownership";
 import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement, sourceLayerElements } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
@@ -79,6 +80,7 @@ export function SourcePreviewFrame(props: {
   const [hoveredLayerHit, setHoveredLayerHit] = useState<SourceLayerHit>();
   const [selectedLayerHit, setSelectedLayerHit] = useState<(SourceLayerHit & { entryId: string })>();
   const [selectedLayerOccurrenceCount, setSelectedLayerOccurrenceCount] = useState(0);
+  const [contentSize, setContentSize] = useState<SourcePreviewContentSize>();
   const [revealTarget, setRevealTarget] = useState<{ key: string; rect: SourceLayerMetrics }>();
   const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
   const previewEntries = useMemo(() => props.entries ?? (props.entry ? [props.entry] : []), [props.entries, props.entry]);
@@ -341,9 +343,19 @@ export function SourcePreviewFrame(props: {
     }
   }, [mounts, projectionKey, props.selectedLayer, props.selectedText, selectedOccurrence, staticRevision]);
 
+  useLayoutEffect(() => {
+    if (!mounts || previewMode === "play") {
+      setContentSize(undefined);
+      return;
+    }
+    const next = measureSourcePreviewContent(mounts.output);
+    setContentSize((current) => current?.width === next?.width && current?.height === next?.height ? current : next);
+  }, [mounts, previewMode, props.selectedClassName, props.selectedText, staticRevision]);
+
   return (
     <SourceCanvasViewport
       compact={props.compact}
+      contentSize={contentSize}
       device={props.device}
       mode={previewMode === "static" ? undefined : previewMode}
       node={props.node}

@@ -6,6 +6,7 @@ import { PreviewCanvas } from "../components/PreviewCanvas/PreviewCanvas";
 import { SourceViewportPicker } from "./SourceViewportPicker";
 import { SourcePreviewModeToggle } from "./SourcePreviewModeToggle";
 import type { SourcePreviewMode } from "./source-layer-design";
+import type { SourcePreviewContentSize } from "./source-preview-content-size";
 import type { SourceTreeNode } from "./source-workspace-tree";
 import { defaultSourceViewport, sourceViewportPresets } from "./source-viewports";
 
@@ -14,6 +15,7 @@ const sourcePreviewId = "source-preview";
 export function SourceCanvasViewport(props: {
   children: (frame: { width: number; height: number }) => React.ReactNode;
   compact?: boolean;
+  contentSize?: SourcePreviewContentSize;
   device: DesignSpaceDevice;
   node?: SourceTreeNode;
   mode?: SourcePreviewMode;
@@ -29,9 +31,11 @@ export function SourceCanvasViewport(props: {
 }) {
   const [presetId, setPresetId] = useState(() => defaultSourceViewport(props.device).id);
   const [responsiveWidth, setResponsiveWidth] = useState(960);
+  const [clipToScreen, setClipToScreen] = useState(true);
   const previousDevice = useRef(props.device);
   const preset = sourceViewportPresets.find((candidate) => candidate.id === presetId) ?? defaultSourceViewport(props.device);
-  const frame = { width: preset.id === "responsive" ? responsiveWidth : preset.width, height: preset.height };
+  const screenFrame = { width: preset.id === "responsive" ? responsiveWidth : preset.width, height: preset.height };
+  const frame = !clipToScreen && props.contentSize ? props.contentSize : screenFrame;
 
   useEffect(() => {
     if (previousDevice.current === props.device) return;
@@ -53,7 +57,7 @@ export function SourceCanvasViewport(props: {
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-1">
       <PreviewCanvas
-        cameraKey={`${props.device}:${presetId}:${props.selectionKey ?? props.node?.id ?? "source"}`}
+        cameraKey={`${props.device}:${presetId}:${clipToScreen ? "screen" : "content"}:${props.selectionKey ?? props.node?.id ?? "source"}`}
         revealTarget={props.revealTarget}
         toolbar={(
           <SourceViewportPicker
@@ -61,9 +65,11 @@ export function SourceCanvasViewport(props: {
             node={props.node}
             presetId={presetId}
             responsiveWidth={responsiveWidth}
+            clipToScreen={clipToScreen}
             onDeviceChange={changeDevice}
             onPresetChange={changePreset}
             onResponsiveWidthChange={(width) => setResponsiveWidth(Math.max(320, Math.min(1440, width)))}
+            onClipToScreenChange={setClipToScreen}
             after={(
               <>
                 {props.showModeToggle !== false && props.mode && props.onModeChange ? <SourcePreviewModeToggle mode={props.mode} onChange={props.onModeChange} /> : null}
@@ -75,7 +81,8 @@ export function SourceCanvasViewport(props: {
         preview={(
           <div
             data-design-space-instance-id={sourcePreviewId}
-            className="overflow-hidden rounded-md border border-white/15 bg-[#111216] shadow-2xl"
+            data-preview-frame-mode={clipToScreen ? "screen" : "content"}
+            className={`${clipToScreen ? "overflow-hidden" : "overflow-visible"} rounded-md border border-white/15 bg-[#111216] shadow-2xl`}
             style={{
               backgroundImage: "linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px)",
               backgroundPosition: "-1px -1px",
