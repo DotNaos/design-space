@@ -14,6 +14,7 @@ interface ApprovalAppearance {
   icon: typeof ShieldCheck;
   iconClassName: string;
   label: string;
+  rowClassName: string;
   tone: ApprovalTone;
 }
 
@@ -63,10 +64,10 @@ export function SourceApprovalStatus(props: {
     <Tooltip closeDelay={80} delay={300}>
       <span
         aria-label={appearance.label}
-        className={`grid size-5 shrink-0 place-items-center ${appearance.iconClassName}`}
+        className={`grid size-4 shrink-0 place-items-center ${appearance.iconClassName}`}
         role="img"
       >
-        <Icon aria-hidden="true" size={13} />
+        <Icon aria-hidden="true" size={11} />
       </span>
       <Tooltip.Content
         className="max-w-72 rounded-md border border-white/10 bg-[#202126] px-2.5 py-2 text-[10px] leading-4 text-zinc-200 shadow-xl"
@@ -79,6 +80,13 @@ export function SourceApprovalStatus(props: {
   );
 }
 
+export function sourceApprovalRowClassName(
+  approvals: SourceApprovalEvidence | undefined,
+  entry: SourceWorkspaceEntry,
+): string {
+  return approvalAppearance(approvals, approvals?.components[entry.id]).rowClassName;
+}
+
 function approvalAppearance(
   evidence: SourceApprovalEvidence | undefined,
   approval: SourceComponentApproval | undefined,
@@ -89,6 +97,7 @@ function approvalAppearance(
       iconClassName: "text-amber-300/80",
       label: "Unreviewed · approvals not configured",
       detail: evidence?.reason ?? "This project has no cryptographic approval policy.",
+      rowClassName: "bg-amber-400/[0.025]",
       tone: "unreviewed",
     };
   }
@@ -98,6 +107,7 @@ function approvalAppearance(
       iconClassName: "text-red-400",
       label: "Approval verification unavailable",
       detail: evidence.reason ?? "The trusted verifier could not produce evidence.",
+      rowClassName: "bg-red-400/[0.035]",
       tone: "unavailable",
     };
   }
@@ -107,6 +117,7 @@ function approvalAppearance(
       iconClassName: "text-amber-300/80",
       label: "Unreviewed · no approval scope",
       detail: "The verified policy does not contain a scope for this component.",
+      rowClassName: "bg-amber-400/[0.025]",
       tone: "unreviewed",
     };
   }
@@ -116,6 +127,7 @@ function approvalAppearance(
       iconClassName: "text-emerald-400",
       label: `Approved · ${approval.label}`,
       detail: approval.attestation,
+      rowClassName: "bg-emerald-400/[0.025]",
       tone: "approved",
     };
   }
@@ -125,6 +137,7 @@ function approvalAppearance(
       iconClassName: "text-amber-300",
       label: `Changed after approval · ${approval.label}`,
       detail: approval.reason ?? "The signed content no longer matches the current component.",
+      rowClassName: "bg-amber-400/[0.035]",
       tone: "stale",
     };
   }
@@ -134,6 +147,7 @@ function approvalAppearance(
       iconClassName: "text-red-400",
       label: `Invalid approval · ${approval.label}`,
       detail: approval.reason ?? "The cryptographic evidence is invalid.",
+      rowClassName: "bg-red-400/[0.035]",
       tone: "invalid",
     };
   }
@@ -142,6 +156,7 @@ function approvalAppearance(
     iconClassName: "text-amber-300/80",
     label: `Awaiting approval · ${approval.label}`,
     detail: approval.reason ?? "No valid signed attestation exists yet.",
+    rowClassName: "bg-amber-400/[0.025]",
     tone: "unreviewed",
   };
 }

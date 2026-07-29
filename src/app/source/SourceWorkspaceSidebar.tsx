@@ -34,6 +34,7 @@ import { SourceComponentPicker } from "./SourceComponentPicker";
 import {
   SourceApprovalReviewSummary,
   SourceApprovalStatus,
+  sourceApprovalRowClassName,
   sourceApprovalModeLabel,
 } from "./SourceApprovalStatus";
 import { SourceDesignStatus } from "./SourceDesignStatus";
@@ -512,12 +513,15 @@ function FocusTreeRow(props: {
       props.onFocus(focusTarget.id, request.selection);
     }
   };
+  const approvalRowClassName = componentEntry && props.approvalReview
+    ? sourceApprovalRowClassName(props.workspace.approvals, componentEntry)
+    : "";
   return (
     <div
       aria-label={row.label}
       aria-level={row.depth + 1}
       aria-selected={active}
-      className={`relative flex min-h-10 w-full min-w-max items-center pr-2 transition-[padding,opacity,transform] duration-150 ease-out motion-reduce:transition-none ${mutedOpacity} ${props.activePath ? "bg-violet-500/[0.025]" : ""}`}
+      className={`relative flex min-h-10 w-full min-w-max items-center pr-2 transition-[padding,opacity,transform,background-color] duration-150 ease-out motion-reduce:transition-none ${mutedOpacity} ${approvalRowClassName || (props.activePath ? "bg-violet-500/[0.025]" : "")}`}
       data-source-active-path={props.activePath || undefined}
       data-source-file-scope={outsideActiveFile ? "external" : "current"}
       data-source-occurrence={row.occurrence?.id}
@@ -558,6 +562,9 @@ function FocusTreeRow(props: {
         onDoubleClick={openComponent}
         onPress={select}
       >
+        {componentEntry && props.approvalReview ? (
+          <SourceApprovalStatus approvals={props.workspace.approvals} entry={componentEntry} />
+        ) : null}
         <Icon aria-hidden="true" className={`shrink-0 ${row.kind === "component" ? withinCanvas && !outsideActiveFile ? "text-violet-400" : props.activePath ? "text-violet-400/65" : "text-violet-500/45" : ""}`} size={row.kind === "component" && !openedCanvas ? 12 : 13} />
         <span className={`flex-1 whitespace-nowrap text-xs ${row.kind === "html" ? "font-mono text-[10px]" : ""}`}>{row.label}</span>
         {row.kind === "component" && row.occurrence && <MissingDeviceCluster implementations={row.occurrence.node.implementations} />}
@@ -568,9 +575,6 @@ function FocusTreeRow(props: {
           designPath={suggestedSourceDesignPath(componentEntry, props.workspace.entries)}
           label={componentEntry.label}
         />
-      ) : null}
-      {componentEntry && props.approvalReview ? (
-        <SourceApprovalStatus approvals={props.workspace.approvals} entry={componentEntry} />
       ) : null}
       {slot && row.occurrence && props.onApplySlot && (
         <SourceComponentPicker

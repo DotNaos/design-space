@@ -216,6 +216,10 @@ it("reveals the cryptographic approval checklist without replacing the source tr
   expect(screen.getByRole("region", { name: "Approval review" })).toHaveTextContent("0 / 5 approved");
   expect(screen.getByRole("region", { name: "Approval review" })).toHaveTextContent("5 to review");
   expect(screen.getAllByRole("img", { name: /Unreviewed · approvals not configured/ }).length).toBeGreaterThan(0);
+  expect(
+    within(screen.getByRole("button", { name: "DesktopLayout" }))
+      .getByRole("img", { name: "Unreviewed · approvals not configured" }),
+  ).toBeVisible();
 });
 
 it("shows verified component approvals in checklist mode", async () => {
