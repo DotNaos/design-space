@@ -10,6 +10,7 @@ import { verifySourceComponentApprovals } from "./source-approval-registration";
 import { indexSourceWorkspace } from "./source-file-index";
 import { parseSourceProjectConfig } from "./source-project-config";
 import { registerSourceComponentStore } from "./source-component-creation";
+import { resolveConfiguredLibraryDevelopmentRoot } from "./library-development-project";
 import type { RegisteredTarget } from "./target-registration";
 
 export async function registerSourceProject(
@@ -45,6 +46,7 @@ export async function registerSourceProject(
     sourceWorkspace,
     sourceComponentStore,
     sourceLibrary,
+    libraryProject: config.library?.project,
   };
 }
 
@@ -62,8 +64,10 @@ async function registerSourceLibrary(
   }
   const packageName = configuredPackage ?? detected?.packageName;
   if (!packageName) return undefined;
-  const development = config.library?.development;
-  const developmentRoot = development ? await canonicalRoot(resolve(root, development.root)) : undefined;
+  const configuredDevelopmentRoot = await resolveConfiguredLibraryDevelopmentRoot(root, config.library);
+  const developmentRoot = configuredDevelopmentRoot
+    ? await canonicalRoot(configuredDevelopmentRoot)
+    : undefined;
   return {
     packageName,
     ...(detected?.mode === "release" ? {
@@ -77,12 +81,36 @@ async function registerSourceLibrary(
 }
 
 async function loadLibraryWorkspace(root: string) {
-  const configPath = await canonicalRegisteredFile(root, ".designspace.ts");
-  const { module } = await runnerImport<Record<string, unknown>>(configPath, {
-    root,
-    logLevel: "silent",
-  });
-  return indexRegisteredSourceWorkspace(root, parseSourceProjectConfig(module.default ?? module.designSpace));
+  const configPath = await canonicalRegisteredFile(root, ".designspace.ts").catch(() => undefined);
+  if (configPath) {
+    const { module } = await runnerImport<Record<string, unknown>>(configPath, {
+      root,
+      logLevel: "silent",
+    });
+    return indexRegisteredSourceWorkspace(root, parseSourceProjectConfig(module.default ?? module.designSpace));
+  }
+  return indexRegisteredSourceWorkspace(root, await inferredLibraryConfig(root));
+}
+
+async function inferredLibraryConfig(root: string): Promise<DesignSpaceProjectConfig> {
+  const manifest = await readFile(resolve(root, "package.json"), "utf8")
+    .then((source) => JSON.parse(source) as { name?: unknown })
+    .catch(() => undefined);
+  const packageName = typeof manifest?.name === "string" ? manifest.name : "Component library";
+  const id = packageName
+    .replace(/^@/, "")
+    .replace(/[^a-z0-9._-]+/gi, "-")
+    .replace(/^[^a-z]+/i, "")
+    .slice(0, 96) || "component-library";
+  return {
+    project: {
+      id,
+      label: packageName,
+    },
+    devices: {
+      mode: "responsive",
+    },
+  };
 }
 
 async function indexRegisteredSourceWorkspace(root: string, config: DesignSpaceProjectConfig) {

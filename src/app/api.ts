@@ -2,6 +2,7 @@ import type {
   AppliedSourceChangeSet,
   BrowserOperation,
   GeneratedSourceDesign,
+  LibraryDevelopmentOperation,
   PreparedEdit,
   PreparedProjectFileEdit,
   PreparedSourceChangeSet,
@@ -16,9 +17,10 @@ import type {
   TailwindPreview,
 } from "../shared/contracts";
 import type { DocumentOperation, DocumentOperationResult } from "../shared/document-transactions";
+import type { LibraryDevelopmentProjectStatus } from "../shared/source-workspace";
 
-type LocalOperation = BrowserOperation | DocumentOperation;
-type OperationResult = SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceChangeSet | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | AppliedSourceChangeSet | SavedSourceComponentCreate | GeneratedSourceDesign | TailwindPreview | TailwindIntelligence | DocumentOperationResult;
+type LocalOperation = BrowserOperation | DocumentOperation | LibraryDevelopmentOperation;
+type OperationResult = SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceChangeSet | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | AppliedSourceChangeSet | SavedSourceComponentCreate | GeneratedSourceDesign | TailwindPreview | TailwindIntelligence | DocumentOperationResult | LibraryDevelopmentProjectStatus;
 
 export class LocalOperationError extends Error {
   constructor(

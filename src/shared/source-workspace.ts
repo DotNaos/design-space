@@ -9,6 +9,15 @@ export type DesignSpaceArea = (typeof designSpaceAreas)[number];
 export type DesignSpaceDevice = (typeof designSpaceDevices)[number];
 export type DesignSpaceRuntime = "react" | "react-native";
 
+export interface DesignSpaceLibraryProjectConfig {
+  /** Trusted Git remote used when the independent library project is not cloned yet. */
+  repository: string;
+  /** Directory name below the shared projects directory. */
+  checkoutName: string;
+  /** Package directory inside each checkout or worktree. */
+  packageRoot: string;
+}
+
 export interface DesignSpaceProjectConfig {
   project: {
     id: string;
@@ -31,6 +40,8 @@ export interface DesignSpaceProjectConfig {
   /** Optional trusted component-library lifecycle owned by the local Design Space server. */
   library?: {
     package: string;
+    /** Optional independent-project lifecycle for selecting and attaching development worktrees. */
+    project?: DesignSpaceLibraryProjectConfig;
     development?: {
       /** Absolute or project-relative directory containing the library package. */
       root: string;
@@ -45,6 +56,25 @@ export interface DesignSpaceProjectConfig {
     /** Project-relative policy path. Defaults to .project/approvals/policy.yaml. */
     policy?: string;
   };
+}
+
+export interface LibraryDevelopmentWorktree {
+  id: string;
+  branch: string;
+  path: string;
+  head: string;
+  packageReady: boolean;
+  active: boolean;
+}
+
+export interface LibraryDevelopmentProjectStatus {
+  configured: boolean;
+  repository?: string;
+  checkoutPath?: string;
+  cloned: boolean;
+  state: "stopped" | "running";
+  activeWorktreeId?: string;
+  worktrees: readonly LibraryDevelopmentWorktree[];
 }
 
 /** Keeps .designspace.ts type-safe without introducing a generated manifest. */

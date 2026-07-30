@@ -14,6 +14,7 @@ import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { readRegisteredFile } from "./registered-file-reader";
 import type { IndexedSourceWorkspace } from "./source-file-index";
 import type { RegisteredSourceComponentStore } from "./source-component-creation";
+import type { DesignSpaceLibraryProjectConfig } from "../shared/source-workspace";
 
 export interface EditValidationContext {
   fileId: string;
@@ -138,6 +139,7 @@ export interface RegisteredTarget {
   sourceWorkspace?: IndexedSourceWorkspace;
   sourceComponentStore?: RegisteredSourceComponentStore;
   sourceLibrary?: RegisteredSourceLibraryCatalog;
+  libraryProject?: DesignSpaceLibraryProjectConfig;
 }
 
 export interface RegisteredSourceLibraryCatalog {

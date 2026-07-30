@@ -17,6 +17,13 @@ const sourceProjectConfigSchema = z.object({
   }).strict().optional(),
   library: z.object({
     package: z.string().regex(/^@?[a-z0-9][a-z0-9._/-]*$/i).max(160),
+    project: z.object({
+      repository: z.string().url().regex(/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+(?:\.git)?$/i).max(500),
+      checkoutName: z.string().regex(/^[a-z0-9][a-z0-9._-]*$/i).max(120),
+      packageRoot: z.string()
+        .regex(/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+$/)
+        .max(1_024),
+    }).strict().optional(),
     development: z.object({
       root: z.string().min(1).max(1_024),
     }).strict().optional(),

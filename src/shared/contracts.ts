@@ -219,6 +219,18 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
 
 export type BrowserOperation = z.infer<typeof browserOperationSchema>;
 
+export const libraryDevelopmentOperationSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("get-library-development") }).strict(),
+  z.object({ type: z.literal("clone-library-development") }).strict(),
+  z.object({
+    type: z.literal("start-library-development"),
+    worktreeId: opaqueIdSchema,
+  }).strict(),
+  z.object({ type: z.literal("stop-library-development") }).strict(),
+]);
+
+export type LibraryDevelopmentOperation = z.infer<typeof libraryDevelopmentOperationSchema>;
+
 export interface SourceSnapshot {
   editTargetId: string;
   value: string;

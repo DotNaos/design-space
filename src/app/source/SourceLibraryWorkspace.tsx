@@ -1,6 +1,6 @@
 import { Button, Input, Label, ListBox, Select, TextField } from "@heroui/react";
 import { Component, Diamond, Library, LockKeyhole, PackageCheck, Radio, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type {
   DesignSpaceDevice,
@@ -22,8 +22,9 @@ import {
 } from "./source-library-catalog";
 import type { SourceLibraryMode } from "./useSourceLibraryRuntime";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
+import { LibraryDevelopmentSourceControl } from "./LibraryDevelopmentSourceControl";
 
-interface SourceLibraryProps {
+export interface SourceLibraryProps {
   appWorkspace?: RuntimeSourceWorkspace;
   catalog?: RuntimeSourceLibraryCatalog;
   catalogKind: SourceCatalogKind;
@@ -51,7 +52,12 @@ interface SourceLibraryProps {
   onGenerateDesign?: (entry: RuntimeSourceWorkspaceEntry) => void;
 }
 
-export function SourceLibrarySidebar(props: SourceLibraryProps & { onSelect: (name: string) => void }) {
+export function SourceLibrarySidebar(
+  props: SourceLibraryProps & {
+    details?: ReactNode;
+    onSelect: (name: string) => void;
+  },
+) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<SourceLibraryCategory>("all");
   const components = useMemo(() => catalogComponents(props, props.catalogKind), [
@@ -101,24 +107,27 @@ export function SourceLibrarySidebar(props: SourceLibraryProps & { onSelect: (na
           />
         </div>
         {props.catalogKind === "library" ? (
-          <div className="mt-3 grid grid-cols-2 gap-1">
-            <SourceOption
-              active={props.mode === "development"}
-              description={props.catalog?.development ? "Editable" : "Not attached"}
-              disabled={!props.catalog?.development}
-              icon={<Radio aria-hidden="true" size={12} />}
-              label="Development"
-              onPress={() => props.onModeChange("development")}
-            />
-            <SourceOption
-              active={props.mode === "release"}
-              description={props.catalog?.release?.version ?? "Not installed"}
-              disabled={!props.catalog?.release}
-              icon={<PackageCheck aria-hidden="true" size={12} />}
-              label="Installed"
-              onPress={() => props.onModeChange("release")}
-            />
-          </div>
+          <>
+            <div className="mt-3 grid grid-cols-2 gap-1">
+              <SourceOption
+                active={props.mode === "development"}
+                description={props.catalog?.development ? "Editable" : "Not attached"}
+                disabled={!props.catalog?.development}
+                icon={<Radio aria-hidden="true" size={12} />}
+                label="Development"
+                onPress={() => props.onModeChange("development")}
+              />
+              <SourceOption
+                active={props.mode === "release"}
+                description={props.catalog?.release?.version ?? "Not installed"}
+                disabled={!props.catalog?.release}
+                icon={<PackageCheck aria-hidden="true" size={12} />}
+                label="Installed"
+                onPress={() => props.onModeChange("release")}
+              />
+            </div>
+            <LibraryDevelopmentSourceControl onModeChange={props.onModeChange} />
+          </>
         ) : null}
         <div className="mt-3 flex items-center justify-between text-[9px] text-zinc-600">
           <span>Design coverage</span>
@@ -138,20 +147,30 @@ export function SourceLibrarySidebar(props: SourceLibraryProps & { onSelect: (na
         ) : null}
       </div>
 
-      <div aria-label="Component list" className="min-h-0 flex-1 overflow-y-auto py-2" role="list">
-        {visible.map((component) => (
-          <CatalogComponentRow
-            component={component}
-            key={component.id}
-            selected={selected === component.id}
-            source={selectedCatalogWorkspace(props)}
-            onSelect={props.onSelect}
-          />
-        ))}
-        {!visible.length ? (
-          <p className="px-5 py-10 text-center text-xs leading-5 text-zinc-600">
-            {query.trim() ? `No components match “${query.trim()}”.` : "No components are available in this catalog."}
-          </p>
+      <div className={props.details
+        ? "grid min-h-0 flex-1 grid-rows-[minmax(9rem,0.8fr)_minmax(12rem,1.2fr)]"
+        : "min-h-0 flex-1"}
+      >
+        <div aria-label="Component list" className="min-h-0 overflow-y-auto py-2" role="list">
+          {visible.map((component) => (
+            <CatalogComponentRow
+              component={component}
+              key={component.id}
+              selected={selected === component.id}
+              source={selectedCatalogWorkspace(props)}
+              onSelect={props.onSelect}
+            />
+          ))}
+          {!visible.length ? (
+            <p className="px-5 py-10 text-center text-xs leading-5 text-zinc-600">
+              {query.trim() ? `No components match “${query.trim()}”.` : "No components are available in this catalog."}
+            </p>
+          ) : null}
+        </div>
+        {props.details ? (
+          <div className="min-h-0 border-t border-white/10">
+            {props.details}
+          </div>
         ) : null}
       </div>
     </aside>
@@ -257,7 +276,7 @@ function SourceOption(props: {
   active: boolean;
   description: string;
   disabled?: boolean;
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   onPress: () => void;
 }) {
@@ -364,7 +383,7 @@ function selectedLibraryWorkspace(props: Pick<SourceLibraryProps, "catalog" | "l
   };
 }
 
-function selectedCatalogWorkspace(
+export function selectedCatalogWorkspace(
   props: Pick<SourceLibraryProps, "appWorkspace" | "catalog" | "catalogKind" | "library" | "mode">,
 ): RuntimeSourceWorkspace | undefined {
   return props.catalogKind === "app" ? props.appWorkspace : selectedLibraryWorkspace(props);

@@ -41,6 +41,38 @@ describe("source project config", () => {
     })).toMatchObject({ library: { package: "@dotnaos/react-ui" } });
   });
 
+  it("accepts a trusted independent library project and rejects unsafe locations", () => {
+    expect(parseSourceProjectConfig({
+      project: { id: "library-host", label: "Library host" },
+      library: {
+        package: "@dotnaos/react-ui",
+        project: {
+          repository: "https://github.com/DotNaos/ui.git",
+          checkoutName: "ui",
+          packageRoot: "packages/react-ui",
+        },
+      },
+    })).toMatchObject({
+      library: {
+        project: {
+          checkoutName: "ui",
+          packageRoot: "packages/react-ui",
+        },
+      },
+    });
+    expect(() => parseSourceProjectConfig({
+      project: { id: "unsafe", label: "Unsafe" },
+      library: {
+        package: "@dotnaos/react-ui",
+        project: {
+          repository: "file:///tmp/ui",
+          checkoutName: "ui",
+          packageRoot: "../outside",
+        },
+      },
+    })).toThrow("valid Design Space project config");
+  });
+
   it("accepts a project-local approval policy without embedding trust material", () => {
     expect(parseSourceProjectConfig({
       project: { id: "approved-ui", label: "Approved UI" },

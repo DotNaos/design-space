@@ -20,9 +20,9 @@ import { useSourceDraftAnalysis } from "./source/useSourceDraftAnalysis";
 import { useSourceFileEditor } from "./source/useSourceFileEditor";
 import { useSourceLayerClassEditor } from "./source/useSourceLayerClassEditor";
 import { DiffSheet } from "./components/DiffSheet/DiffSheet";
-import { selectedSourceLibraryComponent, SourceLibraryCanvas, SourceLibraryInspector, SourceLibrarySidebar } from "./source/SourceLibraryWorkspace";
+import { selectedSourceLibraryComponent, SourceLibraryCanvas } from "./source/SourceLibraryWorkspace";
 import { findSourceLibraryLayerOwner } from "./source/source-library-selection";
-import { SourceLibraryEditorPanel } from "./source/SourceLibraryEditorPanel";
+import { SourceLibraryExplorer } from "./source/SourceLibraryExplorer";
 import { SourceComponentCreateSheet } from "./source/SourceComponentCreateSheet";
 import { useSourceComponentCreation } from "./source/useSourceComponentCreation";
 import { useSourceLibraryRuntime } from "./source/useSourceLibraryRuntime";
@@ -59,11 +59,11 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   } : initial;
   const {
     activity, appCodeHeight, appCodeOpen, canvasMode, codeDocument, designCases, designRootId, designSelection,
-    focusId, mobilePane, previewRuntime, previewSelection, rightMode,
+    focusId, mobilePane, previewRuntime, previewSelection,
     selectedLibraryComponent, selectedLibraryLayerId, selectedProjectFileId,
     selection, workspaceMode, setActivity, setAppCodeHeight, setAppCodeOpen, setCanvasMode, setCodeDocument,
     setDesignCases, setDesignRootId, setDesignSelection, setFocusId, setMobilePane, setPreviewRuntime,
-    setPreviewSelection, setRightMode, setSelectedLibraryComponent, setSelectedLibraryLayerId,
+    setPreviewSelection, setSelectedLibraryComponent, setSelectedLibraryLayerId,
     setSelectedProjectFileId, setSelection, setWorkspaceMode,
   } = useSourceWorkspaceUiState({
     defaultFocusId: initialFocusId,
@@ -244,6 +244,8 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     } : undefined
   ), [libraryEntry?.design?.fileId, libraryRootId, libraryRuntime.mode]);
   const libraryDesignEditor = useSourceDraftFile(draftWorkspace, libraryDesignEditorLocation);
+  const activeLibraryCodeDocument = codeDocument === "design" && libraryEntry?.design ? "design" : "source";
+  const libraryCodeEditor = activeLibraryCodeDocument === "design" ? libraryDesignEditor : libraryEditor;
   const librarySelectedLayer = findSourceTreeLayer(libraryEntry?.layers, selectedLibraryLayerId) ?? baseLibrarySelectedLayer;
   const libraryVisualLayer = sourceCanvasVisualLayer(libraryEntry, librarySelectedLayer);
   const libraryReviewLayer = sourceCanvasVisualLayer(baseLibraryEditEntry, baseLibrarySelectedLayer);
@@ -259,7 +261,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const activeEditor = activity === "files"
     ? fileEditor
     : activity === "library"
-      ? rightMode === "code" && codeDocument === "design" && libraryEntry?.design ? libraryDesignEditor : libraryEditor
+      ? appCodeOpen ? libraryCodeEditor : libraryEditor
       : appCodeOpen ? codeEditor : editor;
   const activeEditable = activity === "files"
     ? Boolean(selectedProjectFile?.editable)
@@ -453,6 +455,24 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       } : undefined}
     />
   );
+  const libraryCodePanel = (
+    <SourceCodeCanvas
+      editable={libraryRuntime.mode === "development" && (
+        activeLibraryCodeDocument === "design" ? Boolean(libraryEntry?.design) : Boolean(libraryEntry)
+      )}
+      editor={libraryCodeEditor}
+      label={activeLibraryCodeDocument === "design"
+        ? `${libraryEntry?.label ?? "Component"} design`
+        : libraryEntry?.label ?? "Select a component"}
+      path={activeLibraryCodeDocument === "design" ? libraryEntry?.design?.relativePath : libraryEntry?.relativePath}
+      selection={activeLibraryCodeDocument === "source"
+        ? librarySelectedLayer?.source ?? libraryEntry?.source
+        : undefined}
+      toolbar={libraryEntry?.design ? (
+        <CodeDocumentSwitch value={activeLibraryCodeDocument} onChange={setCodeDocument} />
+      ) : undefined}
+    />
+  );
   const fileSidebar = (
     <ProjectFileBrowser
       className="flex h-full w-full border-r-0"
@@ -466,10 +486,13 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     />
   );
   const librarySidebar = (
-    <SourceLibrarySidebar
+    <SourceLibraryExplorer
       appWorkspace={workspace}
       catalog={effectiveLibraryCatalog}
       catalogKind={libraryRuntime.catalogKind}
+      code={libraryCodePanel}
+      codeHeight={appCodeHeight}
+      codeOpen={appCodeOpen}
       device={requestedDevice}
       library={workspace.library}
       mode={libraryRuntime.mode}
@@ -488,6 +511,8 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         setSelectedLibraryComponent(undefined);
         setSelectedLibraryLayerId(undefined);
       }}
+      onCodeHeightChange={setAppCodeHeight}
+      onCodeOpenChange={setAppCodeOpen}
       onModeChange={libraryRuntime.setMode}
       onSelectLayer={(layerId) => {
         setSelectedLibraryLayerId(layerId);
@@ -551,7 +576,6 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       onPreviewModeChange={setCanvasMode}
       onSelectLayer={(layerId) => {
         setSelectedLibraryLayerId(layerId);
-        setRightMode("design");
         setMobilePane("inspect");
       }}
       onSelectedLayerMetrics={setSelectedLayerMetrics}
@@ -629,40 +653,18 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   );
   const right = activity === "library"
     ? (
-      <SourceLibraryEditorPanel
-        activeTab={rightMode}
-        codeDocument={codeDocument}
-        designEditor={libraryDesignEditor}
+      <SourceComponentInspector
+        className="flex h-full w-full border-l-0"
         entry={libraryEntry}
-        mode={libraryRuntime.catalogKind === "app" ? "release" : libraryRuntime.mode}
-        releaseFallback={<SourceLibraryInspector
-          appWorkspace={workspace}
-          catalog={effectiveLibraryCatalog}
-          catalogKind={libraryRuntime.catalogKind}
-          device={requestedDevice}
-          library={workspace.library}
-          mode={libraryRuntime.mode}
-          selected={selectedLibraryComponent}
-          onCatalogKindChange={(kind) => {
-            libraryRuntime.setCatalogKind(kind);
-            setSelectedLibraryComponent(undefined);
-            setSelectedLibraryLayerId(undefined);
-          }}
-          onDeviceChange={() => undefined}
-          onModeChange={libraryRuntime.setMode}
-        />}
-        selectedLayer={librarySelectedLayer}
-        designLayer={libraryVisualLayer}
-        selectedLayerMetrics={selectedLayerMetrics}
+        layer={libraryVisualLayer}
+        layerMetrics={selectedLayerMetrics}
         selectedDesignCase={selectedLibraryDesignCase}
-        sourceEditor={libraryEditor}
+        slotLayers={sourceEntrySlotLayers(libraryEntry)}
         styleEditor={libraryStyleEditor}
         onDesignCaseChange={(caseName) => libraryPreviewEntry?.design && setDesignCases((current) => ({
           ...current,
           [libraryPreviewEntry.design!.fileId]: caseName,
         }))}
-        onActiveTabChange={setRightMode}
-        onCodeDocumentChange={setCodeDocument}
       />
     )
     : activity === "files"
@@ -762,7 +764,12 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           onReviewChanges={activity === "files" ? undefined : review.show}
         />
         <ResizableWorkspacePanels
-          namespace={{ projectId: target.project.id, documentId: `${focusedOccurrence?.node.id ?? selectedNode?.id ?? "empty"}:${requestedDevice}` }}
+          namespace={{
+            projectId: target.project.id,
+            documentId: activity === "library"
+              ? `library:${selectedLibraryComponent ?? "empty"}:${requestedDevice}`
+              : `${focusedOccurrence?.node.id ?? selectedNode?.id ?? "empty"}:${requestedDevice}`,
+          }}
           left={{ label: "TypeScript app structure", content: left, defaultWidth: 300, minWidth: 260, maxWidth: 880 }}
           right={{ label: "Component properties", content: right, defaultWidth: 480, minWidth: 360, maxWidth: 760 }}
           mobile={mobile}

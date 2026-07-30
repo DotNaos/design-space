@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
 import type { RuntimeSourceLibraryCatalog, RuntimeSourceWorkspaceEntry, SourceWorkspaceLibrary } from "../../shared/source-workspace";
+import { SourceLibraryExplorer } from "./SourceLibraryExplorer";
 import { SourceLibraryCanvas, SourceLibrarySidebar } from "./SourceLibraryWorkspace";
 import { findSourceLibraryLayerOwner } from "./source-library-selection";
 
@@ -77,7 +78,7 @@ it("shows native development and release sources with a design coverage audit", 
   expect(screen.getByText("1/2")).toBeVisible();
   expect(screen.getByLabelText("Card design missing")).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /Button/ })).toBeVisible();
+  expect(screen.getByRole("button", { name: /Button/, pressed: true })).toBeVisible();
   expect(screen.getByRole("button", { name: /Card/ })).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: /Development/ }));
   expect(change).toHaveBeenCalledWith("development");
@@ -128,6 +129,41 @@ it("searches the flat library catalog", async () => {
   await userEvent.type(search, "Card");
   expect(screen.getByRole("button", { name: /Card/ })).toBeVisible();
   expect(screen.queryByRole("button", { name: /^Button/ })).not.toBeInTheDocument();
+});
+
+it("keeps the flat catalog, selected component layers, and code in one explorer", () => {
+  const layeredEntry: RuntimeSourceWorkspaceEntry = {
+    ...entry,
+    layers: [{
+      id: "html.button",
+      label: "button",
+      kind: "html",
+      children: [],
+      source: { start: 2, end: 8 },
+    }],
+  };
+  render(
+    <SourceLibraryExplorer
+      catalog={{ ...catalog, development: { ...catalog.development!, entries: [layeredEntry] } }}
+      catalogKind="library"
+      code={<div>Editable component code</div>}
+      codeOpen
+      device="desktop"
+      library={{ ...library, components: [{ name: "Button", evidence: "package-export" }] }}
+      mode="development"
+      selected="library.development.Button"
+      onCatalogKindChange={vi.fn()}
+      onCodeOpenChange={vi.fn()}
+      onDeviceChange={vi.fn()}
+      onModeChange={vi.fn()}
+      onSelect={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: /Button/, pressed: true })).toBeVisible();
+  expect(screen.getByRole("region", { name: "Selected component layers" })).toBeVisible();
+  expect(screen.getByText("Editable component code")).toBeVisible();
+  expect(screen.getByText("<button>")).toBeVisible();
 });
 
 it("shows app-built components as a separate flat catalog", async () => {

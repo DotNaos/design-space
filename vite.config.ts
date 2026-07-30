@@ -9,6 +9,7 @@ import {
   designSpaceTargetPlugin,
   DocumentService,
   EditService,
+  LibraryDevelopmentProjectService,
   loadRegisteredProject,
   LocalOperationService,
   resolveServerProjectRoot,
@@ -41,6 +42,7 @@ export default defineConfig(async () => {
   const api = new LocalOperationService(
     new EditService(registeredTarget, { sourceDraftPreviews }),
     new DocumentService(registeredTarget),
+    new LibraryDevelopmentProjectService(registeredTarget),
   );
 
   return {

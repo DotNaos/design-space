@@ -163,6 +163,7 @@ export interface SourceWorkspaceTreeProps extends Omit<SourceWorkspaceSidebarPro
   approvalReview?: boolean;
   collapseOutsideRequest?: number;
   emptyMessage?: string;
+  expandFocus?: boolean;
   focusNodeId?: string;
   revealSelectedRequest?: number;
   rootLabels?: Readonly<Record<string, string>>;
@@ -194,6 +195,7 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
   const previousRevealSelectedRequest = useRef(props.revealSelectedRequest);
   const handledRevealSelectedRevision = useRef(0);
   const previousFocusId = useRef(focusId);
+  const expandedFocusId = useRef<string | undefined>(undefined);
   const [revealSelectedRevision, setRevealSelectedRevision] = useState(0);
   const visibleRows = useMemo(() => visibleSourceCompositionRows(rows, collapsed), [collapsed, rows]);
   const selectedVisibleIndex = useMemo(
@@ -262,6 +264,22 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
     else next.add(key);
     return next;
   });
+  useEffect(() => {
+    if (!props.expandFocus || !focusId || expandedFocusId.current === focusId) return;
+    expandedFocusId.current = focusId;
+    const focusRow = rows.find((row) => (
+      row.kind === "component"
+      && !row.layer
+      && row.occurrence?.id === focusId
+    ));
+    if (!focusRow?.collapsible) return;
+    setCollapsed((current) => {
+      if (!current.has(focusRow.key)) return current;
+      const next = new Set(current);
+      next.delete(focusRow.key);
+      return next;
+    });
+  }, [focusId, props.expandFocus, rows, setCollapsed]);
   useLayoutEffect(() => {
     if (
       revealSelectedRevision === 0
