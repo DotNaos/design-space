@@ -4,11 +4,12 @@ import { describe, expect, it } from "vitest";
 import design from "./index.design";
 
 describe("WorkspaceShell design", () => {
-  it("leaves the content slot empty for the typed preview slot marker", () => {
+  it("shows labeled design-only placeholders without rendering app children", () => {
     render(<>{design.render(design.defaults)}</>);
 
-    expect(design.defaults.slots.content).toBeUndefined();
-    expect(screen.queryByText("Workspace content")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "status slot" })).toHaveTextContent("Workspace state and connectivity");
+    expect(screen.getByRole("region", { name: "content slot" })).toHaveTextContent("Primary workspace surface");
+    expect(screen.getByRole("region", { name: "toolbar slot" })).toHaveTextContent("Optional workspace actions");
     expect(screen.queryByText("Source tree")).not.toBeInTheDocument();
   });
 });
