@@ -104,7 +104,7 @@ export function SourceCanvasFeedbackDock(props: {
 
   return (
     <>
-      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      <div className="mx-auto grid w-full max-w-[min(552px,100%)] flex-1 grid-cols-[2.5rem_minmax(0,28.75rem)_2.5rem] items-end justify-center gap-1.5">
         <Tooltip closeDelay={80} delay={350}>
           <Button
             isIconOnly
@@ -135,81 +135,84 @@ export function SourceCanvasFeedbackDock(props: {
             {props.annotationMode ? "Finish placing annotations" : "Comment on a precise canvas element"}
           </Tooltip.Content>
         </Tooltip>
-        <div
-          aria-label="Codex composer"
-          aria-disabled={!connected}
-          className={`relative flex h-10 min-w-64 max-w-[min(460px,calc(100vw-2rem))] flex-1 items-center gap-0.5 rounded-full border bg-[#0d0e10]/95 p-1 shadow-[0_18px_58px_rgba(0,0,0,0.32)] backdrop-blur-xl transition-colors ${
-            writable
-              ? "border-white/10 focus-within:border-white/20"
-              : connected
-                ? "border-amber-300/15"
-                : "border-white/[0.06] opacity-75"
-          }`}
-        >
-        {error ? (
+        <div className="flex min-w-0 flex-col items-center gap-1.5" data-testid="source-codex-session-stack">
+          <SourceCodexConnectionIndicator
+            connection={connection}
+            origin={origin}
+            onPress={() => setConnectionOpen(true)}
+          />
           <div
-            role="alert"
-            className="absolute bottom-full right-0 mb-2 max-w-[min(420px,calc(100vw-2rem))] rounded-md border border-red-400/25 bg-[#26171a] px-2 py-1 text-[9px] leading-4 text-red-200 shadow-xl"
+            aria-label="Codex composer"
+            aria-disabled={!connected}
+            className={`relative flex h-10 w-full min-w-64 items-center gap-0.5 rounded-full border bg-[#0d0e10]/95 p-1 shadow-[0_18px_58px_rgba(0,0,0,0.32)] backdrop-blur-xl transition-colors ${
+              writable
+                ? "border-white/10 focus-within:border-white/20"
+                : connected
+                  ? "border-amber-300/15"
+                  : "border-white/[0.06] opacity-75"
+            }`}
           >
-            {error}
-          </div>
-        ) : null}
-        <Tooltip closeDelay={80} delay={350}>
-          <Button
-            isIconOnly
-            aria-label="Open full Codex conversation"
-            className="relative size-8 min-w-8 shrink-0 rounded-full text-zinc-400 hover:bg-white/[0.07] hover:text-zinc-100"
-            isDisabled={!connected}
-            size="sm"
-            variant="ghost"
-            onPress={() => setConversationOpen(true)}
-          >
-            <MessageSquare aria-hidden="true" size={14} />
-            {comments.length ? (
-              <span className="absolute right-1 top-1 size-1.5 rounded-full bg-violet-400 ring-2 ring-[#0d0e10]" />
+            {error ? (
+              <div
+                role="alert"
+                className="absolute bottom-full right-0 mb-2 max-w-[min(420px,calc(100vw-2rem))] rounded-md border border-red-400/25 bg-[#26171a] px-2 py-1 text-[9px] leading-4 text-red-200 shadow-xl"
+              >
+                {error}
+              </div>
             ) : null}
-          </Button>
-          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
-            Open full conversation · {comments.length} saved comment{comments.length === 1 ? "" : "s"}
-          </Tooltip.Content>
-        </Tooltip>
-        <Input
-          aria-label="Codex feedback"
-          className="min-w-0 flex-1 bg-transparent px-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-500"
-          placeholder={placeholder}
-          disabled={!writable || sending}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              void send();
-            }
-          }}
-        />
-        <SourceCodexConnectionIndicator
-          connection={connection}
-          origin={origin}
-          onPress={() => setConnectionOpen(true)}
-        />
-        <Tooltip closeDelay={80} delay={350}>
-          <Button
-            isIconOnly
-            aria-label="Send to Codex"
-            className="size-8 min-w-8 rounded-full bg-zinc-100 text-zinc-950 shadow-sm hover:bg-white"
-            isDisabled={!writable || (!draft.trim() && !annotations.length)}
-            isPending={sending}
-            size="sm"
-            variant="ghost"
-            onPress={() => void send()}
-          >
-            <ArrowUp aria-hidden="true" size={14} />
-          </Button>
-          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
-            {writable ? `Send to ${origin?.title}` : "Reconnect a Codex task to send"}
-          </Tooltip.Content>
-        </Tooltip>
+            <Tooltip closeDelay={80} delay={350}>
+              <Button
+                isIconOnly
+                aria-label="Open full Codex conversation"
+                className="relative size-8 min-w-8 shrink-0 rounded-full text-zinc-400 hover:bg-white/[0.07] hover:text-zinc-100"
+                isDisabled={!connected}
+                size="sm"
+                variant="ghost"
+                onPress={() => setConversationOpen(true)}
+              >
+                <MessageSquare aria-hidden="true" size={14} />
+                {comments.length ? (
+                  <span className="absolute right-1 top-1 size-1.5 rounded-full bg-violet-400 ring-2 ring-[#0d0e10]" />
+                ) : null}
+              </Button>
+              <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+                Open full conversation · {comments.length} saved comment{comments.length === 1 ? "" : "s"}
+              </Tooltip.Content>
+            </Tooltip>
+            <Input
+              aria-label="Codex feedback"
+              className="min-w-0 flex-1 bg-transparent px-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-500"
+              placeholder={placeholder}
+              disabled={!writable || sending}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+            />
+            <Tooltip closeDelay={80} delay={350}>
+              <Button
+                isIconOnly
+                aria-label="Send to Codex"
+                className="size-8 min-w-8 rounded-full bg-zinc-100 text-zinc-950 shadow-sm hover:bg-white"
+                isDisabled={!writable || (!draft.trim() && !annotations.length)}
+                isPending={sending}
+                size="sm"
+                variant="ghost"
+                onPress={() => void send()}
+              >
+                <ArrowUp aria-hidden="true" size={14} />
+              </Button>
+              <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+                {writable ? `Send to ${origin?.title}` : "Reconnect a Codex task to send"}
+              </Tooltip.Content>
+            </Tooltip>
+          </div>
         </div>
+        <span aria-hidden="true" className="size-10" />
       </div>
       <SourceCodexConnectionModal
         current={origin}

@@ -81,6 +81,9 @@ it("shows the connected task and keeps the composer enabled", async () => {
   });
   expect(indicator).toHaveTextContent("Design Space");
   expect(indicator).toHaveClass("text-emerald-200");
+  const composer = screen.getByLabelText("Codex composer");
+  expect(screen.getByTestId("source-codex-session-stack")).toContainElement(indicator);
+  expect(composer).not.toContainElement(indicator);
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeEnabled();
 });
 

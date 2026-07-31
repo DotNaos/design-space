@@ -402,7 +402,7 @@ export function SourcePreviewFrame(props: {
               />
             </div>
           ) : null}
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 items-end justify-center gap-1.5">
             {props.workspaceMode ? (
               <SourceCanvasContextHud
                 contextLabel={props.node?.label ?? props.entry?.label ?? "Component"}

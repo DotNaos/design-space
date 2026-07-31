@@ -158,7 +158,7 @@ export function SourceCanvasAnnotationOverlay(props: {
         <form
           aria-label={`Annotation for ${props.target.element}`}
           className="pointer-events-auto absolute z-10 grid w-[min(320px,calc(100%_-_24px))] gap-2.5 rounded-2xl border border-white/15 bg-[#121212]/98 p-3 text-zinc-100 shadow-2xl shadow-black/50 backdrop-blur-xl"
-          style={editorPosition(props.target.point)}
+          style={sourceCanvasAnnotationEditorPosition(props.target.point)}
           onSubmit={(event) => {
             event.preventDefault();
             props.onSave(props.target!, comment);
@@ -236,12 +236,16 @@ function activateWithKeyboard(event: { pointerType: string }, action: () => void
   if (event.pointerType === "keyboard" || event.pointerType === "virtual") action();
 }
 
-function editorPosition(point: SourceCanvasAnnotationTarget["point"]): CSSProperties {
-  const horizontal = point.x > 0.62
-    ? { right: "12px" }
-    : { left: "12px" };
-  const vertical = point.y > 0.58
-    ? { bottom: `${Math.max(0, 1 - point.y) * 100 + 2}%` }
-    : { top: `${point.y * 100 + 2}%` };
-  return { ...horizontal, ...vertical };
+export function sourceCanvasAnnotationEditorPosition(point: SourceCanvasAnnotationTarget["point"]): CSSProperties {
+  const translateX = point.x < 0.42
+    ? "12px"
+    : point.x > 0.58
+      ? "calc(-100% - 12px)"
+      : "-50%";
+  const translateY = point.y < 0.55 ? "12px" : "calc(-100% - 12px)";
+  return {
+    left: `${point.x * 100}%`,
+    top: `${point.y * 100}%`,
+    transform: `translateX(${translateX}) translateY(${translateY})`,
+  };
 }
