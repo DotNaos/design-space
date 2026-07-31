@@ -49,6 +49,7 @@ import {
 } from "./source/use-source-workspace-control";
 import { sourceCanvasAncestry } from "./source/source-canvas-ancestry";
 import { sourceCanvasApprovalStatus } from "./source/SourceApprovalStatus";
+import { SourceWorkspacePageNavigation } from "./source/SourceWorkspacePageNavigation";
 
 export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
   const registeredWorkspace = target.sourceWorkspace;
@@ -295,17 +296,18 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       : libraryRuntime.mode === "development" && Boolean(libraryEntry);
   const connected = workspace.runtime === "react";
   const breadcrumb = activity === "files"
-    ? ["Files"]
+    ? ["Design", "Files"]
     : activity === "library"
       ? [
+        "Design",
         "Library",
         ...(libraryPreviewEntry ? [libraryPreviewEntry.label] : []),
         ...(libraryEntry && libraryEntry.id !== libraryPreviewEntry?.id ? [libraryEntry.label] : []),
         ...(librarySelectedLayer ? [`<${librarySelectedLayer.label}>`] : []),
       ]
       : selectedNode
-        ? ["App", selectedNode.label, ...(selectedLayer ? [selectedLabel ?? selectedLayer.label] : [])]
-        : ["App"];
+        ? [workspaceMode === "design" ? "Design" : "Preview", selectedNode.label, ...(selectedLayer ? [selectedLabel ?? selectedLayer.label] : [])]
+        : [workspaceMode === "design" ? "Design" : "Preview"];
 
   useSourceDraftSynchronization({
     analysis: draftAnalysis, draftWorkspace, editor, location: editorLocation,
@@ -399,9 +401,11 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     if (request.designOccurrenceId) {
       openDesign(request.designOccurrenceId, request.selection);
     } else {
+      if (workspaceMode === "preview") setPreviewSelection(selection);
+      setWorkspaceMode("design");
+      setPreviewRuntime("static");
       setSelection(request.selection);
-      if (workspaceMode === "preview") setPreviewSelection(request.selection);
-      else setDesignSelection(request.selection);
+      setDesignSelection(request.selection);
       setActivity("app");
       setMobilePane("canvas");
     }
@@ -409,19 +413,38 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     setAppCodeOpen(true);
     setDraftSelection(request.source);
   };
-  const returnToPreview = () => {
-    setDesignSelection(selection);
+  const openPreviewPage = () => {
+    if (workspaceMode === "design") setDesignSelection(selection);
     setWorkspaceMode("preview");
     setPreviewRuntime("static");
     setCanvasRevealRequest(undefined);
     setSelection(previewSelection ?? defaultSelection);
+    setActivity("app");
+    setMobilePane("canvas");
+  };
+  const openDesignPage = () => {
+    const occurrenceId = designRootId && graph.occurrences.has(designRootId) ? designRootId : appRootId;
+    const occurrence = occurrenceId ? graph.occurrences.get(occurrenceId) : undefined;
+    const next = designSelection ?? (occurrence ? sourceComponentSelection(occurrence, requestedDevice) : defaultSelection);
+    if (occurrenceId && next) openDesign(occurrenceId, next);
+  };
+  const openAppDesign = () => {
+    const occurrence = appRootId ? graph.occurrences.get(appRootId) : undefined;
+    if (appRootId && occurrence) openDesign(appRootId, sourceComponentSelection(occurrence, requestedDevice));
+  };
+  const openDesignArea = (next: "files" | "library") => {
+    if (workspaceMode === "preview") setPreviewSelection(selection);
+    setWorkspaceMode("design");
+    setPreviewRuntime("static");
+    setActivity(next);
+    setMobilePane("documents");
   };
   const appSidebar = (
     <SourceWorkspaceSidebar
       approvalReview={approvalReview}
       className="flex h-full w-full border-r-0"
       designNavigation={workspaceMode === "design" ? {
-        onExit: returnToPreview,
+        onExit: openAppDesign,
         ...(parentDesignOccurrence ? {
           parentLabel: parentDesignOccurrence.node.label,
           onOpenParent: () => openDesign(parentDesignOccurrence.id, {
@@ -449,9 +472,13 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       onApplySlot={applySlot}
       onPrepareSlotEdit={prepareSlotEdit}
       onSelect={(next) => {
+        if (workspaceMode === "preview") {
+          const occurrenceId = next.occurrenceId ?? resolvedFocusId ?? appRootId;
+          if (occurrenceId) openDesign(occurrenceId, next);
+          return;
+        }
         setSelection(next);
-        if (workspaceMode === "preview") setPreviewSelection(next);
-        else setDesignSelection(next);
+        setDesignSelection(next);
         if (next.kind === "component") setCanvasRevealRequest((current) => (current ?? 0) + 1);
         setDraftSelection(undefined);
         setActivity("app");
@@ -653,7 +680,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         ...current,
         [previewEntry.design!.fileId]: caseName,
       }))}
-      onReturnToPreview={returnToPreview}
+      onReturnToPreview={openPreviewPage}
       onSelectedLayerMetrics={setSelectedLayerMetrics}
       onSelectLayer={(layerId, occurrence) => {
         const next = sourceCanvasSelection(graph, resolvedFocusId, layerId, requestedDevice, occurrence);
@@ -748,8 +775,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       left={left}
       mobilePane={mobilePane}
       right={right}
-      onActivityChange={setActivity}
+      workspaceMode={workspaceMode}
+      onActivityChange={(next) => next === "app" ? openAppDesign() : openDesignArea(next)}
       onPaneChange={setMobilePane}
+      onWorkspaceModeChange={(next) => next === "design" ? openDesignPage() : openPreviewPage()}
     />
   );
 
@@ -759,9 +788,9 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         active={activity}
         strictUiChecking={false}
         canStrictUi={false}
-        onApp={() => setActivity("app")}
-        onLibrary={() => setActivity("library")}
-        onFiles={() => setActivity("files")}
+        onApp={openAppDesign}
+        onLibrary={() => openDesignArea("library")}
+        onFiles={() => openDesignArea("files")}
         onStrictUi={() => undefined}
       />
       <div className="flex min-w-0 flex-1 flex-col">
@@ -783,6 +812,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           canSave={activity === "files" && activeEditable && Boolean(fileEditor.prepared)}
           saving={activity === "files" ? fileEditor.saving : review.applying}
           pendingChanges={currentDraftChanges.length}
+          pageNavigation={<SourceWorkspacePageNavigation mode={workspaceMode} onChange={(next) => next === "design" ? openDesignPage() : openPreviewPage()} />}
           onUndo={() => {
             activeEditor.undo();
             setDraftSelection(undefined);

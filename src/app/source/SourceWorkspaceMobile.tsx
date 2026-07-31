@@ -2,6 +2,7 @@ import { Button } from "@heroui/react";
 import type { ReactNode } from "react";
 
 import { MobileDock, type MobilePane } from "../shell/MobileDock";
+import type { SourceWorkspaceMode } from "./source-layer-design";
 
 type SourceWorkspaceActivity = "app" | "files" | "library";
 
@@ -11,9 +12,11 @@ export function SourceWorkspaceMobile(props: {
   canvas: ReactNode;
   left: ReactNode;
   mobilePane: MobilePane;
+  workspaceMode: SourceWorkspaceMode;
   right: ReactNode;
   onActivityChange: (activity: SourceWorkspaceActivity) => void;
   onPaneChange: (pane: MobilePane) => void;
+  onWorkspaceModeChange: (mode: SourceWorkspaceMode) => void;
 }) {
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
@@ -39,7 +42,12 @@ export function SourceWorkspaceMobile(props: {
           )}
         </section>
       )}
-      <MobileDock active={props.mobilePane} onChange={props.onPaneChange} />
+      <MobileDock
+        active={props.mobilePane}
+        page={props.workspaceMode}
+        onChange={props.onPaneChange}
+        onPageChange={props.onWorkspaceModeChange}
+      />
     </div>
   );
 }

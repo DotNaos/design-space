@@ -449,7 +449,7 @@ it("uses the bottom HUD for safe Preview, temporary Play, and isolated Design", 
     />,
   );
   expect(screen.getByLabelText("Canvas context")).toHaveTextContent("Design · context");
-  await userEvent.click(screen.getByRole("button", { name: "Back to app preview" }));
+  await userEvent.click(screen.getByRole("button", { name: "Open Preview page" }));
   expect(onReturnToPreview).toHaveBeenCalledOnce();
 });
 

@@ -144,7 +144,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           </SourceTreeHeaderAction>
         )}
         {props.designNavigation && (
-          <SourceTreeHeaderAction label="Exit component design" onPress={props.designNavigation.onExit}>
+          <SourceTreeHeaderAction label="Open app design" onPress={props.designNavigation.onExit}>
             <House aria-hidden="true" size={14} />
           </SourceTreeHeaderAction>
         )}

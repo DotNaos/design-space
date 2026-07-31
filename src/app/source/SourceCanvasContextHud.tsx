@@ -1,5 +1,5 @@
 import { Button, Tooltip } from "@heroui/react";
-import { ArrowLeft, Play, Square } from "lucide-react";
+import { MonitorPlay, Play, Square } from "lucide-react";
 
 import type { SourceWorkspaceMode } from "./source-layer-design";
 
@@ -29,8 +29,8 @@ export function SourceCanvasContextHud(props: {
             {props.playing ? <Square aria-hidden="true" size={11} /> : <Play aria-hidden="true" size={11} />}
           </HudButton>
         ) : (
-          <HudButton label="Back to app preview" onPress={() => props.onReturnToPreview?.()}>
-            <ArrowLeft aria-hidden="true" size={12} />
+          <HudButton label="Open Preview page" onPress={() => props.onReturnToPreview?.()}>
+            <MonitorPlay aria-hidden="true" size={12} />
           </HudButton>
         )}
       </div>

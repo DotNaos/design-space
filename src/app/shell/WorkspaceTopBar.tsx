@@ -19,6 +19,7 @@ export function WorkspaceTopBar(props: {
   canSave: boolean;
   saving: boolean;
   pendingChanges?: number;
+  pageNavigation?: React.ReactNode;
   onUndo: () => void;
   onRedo: () => void;
   onReset: () => void;
@@ -40,6 +41,8 @@ export function WorkspaceTopBar(props: {
         <ConnectionStatus connected={props.connected} />
         <div className="lg:hidden"><StrictStatusButton disabled={!props.canStrictUi} evidence={props.strictUi} checking={props.checking} onPress={props.onStrictUi} /></div>
       </div>
+
+      {props.pageNavigation ? <div className="hidden shrink-0 items-center px-2 lg:flex">{props.pageNavigation}</div> : null}
 
       <nav aria-label="Current document path" className="hidden min-w-0 flex-1 border-l border-white/10 px-5 text-xs text-zinc-500 lg:block">
         <ol className="flex h-full min-w-0 items-center gap-2">

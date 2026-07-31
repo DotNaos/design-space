@@ -167,13 +167,13 @@ it("offers parent and exit navigation only while designing a component", async (
   );
 
   await userEvent.click(screen.getByRole("button", { name: "Open parent Dashboard" }));
-  await userEvent.click(screen.getByRole("button", { name: "Exit component design" }));
+  await userEvent.click(screen.getByRole("button", { name: "Open app design" }));
   expect(onOpenParent).toHaveBeenCalledOnce();
   expect(onExit).toHaveBeenCalledOnce();
 
   view.rerender(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
   expect(screen.queryByRole("button", { name: "Open parent Dashboard" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Exit component design" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Open app design" })).not.toBeInTheDocument();
 });
 
 it("keeps exit available at the top of the component hierarchy", () => {
@@ -185,7 +185,7 @@ it("keeps exit available at the top of the component hierarchy", () => {
     />,
   );
 
-  expect(screen.getByRole("button", { name: "Exit component design" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Open app design" })).toBeVisible();
   expect(screen.queryByRole("button", { name: /Open parent/ })).not.toBeInTheDocument();
 });
 

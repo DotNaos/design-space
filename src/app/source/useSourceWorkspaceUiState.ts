@@ -56,7 +56,7 @@ export function useSourceWorkspaceUiState(options: {
   const [previewSelection, setPreviewSelection] = useState<SourceWorkspaceSelection | undefined>(
     validSelection(restored.previewSelection) ?? restoredSelection,
   );
-  const [workspaceMode, setWorkspaceMode] = useState<SourceWorkspaceMode>(restored.workspaceMode ?? "preview");
+  const [workspaceMode, setWorkspaceMode] = useState<SourceWorkspaceMode>(restored.workspaceMode ?? "design");
   const [previewRuntime, setPreviewRuntime] = useState<"static" | "play">("static");
   const [rightMode, setRightMode] = useState<"code" | "design">(restored.rightMode ?? "design");
   const [codeDocument, setCodeDocument] = useState<"source" | "design">(restored.codeDocument ?? "source");
@@ -99,7 +99,7 @@ export function useSourceWorkspaceUiState(options: {
     );
     setDesignSelection(validSelection(restored.designSelection));
     setPreviewSelection(validSelection(restored.previewSelection) ?? restoredSelection);
-    setWorkspaceMode(restored.workspaceMode ?? "preview");
+    setWorkspaceMode(restored.workspaceMode ?? "design");
     setPreviewRuntime("static");
     setRightMode(restored.rightMode ?? "design");
     setCodeDocument(restored.codeDocument ?? "source");

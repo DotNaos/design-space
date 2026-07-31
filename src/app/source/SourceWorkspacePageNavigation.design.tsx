@@ -1,16 +1,17 @@
 import type { ComponentProps } from "react";
 
 import { defineComponentDesign } from "../../shared/component-design";
-import { MobileDock as ComponentUnderDesign } from "./MobileDock";
+import { SourceWorkspacePageNavigation as ComponentUnderDesign } from "./SourceWorkspacePageNavigation";
 
 export default defineComponentDesign(ComponentUnderDesign, {
   isStateful: false,
   defaults: {
-    active: "canvas",
-    page: "design",
+    mode: "design",
     onChange: () => undefined,
-    onPageChange: () => undefined,
-  } as unknown as ComponentProps<typeof ComponentUnderDesign>,
-  designs: { default: {} },
+  } as ComponentProps<typeof ComponentUnderDesign>,
+  designs: {
+    default: {},
+    preview: { mode: "preview" },
+  },
   render: (props: ComponentProps<typeof ComponentUnderDesign>) => <ComponentUnderDesign {...props} />,
 });
