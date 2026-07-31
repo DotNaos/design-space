@@ -4,6 +4,7 @@ import type { DesignSpaceDevice, RuntimeSourceWorkspaceEntry, SourceWorkspaceLay
 import type { SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
 import type { SourceTreeNode } from "./source-workspace-tree";
 import type { SourceCanvasAncestryItem } from "./source-canvas-ancestry";
+import type { SourceSlotScope } from "./source-slot-navigation";
 import { SourceCodeCanvas } from "./SourceCodeCanvas";
 import { SourcePreviewFrame } from "./SourcePreviewFrame";
 
@@ -33,6 +34,7 @@ export function SourceAppCanvas(props: {
   selectedLayerOccurrence?: number;
   selectedText?: string;
   slotLayers: readonly SourceWorkspaceLayer[];
+  slotScopes?: Readonly<Record<string, SourceSlotScope>>;
   slotTargetLabel?: string;
   styles: readonly string[];
   workspaceMode: SourceWorkspaceMode;
@@ -82,6 +84,7 @@ export function SourceAppCanvas(props: {
             selectedLayerOccurrence={props.selectedLayerOccurrence}
             selectedText={props.selectedText}
             slotLayers={props.slotLayers}
+            slotScopes={props.slotScopes}
             slotTargetLabel={props.slotTargetLabel}
             styles={props.styles}
             workspaceMode={props.workspaceMode}

@@ -3,7 +3,7 @@ import type { SourceLayerMetrics } from "./source-layer-design";
 export function mountSourceLayerSelection(
   output: HTMLElement,
   layerId: string,
-  tone: "component" | "layer" | "slot",
+  tone: "component" | "layer" | "shared-slot" | "slot",
   onMetrics?: (metrics: SourceLayerMetrics | undefined) => void,
   fallback?: HTMLElement | null,
   occurrence = 0,
@@ -29,7 +29,7 @@ export function mountSourceLayerHover(
     relativePath: string;
   },
   label?: string,
-  tone?: "annotation" | "component" | "layer" | "slot",
+  tone?: "annotation" | "component" | "layer" | "shared-slot" | "slot",
 ): () => void {
   return mountSourceLayerOutline(output, layerId, {
     externalOwner,
@@ -53,7 +53,7 @@ function mountSourceLayerOutline(
       relativePath: string;
     };
     label?: string;
-    tone: "annotation" | "component" | "layer" | "slot";
+    tone: "annotation" | "component" | "layer" | "shared-slot" | "slot";
     variant: "hover" | "selection";
   },
 ): () => void {
@@ -64,15 +64,7 @@ function mountSourceLayerOutline(
   const overlay = overlayRoot.ownerDocument.createElement("div");
   if (options.variant === "selection") overlay.dataset.designSpaceSourceSelection = layerId;
   else overlay.dataset.designSpaceSourceHover = layerId;
-  const color = options.tone === "annotation"
-    ? "#fbbf24"
-    : options.tone === "component"
-      ? "#a78bfa"
-      : options.tone === "slot"
-        ? options.variant === "selection" ? "#d946ef" : "#c084fc"
-      : options.variant === "selection"
-      ? "#0d99ff"
-      : "#72bfff";
+  const color = outlineColor(options.tone, options.variant);
   const outlineWidth = options.variant === "selection" ? 1.5 : 1;
   overlay.style.cssText = [
     "position:absolute",
@@ -198,6 +190,17 @@ function mountSourceLayerOutline(
     overlay.remove();
     if (!overlayRoot.childElementCount) overlayRoot.remove();
   };
+}
+
+function outlineColor(
+  tone: "annotation" | "component" | "layer" | "shared-slot" | "slot",
+  variant: "hover" | "selection",
+): string {
+  if (tone === "annotation") return "#fbbf24";
+  if (tone === "component") return "#a78bfa";
+  if (tone === "shared-slot") return variant === "selection" ? "#38bdf8" : "#7dd3fc";
+  if (tone === "slot") return variant === "selection" ? "#d946ef" : "#c084fc";
+  return variant === "selection" ? "#0d99ff" : "#72bfff";
 }
 
 function sourceLayerOverlayRoot(previewDocument: Document): HTMLElement {

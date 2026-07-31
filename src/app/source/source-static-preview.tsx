@@ -10,8 +10,10 @@ import type {
 import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { PreviewBoundary } from "../PreviewBoundary";
 import { SourcePreviewRuntimeContext } from "./SourcePreviewRuntime";
+import type { SourceSlotScope } from "./source-slot-navigation";
 
 const sourceCanvasSlotPattern = "url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgdmlld0JveD0iMCAwIDI4IDI4Ij48cGF0aCBkPSJNMTQgOXYxME05IDE0aDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiNkOGI0ZmUiIHN0cm9rZS1vcGFjaXR5PSIuMTIiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==)";
+const sourceCanvasSharedPattern = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M14 9v10M9 14h10' fill='none' stroke='%237dd3fc' stroke-opacity='.12' stroke-width='1'/%3E%3C/svg%3E\")";
 
 export type SourcePreviewContentProps = {
   caseName: string;
@@ -44,13 +46,14 @@ export function renderStaticSourcePreviewMarkup(props: SourcePreviewContentProps
 export function renderStaticSourceDesignMarkup(props: {
   entry: RuntimeSourceWorkspaceEntry;
   slotLayers: readonly SourceWorkspaceLayer[];
+  slotScopes?: Readonly<Record<string, SourceSlotScope>>;
 }): Promise<string> {
   return new Promise((resolve, reject) => {
     queueMicrotask(() => {
       const container = document.createElement("div");
       const root = createRoot(container);
       try {
-        flushSync(() => root.render(<SourceStructureDesign entry={props.entry} slotLayers={props.slotLayers} />));
+        flushSync(() => root.render(<SourceStructureDesign entry={props.entry} slotLayers={props.slotLayers} slotScopes={props.slotScopes} />));
         const markup = container.innerHTML;
         root.unmount();
         resolve(markup);
@@ -179,7 +182,8 @@ function previewProps(
   return { ...values, slots };
 }
 
-function SourceCanvasSlotMarker(props: { fill?: boolean; label: string; layerId: string }) {
+function SourceCanvasSlotMarker(props: { fill?: boolean; label: string; layerId: string; scope?: SourceSlotScope }) {
+  const shared = props.scope === "shared";
   return (
     <span
       aria-label={`${props.label} slot`}
@@ -188,14 +192,14 @@ function SourceCanvasSlotMarker(props: { fill?: boolean; label: string; layerId:
       role="region"
       style={{
         alignItems: "center",
-        backgroundColor: "rgba(88, 28, 135, .16)",
-        backgroundImage: sourceCanvasSlotPattern,
+        backgroundColor: shared ? "rgba(14, 116, 144, .12)" : "rgba(88, 28, 135, .16)",
+        backgroundImage: shared ? sourceCanvasSharedPattern : sourceCanvasSlotPattern,
         backgroundPosition: "0 0",
         backgroundSize: "28px 28px",
-        border: "1px solid rgba(192, 132, 252, .38)",
+        border: shared ? "1px solid rgba(125, 211, 252, .38)" : "1px solid rgba(192, 132, 252, .38)",
         borderRadius: 10,
         boxSizing: "border-box",
-        color: "#c4b5fd",
+        color: shared ? "#7dd3fc" : "#c4b5fd",
         display: "flex",
         flexDirection: "column",
         gap: 4,
@@ -216,6 +220,7 @@ function SourceCanvasSlotMarker(props: { fill?: boolean; label: string; layerId:
 function SourceStructureDesign(props: {
   entry: RuntimeSourceWorkspaceEntry;
   slotLayers: readonly SourceWorkspaceLayer[];
+  slotScopes?: Readonly<Record<string, SourceSlotScope>>;
 }) {
   const slotsById = new Map(props.slotLayers.map((slot) => [slot.id, slot]));
   const slotsByComponent = new Map(props.slotLayers.flatMap((slot) => (
@@ -227,13 +232,14 @@ function SourceStructureDesign(props: {
     slotsById,
     slotsByComponent,
     attached,
+    props.slotScopes,
     true,
   ));
   const remaining = props.slotLayers.filter((slot) => !attached.has(slot.id));
   return (
     <div data-design-space-preview-entry-root style={{ height: "100%", minHeight: "100%", width: "100%" }}>
       {layers}
-      {remaining.map((slot) => <SourceCanvasSlotMarker key={slot.id} label={slot.label} layerId={slot.id} />)}
+      {remaining.map((slot) => <SourceCanvasSlotMarker key={slot.id} label={slot.label} layerId={slot.id} scope={props.slotScopes?.[slot.id]} />)}
     </div>
   );
 }
@@ -243,13 +249,14 @@ function structureLayer(
   slotsById: ReadonlyMap<string, SourceWorkspaceLayer>,
   slotsByComponent: ReadonlyMap<string, SourceWorkspaceLayer>,
   attached: Set<string>,
+  slotScopes: Readonly<Record<string, SourceSlotScope>> | undefined,
   topLevel: boolean,
 ): React.ReactNode {
   const slot = layer.kind === "slot" ? slotsById.get(layer.id) ?? layer : slotsByComponent.get(layer.id);
   if (slot) {
     if (attached.has(slot.id)) return null;
     attached.add(slot.id);
-    return <SourceCanvasSlotMarker key={layer.id} fill={topLevel} label={slot.label} layerId={slot.id} />;
+    return <SourceCanvasSlotMarker key={layer.id} fill={topLevel} label={slot.label} layerId={slot.id} scope={slotScopes?.[slot.id]} />;
   }
   if (layer.kind === "component") return null;
   const tag = /^[a-z][a-z0-9-]*$/.test(layer.label) ? layer.label : "div";
@@ -258,6 +265,7 @@ function structureLayer(
     slotsById,
     slotsByComponent,
     attached,
+    slotScopes,
     false,
   ));
   return createElement(tag, {

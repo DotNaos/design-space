@@ -85,7 +85,8 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
     active: props.selectedLayer?.id === slot.id,
     id: slot.id,
     label: slot.label,
-  })), [props.selectedLayer?.id, props.slotLayers]);
+    scope: props.slotScopes?.[slot.id] ?? "tree",
+  })), [props.selectedLayer?.id, props.slotLayers, props.slotScopes]);
   const designId = props.entry?.design?.fileId;
   const structuralDesign = props.workspaceMode === "design";
   useEffect(() => {
@@ -173,7 +174,11 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
     mounts.output.replaceChildren();
     mounts.staging.replaceChildren();
     const render = structuralDesign
-      ? renderStaticSourceDesignMarkup({ entry: props.entry, slotLayers: props.slotLayers ?? [] })
+      ? renderStaticSourceDesignMarkup({
+        entry: props.entry,
+        slotLayers: props.slotLayers ?? [],
+        slotScopes: props.slotScopes,
+      })
       : renderStaticSourcePreviewMarkup({
         caseName: selectedCase!, centered: props.centerContent, definition: definition!, entry: props.entry,
         matrix, slotLayers: props.slotLayers,
@@ -194,7 +199,7 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
       showStaticPreviewMessage(mounts.output, error instanceof Error ? error.message : "The static design could not be rendered.", true);
     });
     return () => { active = false; };
-  }, [definition, matrix, mounts, previewMode, projectionLayerId, props.centerContent, props.entry, props.slotLayers, selectedCase, structuralDesign]);
+  }, [definition, matrix, mounts, previewMode, projectionLayerId, props.centerContent, props.entry, props.slotLayers, props.slotScopes, selectedCase, structuralDesign]);
 
   const selectStaticLayer = (event: ReactMouseEvent<HTMLDivElement>) => {
     const frame = frameRef.current;
@@ -271,7 +276,11 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
     return mountSourceLayerSelection(
       mounts.output,
       props.selectedLayer.id,
-      props.selectedLayer.kind === "component" ? "component" : props.selectedLayer.kind === "slot" ? "slot" : "layer",
+      props.selectedLayer.kind === "component"
+        ? "component"
+        : props.selectedLayer.kind === "slot"
+          ? props.slotScopes?.[props.selectedLayer.id] === "shared" ? "shared-slot" : "slot"
+          : "layer",
       (metrics) => {
         props.onSelectedLayerMetrics?.(metrics);
         if (metrics && revealKey) setRevealTarget({ key: revealKey, rect: metrics });
@@ -282,7 +291,7 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
       selectedOccurrence,
       props.selectedLayerLabel ?? sourceCanvasLayerLabel(props.selectedLayer),
     );
-  }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer, props.selectedLayerLabel, revealKey, selectedOccurrence, staticRevision]);
+  }, [defaultVisualLayer?.id, mounts, previewMode, props.onSelectedLayerMetrics, props.selectedLayer, props.selectedLayerLabel, props.slotScopes, revealKey, selectedOccurrence, staticRevision]);
 
   useLayoutEffect(() => {
     if (!mounts || previewMode !== "design" || !visibleHoveredLayerHit || (visibleHoveredLayerHit.layerId === props.selectedLayer?.id && visibleHoveredLayerHit.occurrence === selectedOccurrence)) return undefined;
@@ -295,9 +304,15 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
       visibleHoveredLayerHit.occurrence,
       hoveredExternalOwner,
       sourceCanvasLayerLabel(hoveredLayer),
-      canvasAnnotations.active ? "annotation" : hoveredLayer?.kind === "component" ? "component" : hoveredLayer?.kind === "slot" ? "slot" : "layer",
+      canvasAnnotations.active
+        ? "annotation"
+        : hoveredLayer?.kind === "component"
+          ? "component"
+          : hoveredLayer?.kind === "slot"
+            ? props.slotScopes?.[hoveredLayer.id] === "shared" ? "shared-slot" : "slot"
+            : "layer",
     );
-  }, [canvasAnnotations.active, defaultVisualLayer?.id, hoveredExternalOwner, hoveredLayer, mounts, previewMode, props.selectedLayer?.id, selectedOccurrence, staticRevision, visibleHoveredLayerHit]);
+  }, [canvasAnnotations.active, defaultVisualLayer?.id, hoveredExternalOwner, hoveredLayer, mounts, previewMode, props.selectedLayer?.id, props.slotScopes, selectedOccurrence, staticRevision, visibleHoveredLayerHit]);
 
   useEffect(() => {
     setHoveredLayerHit(undefined);

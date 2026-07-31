@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 
 import type { SourceWorkspaceLayer } from "../../shared/source-workspace";
 import type { SourceFocusGraph, SourceOccurrence } from "./source-focus-tree";
-import { sourceSlotNavigationTarget, sourceSlotSelection } from "./source-slot-navigation";
+import { sourceSlotNavigationTarget, sourceSlotScope, sourceSlotSelection } from "./source-slot-navigation";
 
 it("opens the child component represented by an implicit design slot", () => {
   const usageLayer = layer("workspace-shell", "WorkspaceShell", "component");
@@ -33,6 +33,20 @@ it("keeps a synthetic slot selected on its current component", () => {
     slotName: "content",
     kind: "slot",
   });
+});
+
+it("distinguishes shared component boundaries from tree-owned slots", () => {
+  const shared = { ...layer("shared-button", "button", "slot"), children: [layer("button", "Button", "component")] };
+  const nestedShared = {
+    ...layer("shared-icon", "icon", "slot"),
+    children: [{ ...layer("wrapper", "span", "html"), children: [layer("icon", "Icon", "component")] }],
+  };
+  const empty = layer("toolbar", "toolbar", "slot");
+
+  expect(sourceSlotScope(shared, undefined)).toBe("shared");
+  expect(sourceSlotScope(nestedShared, undefined)).toBe("shared");
+  expect(sourceSlotScope(shared, occurrence("button"))).toBe("tree");
+  expect(sourceSlotScope(empty, undefined)).toBe("tree");
 });
 
 function focusGraph(child: SourceOccurrence): SourceFocusGraph {

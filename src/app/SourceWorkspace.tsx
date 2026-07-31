@@ -36,7 +36,7 @@ import { sourceCanvasSelection, sourceCanvasSelectionOccurrence, sourceCanvasVis
 import type { SourceLayerMetrics } from "./source/source-layer-design";
 import { useSourceWorkspaceUiState } from "./source/useSourceWorkspaceUiState";
 import { sourceEntrySlotLayers } from "./source/source-entry-layers";
-import { sourceSlotNavigationTarget, sourceSlotSelection } from "./source/source-slot-navigation";
+import { sourceSlotNavigationTarget, sourceSlotScope, sourceSlotSelection } from "./source/source-slot-navigation";
 import { SourceWorkspaceCodeOverlay } from "./source/SourceWorkspaceCodeOverlay";
 import { useSourceDraftSynchronization } from "./source/useSourceDraftSynchronization";
 import { useSourceDesignGeneration } from "./source/useSourceDesignGeneration";
@@ -186,7 +186,15 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const selectedCanvasSlot = selection?.kind === "slot" && selectedLayer?.kind === "slot"
     ? selectedLayer
     : undefined;
-  const selectedSlotTarget = sourceSlotNavigationTarget(graph, resolvedFocusId, selectedCanvasSlot);
+  const previewSlotNavigation = useMemo(() => previewSlotLayers.map((slot) => {
+    const target = sourceSlotNavigationTarget(graph, resolvedFocusId, slot);
+    return { id: slot.id, scope: sourceSlotScope(slot, target), target };
+  }), [graph, previewSlotLayers, resolvedFocusId]);
+  const selectedSlotTarget = previewSlotNavigation.find((slot) => slot.id === selectedCanvasSlot?.id)?.target;
+  const previewSlotScopes = useMemo(
+    () => Object.fromEntries(previewSlotNavigation.map((slot) => [slot.id, slot.scope])),
+    [previewSlotNavigation],
+  );
   const inspectorSourceOwner = focusedOccurrence?.usageOwnerId
     ? nodes.find((node) => node.id === focusedOccurrence.usageOwnerId)
     : undefined;
@@ -679,6 +687,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       selectedLayerOccurrence={sourceCanvasSelectionOccurrence(graph, resolvedFocusId, selection)}
       selectedText={styleEditor.previewTextValue}
       slotLayers={previewSlotLayers}
+      slotScopes={previewSlotScopes}
       slotTargetLabel={selectedSlotTarget?.node.label}
       styles={workspace.styles}
       workspaceMode={workspaceMode}

@@ -2,6 +2,7 @@ import type { DesignSpaceDevice, RuntimeSourceWorkspaceEntry, SourceWorkspaceLay
 import type { SourceCanvasAncestryItem } from "./source-canvas-ancestry";
 import type { SourceLayerMetrics, SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
 import type { SourceTreeNode } from "./source-workspace-tree";
+import type { SourceSlotScope } from "./source-slot-navigation";
 
 export interface SourcePreviewFrameProps {
   ancestry?: readonly SourceCanvasAncestryItem[];
@@ -28,6 +29,7 @@ export interface SourcePreviewFrameProps {
   selectedText?: string;
   selectionMode?: boolean;
   slotLayers?: readonly SourceWorkspaceLayer[];
+  slotScopes?: Readonly<Record<string, SourceSlotScope>>;
   slotTargetLabel?: string;
   styles: readonly string[];
   workspaceMode?: SourceWorkspaceMode;

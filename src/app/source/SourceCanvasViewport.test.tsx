@@ -79,9 +79,9 @@ it("attaches an interactive ancestry path to the canvas", async () => {
       onSelectSlot={onSelectSlot}
       slotOwnerLabel="WorkspaceShell"
       slotTabs={[
-        { active: false, id: "status", label: "status" },
-        { active: true, id: "content", label: "content" },
-        { active: false, id: "toolbar", label: "toolbar" },
+        { active: false, id: "status", label: "status", scope: "tree" },
+        { active: true, id: "content", label: "content", scope: "tree" },
+        { active: false, id: "toolbar", label: "toolbar", scope: "shared" },
       ]}
     >
       {() => <div>Preview</div>}
@@ -100,9 +100,10 @@ it("attaches an interactive ancestry path to the canvas", async () => {
   await userEvent.click(screen.getByRole("button", { name: /App/ }));
   expect(onSelectAncestry).toHaveBeenCalledWith({ id: "app", kind: "component", label: "App" });
 
-  expect(screen.getByRole("button", { name: "content" })).toHaveAttribute("aria-pressed", "true");
-  await userEvent.click(screen.getByRole("button", { name: "status" }));
-  expect(onSelectSlot).toHaveBeenCalledWith({ active: false, id: "status", label: "status" });
+  expect(screen.getByRole("button", { name: "slot:content" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "slot:toolbar" })).toHaveAttribute("data-slot-scope", "shared");
+  await userEvent.click(screen.getByRole("button", { name: "slot:status" }));
+  expect(onSelectSlot).toHaveBeenCalledWith({ active: false, id: "status", label: "status", scope: "tree" });
 });
 
 it("shows parent approval status only when supplied by approval review mode", () => {

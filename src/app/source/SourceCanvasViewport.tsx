@@ -54,7 +54,7 @@ export function SourceCanvasViewport(props: {
     ? { width: deviceFrame.outerWidth, height: deviceFrame.outerHeight }
     : frame;
   const hasCanvasDeviceSwitcher = Boolean(props.ancestry?.length && props.node);
-  const ancestryHeight = props.ancestry?.length ? props.slotTabs?.length ? 64 : 36 : 0;
+  const ancestryHeight = props.ancestry?.length ? 36 : 0;
 
   useEffect(() => {
     if (previousDevice.current === props.device) return;
