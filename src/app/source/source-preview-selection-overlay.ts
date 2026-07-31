@@ -3,7 +3,7 @@ import type { SourceLayerMetrics } from "./source-layer-design";
 export function mountSourceLayerSelection(
   output: HTMLElement,
   layerId: string,
-  tone: "component" | "layer",
+  tone: "component" | "layer" | "slot",
   onMetrics?: (metrics: SourceLayerMetrics | undefined) => void,
   fallback?: HTMLElement | null,
   occurrence = 0,
@@ -29,7 +29,7 @@ export function mountSourceLayerHover(
     relativePath: string;
   },
   label?: string,
-  tone?: "annotation" | "component" | "layer",
+  tone?: "annotation" | "component" | "layer" | "slot",
 ): () => void {
   return mountSourceLayerOutline(output, layerId, {
     externalOwner,
@@ -53,7 +53,7 @@ function mountSourceLayerOutline(
       relativePath: string;
     };
     label?: string;
-    tone: "annotation" | "component" | "layer";
+    tone: "annotation" | "component" | "layer" | "slot";
     variant: "hover" | "selection";
   },
 ): () => void {
@@ -68,10 +68,15 @@ function mountSourceLayerOutline(
     ? "#fbbf24"
     : options.tone === "component"
       ? "#a78bfa"
+      : options.tone === "slot"
+        ? options.variant === "selection" ? "#d946ef" : "#c084fc"
       : options.variant === "selection"
       ? "#0d99ff"
       : "#72bfff";
-  const outlineWidth = options.variant === "selection" ? 1.5 : 1;
+  const outlineWidth = options.variant === "selection" ? options.tone === "slot" ? 2 : 1.5 : 1;
+  const outlineShadow = options.tone === "slot" && options.variant === "selection"
+    ? `inset 0 0 0 ${outlineWidth}px ${color}, inset 0 0 16px rgba(217,70,239,.24)`
+    : `inset 0 0 0 ${outlineWidth}px ${color}`;
   overlay.style.cssText = [
     "position:absolute",
     "pointer-events:none",
@@ -80,7 +85,7 @@ function mountSourceLayerOutline(
     "padding:0",
     "box-sizing:border-box",
     "display:none",
-    `box-shadow:inset 0 0 0 ${outlineWidth}px ${color}`,
+    `box-shadow:${outlineShadow}`,
   ].join(";");
   const label = options.label ? overlayRoot.ownerDocument.createElement("span") : undefined;
   if (label) {

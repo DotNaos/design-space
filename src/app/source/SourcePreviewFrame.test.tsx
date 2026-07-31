@@ -565,8 +565,9 @@ it("renders empty typed slots as purple canvas insertion targets", async () => {
   expect(target).toHaveTextContent("content");
   expect(target).toHaveTextContent("Slot");
   expect(target).toHaveAttribute("data-design-space-source-layer-id", slot.id);
-  expect(target?.style.backgroundImage).toContain("linear-gradient");
-  expect(target?.style.borderColor).toContain("167");
+  expect(target?.style.backgroundImage).toBe("");
+  expect(target?.style.backgroundColor).toContain("88");
+  expect(target?.style.borderColor).toContain("192");
 });
 
 it("makes explicit design slot previews selectable through their source layers", async () => {
@@ -836,6 +837,22 @@ it("uses the component color for selected component outlines and labels", () => 
   expect(label).toHaveTextContent("WorkspaceStatus");
   expect(label).toHaveStyle({ color: "rgb(167, 139, 250)" });
   expect(overlay.style.boxShadow).toContain("#a78bfa");
+
+  dispose();
+  output.remove();
+});
+
+it("uses a bright purple glow for selected slot outlines and labels", () => {
+  const output = document.createElement("div");
+  document.body.append(output);
+  const dispose = mountSourceLayerSelection(output, "selected-slot", "slot", undefined, undefined, 0, "slot:content");
+  const overlay = document.querySelector<HTMLElement>("[data-design-space-source-selection]")!;
+  const label = overlay.querySelector<HTMLElement>("[data-design-space-source-outline-label='selection']");
+
+  expect(label).toHaveTextContent("slot:content");
+  expect(label).toHaveStyle({ color: "rgb(217, 70, 239)" });
+  expect(overlay.style.boxShadow).toContain("#d946ef");
+  expect(overlay.style.boxShadow).toContain("rgba(217,70,239,.24)");
 
   dispose();
   output.remove();

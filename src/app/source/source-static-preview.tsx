@@ -165,14 +165,11 @@ function SourceCanvasSlotMarker(props: { label: string; layerId: string }) {
       role="region"
       style={{
         alignItems: "center",
-        backgroundColor: "rgba(124, 58, 237, .08)",
-        backgroundImage: "linear-gradient(45deg, rgba(196, 181, 253, .04) 25%, transparent 25%, transparent 75%, rgba(196, 181, 253, .04) 75%), linear-gradient(45deg, rgba(196, 181, 253, .04) 25%, transparent 25%, transparent 75%, rgba(196, 181, 253, .04) 75%)",
-        backgroundPosition: "0 0, 12px 12px",
-        backgroundSize: "24px 24px",
-        border: "1px solid rgba(167, 139, 250, .68)",
+        backgroundColor: "rgba(88, 28, 135, .16)",
+        border: "1px solid rgba(192, 132, 252, .38)",
         borderRadius: 10,
         boxSizing: "border-box",
-        boxShadow: "inset 0 0 0 1px rgba(124, 58, 237, .14)",
+        boxShadow: "inset 0 1px 0 rgba(233, 213, 255, .05)",
         color: "#c4b5fd",
         display: "flex",
         flexDirection: "column",

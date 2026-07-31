@@ -285,7 +285,7 @@ export function SourcePreviewFrame(props: {
     return mountSourceLayerSelection(
       mounts.output,
       props.selectedLayer.id,
-      props.selectedLayer.kind === "component" ? "component" : "layer",
+      props.selectedLayer.kind === "component" ? "component" : props.selectedLayer.kind === "slot" ? "slot" : "layer",
       (metrics) => {
         props.onSelectedLayerMetrics?.(metrics);
         if (metrics && revealKey) setRevealTarget({ key: revealKey, rect: metrics });
@@ -309,7 +309,7 @@ export function SourcePreviewFrame(props: {
       visibleHoveredLayerHit.occurrence,
       hoveredExternalOwner,
       sourceCanvasLayerLabel(hoveredLayer),
-      canvasAnnotations.active ? "annotation" : hoveredLayer?.kind === "component" ? "component" : "layer",
+      canvasAnnotations.active ? "annotation" : hoveredLayer?.kind === "component" ? "component" : hoveredLayer?.kind === "slot" ? "slot" : "layer",
     );
   }, [canvasAnnotations.active, defaultVisualLayer?.id, hoveredExternalOwner, hoveredLayer, mounts, previewMode, props.selectedLayer?.id, selectedOccurrence, staticRevision, visibleHoveredLayerHit]);
 
