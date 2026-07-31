@@ -166,6 +166,9 @@ function SourceCanvasSlotMarker(props: { label: string; layerId: string }) {
       style={{
         alignItems: "center",
         backgroundColor: "rgba(88, 28, 135, .16)",
+        backgroundImage: "radial-gradient(circle, rgba(216, 180, 254, .09) 1px, transparent 1px)",
+        backgroundPosition: "0 0",
+        backgroundSize: "14px 14px",
         border: "1px solid rgba(192, 132, 252, .38)",
         borderRadius: 10,
         boxSizing: "border-box",

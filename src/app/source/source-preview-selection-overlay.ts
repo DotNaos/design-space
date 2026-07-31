@@ -73,10 +73,8 @@ function mountSourceLayerOutline(
       : options.variant === "selection"
       ? "#0d99ff"
       : "#72bfff";
-  const outlineWidth = options.variant === "selection" ? options.tone === "slot" ? 2 : 1.5 : 1;
-  const outlineShadow = options.tone === "slot" && options.variant === "selection"
-    ? `inset 0 0 0 ${outlineWidth}px ${color}, inset 0 0 16px rgba(217,70,239,.24)`
-    : `inset 0 0 0 ${outlineWidth}px ${color}`;
+  const outlineWidth = options.variant === "selection" ? 1.5 : 1;
+  const outlineShadow = `inset 0 0 0 ${outlineWidth}px ${color}`;
   overlay.style.cssText = [
     "position:absolute",
     "pointer-events:none",

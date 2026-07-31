@@ -565,7 +565,8 @@ it("renders empty typed slots as purple canvas insertion targets", async () => {
   expect(target).toHaveTextContent("content");
   expect(target).toHaveTextContent("Slot");
   expect(target).toHaveAttribute("data-design-space-source-layer-id", slot.id);
-  expect(target?.style.backgroundImage).toBe("");
+  expect(target?.style.backgroundImage).toContain("radial-gradient");
+  expect(target?.style.backgroundSize).toBe("14px 14px");
   expect(target?.style.backgroundColor).toContain("88");
   expect(target?.style.borderColor).toContain("192");
 });
@@ -842,7 +843,7 @@ it("uses the component color for selected component outlines and labels", () => 
   output.remove();
 });
 
-it("uses a bright purple glow for selected slot outlines and labels", () => {
+it("uses a restrained purple outline for selected slots", () => {
   const output = document.createElement("div");
   document.body.append(output);
   const dispose = mountSourceLayerSelection(output, "selected-slot", "slot", undefined, undefined, 0, "slot:content");
@@ -852,7 +853,7 @@ it("uses a bright purple glow for selected slot outlines and labels", () => {
   expect(label).toHaveTextContent("slot:content");
   expect(label).toHaveStyle({ color: "rgb(217, 70, 239)" });
   expect(overlay.style.boxShadow).toContain("#d946ef");
-  expect(overlay.style.boxShadow).toContain("rgba(217,70,239,.24)");
+  expect(overlay.style.boxShadow).not.toContain("rgba");
 
   dispose();
   output.remove();
