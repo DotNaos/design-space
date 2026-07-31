@@ -1,8 +1,9 @@
 import { Button, Input, Tooltip } from "@heroui/react";
-import { ArrowUp, Cable, MessageSquare, MessageSquarePlus, Unplug } from "lucide-react";
+import { ArrowUp, MessageSquare, MessageSquarePlus } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { SourceCodexChatModal } from "./SourceCodexChatModal";
+import { SourceCodexConnectionIndicator } from "./SourceCodexConnectionIndicator";
 import { SourceCodexConnectionModal } from "./SourceCodexConnectionModal";
 import {
   addSourceFeedbackAnnotation,
@@ -118,7 +119,7 @@ export function SourceCanvasFeedbackDock(props: {
                 ? "border-amber-200/30 bg-amber-300 text-zinc-950 hover:bg-amber-200"
                 : "border-white/10 bg-[#0d0e10]/95 text-zinc-400 hover:bg-[#18191c] hover:text-zinc-100"
             }`}
-            isDisabled={!props.context || !props.onAnnotationModeChange}
+            isDisabled={!writable || !props.context || !props.onAnnotationModeChange}
             size="sm"
             variant="ghost"
             onPress={() => props.onAnnotationModeChange?.(!props.annotationMode)}
@@ -136,8 +137,13 @@ export function SourceCanvasFeedbackDock(props: {
         </Tooltip>
         <div
           aria-label="Codex composer"
+          aria-disabled={!connected}
           className={`relative flex h-10 min-w-64 max-w-[min(460px,calc(100vw-2rem))] flex-1 items-center gap-0.5 rounded-full border bg-[#0d0e10]/95 p-1 shadow-[0_18px_58px_rgba(0,0,0,0.32)] backdrop-blur-xl transition-colors ${
-            writable ? "border-white/10 focus-within:border-white/20" : "border-amber-300/15"
+            writable
+              ? "border-white/10 focus-within:border-white/20"
+              : connected
+                ? "border-amber-300/15"
+                : "border-white/[0.06] opacity-75"
           }`}
         >
         {error ? (
@@ -169,16 +175,10 @@ export function SourceCanvasFeedbackDock(props: {
         </Tooltip>
         <Input
           aria-label="Codex feedback"
-          className={`min-w-0 flex-1 bg-transparent px-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-500 ${
-            writable ? "" : "cursor-pointer"
-          }`}
+          className="min-w-0 flex-1 bg-transparent px-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-500"
           placeholder={placeholder}
-          readOnly={!writable}
-          disabled={sending}
+          disabled={!writable || sending}
           value={draft}
-          onClick={() => {
-            if (!writable && connection !== "checking") setConnectionOpen(true);
-          }}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
@@ -187,28 +187,11 @@ export function SourceCanvasFeedbackDock(props: {
             }
           }}
         />
-        <Tooltip closeDelay={80} delay={350}>
-          <Button
-            isIconOnly
-            aria-label={connected ? "Change connected Codex task" : "Connect Codex task"}
-            className={`size-8 min-w-8 shrink-0 rounded-full ${
-              writable ? "text-zinc-500 hover:bg-white/[0.07] hover:text-zinc-200" : "text-amber-300/70 hover:bg-amber-300/10"
-            }`}
-            isDisabled={connection === "checking"}
-            size="sm"
-            variant="ghost"
-            onPress={() => setConnectionOpen(true)}
-          >
-            {writable ? <Cable aria-hidden="true" size={12} /> : <Unplug aria-hidden="true" size={12} />}
-          </Button>
-          <Tooltip.Content className="max-w-64 rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] leading-4 text-zinc-200 shadow-xl">
-            {writable
-              ? `Connected to ${origin?.title}. Click to change task.`
-              : connected
-                ? `${origin?.title} needs to be reconnected before sending messages.`
-                : "Choose an existing Codex task or create a new one."}
-          </Tooltip.Content>
-        </Tooltip>
+        <SourceCodexConnectionIndicator
+          connection={connection}
+          origin={origin}
+          onPress={() => setConnectionOpen(true)}
+        />
         <Tooltip closeDelay={80} delay={350}>
           <Button
             isIconOnly

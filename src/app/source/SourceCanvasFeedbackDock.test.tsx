@@ -72,3 +72,28 @@ it("sends pending canvas annotations without requiring a separate message", asyn
   expect(sendSourceCodexFeedback.mock.calls[0]?.[1]).toContain("Make this action clearer.");
   expect(onAnnotationsSent).toHaveBeenCalledOnce();
 });
+
+it("shows the connected task and keeps the composer enabled", async () => {
+  render(<SourceCanvasFeedbackDock context={context} onAnnotationModeChange={vi.fn()} />);
+
+  const indicator = await screen.findByRole("button", {
+    name: "Connected to Design Space. Change Codex task",
+  });
+  expect(indicator).toHaveTextContent("Design Space");
+  expect(indicator).toHaveClass("text-emerald-200");
+  expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeEnabled();
+});
+
+it("disables composer actions while no Codex task is connected", async () => {
+  inspectSourceCodexOrigin.mockResolvedValueOnce(undefined);
+  render(<SourceCanvasFeedbackDock context={context} onAnnotationModeChange={vi.fn()} />);
+
+  const connect = await screen.findByRole("button", { name: "Connect Codex task" });
+  expect(connect).toHaveTextContent("Connect Codex");
+  expect(connect).toHaveClass("text-rose-200");
+  expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Add a canvas annotation" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Open full Codex conversation" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Send to Codex" })).toBeDisabled();
+  expect(screen.getByLabelText("Codex composer")).toHaveAttribute("aria-disabled", "true");
+});

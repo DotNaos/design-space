@@ -3,6 +3,20 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
+const { inspectSourceCodexOrigin } = vi.hoisted(() => ({
+  inspectSourceCodexOrigin: vi.fn(async () => ({
+    status: "active" as const,
+    threadId: "019f651f-2bca-7513-9be5-857cb5fb86e6",
+    title: "Design Space",
+    writable: true,
+  })),
+}));
+
+vi.mock("./source-codex-feedback-client", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./source-codex-feedback-client")>(),
+  inspectSourceCodexOrigin,
+}));
+
 import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import {
   applySourceLayerClassName,
