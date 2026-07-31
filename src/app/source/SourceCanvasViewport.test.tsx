@@ -6,12 +6,14 @@ vi.mock("../components/PreviewCanvas/PreviewCanvas", () => ({
   PreviewCanvas: (props: {
     preview: React.ReactNode;
     toolbar?: React.ReactNode;
+    worldFooter?: React.ReactNode;
     worldHeader?: React.ReactNode;
   }) => (
     <div>
       {props.toolbar}
       {props.worldHeader}
       {props.preview}
+      {props.worldFooter}
     </div>
   ),
 }));
@@ -93,6 +95,7 @@ it("attaches an interactive ancestry path to the canvas", async () => {
   expect(ancestry).toHaveTextContent("slot:content");
   expect(screen.getByText("slot:content").closest("[aria-current]"))
     .toHaveAttribute("aria-current", "location");
+  expect(document.querySelector("[data-preview-frame-mode]")).not.toHaveClass("shadow-2xl");
 
   await userEvent.click(screen.getByRole("button", { name: /App/ }));
   expect(onSelectAncestry).toHaveBeenCalledWith({ id: "app", kind: "component", label: "App" });

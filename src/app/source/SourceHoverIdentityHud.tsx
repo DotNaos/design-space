@@ -9,8 +9,8 @@ export function SourceHoverIdentityHud(props: {
   return (
     <div
       aria-hidden="true"
-      className="flex min-w-[min(420px,calc(100vw-2rem))] max-w-[min(620px,calc(100vw-2rem))] items-center gap-2 rounded-md border border-fuchsia-400/25 bg-[#17131d]/95 px-2.5 py-1.5 text-[11px] shadow-xl shadow-black/35 backdrop-blur"
-      data-testid="canvas-hover-identity-hud"
+      className="flex h-8 w-full min-w-0 items-center gap-2 rounded-b-md border border-t-0 border-fuchsia-400/25 bg-[#17131d]/95 px-2.5 text-[11px] backdrop-blur"
+      data-testid="canvas-selection-identity-footer"
     >
       <Diamond aria-hidden="true" className="size-3 shrink-0 text-fuchsia-400" strokeWidth={2} />
       <span className="shrink-0 font-semibold text-fuchsia-100">{props.owner.label}</span>

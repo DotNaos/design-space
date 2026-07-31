@@ -7,17 +7,21 @@ export interface SourceLayerOwner {
   relativePath: string;
 }
 
+export function sourceEntryOwner(entry: RuntimeSourceWorkspaceEntry): SourceLayerOwner {
+  return {
+    entryId: entry.id,
+    fileId: entry.fileId,
+    label: entry.label,
+    relativePath: entry.relativePath,
+  };
+}
+
 export function sourceLayerOwner(
   entries: readonly RuntimeSourceWorkspaceEntry[],
   layerId: string,
 ): SourceLayerOwner | undefined {
   const entry = entries.find((candidate) => containsSourceLayer(candidate.layers, layerId));
-  return entry ? {
-    entryId: entry.id,
-    fileId: entry.fileId,
-    label: entry.label,
-    relativePath: entry.relativePath,
-  } : undefined;
+  return entry ? sourceEntryOwner(entry) : undefined;
 }
 
 export function externalSourceLayerOwner(

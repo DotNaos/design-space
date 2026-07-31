@@ -32,6 +32,7 @@ export function SourceCanvasViewport(props: {
   slotOwnerLabel?: string;
   slotTabs?: readonly SourceCanvasSlotTab[];
   hud?: React.ReactNode;
+  footer?: React.ReactNode;
   revealTarget?: { key: string; rect: CanvasWorldRect };
   toolbarEnd?: React.ReactNode;
   onSelectAncestry?: (item: SourceCanvasAncestryItem) => void;
@@ -120,6 +121,8 @@ export function SourceCanvasViewport(props: {
         forcedInteractionMode={props.mode === "play" ? "interact" : "select"}
         compact={props.compact}
         verticalAlignment="start"
+        worldFooter={props.footer}
+        worldFooterHeight={32}
         worldHeader={props.ancestry?.length ? (
           <SourceCanvasAncestryHeader
             deviceSwitcher={hasCanvasDeviceSwitcher ? (
@@ -133,6 +136,7 @@ export function SourceCanvasViewport(props: {
           />
         ) : undefined}
         worldHeaderHeight={ancestryHeight}
+        worldHeight={previewFrame.height}
         worldWidth={previewFrame.width}
         onSelect={() => undefined}
       />
@@ -150,7 +154,7 @@ function PreviewScreen(props: {
     <div
       data-design-space-instance-id={sourcePreviewId}
       data-preview-frame-mode={props.clipToScreen ? "screen" : "content"}
-      className={`${props.clipToScreen ? "overflow-hidden" : "overflow-visible"} size-full ${props.attachedHeader ? "rounded-b-md" : "rounded-md"} border border-white/15 bg-[#111216] shadow-2xl`}
+      className={`${props.clipToScreen ? "overflow-hidden" : "overflow-visible"} size-full ${props.attachedHeader ? "rounded-b-md" : "rounded-md shadow-2xl"} border border-white/15 bg-[#111216]`}
       style={{
         backgroundImage: "linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px)",
         backgroundPosition: "-1px -1px",

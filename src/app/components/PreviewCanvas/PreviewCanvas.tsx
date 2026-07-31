@@ -37,6 +37,8 @@ import {
 } from "./canvas-target-selection";
 import { CanvasGridLayer } from "../CanvasGrid/CanvasGridLayer";
 import { CanvasViewportControls } from "../CanvasViewport/CanvasViewportControls";
+import { CanvasWorldChrome } from "./CanvasWorldChrome";
+import { applyPreviewHtmlClassNames, isCanvasChromeTarget } from "./preview-canvas-dom";
 import { defaultCanvasLayoutGrid, type CanvasGridMode } from "../CanvasGrid/canvas-grid-types";
 import { useCanvasTrackpadGestures } from "./use-canvas-trackpad-gestures";
 import { useCanvasTouchGestures } from "./use-canvas-touch-gestures";
@@ -70,8 +72,11 @@ type PreviewCanvasProps = {
   staticPreview?: boolean;
   forcedInteractionMode?: "select" | "interact";
   worldWidth?: number;
+  worldHeight?: number;
   worldHeader?: React.ReactNode;
   worldHeaderHeight?: number;
+  worldFooter?: React.ReactNode;
+  worldFooterHeight?: number;
   verticalAlignment?: "center" | "start";
   onSelect: (selection: Selection) => void;
   onDeselect?: () => void;
@@ -84,7 +89,9 @@ type MeasuredStrictUiTarget = { target: StrictUiCanvasTarget; rect: ViewRect };
 const defaultWorldWidth = 620;
 export function PreviewCanvas(props: PreviewCanvasProps) {
   const worldWidth = props.worldWidth ?? defaultWorldWidth;
+  const worldHeight = props.worldHeight ?? 0;
   const worldHeaderHeight = props.worldHeader ? props.worldHeaderHeight ?? 36 : 0;
+  const worldFooterHeight = props.worldFooter ? props.worldFooterHeight ?? 32 : 0;
   const viewportRef = useRef<HTMLElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const overlayChromeRef = useRef<HTMLDivElement>(null);
@@ -183,7 +190,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     const world = worldRef.current;
     if (!viewport || !world) return;
     const viewportRect = viewport.getBoundingClientRect();
-    applyHtmlClassNames(world, props.htmlClassNames);
+    applyPreviewHtmlClassNames(world, props.htmlClassNames);
     if (props.onDomSnapshot) {
       const snapshot = indexPreviewDom(world);
       const serialized = JSON.stringify(snapshot);
@@ -585,20 +592,15 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       </div>
 
       <div ref={overlayChromeRef} className="pointer-events-none absolute inset-0 z-10">
-        {props.worldHeader ? (
-          <div
-            className="pointer-events-auto absolute"
-            data-testid="canvas-world-header"
-            style={{
-              height: worldHeaderHeight,
-              left: camera.x,
-              top: camera.y - worldHeaderHeight,
-              width: worldWidth * camera.scale,
-            }}
-          >
-            {props.worldHeader}
-          </div>
-        ) : null}
+        <CanvasWorldChrome
+          camera={camera}
+          footer={props.worldFooter}
+          footerHeight={worldFooterHeight}
+          header={props.worldHeader}
+          headerHeight={worldHeaderHeight}
+          worldHeight={worldHeight}
+          worldWidth={worldWidth}
+        />
         {strictUiRects.map(({ target, rect }) => (
           <div
             key={target.marker.key}
@@ -692,15 +694,4 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       ) : null}
     </main>
   );
-}
-
-function isCanvasChromeTarget(target: EventTarget | null): boolean {
-  return target instanceof Element && Boolean(target.closest("[data-design-space-canvas-chrome]"));
-}
-
-function applyHtmlClassNames(root: HTMLElement, values: Readonly<Record<string, string>> | undefined): void {
-  for (const [selectionId, className] of Object.entries(values ?? {})) {
-    const element = root.querySelector<HTMLElement>(`[data-design-space-html-id="${CSS.escape(selectionId)}"]`);
-    if (element && element.className !== className) element.className = className;
-  }
 }

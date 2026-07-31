@@ -11,6 +11,8 @@ describe("preview canvas", () => {
       <PreviewCanvas
         compact
         hud={<button type="button">HUD action</button>}
+        worldFooter={<span>Selected component</span>}
+        worldHeight={300}
         preview={<div data-design-space-instance-id="one">One</div>}
         rootInstanceId="one"
         selectedComponentInstanceId="one"
@@ -23,6 +25,7 @@ describe("preview canvas", () => {
 
     expect(screen.getByTestId("canvas-hud")).toHaveClass("pointer-events-auto");
     expect(screen.getByTestId("canvas-hud")).not.toHaveClass("pointer-events-none");
+    expect(screen.getByTestId("canvas-world-footer")).toHaveTextContent("Selected component");
     expect(screen.getByTestId("canvas-hud")).toHaveClass(
       "bottom-[calc(5rem+env(safe-area-inset-bottom))]",
       "lg:bottom-4",

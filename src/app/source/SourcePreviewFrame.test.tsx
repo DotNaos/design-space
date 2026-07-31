@@ -73,6 +73,8 @@ it("keeps the Codex composer available in a library canvas", () => {
   expect(screen.getByLabelText("Codex composer")).toBeVisible();
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeVisible();
   expect(screen.getByTestId("source-canvas-feedback-row")).toHaveClass("flex-col", "sm:flex-row");
+  expect(screen.getByTestId("canvas-selection-identity-footer")).toHaveTextContent("LibraryButton");
+  expect(screen.getByTestId("canvas-world-footer")).not.toContainElement(screen.getByTestId("canvas-hud"));
 });
 
 it("places, edits, and removes spatial canvas annotations", async () => {
@@ -226,7 +228,7 @@ it("places a non-interactive selection surface over authored HTML in design mode
     .toHaveAttribute("data-design-space-canvas-action");
 });
 
-it("identifies the owning component and source file in a hover-only canvas HUD", async () => {
+it("keeps the selected owner and source file in the canvas footer", async () => {
   const layerId = "jsx:src/app/components/Panel.tsx:12";
   const entry = {
     ...previewEntry("Panel", async () => previewDefinition("Panel design")),
@@ -245,6 +247,7 @@ it("identifies the owning component and source file in a hover-only canvas HUD",
       entry={entry}
       mode="design"
       runtime="react"
+      selectedLayer={entry.layers[0]}
       styles={[]}
       onSelectLayer={vi.fn()}
     />,
@@ -261,7 +264,7 @@ it("identifies the owning component and source file in a hover-only canvas HUD",
 
   fireEvent.mouseMove(surface, { clientX: 20, clientY: 20 });
 
-  const hud = await screen.findByTestId("canvas-hover-identity-hud");
+  const hud = await screen.findByTestId("canvas-selection-identity-footer");
   expect(hud).toHaveTextContent("Panel");
   expect(hud).toHaveTextContent("src/app/components/Panel.tsx");
   expect(hud).not.toHaveTextContent("Double-click to open");
@@ -352,6 +355,7 @@ it("requires a double click before opening a layer owned by another source file"
       entry={current}
       mode="design"
       runtime="react"
+      selectedLayer={foreign.layers[0]}
       styles={[]}
       onOpenLayerOwner={onOpenLayerOwner}
       onSelectLayer={onSelectLayer}
@@ -369,7 +373,7 @@ it("requires a double click before opening a layer owned by another source file"
   frameDocument.elementFromPoint = vi.fn(() => foreignElement);
 
   fireEvent.mouseMove(surface, { clientX: 20, clientY: 20 });
-  const hud = await screen.findByTestId("canvas-hover-identity-hud");
+  const hud = await screen.findByTestId("canvas-selection-identity-footer");
   expect(hud).toHaveTextContent("foreign");
   expect(hud).toHaveTextContent("src/Foreign.tsx");
   expect(hud).toHaveTextContent("Double-click to open");
@@ -381,7 +385,7 @@ it("requires a double click before opening a layer owned by another source file"
   expect(onOpenLayerOwner).toHaveBeenCalledWith("foreign", foreignLayerId, 0);
 
   fireEvent.mouseMove(document.body);
-  expect(screen.queryByTestId("canvas-hover-identity-hud")).not.toBeInTheDocument();
+  expect(screen.getByTestId("canvas-selection-identity-footer")).toBeInTheDocument();
 });
 
 it("separates design selection from playable component interactions", async () => {

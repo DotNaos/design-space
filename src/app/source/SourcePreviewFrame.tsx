@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { CircleAlert, WandSparkles } from "lucide-react";
+import { WandSparkles } from "lucide-react";
 import { Button } from "@heroui/react";
 
 import type {
@@ -14,12 +14,13 @@ import { SourceCanvasFeedbackDock } from "./SourceCanvasFeedbackDock";
 import { sourceCanvasAnnotationTargetAtPoint, SourceCanvasAnnotationOverlay, useSourceCanvasAnnotations } from "./SourceCanvasAnnotations";
 import { SourceDesignControls } from "./SourceDesignControls";
 import { SourceHoverIdentityHud } from "./SourceHoverIdentityHud";
+import { SourcePreviewState as PreviewState } from "./SourcePreviewState";
 import { sourceFeedbackContext } from "./source-feedback";
 import { SourceInstanceNavigator } from "./SourceInstanceNavigator";
 import type { SourceLayerMetrics, SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
 import { sourceLayerHitAtPreviewPoint, type SourceLayerHit } from "./source-preview-hit-testing";
 import { measureSourcePreviewContent, type SourcePreviewContentSize } from "./source-preview-content-size";
-import { externalSourceLayerOwner, sourceLayerOwner } from "./source-layer-ownership";
+import { externalSourceLayerOwner, sourceEntryOwner, sourceLayerOwner } from "./source-layer-ownership";
 import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement, sourceLayerElements } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
 import { renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
@@ -102,14 +103,14 @@ export function SourcePreviewFrame(props: {
   const hoveredLayer = useMemo(() => (
     visibleHoveredLayerHit ? findPreviewLayer(previewEntries, visibleHoveredLayerHit.layerId) : undefined
   ), [previewEntries, visibleHoveredLayerHit]);
-  const hoveredOwner = useMemo(() => (
-    visibleHoveredLayerHit ? sourceLayerOwner(previewEntries, visibleHoveredLayerHit.layerId) : undefined
-  ), [previewEntries, visibleHoveredLayerHit]);
-  const hoveredExternalOwner = useMemo(() => (
-    hoveredOwner && props.onOpenLayerOwner && hoveredOwner.fileId !== props.entry?.fileId
-      ? hoveredOwner
-      : undefined
-  ), [hoveredOwner, props.entry?.fileId, props.onOpenLayerOwner]);
+  const selectedOwner = useMemo(() => props.selectedLayer
+    ? sourceLayerOwner(previewEntries, props.selectedLayer.id)
+    : props.entry ? sourceEntryOwner(props.entry) : undefined,
+  [previewEntries, props.entry, props.selectedLayer]);
+  const hoveredExternalOwner = useMemo(() => visibleHoveredLayerHit && props.onOpenLayerOwner
+    ? externalSourceLayerOwner(props.entry, previewEntries, visibleHoveredLayerHit.layerId)
+    : undefined,
+  [previewEntries, props.entry, props.onOpenLayerOwner, visibleHoveredLayerHit]);
   const defaultVisualLayer = sourceCanvasVisualLayer(props.entry, undefined);
   const canvasSlotTabs = useMemo(() => (props.slotLayers ?? []).map((slot) => ({
     active: props.selectedLayer?.id === slot.id,
@@ -398,13 +399,15 @@ export function SourcePreviewFrame(props: {
       selectionLabel={props.selectedLayerLabel ?? sourceCanvasLayerLabel(props.selectedLayer) ?? props.node?.label}
       slotOwnerLabel={props.node?.label ?? props.entry?.label}
       slotTabs={canvasSlotTabs}
+      footer={selectedOwner ? (
+        <SourceHoverIdentityHud
+          external={Boolean(props.onOpenLayerOwner && selectedOwner.fileId !== props.entry?.fileId)}
+          owner={selectedOwner}
+        />
+      ) : undefined}
       hud={(
         <div className="flex w-[min(920px,calc(100vw-2rem))] max-w-full flex-col gap-1.5">
-          {hoveredOwner ? (
-            <div className="min-w-0">
-              <SourceHoverIdentityHud external={Boolean(hoveredExternalOwner)} owner={hoveredOwner} />
-            </div>
-          ) : !props.workspaceMode && props.selectedLayer && selectedLayerOccurrenceCount > 1 ? (
+          {!props.workspaceMode && props.selectedLayer && selectedLayerOccurrenceCount > 1 ? (
             <div className="min-w-0">
               <SourceInstanceNavigator
                 count={selectedLayerOccurrenceCount}
@@ -683,33 +686,4 @@ function replaceDirectText(selected: Element, text: string): boolean {
   if (!textNode) return false;
   textNode.textContent = text;
   return true;
-}
-
-function PreviewState(props: {
-  action?: React.ReactNode;
-  error?: string;
-  message: string;
-  title: string;
-  tone?: "error" | "neutral";
-}) {
-  const isError = props.tone === "error" || Boolean(props.error);
-  return (
-    <section
-      aria-live={isError ? "assertive" : undefined}
-      className="grid h-full min-h-0 place-items-center bg-[#0d0e10] px-8 text-center"
-      role={isError ? "alert" : undefined}
-    >
-      <div className="max-w-sm">
-        {isError ? <CircleAlert aria-hidden="true" className="mx-auto text-red-400" size={24} /> : null}
-        <h2 className={`text-sm font-semibold ${isError ? "mt-3 text-red-200" : "text-zinc-200"}`}>{props.title}</h2>
-        <p className={`mt-2 text-xs leading-5 ${isError ? "text-red-300/80" : "text-zinc-500"}`}>{props.message}</p>
-        {props.error ? (
-          <p className="mt-3 max-h-24 overflow-auto border-t border-red-500/20 pt-3 font-mono text-[10px] leading-4 text-red-300/70">
-            {props.error}
-          </p>
-        ) : null}
-        {props.action ? <div className="mt-4 flex justify-center">{props.action}</div> : null}
-      </div>
-    </section>
-  );
 }
