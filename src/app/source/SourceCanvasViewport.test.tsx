@@ -101,3 +101,37 @@ it("attaches an interactive ancestry path to the canvas", async () => {
   await userEvent.click(screen.getByRole("button", { name: "status" }));
   expect(onSelectSlot).toHaveBeenCalledWith({ active: false, id: "status", label: "status" });
 });
+
+it("shows parent approval status only when supplied by approval review mode", () => {
+  render(
+    <SourceCanvasViewport
+      ancestry={[
+        {
+          approval: { label: "Approved · App", tone: "approved" },
+          id: "app",
+          kind: "component",
+          label: "App",
+        },
+        {
+          approval: { label: "Awaiting approval · WorkspaceShell", tone: "pending" },
+          id: "shell",
+          kind: "component",
+          label: "WorkspaceShell",
+        },
+        { id: "content", kind: "slot", label: "slot:content" },
+      ]}
+      device="desktop"
+      onDeviceChange={vi.fn()}
+      onSelectAncestry={vi.fn()}
+    >
+      {() => <div>Preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  expect(screen.getByRole("button", { name: "App · Approved · App" }))
+    .toHaveAttribute("data-approval-tone", "approved");
+  expect(screen.getByRole("button", { name: "WorkspaceShell · Awaiting approval · WorkspaceShell" }))
+    .toHaveAttribute("data-approval-tone", "pending");
+  expect(screen.getByText("slot:content").closest("[data-approval-tone]"))
+    .not.toBeInTheDocument();
+});

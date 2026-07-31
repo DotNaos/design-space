@@ -48,6 +48,7 @@ import {
   useSourceWorkspaceControl,
 } from "./source/use-source-workspace-control";
 import { sourceCanvasAncestry } from "./source/source-canvas-ancestry";
+import { sourceCanvasApprovalStatus } from "./source/SourceApprovalStatus";
 
 export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
   const registeredWorkspace = target.sourceWorkspace;
@@ -84,6 +85,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const [hoveredTreeSelection, setHoveredTreeSelection] = useState<SourceWorkspaceSelection>();
   const [selectedLayerMetrics, setSelectedLayerMetrics] = useState<SourceLayerMetrics>();
   const [canvasRevealRequest, setCanvasRevealRequest] = useState<number>();
+  const [approvalReview, setApprovalReview] = useState(false);
   const [draftWorkspace] = useState(createLocalSourceDraftWorkspace);
   const { state: draftWorkspaceState } = useSourceDraftWorkspace(draftWorkspace);
   const libraryRootId = `${target.project.id}:${target.sourceLibrary?.packageName ?? "library-development"}`;
@@ -188,11 +190,21 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     : selectedLayer?.kind === "slot"
       ? `slot:${selectedLayer.label}`
       : selectedOccurrence?.node.label ?? focusedOccurrence?.node.label ?? selectedNode?.label;
-  const canvasAncestry = useMemo(() => sourceCanvasAncestry(
-    graph,
-    selectedOccurrence?.id ?? resolvedFocusId,
-    selection?.kind === "component" ? undefined : selectedLayer,
-  ), [graph, resolvedFocusId, selectedLayer, selectedOccurrence?.id, selection?.kind]);
+  const canvasAncestry = useMemo(() => {
+    const items = sourceCanvasAncestry(
+      graph,
+      selectedOccurrence?.id ?? resolvedFocusId,
+      selection?.kind === "component" ? undefined : selectedLayer,
+    );
+    if (!approvalReview) return items;
+    return items.map((item) => {
+      if (item.kind !== "component") return item;
+      const entryId = graph.occurrences.get(item.id)?.entry?.id;
+      return entryId
+        ? { ...item, approval: sourceCanvasApprovalStatus(workspace.approvals, entryId) }
+        : item;
+    });
+  }, [approvalReview, graph, resolvedFocusId, selectedLayer, selectedOccurrence?.id, selection?.kind, workspace.approvals]);
   const styleEditor = useSourceLayerClassEditor({
     connected: workspace.runtime === "react",
     editor,
@@ -406,6 +418,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   };
   const appSidebar = (
     <SourceWorkspaceSidebar
+      approvalReview={approvalReview}
       className="flex h-full w-full border-r-0"
       designNavigation={workspaceMode === "design" ? {
         onExit: returnToPreview,
@@ -424,6 +437,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       selected={selection}
       treeStateKey={`${target.project.id}:app:${requestedDevice}`}
       workspace={workspace}
+      onApprovalReviewChange={setApprovalReview}
       editingSourceOwnerId={selection?.sourceNodeId}
       slotEditorReady={slotEditorReady}
       onCreateComponent={componentCreation.open}

@@ -222,6 +222,21 @@ it("reveals the cryptographic approval checklist without replacing the source tr
   ).toBeVisible();
 });
 
+it("reports approval review mode changes to the canvas owner", async () => {
+  const onApprovalReviewChange = vi.fn();
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      approvalReview={false}
+      onApprovalReviewChange={onApprovalReviewChange}
+      workspace={workspace}
+    />,
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: /Show approval checklist/ }));
+  expect(onApprovalReviewChange).toHaveBeenCalledWith(true);
+});
+
 it("shows verified component approvals in checklist mode", async () => {
   render(
     <SourceWorkspaceSidebar

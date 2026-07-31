@@ -6,6 +6,7 @@ import type {
   SourceComponentApproval,
   SourceWorkspaceEntry,
 } from "../../shared/source-workspace";
+import type { SourceCanvasApprovalStatus } from "./source-canvas-ancestry";
 
 type ApprovalTone = "approved" | "invalid" | "stale" | "unreviewed" | "unavailable";
 
@@ -85,6 +86,21 @@ export function sourceApprovalRowClassName(
   entry: SourceWorkspaceEntry,
 ): string {
   return approvalAppearance(approvals, approvals?.components[entry.id]).rowClassName;
+}
+
+export function sourceCanvasApprovalStatus(
+  approvals: SourceApprovalEvidence | undefined,
+  entryId: string,
+): SourceCanvasApprovalStatus {
+  const appearance = approvalAppearance(approvals, approvals?.components[entryId]);
+  return {
+    label: appearance.label,
+    tone: appearance.tone === "approved"
+      ? "approved"
+      : appearance.tone === "invalid" || appearance.tone === "unavailable"
+        ? "invalid"
+        : "pending",
+  };
 }
 
 function approvalAppearance(

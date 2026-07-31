@@ -2,9 +2,15 @@ import type { SourceWorkspaceLayer } from "../../shared/source-workspace";
 import type { SourceFocusGraph, SourceOccurrence } from "./source-focus-tree";
 
 export type SourceCanvasAncestryItem = {
+  approval?: SourceCanvasApprovalStatus;
   id: string;
   kind: "component" | "element" | "slot";
   label: string;
+};
+
+export type SourceCanvasApprovalStatus = {
+  label: string;
+  tone: "approved" | "invalid" | "pending";
 };
 
 export type SourceCanvasSlotTab = {

@@ -73,6 +73,7 @@ export interface SourceComponentOpenRequest {
 }
 
 export interface SourceWorkspaceSidebarProps {
+  approvalReview?: boolean;
   className?: string;
   selected?: SourceWorkspaceSelection;
   workspace: RuntimeSourceWorkspace;
@@ -91,6 +92,7 @@ export interface SourceWorkspaceSidebarProps {
   slotEditorReady?: boolean;
   onPrepareSlotEdit?: (occurrence: SourceOccurrence) => void;
   onCreateComponent?: () => void;
+  onApprovalReviewChange?: (active: boolean) => void;
   treeStateKey?: string;
   designNavigation?: {
     parentLabel?: string;
@@ -101,7 +103,13 @@ export interface SourceWorkspaceSidebarProps {
 
 export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   const [collapseOutsideRequest, setCollapseOutsideRequest] = useState(0);
-  const [approvalReview, setApprovalReview] = useState(false);
+  const [internalApprovalReview, setInternalApprovalReview] = useState(false);
+  const approvalReview = props.approvalReview ?? internalApprovalReview;
+  const toggleApprovalReview = () => {
+    const next = !approvalReview;
+    if (props.approvalReview === undefined) setInternalApprovalReview(next);
+    props.onApprovalReviewChange?.(next);
+  };
   return (
     <aside aria-label="Source workspace" className={`${props.className ?? "flex w-80"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
       <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
@@ -122,7 +130,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           <SourceTreeHeaderAction
             active={approvalReview}
             label={sourceApprovalModeLabel(props.workspace.approvals, props.workspace.entries)}
-            onPress={() => setApprovalReview((current) => !current)}
+            onPress={toggleApprovalReview}
           >
             <ShieldCheck aria-hidden="true" size={14} />
           </SourceTreeHeaderAction>
@@ -161,7 +169,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   );
 }
 
-export interface SourceWorkspaceTreeProps extends Omit<SourceWorkspaceSidebarProps, "className" | "onCreateComponent"> {
+export interface SourceWorkspaceTreeProps extends Omit<SourceWorkspaceSidebarProps, "approvalReview" | "className" | "onApprovalReviewChange" | "onCreateComponent"> {
   approvalReview?: boolean;
   collapseOutsideRequest?: number;
   emptyMessage?: string;

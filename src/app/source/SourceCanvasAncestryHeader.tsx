@@ -49,11 +49,28 @@ export function SourceCanvasAncestryHeader(props: {
         <ol ref={listRef} className="flex h-full min-w-0 flex-1 items-center overflow-x-auto px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {props.items.map((item, index) => {
             const current = index === props.items.length - 1;
+            const approval = item.approval;
+            const approvalClasses = approval?.tone === "approved"
+              ? "bg-emerald-400/[0.06] text-emerald-300"
+              : approval?.tone === "invalid"
+                ? "bg-rose-400/[0.07] text-rose-300"
+                : approval
+                  ? "bg-amber-400/[0.06] text-amber-300"
+                  : undefined;
+            const badgeClasses = approval?.tone === "approved"
+              ? "bg-emerald-400/15 text-emerald-300 ring-1 ring-inset ring-emerald-400/30"
+              : approval?.tone === "invalid"
+                ? "bg-rose-400/15 text-rose-300 ring-1 ring-inset ring-rose-400/30"
+                : approval
+                  ? "bg-amber-400/15 text-amber-300 ring-1 ring-inset ring-amber-400/30"
+                  : current
+                    ? "bg-fuchsia-400 text-[#1a0d1c]"
+                    : "bg-white/[0.07] text-zinc-400";
             const content = (
               <>
                 <span
                   aria-hidden="true"
-                  className={`grid size-4 shrink-0 place-items-center rounded text-[9px] tabular-nums ${current ? "bg-fuchsia-400 text-[#1a0d1c]" : "bg-white/[0.07] text-zinc-400"}`}
+                  className={`grid size-4 shrink-0 place-items-center rounded text-[9px] tabular-nums ${badgeClasses}`}
                 >
                   {index}
                 </span>
@@ -66,13 +83,18 @@ export function SourceCanvasAncestryHeader(props: {
                 {current || !props.onSelect || item.kind !== "component" ? (
                   <span
                     aria-current={current ? "location" : undefined}
-                    className={`flex h-7 items-center gap-1.5 rounded px-1.5 ${current ? "font-medium text-fuchsia-300" : "text-zinc-400"}`}
+                    aria-label={approval ? `${item.label} · ${approval.label}` : undefined}
+                    className={`flex h-7 items-center gap-1.5 rounded px-1.5 ${approvalClasses ?? (current ? "font-medium text-fuchsia-300" : "text-zinc-400")}`}
+                    data-approval-tone={approval?.tone}
+                    title={approval?.label}
                   >
                     {content}
                   </span>
                 ) : (
                   <Button
-                    className="flex h-7 items-center gap-1.5 rounded px-1.5 text-zinc-400 outline-none hover:bg-white/[0.05] hover:text-zinc-100 focus-visible:ring-1 focus-visible:ring-sky-300"
+                    aria-label={approval ? `${item.label} · ${approval.label}` : undefined}
+                    className={`flex h-7 items-center gap-1.5 rounded px-1.5 outline-none hover:bg-white/[0.08] focus-visible:ring-1 focus-visible:ring-sky-300 ${approvalClasses ?? "text-zinc-400 hover:text-zinc-100"}`}
+                    data-approval-tone={approval?.tone}
                     size="sm"
                     variant="ghost"
                     onPress={() => props.onSelect?.(item)}
