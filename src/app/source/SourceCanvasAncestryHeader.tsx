@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@heroui/react";
 import { ChevronRight } from "lucide-react";
 
@@ -13,7 +13,13 @@ export function SourceCanvasAncestryHeader(props: {
   slots?: readonly SourceCanvasSlotTab[];
 }) {
   const listRef = useRef<HTMLOListElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [pathCapacity, setPathCapacity] = useState(props.items.length);
   const pathKey = props.items.map((item) => `${item.kind}:${item.id}`).join("/");
+  const visibleItems = useMemo(() => props.items
+    .map((item, index) => ({ index, item }))
+    .slice(-pathCapacity), [pathCapacity, props.items]);
+  const hiddenItems = props.items.length - visibleItems.length;
 
   useLayoutEffect(() => {
     const list = listRef.current;
@@ -27,12 +33,25 @@ export function SourceCanvasAncestryHeader(props: {
       cancelAnimationFrame(frame);
       observer?.disconnect();
     };
-  }, [pathKey]);
+  }, [pathCapacity, pathKey]);
+
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry?.contentRect.width ?? header.clientWidth;
+      const next = width < 360 ? 1 : width < 560 ? 2 : props.items.length;
+      setPathCapacity((current) => current === next ? current : next);
+    });
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [props.items.length]);
 
   if (props.items.length === 0) return null;
 
   return (
     <div
+      ref={headerRef}
       className={`flex min-w-0 flex-col overflow-hidden rounded-t-md border border-b-0 border-white/[0.12] bg-[#15161a] text-[10px] text-zinc-500 ${props.slots?.length ? "h-16" : "h-9"}`}
       data-design-space-canvas-chrome
       onPointerDown={(event) => event.stopPropagation()}
@@ -47,7 +66,8 @@ export function SourceCanvasAncestryHeader(props: {
           <span className="hidden sm:inline">From&nbsp;</span>root
         </span>
         <ol ref={listRef} className="flex h-full min-w-0 flex-1 items-center overflow-x-auto px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {props.items.map((item, index) => {
+          {hiddenItems > 0 ? <li aria-hidden="true" className="shrink-0 px-1 text-zinc-600">…</li> : null}
+          {visibleItems.map(({ item, index }, visibleIndex) => {
             const current = index === props.items.length - 1;
             const approval = item.approval;
             const approvalClasses = approval?.tone === "approved"
@@ -79,7 +99,7 @@ export function SourceCanvasAncestryHeader(props: {
             );
             return (
               <li className="flex shrink-0 items-center" key={`${item.kind}:${item.id}`}>
-                {index > 0 ? <ChevronRight aria-hidden="true" className="mx-1 shrink-0 text-zinc-700" size={12} /> : null}
+                {visibleIndex > 0 ? <ChevronRight aria-hidden="true" className="mx-1 shrink-0 text-zinc-700" size={12} /> : null}
                 {current || !props.onSelect || item.kind !== "component" ? (
                   <span
                     aria-current={current ? "location" : undefined}

@@ -37,7 +37,7 @@ import {
 } from "./canvas-target-selection";
 import { CanvasGridLayer } from "../CanvasGrid/CanvasGridLayer";
 import { CanvasViewportControls } from "../CanvasViewport/CanvasViewportControls";
-import { CanvasWorldChrome } from "./CanvasWorldChrome";
+import { applyCanvasWorldChromeCamera, CanvasWorldChrome } from "./CanvasWorldChrome";
 import { applyPreviewHtmlClassNames, isCanvasChromeTarget } from "./preview-canvas-dom";
 import { defaultCanvasLayoutGrid, type CanvasGridMode } from "../CanvasGrid/canvas-grid-types";
 import { useCanvasTrackpadGestures } from "./use-canvas-trackpad-gestures";
@@ -95,6 +95,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const viewportRef = useRef<HTMLElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const overlayChromeRef = useRef<HTMLDivElement>(null);
+  const measuredOverlayRef = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(false);
   const cameraRef = useRef<CanvasCamera>({ x: 16, y: 56, scale: 1 });
   const lastCameraResetKey = useRef<string | undefined>(undefined);
@@ -138,7 +139,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     if (cameraCommitTimer.current !== undefined) window.clearTimeout(cameraCommitTimer.current);
     cameraCommitTimer.current = undefined;
     pendingGestureCamera.current = undefined;
-    if (overlayChromeRef.current) overlayChromeRef.current.style.visibility = "";
+    if (measuredOverlayRef.current) measuredOverlayRef.current.style.visibility = "";
     cameraRef.current = next;
     setCameraState(next);
   }, []);
@@ -147,7 +148,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     cameraCommitTimer.current = undefined;
     const next = pendingGestureCamera.current;
     pendingGestureCamera.current = undefined;
-    if (overlayChromeRef.current) overlayChromeRef.current.style.visibility = "";
+    if (measuredOverlayRef.current) measuredOverlayRef.current.style.visibility = "";
     if (next) setCameraState(next);
   }, []);
 
@@ -156,10 +157,13 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     pendingGestureCamera.current = next;
     const world = worldRef.current;
     if (world) applyCanvasCamera(world, next);
-    if (overlayChromeRef.current) overlayChromeRef.current.style.visibility = "hidden";
+    if (overlayChromeRef.current) applyCanvasWorldChromeCamera(overlayChromeRef.current, next, {
+      footerHeight: worldFooterHeight, headerHeight: worldHeaderHeight, worldHeight, worldWidth,
+    });
+    if (measuredOverlayRef.current) measuredOverlayRef.current.style.visibility = "hidden";
     if (cameraCommitTimer.current !== undefined) window.clearTimeout(cameraCommitTimer.current);
     cameraCommitTimer.current = window.setTimeout(commitPendingGestureCamera, 80);
-  }, [commitPendingGestureCamera]);
+  }, [commitPendingGestureCamera, worldFooterHeight, worldHeaderHeight, worldHeight, worldWidth]);
 
   const beginCameraInteraction = useCallback(() => {
     autoFit.current = false;
@@ -305,11 +309,9 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   useLayoutEffect(() => {
     if (needsCameraMeasurement) scheduleMeasure();
   }, [camera, needsCameraMeasurement, props.preview, scheduleMeasure]);
-
   useLayoutEffect(() => {
     if (!props.selection) setSelectionRect(undefined);
   }, [props.selection]);
-
   useLayoutEffect(() => {
     if (props.cameraKey === undefined) return;
     const resetKey = `${props.cameraKey}:${props.compact ? "compact" : "full"}:${props.verticalAlignment ?? "center"}:${worldHeaderHeight}`;
@@ -330,7 +332,6 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     });
     return () => cancelAnimationFrame(settleFrame);
   }, [fit, props.cameraKey, props.compact, scheduleMeasure, setCamera, touchGestures.resetTouchGestures, worldHeaderHeight]);
-
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
     const target = props.revealTarget;
@@ -601,6 +602,8 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
           worldHeight={worldHeight}
           worldWidth={worldWidth}
         />
+      </div>
+      <div ref={measuredOverlayRef} className="pointer-events-none absolute inset-0 z-10">
         {strictUiRects.map(({ target, rect }) => (
           <div
             key={target.marker.key}

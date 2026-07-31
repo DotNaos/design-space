@@ -1,5 +1,31 @@
 import type { CanvasCamera } from "../../canvas-transform";
 
+export type CanvasWorldChromeLayout = {
+  footerHeight: number;
+  headerHeight: number;
+  worldHeight: number;
+  worldWidth: number;
+};
+
+export function applyCanvasWorldChromeCamera(
+  root: HTMLElement,
+  camera: CanvasCamera,
+  layout: CanvasWorldChromeLayout,
+): void {
+  positionChrome(root.querySelector<HTMLElement>('[data-canvas-world-chrome="header"]'), {
+    height: layout.headerHeight,
+    left: camera.x,
+    top: camera.y - layout.headerHeight,
+    width: layout.worldWidth * camera.scale,
+  });
+  positionChrome(root.querySelector<HTMLElement>('[data-canvas-world-chrome="footer"]'), {
+    height: layout.footerHeight,
+    left: camera.x,
+    top: camera.y + layout.worldHeight * camera.scale,
+    width: layout.worldWidth * camera.scale,
+  });
+}
+
 export function CanvasWorldChrome(props: {
   camera: CanvasCamera;
   footer?: React.ReactNode;
@@ -14,6 +40,7 @@ export function CanvasWorldChrome(props: {
       {props.header ? (
         <div
           className="pointer-events-auto absolute"
+          data-canvas-world-chrome="header"
           data-design-space-canvas-chrome
           data-testid="canvas-world-header"
           style={{
@@ -29,6 +56,7 @@ export function CanvasWorldChrome(props: {
       {props.footer ? (
         <div
           className="pointer-events-auto absolute"
+          data-canvas-world-chrome="footer"
           data-design-space-canvas-chrome
           data-testid="canvas-world-footer"
           style={{
@@ -43,4 +71,15 @@ export function CanvasWorldChrome(props: {
       ) : null}
     </>
   );
+}
+
+function positionChrome(
+  element: HTMLElement | null,
+  rect: { height: number; left: number; top: number; width: number },
+): void {
+  if (!element) return;
+  element.style.height = `${rect.height}px`;
+  element.style.left = `${rect.left}px`;
+  element.style.top = `${rect.top}px`;
+  element.style.width = `${rect.width}px`;
 }
