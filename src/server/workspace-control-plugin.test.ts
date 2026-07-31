@@ -37,6 +37,7 @@ it("serves a no-install Bun CLI tied to the current Design Space origin", async 
     expect(source).toContain("#!/usr/bin/env bun");
     expect(source).toContain(`http://127.0.0.1:${port}${DESIGN_SPACE_CONTROL_PATH}`);
     expect(source).toContain("panel <left|right> <open|close|toggle>");
+    expect(source).toContain("component isolate <name>");
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
@@ -65,6 +66,15 @@ it("validates commands and sends typed IPC over the Vite websocket", async () =>
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, command });
     expect(send).toHaveBeenCalledWith({ type: "custom", event: DESIGN_SPACE_CONTROL_EVENT, data: command });
+
+    const component = { type: "workspace-component", name: "SourceWorkspaceSidebar", action: "isolate", scope: "top" } as const;
+    const componentResponse = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(component),
+    });
+    expect(componentResponse.status).toBe(200);
+    expect(send).toHaveBeenLastCalledWith({ type: "custom", event: DESIGN_SPACE_CONTROL_EVENT, data: component });
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

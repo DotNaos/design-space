@@ -7,8 +7,7 @@ import {
   DESIGN_SPACE_CONTROL_CLI_PATH,
   DESIGN_SPACE_CONTROL_EVENT,
   DESIGN_SPACE_CONTROL_PATH,
-  parseWorkspacePanelControlCommand,
-  type WorkspacePanelControlCommand,
+  parseWorkspaceControlCommand,
 } from "../shared/workspace-control";
 
 const maximumBodyBytes = 4_096;
@@ -46,9 +45,9 @@ export function workspaceControlPlugin(): Plugin {
           respondJson(response, 415, { ok: false, error: "application/json required" });
           return;
         }
-        const command = parseWorkspacePanelControlCommand(await readJsonBody(request));
+        const command = parseWorkspaceControlCommand(await readJsonBody(request));
         if (!command) {
-          respondJson(response, 422, { ok: false, error: "Invalid workspace panel command" });
+          respondJson(response, 422, { ok: false, error: "Invalid workspace control command" });
           return;
         }
         server.ws.send({ type: "custom", event: DESIGN_SPACE_CONTROL_EVENT, data: command });
@@ -61,17 +60,32 @@ export function workspaceControlPlugin(): Plugin {
 export function controlCliSource(request: IncomingMessage): string {
   const serverUrl = publicServerUrl(request);
   return `#!/usr/bin/env bun
-const usage = "Usage: curl -fsSL ${serverUrl}${DESIGN_SPACE_CONTROL_CLI_PATH} | bun - panel <left|right> <open|close|toggle>";
-const [resource, side, action, ...extra] = process.argv.slice(2);
+const usage = [
+  "Usage:",
+  "  curl -fsSL ${serverUrl}${DESIGN_SPACE_CONTROL_CLI_PATH} | bun - panel <left|right> <open|close|toggle>",
+  "  curl -fsSL ${serverUrl}${DESIGN_SPACE_CONTROL_CLI_PATH} | bun - component isolate <name>",
+].join("\\n");
+const [resource, first, second, ...extra] = process.argv.slice(2);
 if (resource === "--help" || resource === "-h") {
   console.log(usage);
   process.exit(0);
 }
-if (resource !== "panel" || !["left", "right"].includes(side) || !["open", "close", "toggle"].includes(action) || extra.length > 0) {
+const panelCommand = resource === "panel"
+  && ["left", "right"].includes(first)
+  && ["open", "close", "toggle"].includes(second)
+  && extra.length === 0;
+const componentCommand = resource === "component"
+  && first === "isolate"
+  && typeof second === "string"
+  && second.length > 0
+  && extra.length === 0;
+if (!panelCommand && !componentCommand) {
   console.error(usage);
   process.exit(2);
 }
-const command = { type: "workspace-panel", side, action, scope: "top" };
+const command = panelCommand
+  ? { type: "workspace-panel", side: first, action: second, scope: "top" }
+  : { type: "workspace-component", name: second, action: "isolate", scope: "top" };
 const response = await fetch(${JSON.stringify(`${serverUrl}${DESIGN_SPACE_CONTROL_PATH}`)}, {
   method: "POST",
   headers: { "content-type": "application/json" },
@@ -82,7 +96,9 @@ if (!response.ok || !result.ok) {
   console.error(result.error ?? \`Design Space returned HTTP \${response.status}\`);
   process.exit(1);
 }
-console.log(\`Sent \${action} command for the \${side} panel to Design Space.\`);
+console.log(panelCommand
+  ? \`Sent \${second} command for the \${first} panel to Design Space.\`
+  : \`Sent isolate command for component \${second} to Design Space.\`);
 `;
 }
 

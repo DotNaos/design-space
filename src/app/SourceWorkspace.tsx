@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { TargetModule } from "../shared/target-module";
 import type { SourceWorkspaceLayer } from "../shared/source-workspace";
 import { ProjectFileBrowser } from "./documents/ProjectFileBrowser";
@@ -42,6 +42,11 @@ import { useSourceDesignGeneration } from "./source/useSourceDesignGeneration";
 import { useSynchronizedSourceDesignSelection } from "./source/useSynchronizedSourceDesignSelection";
 import { SourceWorkspaceMobile } from "./source/SourceWorkspaceMobile";
 import { sourceSelectionAtOffset } from "./source/source-code-selection";
+import {
+  findSourceComponentOccurrence,
+  sourceComponentSelection,
+  useSourceWorkspaceControl,
+} from "./source/use-source-workspace-control";
 
 export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
   const registeredWorkspace = target.sourceWorkspace;
@@ -353,7 +358,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       return;
     }
   };
-  const openDesign = (occurrenceId: string, next: SourceWorkspaceSelection) => {
+  const openDesign = useCallback((occurrenceId: string, next: SourceWorkspaceSelection) => {
     if (workspaceMode === "preview") setPreviewSelection(selection);
     setWorkspaceMode("design");
     setPreviewRuntime("static");
@@ -365,7 +370,13 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     setDraftSelection(undefined);
     setActivity("app");
     setMobilePane("canvas");
-  };
+  }, [selection, workspaceMode]);
+  const isolateComponent = useCallback((name: string) => {
+    const occurrence = findSourceComponentOccurrence(graph, name);
+    if (!occurrence) return;
+    openDesign(occurrence.id, sourceComponentSelection(occurrence, requestedDevice));
+  }, [graph, openDesign, requestedDevice]);
+  useSourceWorkspaceControl(isolateComponent);
   const openComponent = (request: SourceComponentOpenRequest) => {
     if (request.designOccurrenceId) {
       openDesign(request.designOccurrenceId, request.selection);
