@@ -561,10 +561,12 @@ it("renders empty typed slots as purple canvas insertion targets", async () => {
   const container = document.createElement("div");
   container.innerHTML = markup;
   const target = container.querySelector<HTMLElement>('[data-design-space-source-slot-name="content"]');
-  expect(target).toBeEmptyDOMElement();
+  expect(target).toHaveAccessibleName("content slot");
+  expect(target).toHaveTextContent("content");
+  expect(target).toHaveTextContent("Slot");
   expect(target).toHaveAttribute("data-design-space-source-layer-id", slot.id);
   expect(target?.style.backgroundImage).toContain("linear-gradient");
-  expect(target?.style.borderColor).toContain("192");
+  expect(target?.style.borderColor).toContain("167");
 });
 
 it("makes explicit design slot previews selectable through their source layers", async () => {

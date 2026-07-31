@@ -148,9 +148,10 @@ function previewProps(
   if (!props.slotLayers?.length) return values;
   const slots = { ...asRecord(values.slots) };
   for (const layer of props.slotLayers) {
-    if (!layer.slot || (layer.slot.validity !== "missing" && !emptySlotValue(slots[layer.label]))) continue;
+    if (!emptySlotValue(slots[layer.label])) continue;
+    const contract = layer.slot?.contract ?? props.entry.slots.find((candidate) => candidate.name === layer.label);
     const marker = <SourceCanvasSlotMarker key={layer.id} label={layer.label} layerId={layer.id} />;
-    slots[layer.label] = layer.slot.contract.multiple ? [marker] : marker;
+    slots[layer.label] = contract?.multiple ? [marker] : marker;
   }
   return { ...values, slots };
 }
@@ -158,22 +159,34 @@ function previewProps(
 function SourceCanvasSlotMarker(props: { label: string; layerId: string }) {
   return (
     <span
-      aria-hidden="true"
+      aria-label={`${props.label} slot`}
       data-design-space-source-layer-id={props.layerId}
       data-design-space-source-slot-name={props.label}
+      role="region"
       style={{
-        backgroundColor: "rgba(46, 16, 70, .28)",
-        backgroundImage: "linear-gradient(45deg, rgba(216, 180, 254, .055) 25%, transparent 25%, transparent 75%, rgba(216, 180, 254, .055) 75%), linear-gradient(45deg, rgba(216, 180, 254, .055) 25%, transparent 25%, transparent 75%, rgba(216, 180, 254, .055) 75%)",
-        backgroundPosition: "0 0, 8px 8px",
-        backgroundSize: "16px 16px",
-        border: "1px solid rgba(192, 132, 252, .24)",
+        alignItems: "center",
+        backgroundColor: "rgba(124, 58, 237, .08)",
+        backgroundImage: "linear-gradient(45deg, rgba(196, 181, 253, .04) 25%, transparent 25%, transparent 75%, rgba(196, 181, 253, .04) 75%), linear-gradient(45deg, rgba(196, 181, 253, .04) 25%, transparent 25%, transparent 75%, rgba(196, 181, 253, .04) 75%)",
+        backgroundPosition: "0 0, 12px 12px",
+        backgroundSize: "24px 24px",
+        border: "1px solid rgba(167, 139, 250, .68)",
+        borderRadius: 10,
         boxSizing: "border-box",
-        display: "block",
-        minHeight: 56,
+        boxShadow: "inset 0 0 0 1px rgba(124, 58, 237, .14)",
+        color: "#c4b5fd",
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        justifyContent: "center",
+        minHeight: "clamp(64px, 18vh, 144px)",
         minWidth: 96,
+        padding: 12,
         width: "100%",
       }}
-    />
+    >
+      <strong style={{ font: "600 12px/1.4 ui-monospace, SFMono-Regular, monospace" }}>{props.label}</strong>
+      <span style={{ color: "#71717a", font: "10px/1.4 ui-sans-serif, system-ui, sans-serif" }}>Slot</span>
+    </span>
   );
 }
 

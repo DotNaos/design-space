@@ -25,8 +25,12 @@ export interface ComponentDesignPreview {
   layout?: "start" | "center";
 }
 
+type ComponentDesignDefaults<Props extends object> = Omit<Props, "slots"> & (
+  "slots" extends keyof Props ? { readonly slots?: Partial<Props["slots"]> } : object
+);
+
 interface ComponentDesignBase<Component extends ComponentType<any>> {
-  defaults: Readonly<ComponentProps<Component>>;
+  defaults: Readonly<ComponentDesignDefaults<ComponentProps<Component>>>;
   preview?: Readonly<ComponentDesignPreview>;
   render: (props: Readonly<ComponentProps<Component>>) => ReactNode;
 }
@@ -88,7 +92,7 @@ export function defineComponentDesign<Component extends ComponentType<any>>(
     }
     return {
       component,
-      defaults: options.defaults,
+      defaults: options.defaults as Readonly<ComponentProps<Component>>,
       initialCase: options.initialState,
       isStateful: true,
       cases: options.states,
@@ -98,7 +102,7 @@ export function defineComponentDesign<Component extends ComponentType<any>>(
   }
   return {
     component,
-    defaults: options.defaults,
+    defaults: options.defaults as Readonly<ComponentProps<Component>>,
     initialCase: "default",
     isStateful: false,
     cases: options.designs,
