@@ -11,6 +11,8 @@ import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../sh
 import { PreviewBoundary } from "../PreviewBoundary";
 import { SourcePreviewRuntimeContext } from "./SourcePreviewRuntime";
 
+const sourceCanvasSlotPattern = "url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgdmlld0JveD0iMCAwIDI4IDI4Ij48cGF0aCBkPSJNMTQgOXYxME05IDE0aDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiNkOGI0ZmUiIHN0cm9rZS1vcGFjaXR5PSIuMTIiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==)";
+
 export type SourcePreviewContentProps = {
   caseName: string;
   centered?: boolean;
@@ -166,9 +168,9 @@ function SourceCanvasSlotMarker(props: { label: string; layerId: string }) {
       style={{
         alignItems: "center",
         backgroundColor: "rgba(88, 28, 135, .16)",
-        backgroundImage: "linear-gradient(rgba(216, 180, 254, .045) 1px, transparent 1px), linear-gradient(90deg, rgba(216, 180, 254, .045) 1px, transparent 1px)",
+        backgroundImage: sourceCanvasSlotPattern,
         backgroundPosition: "0 0",
-        backgroundSize: "24px 24px",
+        backgroundSize: "28px 28px",
         border: "1px solid rgba(192, 132, 252, .38)",
         borderRadius: 10,
         boxSizing: "border-box",

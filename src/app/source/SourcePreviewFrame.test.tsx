@@ -565,9 +565,8 @@ it("renders empty typed slots as purple canvas insertion targets", async () => {
   expect(target).toHaveTextContent("content");
   expect(target).toHaveTextContent("Empty slot");
   expect(target).toHaveAttribute("data-design-space-source-layer-id", slot.id);
-  expect(target?.style.backgroundImage).toContain("linear-gradient");
-  expect(target?.style.backgroundImage).toContain("90deg");
-  expect(target?.style.backgroundSize).toBe("24px 24px");
+  expect(target?.style.backgroundImage).toContain("data:image/svg+xml;base64");
+  expect(target?.style.backgroundSize).toBe("28px 28px");
   expect(target?.style.backgroundColor).toContain("88");
   expect(target?.style.borderColor).toContain("192");
 });
