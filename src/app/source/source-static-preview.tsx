@@ -27,6 +27,7 @@ export function renderStaticSourcePreviewMarkup(props: SourcePreviewContentProps
       const root = createRoot(container);
       try {
         flushSync(() => root.render(<SourcePreviewContent {...props} />));
+        bindRenderedSlotLayers(container, props.slotLayers);
         const markup = container.innerHTML;
         root.unmount();
         resolve(markup);
@@ -36,6 +37,23 @@ export function renderStaticSourcePreviewMarkup(props: SourcePreviewContentProps
       }
     });
   });
+}
+
+function bindRenderedSlotLayers(
+  container: ParentNode,
+  slotLayers: readonly SourceWorkspaceLayer[] | undefined,
+): void {
+  if (!slotLayers?.length) return;
+  const layerIds = new Map(
+    slotLayers
+      .filter((layer) => layer.kind === "slot")
+      .map((layer) => [layer.label, layer.id]),
+  );
+  for (const element of container.querySelectorAll<HTMLElement>("[data-design-space-source-slot-name]")) {
+    const slotName = element.dataset.designSpaceSourceSlotName;
+    const layerId = slotName ? layerIds.get(slotName) : undefined;
+    if (layerId) element.dataset.designSpaceSourceLayerId = layerId;
+  }
 }
 
 export function SourcePreviewContent(props: SourcePreviewContentProps) {

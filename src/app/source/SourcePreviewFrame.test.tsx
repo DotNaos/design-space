@@ -567,6 +567,50 @@ it("renders empty typed slots as purple canvas insertion targets", async () => {
   expect(target?.style.borderColor).toContain("192");
 });
 
+it("makes explicit design slot previews selectable through their source layers", async () => {
+  const slot: SourceWorkspaceLayer = {
+    id: "slot.content",
+    label: "content",
+    kind: "slot",
+    source: { start: 10, end: 10 },
+    children: [],
+    slot: {
+      contract: { name: "content", type: "ComponentSlot<Panel>", required: true, multiple: false, accepts: ["Panel"], min: 1, max: 1 },
+      validity: "valid",
+      received: ["Panel"],
+      edit: { kind: "single", insertAt: 10, value: { start: 10, end: 20 } },
+    },
+  };
+  const markup = await renderStaticSourcePreviewMarkup({
+    caseName: "default",
+    definition: {
+      ...previewDefinition("unused"),
+      defaults: {
+        slots: {
+          content: (
+            <section
+              data-design-space-source-layer-id="generated-design-layer"
+              data-design-space-source-slot-name="content"
+            >
+              Content slot
+            </section>
+          ),
+        },
+      },
+      render: (props) => <main>{(props.slots as Record<string, ReactNode>).content}</main>,
+    },
+    entry: previewEntry("shell", async () => previewDefinition("unused")),
+    matrix: false,
+    slotLayers: [slot],
+  });
+  const container = document.createElement("div");
+  container.innerHTML = markup;
+  const target = container.querySelector<HTMLElement>('[data-design-space-source-slot-name="content"]');
+
+  expect(target).toHaveTextContent("Content slot");
+  expect(target).toHaveAttribute("data-design-space-source-layer-id", slot.id);
+});
+
 it("shows a checking state while switching between asynchronously loaded designs", async () => {
   const first = previewEntry("first", async () => previewDefinition("First design"));
   let resolveSecond: ((value: ReturnType<typeof previewDefinition>) => void) | undefined;

@@ -6,7 +6,7 @@ export function sourceEntrySlotLayers(
   const slots: SourceWorkspaceLayer[] = [];
   const visit = (layers: readonly SourceWorkspaceLayer[] | undefined) => {
     for (const layer of layers ?? []) {
-      if (layer.kind === "slot" && layer.slot) slots.push(layer);
+      if (layer.kind === "slot") slots.push(layer);
       visit(layer.children);
     }
   };
