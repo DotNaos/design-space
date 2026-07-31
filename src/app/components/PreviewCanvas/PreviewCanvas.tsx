@@ -681,7 +681,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       </div>
 
       {props.hud ? (
-        <div data-testid="canvas-hud" className="pointer-events-auto absolute bottom-4 left-1/2 z-20 max-w-[calc(100%-2rem)] -translate-x-1/2">
+        <div data-testid="canvas-hud" className="pointer-events-auto absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-20 max-w-[calc(100%-2rem)] -translate-x-1/2 lg:bottom-4">
           {props.hud}
         </div>
       ) : showGestureHint && !props.compact ? (

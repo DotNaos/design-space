@@ -104,7 +104,7 @@ export function SourceCanvasFeedbackDock(props: {
 
   return (
     <>
-      <div className="mx-auto grid w-full max-w-[min(552px,100%)] flex-1 grid-cols-[2.5rem_minmax(0,28.75rem)_2.5rem] items-end justify-center gap-1.5">
+      <div className="mx-auto grid w-full max-w-[min(552px,100%)] flex-1 grid-cols-[2.5rem_minmax(0,1fr)] items-end justify-center gap-1.5 sm:grid-cols-[2.5rem_minmax(0,28.75rem)_2.5rem]">
         <Tooltip closeDelay={80} delay={350}>
           <Button
             isIconOnly
@@ -144,7 +144,7 @@ export function SourceCanvasFeedbackDock(props: {
           <div
             aria-label="Codex composer"
             aria-disabled={!connected}
-            className={`relative flex h-10 w-full min-w-64 items-center gap-0.5 rounded-full border bg-[#0d0e10]/95 p-1 shadow-[0_18px_58px_rgba(0,0,0,0.32)] backdrop-blur-xl transition-colors ${
+            className={`relative flex h-10 w-full min-w-0 items-center gap-0.5 rounded-full border bg-[#0d0e10]/95 p-1 shadow-[0_18px_58px_rgba(0,0,0,0.32)] backdrop-blur-xl transition-colors sm:min-w-64 ${
               writable
                 ? "border-white/10 focus-within:border-white/20"
                 : connected
@@ -212,7 +212,7 @@ export function SourceCanvasFeedbackDock(props: {
             </Tooltip>
           </div>
         </div>
-        <span aria-hidden="true" className="size-10" />
+        <span aria-hidden="true" className="hidden size-10 sm:block" />
       </div>
       <SourceCodexConnectionModal
         current={origin}

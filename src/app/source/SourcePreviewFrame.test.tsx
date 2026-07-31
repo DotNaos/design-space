@@ -72,6 +72,7 @@ it("keeps the Codex composer available in a library canvas", () => {
 
   expect(screen.getByLabelText("Codex composer")).toBeVisible();
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeVisible();
+  expect(screen.getByTestId("source-canvas-feedback-row")).toHaveClass("flex-col", "sm:flex-row");
 });
 
 it("places, edits, and removes spatial canvas annotations", async () => {

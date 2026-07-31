@@ -23,6 +23,10 @@ describe("preview canvas", () => {
 
     expect(screen.getByTestId("canvas-hud")).toHaveClass("pointer-events-auto");
     expect(screen.getByTestId("canvas-hud")).not.toHaveClass("pointer-events-none");
+    expect(screen.getByTestId("canvas-hud")).toHaveClass(
+      "bottom-[calc(5rem+env(safe-area-inset-bottom))]",
+      "lg:bottom-4",
+    );
   });
 
   it("keeps supplied viewport controls and canvas controls in one toolbar", () => {
