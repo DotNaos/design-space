@@ -174,7 +174,6 @@ function SourceCanvasSlotMarker(props: { label: string; layerId: string }) {
         border: "1px solid rgba(192, 132, 252, .38)",
         borderRadius: 10,
         boxSizing: "border-box",
-        boxShadow: "inset 0 1px 0 rgba(233, 213, 255, .05)",
         color: "#c4b5fd",
         display: "flex",
         flexDirection: "column",

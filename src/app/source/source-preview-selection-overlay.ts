@@ -74,16 +74,15 @@ function mountSourceLayerOutline(
       ? "#0d99ff"
       : "#72bfff";
   const outlineWidth = options.variant === "selection" ? 1.5 : 1;
-  const outlineShadow = `inset 0 0 0 ${outlineWidth}px ${color}`;
   overlay.style.cssText = [
     "position:absolute",
     "pointer-events:none",
-    "border:0",
+    `border:${outlineWidth}px solid ${color}`,
     "margin:0",
     "padding:0",
     "box-sizing:border-box",
     "display:none",
-    `box-shadow:${outlineShadow}`,
+    "box-shadow:none",
   ].join(";");
   const label = options.label ? overlayRoot.ownerDocument.createElement("span") : undefined;
   if (label) {

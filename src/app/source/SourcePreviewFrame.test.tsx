@@ -821,8 +821,7 @@ it("mounts selection chrome outside the rendered preview DOM without changing it
   expect(output.innerHTML).toBe(renderedMarkup);
   expect(previewDocument.querySelector("[data-design-space-source-selection]")).toBeNull();
   expect(overlay.style.position).toBe("absolute");
-  expect(overlay.style.borderWidth).toBe("0px");
-  expect(overlay.style.boxShadow).toContain("inset");
+  expect(overlay).toHaveStyle({ borderColor: "#0d99ff", borderWidth: "1.5px", boxShadow: "none" });
 
   dispose();
   canvas.remove();
@@ -837,7 +836,7 @@ it("uses the component color for selected component outlines and labels", () => 
 
   expect(label).toHaveTextContent("WorkspaceStatus");
   expect(label).toHaveStyle({ color: "rgb(167, 139, 250)" });
-  expect(overlay.style.boxShadow).toContain("#a78bfa");
+  expect(overlay).toHaveStyle({ borderColor: "#a78bfa", boxShadow: "none" });
 
   dispose();
   output.remove();
@@ -852,8 +851,7 @@ it("uses a restrained purple outline for selected slots", () => {
 
   expect(label).toHaveTextContent("slot:content");
   expect(label).toHaveStyle({ color: "rgb(217, 70, 239)" });
-  expect(overlay.style.boxShadow).toContain("#d946ef");
-  expect(overlay.style.boxShadow).not.toContain("rgba");
+  expect(overlay).toHaveStyle({ borderColor: "#d946ef", borderWidth: "1.5px", boxShadow: "none" });
 
   dispose();
   output.remove();
@@ -872,8 +870,7 @@ it("renders hover feedback as a lightweight outline without selection handles", 
   expect(overlay.dataset.designSpaceSourceHover).toBe("hovered");
   expect(label).toHaveTextContent("ForeignPanel");
   expect(label).toHaveStyle({ backgroundColor: "", color: "rgb(167, 139, 250)" });
-  expect(overlay.style.boxShadow).toContain("#a78bfa");
-  expect(overlay.style.borderWidth).toBe("0px");
+  expect(overlay).toHaveStyle({ borderColor: "#a78bfa", borderWidth: "1px", boxShadow: "none" });
   expect(overlay.parentElement).toHaveAttribute("id", "design-space-canvas-overlays");
   expect(document.querySelector("[data-design-space-source-owner-tooltip]")).toBeNull();
 
