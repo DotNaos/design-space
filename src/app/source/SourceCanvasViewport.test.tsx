@@ -106,6 +106,43 @@ it("attaches an interactive ancestry path to the canvas", async () => {
   expect(onSelectSlot).toHaveBeenCalledWith({ active: false, id: "status", label: "status", scope: "tree" });
 });
 
+it("collapses dense sibling slots into a compact picker", async () => {
+  const onSelectSlot = vi.fn();
+  render(
+    <SourceCanvasViewport
+      ancestry={[{ id: "workspace", kind: "component", label: "SourceWorkspace" }]}
+      device="desktop"
+      onDeviceChange={vi.fn()}
+      onSelectSlot={onSelectSlot}
+      slotOwnerLabel="SourceWorkspace"
+      slotTabs={[
+        { active: false, id: "sidebar", label: "sourceWorkspaceSidebar", scope: "tree" },
+        { active: false, id: "canvas", label: "sourceCodeCanvas", scope: "tree" },
+        { active: false, id: "browser", label: "projectFileBrowser", scope: "tree" },
+        { active: false, id: "library", label: "sourceLibraryExplorer", scope: "tree" },
+        { active: false, id: "overlay", label: "sourceWorkspaceCodeOverlay", scope: "shared" },
+      ]}
+    >
+      {() => <div>Preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  const picker = screen.getByRole("button", { name: "Choose child slot of SourceWorkspace · 5 slots" });
+  expect(picker).toHaveTextContent("Slots5");
+  expect(screen.queryByRole("menuitemradio", { name: /sourceWorkspaceCodeOverlay/ })).not.toBeInTheDocument();
+
+  await userEvent.click(picker);
+  const sharedSlot = await screen.findByRole("menuitemradio", { name: /sourceWorkspaceCodeOverlay/ });
+  expect(sharedSlot).toHaveTextContent("Shared");
+  await userEvent.click(sharedSlot);
+  expect(onSelectSlot).toHaveBeenCalledWith({
+    active: false,
+    id: "overlay",
+    label: "sourceWorkspaceCodeOverlay",
+    scope: "shared",
+  });
+});
+
 it("shows parent approval status only when supplied by approval review mode", () => {
   render(
     <SourceCanvasViewport
