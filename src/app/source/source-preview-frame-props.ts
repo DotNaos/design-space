@@ -1,0 +1,44 @@
+import type { DesignSpaceDevice, RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
+import type { SourceCanvasAncestryItem } from "./source-canvas-ancestry";
+import type { SourceLayerMetrics, SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
+import type { SourceTreeNode } from "./source-workspace-tree";
+
+export interface SourcePreviewFrameProps {
+  ancestry?: readonly SourceCanvasAncestryItem[];
+  centerContent?: boolean;
+  compact?: boolean;
+  device: DesignSpaceDevice;
+  entries?: readonly RuntimeSourceWorkspaceEntry[];
+  entry?: RuntimeSourceWorkspaceEntry;
+  generateDesignError?: string;
+  generatingDesign?: boolean;
+  hoveredLayer?: SourceWorkspaceLayer;
+  hoveredLayerOccurrence?: number;
+  isolateSelectedLayer?: boolean;
+  mode?: SourcePreviewMode;
+  node?: SourceTreeNode;
+  revealSelectedLayerKey?: number;
+  runtime: "react" | "react-native";
+  selectedClassCss?: string;
+  selectedClassName?: string;
+  selectedDesignCase?: string;
+  selectedLayer?: SourceWorkspaceLayer;
+  selectedLayerLabel?: string;
+  selectedLayerOccurrence?: number;
+  selectedText?: string;
+  selectionMode?: boolean;
+  slotLayers?: readonly SourceWorkspaceLayer[];
+  slotTargetLabel?: string;
+  styles: readonly string[];
+  workspaceMode?: SourceWorkspaceMode;
+  onDesignCaseChange?: (caseName: string) => void;
+  onDeviceChange?: (device: DesignSpaceDevice) => void;
+  onGenerateDesign?: () => void;
+  onModeChange?: (mode: SourcePreviewMode) => void;
+  onOpenLayerOwner?: (entryId: string, layerId: string, occurrence: number) => void;
+  onOpenSlotTarget?: () => void;
+  onReturnToPreview?: () => void;
+  onSelectAncestry?: (item: SourceCanvasAncestryItem) => void;
+  onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
+  onSelectLayer?: (layerId: string, occurrence: number) => void;
+}

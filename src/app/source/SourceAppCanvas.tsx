@@ -33,6 +33,7 @@ export function SourceAppCanvas(props: {
   selectedLayerOccurrence?: number;
   selectedText?: string;
   slotLayers: readonly SourceWorkspaceLayer[];
+  slotTargetLabel?: string;
   styles: readonly string[];
   workspaceMode: SourceWorkspaceMode;
   onDeviceChange: (device: DesignSpaceDevice) => void;
@@ -40,6 +41,7 @@ export function SourceAppCanvas(props: {
   onDesignCaseChange?: (caseName: string) => void;
   onModeChange: (mode: SourcePreviewMode) => void;
   onOpenLayerOwner: (entryId: string, layerId: string, occurrence: number) => void;
+  onOpenSlotTarget?: () => void;
   onSelectAncestry: (item: SourceCanvasAncestryItem) => void;
   onReturnToPreview: () => void;
   onSelectLayer: (layerId: string, occurrence: number) => void;
@@ -80,6 +82,7 @@ export function SourceAppCanvas(props: {
             selectedLayerOccurrence={props.selectedLayerOccurrence}
             selectedText={props.selectedText}
             slotLayers={props.slotLayers}
+            slotTargetLabel={props.slotTargetLabel}
             styles={props.styles}
             workspaceMode={props.workspaceMode}
             onDeviceChange={props.onDeviceChange}
@@ -87,6 +90,7 @@ export function SourceAppCanvas(props: {
             onGenerateDesign={props.onGenerateDesign}
             onModeChange={props.onModeChange}
             onOpenLayerOwner={props.onOpenLayerOwner}
+            onOpenSlotTarget={props.onOpenSlotTarget}
             onSelectAncestry={props.onSelectAncestry}
             onReturnToPreview={props.onReturnToPreview}
             onSelectLayer={props.onSelectLayer}

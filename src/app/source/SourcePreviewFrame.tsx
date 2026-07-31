@@ -3,7 +3,6 @@ import { WandSparkles } from "lucide-react";
 import { Button } from "@heroui/react";
 
 import type {
-  DesignSpaceDevice,
   RuntimeSourceWorkspaceEntry,
   SourceWorkspaceLayer,
 } from "../../shared/source-workspace";
@@ -17,15 +16,14 @@ import { SourceHoverIdentityHud } from "./SourceHoverIdentityHud";
 import { SourcePreviewState as PreviewState } from "./SourcePreviewState";
 import { sourceFeedbackContext } from "./source-feedback";
 import { SourceInstanceNavigator } from "./SourceInstanceNavigator";
-import type { SourceLayerMetrics, SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
+import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 import { sourceLayerHitAtPreviewPoint, type SourceLayerHit } from "./source-preview-hit-testing";
 import { measureSourcePreviewContent, type SourcePreviewContentSize } from "./source-preview-content-size";
 import { externalSourceLayerOwner, sourceEntryOwner, sourceLayerOwner } from "./source-layer-ownership";
 import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement, sourceLayerElements } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
 import { renderStaticSourceDesignMarkup, renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
-import type { SourceTreeNode } from "./source-workspace-tree";
-import type { SourceCanvasAncestryItem } from "./source-canvas-ancestry";
+import type { SourcePreviewFrameProps } from "./source-preview-frame-props";
 
 export function sourceStaticProjectionLayerId(options: {
   entry?: RuntimeSourceWorkspaceEntry;
@@ -41,43 +39,7 @@ export function sourceStaticProjectionLayerId(options: {
     : undefined;
 }
 
-export function SourcePreviewFrame(props: {
-  device: DesignSpaceDevice;
-  ancestry?: readonly SourceCanvasAncestryItem[];
-  entry?: RuntimeSourceWorkspaceEntry;
-  runtime: "react" | "react-native";
-  styles: readonly string[];
-  entries?: readonly RuntimeSourceWorkspaceEntry[];
-  node?: SourceTreeNode;
-  hoveredLayer?: SourceWorkspaceLayer;
-  hoveredLayerOccurrence?: number;
-  selectedLayer?: SourceWorkspaceLayer;
-  selectedLayerLabel?: string;
-  selectedLayerOccurrence?: number;
-  selectedDesignCase?: string;
-  selectedClassName?: string;
-  selectedClassCss?: string;
-  selectedText?: string;
-  centerContent?: boolean;
-  compact?: boolean;
-  isolateSelectedLayer?: boolean;
-  generateDesignError?: string;
-  generatingDesign?: boolean;
-  selectionMode?: boolean;
-  slotLayers?: readonly SourceWorkspaceLayer[];
-  mode?: SourcePreviewMode;
-  workspaceMode?: SourceWorkspaceMode;
-  onGenerateDesign?: () => void;
-  onSelectAncestry?: (item: SourceCanvasAncestryItem) => void;
-  onDeviceChange?: (device: DesignSpaceDevice) => void;
-  onSelectLayer?: (layerId: string, occurrence: number) => void;
-  onDesignCaseChange?: (caseName: string) => void;
-  onOpenLayerOwner?: (entryId: string, layerId: string, occurrence: number) => void;
-  onModeChange?: (mode: SourcePreviewMode) => void;
-  onReturnToPreview?: () => void;
-  onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;
-  revealSelectedLayerKey?: number;
-}) {
+export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
   const [mounts, setMounts] = useState<PreviewMounts>();
   const [loaded, setLoaded] = useState<LoadedDesign>();
   const [loadState, setLoadState] = useState<"checking" | "invalid" | "ready">("checking");
@@ -94,17 +56,24 @@ export function SourcePreviewFrame(props: {
   const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
   const feedbackContext = sourceFeedbackContext(props.entry, props.selectedLayer);
   const previewEntries = useMemo(() => props.entries ?? (props.entry ? [props.entry] : []), [props.entries, props.entry]);
-  const selectableLayerIds = useMemo(() => sourceLayerIds(previewEntries), [previewEntries]);
+  const selectableLayerIds = useMemo(() => new Set([
+    ...sourceLayerIds(previewEntries),
+    ...(props.slotLayers ?? []).map((slot) => slot.id),
+  ]), [previewEntries, props.slotLayers]);
   const externallyHoveredLayerHit = useMemo(() => props.hoveredLayer ? {
     layerId: props.hoveredLayer.id,
     occurrence: props.hoveredLayerOccurrence ?? 0,
   } : undefined, [props.hoveredLayer, props.hoveredLayerOccurrence]);
   const visibleHoveredLayerHit = hoveredLayerHit ?? externallyHoveredLayerHit;
   const hoveredLayer = useMemo(() => (
-    visibleHoveredLayerHit ? findPreviewLayer(previewEntries, visibleHoveredLayerHit.layerId) : undefined
-  ), [previewEntries, visibleHoveredLayerHit]);
+    visibleHoveredLayerHit
+      ? findPreviewLayer(previewEntries, visibleHoveredLayerHit.layerId)
+        ?? props.slotLayers?.find((slot) => slot.id === visibleHoveredLayerHit.layerId)
+      : undefined
+  ), [previewEntries, props.slotLayers, visibleHoveredLayerHit]);
   const selectedOwner = useMemo(() => props.selectedLayer
     ? sourceLayerOwner(previewEntries, props.selectedLayer.id)
+      ?? (props.selectedLayer.kind === "slot" && props.entry ? sourceEntryOwner(props.entry) : undefined)
     : props.entry ? sourceEntryOwner(props.entry) : undefined,
   [previewEntries, props.entry, props.selectedLayer]);
   const hoveredExternalOwner = useMemo(() => visibleHoveredLayerHit && props.onOpenLayerOwner
@@ -243,7 +212,9 @@ export function SourcePreviewFrame(props: {
     const surface = selectionSurfaceRef.current;
     if (!frame || !surface || !props.entry) return;
     const hit = sourceLayerHitAtPreviewPoint(frame, event, selectableLayerIds, defaultVisualLayer?.id);
-    const layer = hit ? findPreviewLayer(previewEntries, hit.layerId) : defaultVisualLayer;
+    const layer = hit
+      ? findPreviewLayer(previewEntries, hit.layerId) ?? props.slotLayers?.find((slot) => slot.id === hit.layerId)
+      : defaultVisualLayer;
     const context = sourceFeedbackContext(props.entry, layer);
     if (!context) return;
     event.preventDefault();
@@ -407,6 +378,10 @@ export function SourcePreviewFrame(props: {
       slotTabs={canvasSlotTabs}
       footer={selectedOwner ? (
         <SourceHoverIdentityHud
+          action={props.onOpenSlotTarget && props.slotTargetLabel ? {
+            label: props.slotTargetLabel,
+            onPress: props.onOpenSlotTarget,
+          } : undefined}
           external={Boolean(props.onOpenLayerOwner && selectedOwner.fileId !== props.entry?.fileId)}
           owner={selectedOwner}
         />

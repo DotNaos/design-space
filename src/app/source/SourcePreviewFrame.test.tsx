@@ -353,6 +353,36 @@ it("selects a canvas slot without opening a component picker", async () => {
   expect(screen.queryByRole("listbox", { name: "Compatible components" })).not.toBeInTheDocument();
 });
 
+it("offers a footer action for drilling into the component inside a selected slot", async () => {
+  const onOpenSlotTarget = vi.fn();
+  const slot: SourceWorkspaceLayer = {
+    id: "app:design-slot:content",
+    label: "content",
+    kind: "slot",
+    source: { start: 0, end: 1 },
+    children: [],
+  };
+  render(
+    <SourcePreviewFrame
+      device="desktop"
+      entry={previewEntry("App", async () => previewDefinition("App"))}
+      mode="design"
+      runtime="react"
+      selectedLayer={slot}
+      slotLayers={[slot]}
+      slotTargetLabel="WorkspaceShell"
+      styles={[]}
+      workspaceMode="design"
+      onOpenSlotTarget={onOpenSlotTarget}
+    />,
+  );
+
+  const open = screen.getByRole("button", { name: "Open WorkspaceShell" });
+  expect(screen.getByTestId("canvas-selection-identity-footer")).toContainElement(open);
+  await userEvent.click(open);
+  expect(onOpenSlotTarget).toHaveBeenCalledOnce();
+});
+
 it("requires a double click before opening a layer owned by another source file", async () => {
   const foreignLayerId = "jsx:src/Foreign.tsx:8";
   const current = {

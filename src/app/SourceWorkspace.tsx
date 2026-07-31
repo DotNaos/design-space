@@ -36,6 +36,7 @@ import { sourceCanvasSelection, sourceCanvasSelectionOccurrence, sourceCanvasVis
 import type { SourceLayerMetrics } from "./source/source-layer-design";
 import { useSourceWorkspaceUiState } from "./source/useSourceWorkspaceUiState";
 import { sourceEntrySlotLayers } from "./source/source-entry-layers";
+import { sourceSlotNavigationTarget, sourceSlotSelection } from "./source/source-slot-navigation";
 import { SourceWorkspaceCodeOverlay } from "./source/SourceWorkspaceCodeOverlay";
 import { useSourceDraftSynchronization } from "./source/useSourceDraftSynchronization";
 import { useSourceDesignGeneration } from "./source/useSourceDesignGeneration";
@@ -147,6 +148,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const codeEditor = activeCodeDocument === "design" ? designEditor : editor;
   const inspectorEntry = selectedOccurrence?.entry ?? focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
   const previewEntry = focusedOccurrence?.entry ?? selectedNode?.implementations[requestedDevice].entry;
+  const previewSlotLayers = useMemo(
+    () => sourceEntrySlotLayers(previewEntry),
+    [previewEntry],
+  );
   const externalInspectorEntry = selection?.kind === "component"
     && selectedOccurrence?.entry
     && previewEntry
@@ -156,7 +161,8 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const selectedAppDesignCase = previewEntry?.design
     ? designCases[previewEntry.design.fileId]
     : undefined;
-  const selectedLayer = findSourceTreeLayer(entry?.layers, selection?.layerId)
+  const selectedLayer = previewSlotLayers.find((slot) => slot.id === selection?.layerId)
+    ?? findSourceTreeLayer(entry?.layers, selection?.layerId)
     ?? (selection?.kind === "slot" && selection.slotName
       ? findSourceSlotLayer(entry?.layers, selection.slotName)
       : undefined);
@@ -177,10 +183,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     )
     : undefined;
   const appReviewLayer = findSourceTreeLayer(registeredCodeEntry?.layers, visualLayer?.id);
-  const previewSlotLayers = useMemo(
-    () => sourceEntrySlotLayers(previewEntry),
-    [previewEntry],
-  );
+  const selectedCanvasSlot = selection?.kind === "slot" && selectedLayer?.kind === "slot"
+    ? selectedLayer
+    : undefined;
+  const selectedSlotTarget = sourceSlotNavigationTarget(graph, resolvedFocusId, selectedCanvasSlot);
   const inspectorSourceOwner = focusedOccurrence?.usageOwnerId
     ? nodes.find((node) => node.id === focusedOccurrence.usageOwnerId)
     : undefined;
@@ -673,6 +679,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       selectedLayerOccurrence={sourceCanvasSelectionOccurrence(graph, resolvedFocusId, selection)}
       selectedText={styleEditor.previewTextValue}
       slotLayers={previewSlotLayers}
+      slotTargetLabel={selectedSlotTarget?.node.label}
       styles={workspace.styles}
       workspaceMode={workspaceMode}
       onModeChange={(mode) => setPreviewRuntime(mode === "play" ? "play" : "static")}
@@ -683,7 +690,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       onReturnToPreview={openPreviewPage}
       onSelectedLayerMetrics={setSelectedLayerMetrics}
       onSelectLayer={(layerId, occurrence) => {
-        const next = sourceCanvasSelection(graph, resolvedFocusId, layerId, requestedDevice, occurrence);
+        const slot = previewSlotLayers.find((candidate) => candidate.id === layerId);
+        const next = slot && focusedOccurrence
+          ? sourceSlotSelection(focusedOccurrence, slot, requestedDevice)
+          : sourceCanvasSelection(graph, resolvedFocusId, layerId, requestedDevice, occurrence);
         if (!next) return;
         setSelection(next);
         if (workspaceMode === "preview") setPreviewSelection(next);
@@ -702,6 +712,9 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           kind: "component",
         });
       }}
+      onOpenSlotTarget={selectedSlotTarget ? () => {
+        openDesign(selectedSlotTarget.id, sourceComponentSelection(selectedSlotTarget, requestedDevice));
+      } : undefined}
       onSelectAncestry={(item) => {
         if (item.kind !== "component") return;
         const occurrence = graph.occurrences.get(item.id);
