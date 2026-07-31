@@ -15,6 +15,7 @@ export function SourceViewportPicker(props: {
   node?: SourceTreeNode;
   presetId: string;
   responsiveWidth: number;
+  showDeviceTabs?: boolean;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onClipToScreenChange: (clipToScreen: boolean) => void;
   onShowDeviceFrameChange: (showDeviceFrame: boolean) => void;
@@ -23,8 +24,8 @@ export function SourceViewportPicker(props: {
 }) {
   return (
     <div className="pointer-events-auto flex h-9 min-w-0 items-center gap-1 px-0.5 lg:h-7">
-      <SourceDeviceTabs device={props.device} node={props.node} onChange={props.onDeviceChange} />
-      <span aria-hidden="true" className="h-5 w-px shrink-0 bg-white/10" />
+      {props.showDeviceTabs !== false ? <SourceDeviceTabs device={props.device} node={props.node} onChange={props.onDeviceChange} /> : null}
+      {props.showDeviceTabs !== false ? <span aria-hidden="true" className="h-5 w-px shrink-0 bg-white/10" /> : null}
       <MonitorSmartphone aria-hidden="true" className="hidden shrink-0 text-zinc-500 sm:block group-data-[narrow=true]/canvas-controls:hidden" size={13} />
       <Select
         aria-label="Preview dimensions"

@@ -55,13 +55,16 @@ export function fitCanvas(
   world: { width: number; height: number },
   margin = 16,
   topInset = 48,
+  verticalAlignment: "center" | "start" = "center",
 ): CanvasCamera {
   const usableWidth = Math.max(1, viewport.width - margin * 2);
   const usableHeight = Math.max(1, viewport.height - topInset - margin);
   const scale = clampCanvasScale(Math.min(1, usableWidth / world.width, usableHeight / world.height));
   return {
     x: (viewport.width - world.width * scale) / 2,
-    y: topInset + (usableHeight - world.height * scale) / 2,
+    y: verticalAlignment === "start"
+      ? topInset + margin
+      : topInset + (usableHeight - world.height * scale) / 2,
     scale,
   };
 }

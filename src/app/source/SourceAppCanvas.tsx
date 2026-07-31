@@ -3,10 +3,12 @@ import type { ComponentProps } from "react";
 import type { DesignSpaceDevice, RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import type { SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
 import type { SourceTreeNode } from "./source-workspace-tree";
+import type { SourceCanvasAncestryItem } from "./source-canvas-ancestry";
 import { SourceCodeCanvas } from "./SourceCodeCanvas";
 import { SourcePreviewFrame } from "./SourcePreviewFrame";
 
 export function SourceAppCanvas(props: {
+  ancestry: readonly SourceCanvasAncestryItem[];
   centerContent: boolean;
   device: DesignSpaceDevice;
   draftSelection?: { start: number; end: number };
@@ -38,6 +40,7 @@ export function SourceAppCanvas(props: {
   onDesignCaseChange?: (caseName: string) => void;
   onModeChange: (mode: SourcePreviewMode) => void;
   onOpenLayerOwner: (entryId: string, layerId: string, occurrence: number) => void;
+  onSelectAncestry: (item: SourceCanvasAncestryItem) => void;
   onReturnToPreview: () => void;
   onSelectLayer: (layerId: string, occurrence: number) => void;
   onSelectedLayerMetrics: ComponentProps<typeof SourcePreviewFrame>["onSelectedLayerMetrics"];
@@ -55,6 +58,7 @@ export function SourceAppCanvas(props: {
           />
         ) : (
           <SourcePreviewFrame
+            ancestry={props.ancestry}
             centerContent={props.centerContent}
             device={props.device}
             entry={props.previewEntry}
@@ -83,6 +87,7 @@ export function SourceAppCanvas(props: {
             onGenerateDesign={props.onGenerateDesign}
             onModeChange={props.onModeChange}
             onOpenLayerOwner={props.onOpenLayerOwner}
+            onSelectAncestry={props.onSelectAncestry}
             onReturnToPreview={props.onReturnToPreview}
             onSelectLayer={props.onSelectLayer}
             onSelectedLayerMetrics={props.onSelectedLayerMetrics}

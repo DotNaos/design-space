@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import type { DesignSpaceDevice } from "../../shared/source-workspace";
 import type { CanvasWorldRect } from "../canvas-transform";
 import { PreviewCanvas } from "../components/PreviewCanvas/PreviewCanvas";
+import { SourceCanvasAncestryHeader } from "./SourceCanvasAncestryHeader";
+import { SourceDeviceTabs } from "./SourceDeviceTabs";
 import { SourceDeviceFrame } from "./SourceDeviceFrame";
 import { SourceViewportPicker } from "./SourceViewportPicker";
 import { SourcePreviewModeToggle } from "./SourcePreviewModeToggle";
@@ -11,11 +13,13 @@ import type { SourcePreviewContentSize } from "./source-preview-content-size";
 import type { SourceTreeNode } from "./source-workspace-tree";
 import { sourceDeviceFrameKind, sourceDeviceFrameLayout } from "./source-device-frame";
 import { defaultSourceViewport, sourceViewportPresets } from "./source-viewports";
+import type { SourceCanvasAncestryItem, SourceCanvasSlotTab } from "./source-canvas-ancestry";
 
 const sourcePreviewId = "source-preview";
 
 export function SourceCanvasViewport(props: {
   children: (frame: { width: number; height: number }) => React.ReactNode;
+  ancestry?: readonly SourceCanvasAncestryItem[];
   compact?: boolean;
   contentSize?: SourcePreviewContentSize;
   device: DesignSpaceDevice;
@@ -25,9 +29,13 @@ export function SourceCanvasViewport(props: {
   selectedLayer?: boolean;
   selectionKey?: string;
   selectionLabel?: string;
+  slotOwnerLabel?: string;
+  slotTabs?: readonly SourceCanvasSlotTab[];
   hud?: React.ReactNode;
   revealTarget?: { key: string; rect: CanvasWorldRect };
   toolbarEnd?: React.ReactNode;
+  onSelectAncestry?: (item: SourceCanvasAncestryItem) => void;
+  onSelectSlot?: (slot: SourceCanvasSlotTab) => void;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onModeChange?: (mode: SourcePreviewMode) => void;
 }) {
@@ -41,9 +49,11 @@ export function SourceCanvasViewport(props: {
   const frame = !clipToScreen && props.contentSize ? props.contentSize : screenFrame;
   const deviceFrameKind = sourceDeviceFrameKind(props.device);
   const deviceFrame = showDeviceFrame ? sourceDeviceFrameLayout(deviceFrameKind, frame.width, frame.height) : undefined;
-  const worldFrame = deviceFrame
+  const previewFrame = deviceFrame
     ? { width: deviceFrame.outerWidth, height: deviceFrame.outerHeight }
     : frame;
+  const hasCanvasDeviceSwitcher = Boolean(props.ancestry?.length && props.node);
+  const ancestryHeight = props.ancestry?.length ? props.slotTabs?.length ? 64 : 36 : 0;
 
   useEffect(() => {
     if (previousDevice.current === props.device) return;
@@ -78,6 +88,7 @@ export function SourceCanvasViewport(props: {
             onDeviceChange={changeDevice}
             onPresetChange={changePreset}
             onResponsiveWidthChange={(width) => setResponsiveWidth(Math.max(320, Math.min(1440, width)))}
+            showDeviceTabs={!hasCanvasDeviceSwitcher}
             onClipToScreenChange={setClipToScreen}
             onShowDeviceFrameChange={setShowDeviceFrame}
             after={(
@@ -88,18 +99,16 @@ export function SourceCanvasViewport(props: {
             )}
           />
         )}
-        preview={(
-          showDeviceFrame ? (
-            <SourceDeviceFrame kind={deviceFrameKind} screenHeight={frame.height} screenWidth={frame.width}>
-              <PreviewScreen clipToScreen={clipToScreen} frame={frame}>
-                {props.children(frame)}
-              </PreviewScreen>
-            </SourceDeviceFrame>
-          ) : (
-            <PreviewScreen clipToScreen={clipToScreen} frame={frame}>
+        preview={showDeviceFrame ? (
+          <SourceDeviceFrame kind={deviceFrameKind} screenHeight={frame.height} screenWidth={frame.width}>
+            <PreviewScreen attachedHeader={ancestryHeight > 0} clipToScreen={clipToScreen} frame={frame}>
               {props.children(frame)}
             </PreviewScreen>
-          )
+          </SourceDeviceFrame>
+        ) : (
+          <PreviewScreen attachedHeader={ancestryHeight > 0} clipToScreen={clipToScreen} frame={frame}>
+            {props.children(frame)}
+          </PreviewScreen>
         )}
         rootInstanceId={sourcePreviewId}
         selectedComponentInstanceId={sourcePreviewId}
@@ -110,7 +119,21 @@ export function SourceCanvasViewport(props: {
         staticPreview
         forcedInteractionMode={props.mode === "play" ? "interact" : "select"}
         compact={props.compact}
-        worldWidth={worldFrame.width}
+        verticalAlignment="start"
+        worldHeader={props.ancestry?.length ? (
+          <SourceCanvasAncestryHeader
+            deviceSwitcher={hasCanvasDeviceSwitcher ? (
+              <SourceDeviceTabs device={props.device} node={props.node} onChange={changeDevice} />
+            ) : undefined}
+            items={props.ancestry}
+            slotOwnerLabel={props.slotOwnerLabel}
+            slots={props.slotTabs}
+            onSelect={props.onSelectAncestry}
+            onSelectSlot={props.onSelectSlot}
+          />
+        ) : undefined}
+        worldHeaderHeight={ancestryHeight}
+        worldWidth={previewFrame.width}
         onSelect={() => undefined}
       />
     </div>
@@ -118,6 +141,7 @@ export function SourceCanvasViewport(props: {
 }
 
 function PreviewScreen(props: {
+  attachedHeader: boolean;
   children: React.ReactNode;
   clipToScreen: boolean;
   frame: { height: number; width: number };
@@ -126,7 +150,7 @@ function PreviewScreen(props: {
     <div
       data-design-space-instance-id={sourcePreviewId}
       data-preview-frame-mode={props.clipToScreen ? "screen" : "content"}
-      className={`${props.clipToScreen ? "overflow-hidden" : "overflow-visible"} size-full rounded-md border border-white/15 bg-[#111216] shadow-2xl`}
+      className={`${props.clipToScreen ? "overflow-hidden" : "overflow-visible"} size-full ${props.attachedHeader ? "rounded-b-md" : "rounded-md"} border border-white/15 bg-[#111216] shadow-2xl`}
       style={{
         backgroundImage: "linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px)",
         backgroundPosition: "-1px -1px",

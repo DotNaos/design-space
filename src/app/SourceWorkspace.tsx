@@ -47,6 +47,7 @@ import {
   sourceComponentSelection,
   useSourceWorkspaceControl,
 } from "./source/use-source-workspace-control";
+import { sourceCanvasAncestry } from "./source/source-canvas-ancestry";
 
 export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
   const registeredWorkspace = target.sourceWorkspace;
@@ -187,6 +188,11 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     : selectedLayer?.kind === "slot"
       ? `slot:${selectedLayer.label}`
       : selectedOccurrence?.node.label ?? focusedOccurrence?.node.label ?? selectedNode?.label;
+  const canvasAncestry = useMemo(() => sourceCanvasAncestry(
+    graph,
+    selectedOccurrence?.id ?? resolvedFocusId,
+    selection?.kind === "component" ? undefined : selectedLayer,
+  ), [graph, resolvedFocusId, selectedLayer, selectedOccurrence?.id, selection?.kind]);
   const styleEditor = useSourceLayerClassEditor({
     connected: workspace.runtime === "react",
     editor,
@@ -599,6 +605,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     />
   ) : (
     <SourceAppCanvas
+      ancestry={canvasAncestry}
       centerContent={workspaceMode === "design"}
       device={requestedDevice}
       draftSelection={draftSelection}
@@ -653,6 +660,12 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           occurrenceId: occurrence.id,
           kind: "component",
         });
+      }}
+      onSelectAncestry={(item) => {
+        if (item.kind !== "component") return;
+        const occurrence = graph.occurrences.get(item.id);
+        if (!occurrence) return;
+        openDesign(occurrence.id, sourceComponentSelection(occurrence, requestedDevice));
       }}
       onGenerateDesign={previewEntry ? () => void designGeneration.generate("app", previewEntry.id) : undefined}
       onDeviceChange={(device) => selectedNode && setSelection((current) => ({

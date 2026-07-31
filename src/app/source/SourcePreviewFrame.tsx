@@ -24,6 +24,7 @@ import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement, s
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
 import { renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
 import type { SourceTreeNode } from "./source-workspace-tree";
+import type { SourceCanvasAncestryItem } from "./source-canvas-ancestry";
 
 export function sourceStaticProjectionLayerId(options: {
   entry?: RuntimeSourceWorkspaceEntry;
@@ -41,6 +42,7 @@ export function sourceStaticProjectionLayerId(options: {
 
 export function SourcePreviewFrame(props: {
   device: DesignSpaceDevice;
+  ancestry?: readonly SourceCanvasAncestryItem[];
   entry?: RuntimeSourceWorkspaceEntry;
   runtime: "react" | "react-native";
   styles: readonly string[];
@@ -65,6 +67,7 @@ export function SourcePreviewFrame(props: {
   mode?: SourcePreviewMode;
   workspaceMode?: SourceWorkspaceMode;
   onGenerateDesign?: () => void;
+  onSelectAncestry?: (item: SourceCanvasAncestryItem) => void;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
   onSelectLayer?: (layerId: string, occurrence: number) => void;
   onDesignCaseChange?: (caseName: string) => void;
@@ -108,6 +111,11 @@ export function SourcePreviewFrame(props: {
       : undefined
   ), [hoveredOwner, props.entry?.fileId, props.onOpenLayerOwner]);
   const defaultVisualLayer = sourceCanvasVisualLayer(props.entry, undefined);
+  const canvasSlotTabs = useMemo(() => (props.slotLayers ?? []).map((slot) => ({
+    active: props.selectedLayer?.id === slot.id,
+    id: slot.id,
+    label: slot.label,
+  })), [props.selectedLayer?.id, props.slotLayers]);
   const designId = props.entry?.design?.fileId;
   useEffect(() => {
     const design = props.entry?.design;
@@ -377,6 +385,7 @@ export function SourcePreviewFrame(props: {
 
   return (
     <SourceCanvasViewport
+      ancestry={props.ancestry}
       compact={props.compact}
       contentSize={contentSize}
       device={props.device}
@@ -387,6 +396,8 @@ export function SourcePreviewFrame(props: {
       revealTarget={revealTarget?.key === revealKey ? revealTarget : undefined}
       selectionKey={props.entry?.id}
       selectionLabel={props.selectedLayerLabel ?? sourceCanvasLayerLabel(props.selectedLayer) ?? props.node?.label}
+      slotOwnerLabel={props.node?.label ?? props.entry?.label}
+      slotTabs={canvasSlotTabs}
       hud={(
         <div className="flex w-[min(920px,calc(100vw-2rem))] max-w-full flex-col gap-1.5">
           {hoveredOwner ? (
@@ -423,6 +434,8 @@ export function SourcePreviewFrame(props: {
         </div>
       )}
       onDeviceChange={props.onDeviceChange ?? (() => undefined)}
+      onSelectAncestry={props.onSelectAncestry}
+      onSelectSlot={(slot) => props.onSelectLayer?.(slot.id, 0)}
       onModeChange={props.onModeChange}
       toolbarEnd={definition && selectedCase ? (
         <SourceDesignControls

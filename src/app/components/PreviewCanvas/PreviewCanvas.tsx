@@ -70,6 +70,9 @@ type PreviewCanvasProps = {
   staticPreview?: boolean;
   forcedInteractionMode?: "select" | "interact";
   worldWidth?: number;
+  worldHeader?: React.ReactNode;
+  worldHeaderHeight?: number;
+  verticalAlignment?: "center" | "start";
   onSelect: (selection: Selection) => void;
   onDeselect?: () => void;
   onNavigate?: (command: SelectionNavigationCommand) => void;
@@ -81,6 +84,7 @@ type MeasuredStrictUiTarget = { target: StrictUiCanvasTarget; rect: ViewRect };
 const defaultWorldWidth = 620;
 export function PreviewCanvas(props: PreviewCanvasProps) {
   const worldWidth = props.worldWidth ?? defaultWorldWidth;
+  const worldHeaderHeight = props.worldHeader ? props.worldHeaderHeight ?? 36 : 0;
   const viewportRef = useRef<HTMLElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const overlayChromeRef = useRef<HTMLDivElement>(null);
@@ -254,9 +258,10 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       { width: viewport.clientWidth, height: viewport.clientHeight },
       { width: worldWidth, height: Math.max(1, world.offsetHeight) },
       props.compact ? 12 : 16,
-      props.compact ? 42 : 52,
+      (props.compact ? 42 : 52) + worldHeaderHeight,
+      props.verticalAlignment,
     ));
-  }, [props.compact, setCamera, worldWidth]);
+  }, [props.compact, props.verticalAlignment, setCamera, worldHeaderHeight, worldWidth]);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -300,7 +305,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 
   useLayoutEffect(() => {
     if (props.cameraKey === undefined) return;
-    const resetKey = `${props.cameraKey}:${props.compact ? "compact" : "full"}`;
+    const resetKey = `${props.cameraKey}:${props.compact ? "compact" : "full"}:${props.verticalAlignment ?? "center"}:${worldHeaderHeight}`;
     if (lastCameraResetKey.current === resetKey) return;
     lastCameraResetKey.current = resetKey;
     touchGestures.resetTouchGestures();
@@ -317,7 +322,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       scheduleMeasure();
     });
     return () => cancelAnimationFrame(settleFrame);
-  }, [fit, props.cameraKey, props.compact, scheduleMeasure, setCamera, touchGestures.resetTouchGestures]);
+  }, [fit, props.cameraKey, props.compact, scheduleMeasure, setCamera, touchGestures.resetTouchGestures, worldHeaderHeight]);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -332,17 +337,17 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       { width: viewport.clientWidth, height: viewport.clientHeight },
       target.rect,
       props.compact ? 16 : 24,
-      props.compact ? 48 : 72,
+      (props.compact ? 48 : 72) + worldHeaderHeight,
     ));
     scheduleMeasure();
-  }, [props.compact, props.revealTarget, scheduleMeasure, setCamera]);
+  }, [props.compact, props.revealTarget, scheduleMeasure, setCamera, worldHeaderHeight]);
 
   const reset = () => {
     const viewport = viewportRef.current;
     if (!viewport) return;
     suppressClick.current = false;
     autoFit.current = false;
-    setCamera({ x: (viewport.clientWidth - worldWidth) / 2, y: props.compact ? 44 : 56, scale: 1 });
+    setCamera({ x: (viewport.clientWidth - worldWidth) / 2, y: (props.compact ? 44 : 56) + worldHeaderHeight, scale: 1 });
   };
 
   const zoomBy = (factor: number) => {
@@ -397,6 +402,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   ]);
 
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (isCanvasChromeTarget(event.target)) return;
     if (suppressClick.current) {
       suppressClick.current = false;
       event.preventDefault();
@@ -455,6 +461,10 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const onPointerMove = (event: React.PointerEvent<HTMLElement>) => {
     touchGestures.onPointerMove(event);
     if (activeInteractionMode !== "select" || event.pointerType !== "mouse") return;
+    if (isCanvasChromeTarget(event.target)) {
+      setPointerHoveredSelection(undefined);
+      return;
+    }
     const next = selectionForCanvasTarget(
       event.target instanceof Element ? event.target : undefined,
       props.slots,
@@ -464,6 +474,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   };
 
   const onDoubleClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (isCanvasChromeTarget(event.target)) return;
     if (!props.onEditComponent) return;
     const selection = selectionForCanvasTarget(
       event.target instanceof Element ? event.target : undefined,
@@ -478,6 +489,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   };
 
   const onContextMenu = (event: React.MouseEvent<HTMLElement>) => {
+    if (isCanvasChromeTarget(event.target)) return;
     if (!props.onContextMenuRequest) return;
     const selection = selectionForCanvasTarget(
       event.target instanceof Element ? event.target : undefined,
@@ -573,6 +585,20 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       </div>
 
       <div ref={overlayChromeRef} className="pointer-events-none absolute inset-0 z-10">
+        {props.worldHeader ? (
+          <div
+            className="pointer-events-auto absolute"
+            data-testid="canvas-world-header"
+            style={{
+              height: worldHeaderHeight,
+              left: camera.x,
+              top: camera.y - worldHeaderHeight,
+              width: worldWidth * camera.scale,
+            }}
+          >
+            {props.worldHeader}
+          </div>
+        ) : null}
         {strictUiRects.map(({ target, rect }) => (
           <div
             key={target.marker.key}
@@ -666,6 +692,10 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       ) : null}
     </main>
   );
+}
+
+function isCanvasChromeTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest("[data-design-space-canvas-chrome]"));
 }
 
 function applyHtmlClassNames(root: HTMLElement, values: Readonly<Record<string, string>> | undefined): void {

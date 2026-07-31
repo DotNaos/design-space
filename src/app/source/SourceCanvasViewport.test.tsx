@@ -6,9 +6,11 @@ vi.mock("../components/PreviewCanvas/PreviewCanvas", () => ({
   PreviewCanvas: (props: {
     preview: React.ReactNode;
     toolbar?: React.ReactNode;
+    worldHeader?: React.ReactNode;
   }) => (
     <div>
       {props.toolbar}
+      {props.worldHeader}
       {props.preview}
     </div>
   ),
@@ -57,4 +59,45 @@ it("wraps the selected screen in a device mockup without changing its viewport",
   expect(screen.getByLabelText("phone device frame")).toBeVisible();
   expect(screen.getByText("390 × 844")).toBeVisible();
   expect(screen.getByRole("button", { name: "Hide device mockup" })).toBeVisible();
+});
+
+it("attaches an interactive ancestry path to the canvas", async () => {
+  const onSelectAncestry = vi.fn();
+  const onSelectSlot = vi.fn();
+  render(
+    <SourceCanvasViewport
+      ancestry={[
+        { id: "app", kind: "component", label: "App" },
+        { id: "shell", kind: "component", label: "WorkspaceShell" },
+        { id: "content", kind: "slot", label: "slot:content" },
+      ]}
+      device="desktop"
+      onDeviceChange={vi.fn()}
+      onSelectAncestry={onSelectAncestry}
+      onSelectSlot={onSelectSlot}
+      slotOwnerLabel="WorkspaceShell"
+      slotTabs={[
+        { active: false, id: "status", label: "status" },
+        { active: true, id: "content", label: "content" },
+        { active: false, id: "toolbar", label: "toolbar" },
+      ]}
+    >
+      {() => <div>Preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  const ancestry = screen.getByRole("navigation", { name: "Canvas ancestry" });
+  expect(ancestry).toHaveTextContent("From root");
+  expect(ancestry).toHaveTextContent("App");
+  expect(ancestry).toHaveTextContent("WorkspaceShell");
+  expect(ancestry).toHaveTextContent("slot:content");
+  expect(screen.getByText("slot:content").closest("[aria-current]"))
+    .toHaveAttribute("aria-current", "location");
+
+  await userEvent.click(screen.getByRole("button", { name: /App/ }));
+  expect(onSelectAncestry).toHaveBeenCalledWith({ id: "app", kind: "component", label: "App" });
+
+  expect(screen.getByRole("button", { name: "content" })).toHaveAttribute("aria-pressed", "true");
+  await userEvent.click(screen.getByRole("button", { name: "status" }));
+  expect(onSelectSlot).toHaveBeenCalledWith({ active: false, id: "status", label: "status" });
 });

@@ -27,6 +27,11 @@ describe("canvas camera math", () => {
     expect(camera.y).toBeGreaterThanOrEqual(48);
   });
 
+  it("can align a fitted world directly below the canvas controls", () => {
+    const camera = fitCanvas({ width: 1200, height: 900 }, { width: 620, height: 420 }, 16, 52, "start");
+    expect(camera).toEqual({ x: 290, y: 68, scale: 1 });
+  });
+
   it("supports pixel-level inspection zoom while keeping a finite ceiling", () => {
     expect(maximumCanvasScale).toBe(256);
     expect(zoomCanvasAt({ x: 0, y: 0, scale: 1 }, 512, { x: 0, y: 0 }).scale).toBe(256);

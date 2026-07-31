@@ -47,13 +47,13 @@ export function CanvasViewportControls(props: CanvasViewportControlsProps) {
       )}
       <div
         data-testid="canvas-viewport-toolbar"
-        className={`group/canvas-controls absolute top-3 z-20 flex h-11 max-w-[calc(100%-1.5rem)] items-center rounded-lg border border-white/10 bg-[#17181b]/95 px-1 shadow-xl lg:h-8 ${props.leadingContent ? "left-1/2 -translate-x-1/2" : "right-3"}`}
+        className={`group/canvas-controls absolute top-3 z-20 flex h-11 max-w-[calc(100%-1.5rem)] items-center overflow-x-auto rounded-lg border border-white/10 bg-[#17181b]/95 px-1 shadow-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:h-8 ${props.leadingContent ? "left-1/2 -translate-x-1/2" : "right-3"}`}
         data-narrow={props.narrow || undefined}
         onPointerDown={(event) => event.stopPropagation()}
         onPointerMove={(event) => event.stopPropagation()}
         onPointerUp={(event) => event.stopPropagation()}
       >
-        {props.leadingContent && <div className="min-w-0 shrink">{props.leadingContent}</div>}
+        {props.leadingContent && <div className={`min-w-0 ${props.narrow ? "shrink-0" : "shrink"}`}>{props.leadingContent}</div>}
         {props.leadingContent && <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-white/10" />}
         <div className={`${props.narrow ? "hidden" : "hidden sm:block"} shrink-0`}>
           <CanvasGridControls
