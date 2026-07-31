@@ -1,5 +1,5 @@
 import { Button, Modal, TextArea } from "@heroui/react";
-import { ImagePlus, LoaderCircle, RefreshCw, Send, X } from "lucide-react";
+import { ArrowUp, LoaderCircle, Plus, RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -39,6 +39,7 @@ export function SourceCodexChatModal(props: {
   const [screenshots, setScreenshots] = useState<PendingScreenshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [error, setError] = useState<string>();
   const endRef = useRef<HTMLDivElement>(null);
@@ -46,6 +47,7 @@ export function SourceCodexChatModal(props: {
   const pendingMessagesRef = useRef<SourceCodexMessage[]>([]);
   const sessionImageUrlsRef = useRef(new Map<string, readonly string[]>());
   const screenshotInputRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
 
   const loadConversation = useCallback(async (showLoading = false) => {
     if (!props.origin || loadInFlightRef.current) return;
@@ -88,6 +90,8 @@ export function SourceCodexChatModal(props: {
     setPendingCount(0);
     setMessages([]);
     setScreenshots([]);
+    setDragActive(false);
+    dragDepthRef.current = 0;
     if (!props.open || !props.origin) return;
     void loadConversation(true);
     const refresh = window.setInterval(() => void loadConversation(), 2_500);
@@ -300,39 +304,62 @@ export function SourceCodexChatModal(props: {
                   ) : null}
                 </div>
               ) : null}
-              {screenshots.length ? (
-                <div className="mb-2 flex flex-wrap gap-2" aria-label="Attached screenshots">
-                  {screenshots.map((screenshot) => (
-                    <div
-                      key={screenshot.id}
-                      className="group relative h-20 w-28 overflow-hidden rounded-lg border border-white/10 bg-black/25"
-                    >
-                      <img alt={screenshot.fileName} className="size-full object-cover" src={screenshot.dataUrl} />
-                      <Button
-                        isIconOnly
-                        aria-label={`Remove ${screenshot.fileName}`}
-                        className="absolute right-1 top-1 size-6 min-w-6 rounded-md bg-black/70 text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 focus:opacity-100"
-                        size="sm"
-                        variant="ghost"
-                        onPress={() => setScreenshots((current) => current.filter((item) => item.id !== screenshot.id))}
-                      >
-                        <X aria-hidden="true" size={12} />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
               <div
-                className="flex items-end gap-1 rounded-xl border border-white/10 bg-black/20 p-2 transition-colors focus-within:border-sky-400/30"
+                aria-label="Codex message composer"
+                className={`relative flex min-h-12 w-full flex-wrap items-end gap-1 rounded-[1.75rem] border p-1.5 shadow-[0_18px_58px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-[border-color,background-color,box-shadow] ${
+                  dragActive
+                    ? "border-sky-300/50 bg-sky-400/[0.08] shadow-[0_18px_58px_rgba(0,0,0,0.28),0_0_0_3px_rgba(56,189,248,0.08)]"
+                    : "border-white/10 bg-[#0d0e10]/95 focus-within:border-white/20"
+                }`}
+                role="group"
+                onDragEnter={(event) => {
+                  if (!event.dataTransfer.types.includes("Files")) return;
+                  event.preventDefault();
+                  dragDepthRef.current += 1;
+                  setDragActive(true);
+                }}
+                onDragLeave={(event) => {
+                  if (!event.dataTransfer.types.includes("Files")) return;
+                  dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+                  if (!dragDepthRef.current) setDragActive(false);
+                }}
                 onDragOver={(event) => {
                   if (event.dataTransfer.types.includes("Files")) event.preventDefault();
                 }}
                 onDrop={(event) => {
+                  dragDepthRef.current = 0;
+                  setDragActive(false);
                   if (!event.dataTransfer.files.length) return;
                   event.preventDefault();
                   void addScreenshots(event.dataTransfer.files);
                 }}
               >
+                {screenshots.length ? (
+                  <div className="flex w-full min-w-0 gap-2 overflow-x-auto px-2 pb-1 pt-1" aria-label="Attached screenshots">
+                    {screenshots.map((screenshot) => (
+                      <div
+                        key={screenshot.id}
+                        className="group relative size-14 shrink-0"
+                      >
+                        <img
+                          alt={screenshot.fileName}
+                          className="size-full rounded-xl border border-white/10 object-cover"
+                          src={screenshot.dataUrl}
+                        />
+                        <Button
+                          isIconOnly
+                          aria-label={`Remove ${screenshot.fileName}`}
+                          className="absolute -right-1 -top-1 size-5 min-w-5 rounded-full bg-zinc-950 text-white shadow-md"
+                          size="sm"
+                          variant="ghost"
+                          onPress={() => setScreenshots((current) => current.filter((item) => item.id !== screenshot.id))}
+                        >
+                          <X aria-hidden="true" size={10} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 <input
                   ref={screenshotInputRef}
                   multiple
@@ -348,21 +375,23 @@ export function SourceCodexChatModal(props: {
                 <Button
                   isIconOnly
                   aria-label="Attach screenshots"
-                  className="size-10 min-w-10 rounded-lg text-zinc-400"
+                  className="size-9 min-w-9 rounded-full text-zinc-400 hover:bg-white/[0.07] hover:text-zinc-100"
                   isDisabled={!props.origin || !props.origin.writable || sending || screenshots.length >= maximumScreenshots}
                   size="sm"
                   variant="ghost"
                   onPress={() => screenshotInputRef.current?.click()}
                 >
-                  <ImagePlus aria-hidden="true" size={16} />
+                  <Plus aria-hidden="true" size={17} />
                 </Button>
                 <TextArea
                   aria-label="Message Codex"
-                  className="min-h-11 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-xs leading-5 text-zinc-100 outline-none placeholder:text-zinc-600"
+                  className="max-h-24 min-h-9 min-w-0 flex-1 resize-none border-0 bg-transparent px-3 py-1.5 text-sm leading-6 text-zinc-100 shadow-none outline-none placeholder:text-zinc-500"
                   disabled={!props.origin || !props.origin.writable || sending}
                   placeholder={props.context ? `Comment on ${props.context.label}…` : "Message Codex…"}
-                  rows={2}
+                  rows={1}
+                  title="Enter to send · Shift+Enter for a new line"
                   value={draft}
+                  variant="secondary"
                   onChange={(event) => setDraft(event.target.value)}
                   onPaste={(event) => {
                     const images = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
@@ -380,12 +409,13 @@ export function SourceCodexChatModal(props: {
                 <Button
                   isIconOnly
                   aria-label="Send message to Codex"
-                  className="size-10 min-w-10 rounded-lg text-sky-200"
-                  isDisabled={!props.origin || !props.origin.writable || (!draft.trim() && !screenshots.length)}
+                  className="size-9 min-w-9 rounded-full bg-zinc-100 text-zinc-950 shadow-sm hover:bg-white"
+                  isDisabled={!props.origin || !props.origin.writable || sending || (!draft.trim() && !screenshots.length)}
                   isPending={sending}
+                  size="sm"
                   onPress={() => void send()}
                 >
-                  <Send aria-hidden="true" size={15} />
+                  <ArrowUp aria-hidden="true" size={16} />
                 </Button>
               </div>
             </div>

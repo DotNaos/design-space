@@ -1,5 +1,5 @@
 import { Button, Input, Tooltip } from "@heroui/react";
-import { Cable, Maximize2, MessageSquarePlus, Send, Unplug } from "lucide-react";
+import { ArrowUp, Cable, MessageSquare, Unplug } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { SourceCodexChatModal } from "./SourceCodexChatModal";
@@ -93,8 +93,8 @@ export function SourceCanvasFeedbackDock(props: {
     <>
       <div
         aria-label="Codex composer"
-        className={`relative flex h-9 min-w-64 max-w-[min(520px,48vw)] flex-1 items-center rounded-lg border bg-[#18191d]/95 shadow-xl shadow-black/30 backdrop-blur ${
-          writable ? "border-white/10" : "border-amber-300/15"
+        className={`relative flex h-10 min-w-64 max-w-[min(460px,calc(100vw-2rem))] flex-1 items-center gap-0.5 rounded-full border bg-[#0d0e10]/95 p-1 shadow-[0_18px_58px_rgba(0,0,0,0.32)] backdrop-blur-xl transition-colors ${
+          writable ? "border-white/10 focus-within:border-white/20" : "border-amber-300/15"
         }`}
       >
         {error ? (
@@ -109,39 +109,24 @@ export function SourceCanvasFeedbackDock(props: {
           <Button
             isIconOnly
             aria-label="Open full Codex conversation"
-            className="size-7 min-w-7 shrink-0 text-zinc-500 hover:text-zinc-300"
+            className="relative size-8 min-w-8 shrink-0 rounded-full text-zinc-400 hover:bg-white/[0.07] hover:text-zinc-100"
             isDisabled={!connected}
             size="sm"
             variant="ghost"
             onPress={() => setConversationOpen(true)}
           >
-            <Maximize2 aria-hidden="true" size={12} />
-          </Button>
-          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
-            Open full conversation
-          </Tooltip.Content>
-        </Tooltip>
-        <Tooltip closeDelay={80} delay={350}>
-          <Button
-            isIconOnly
-            aria-label={props.context ? `${comments.length} comments on ${props.context.label}` : "No layer selected"}
-            className="size-7 min-w-7 text-zinc-500"
-            isDisabled={!props.context}
-            size="sm"
-            variant="ghost"
-          >
-            <MessageSquarePlus aria-hidden="true" size={13} />
+            <MessageSquare aria-hidden="true" size={14} />
             {comments.length ? (
-              <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-violet-400" />
+              <span className="absolute right-1 top-1 size-1.5 rounded-full bg-violet-400 ring-2 ring-[#0d0e10]" />
             ) : null}
           </Button>
           <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
-            {props.context ? `${comments.length} saved comment${comments.length === 1 ? "" : "s"}` : "Select a component or layer"}
+            Open full conversation · {comments.length} saved comment{comments.length === 1 ? "" : "s"}
           </Tooltip.Content>
         </Tooltip>
         <Input
           aria-label="Codex feedback"
-          className={`min-w-0 flex-1 bg-transparent px-1 text-[11px] text-zinc-200 outline-none placeholder:text-zinc-600 ${
+          className={`min-w-0 flex-1 bg-transparent px-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-500 ${
             writable ? "" : "cursor-pointer"
           }`}
           placeholder={placeholder}
@@ -163,8 +148,8 @@ export function SourceCanvasFeedbackDock(props: {
           <Button
             isIconOnly
             aria-label={connected ? "Change connected Codex task" : "Connect Codex task"}
-            className={`size-7 min-w-7 shrink-0 ${
-              writable ? "text-zinc-500 hover:text-zinc-300" : "text-amber-300/70 hover:bg-amber-300/10"
+            className={`size-8 min-w-8 shrink-0 rounded-full ${
+              writable ? "text-zinc-500 hover:bg-white/[0.07] hover:text-zinc-200" : "text-amber-300/70 hover:bg-amber-300/10"
             }`}
             isDisabled={connection === "checking"}
             size="sm"
@@ -185,14 +170,14 @@ export function SourceCanvasFeedbackDock(props: {
           <Button
             isIconOnly
             aria-label="Send to Codex"
-            className="size-7 min-w-7 rounded-md text-sky-300 hover:bg-sky-400/10"
+            className="size-8 min-w-8 rounded-full bg-zinc-100 text-zinc-950 shadow-sm hover:bg-white"
             isDisabled={!writable || !draft.trim()}
             isPending={sending}
             size="sm"
             variant="ghost"
             onPress={() => void send()}
           >
-            <Send aria-hidden="true" size={12} />
+            <ArrowUp aria-hidden="true" size={14} />
           </Button>
           <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
             {writable ? `Send to ${origin?.title}` : "Reconnect a Codex task to send"}

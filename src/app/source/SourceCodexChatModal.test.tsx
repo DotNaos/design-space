@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -127,6 +127,37 @@ describe("SourceCodexChatModal", () => {
       "Please inspect this screenshot",
       ["/tmp/design-space-codex-attachments/test.png"],
     ));
+  });
+
+  it("accepts a pasted screenshot without replacing typed text", async () => {
+    render(<SourceCodexChatModal open origin={origin} onClose={() => undefined} />);
+    const composer = await screen.findByRole("textbox", { name: "Message Codex" });
+    await userEvent.type(composer, "Keep this draft");
+
+    fireEvent.paste(composer, {
+      clipboardData: {
+        files: [new File([new Uint8Array([137, 80, 78, 71])], "pasted.png", { type: "image/png" })],
+      },
+    });
+
+    expect(await screen.findByRole("img", { name: "pasted.png" })).toBeVisible();
+    expect(composer).toHaveValue("Keep this draft");
+  });
+
+  it("accepts and removes a dropped screenshot from the compact composer", async () => {
+    render(<SourceCodexChatModal open origin={origin} onClose={() => undefined} />);
+    const composer = await screen.findByRole("group", { name: "Codex message composer" });
+    const screenshot = new File([new Uint8Array([137, 80, 78, 71])], "dropped.png", {
+      type: "image/png",
+    });
+
+    fireEvent.drop(composer, {
+      dataTransfer: { files: [screenshot], types: ["Files"] },
+    });
+
+    expect(await screen.findByRole("img", { name: "dropped.png" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Remove dropped.png" }));
+    expect(screen.queryByRole("img", { name: "dropped.png" })).not.toBeInTheDocument();
   });
 
   it("asks for a reconnect without claiming Desktop tasks are read-only", async () => {
