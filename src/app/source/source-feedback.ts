@@ -28,6 +28,23 @@ export interface SourceFeedbackAnnotation {
   id: string;
 }
 
+export interface SourceCanvasAnnotation {
+  comment: string;
+  context: SourceFeedbackContext;
+  element: string;
+  id: string;
+  occurrence: number;
+  point: {
+    x: number;
+    y: number;
+  };
+}
+
+export type SourceCanvasAnnotationTarget = Omit<SourceCanvasAnnotation, "comment" | "id"> & {
+  annotationId?: string;
+  comment?: string;
+};
+
 export function sourceFeedbackContext(
   entry?: SourceWorkspaceEntry,
   layer?: SourceWorkspaceLayer,
@@ -57,20 +74,44 @@ export function sourceFeedbackContext(
   };
 }
 
-export function formatSourceFeedback(message: string, context?: SourceFeedbackContext) {
+export function formatSourceFeedback(
+  message: string,
+  context?: SourceFeedbackContext,
+  annotations: readonly SourceCanvasAnnotation[] = [],
+) {
   const trimmed = message.trim();
+  if (annotations.length) {
+    const lines = [
+      ...(trimmed ? [trimmed, ""] : []),
+      "---",
+      "Design Space annotations",
+      ...annotations.flatMap((annotation, index) => {
+        const range = sourceRange(annotation.context);
+        return [
+          `${index + 1}. ${annotation.element} — ${annotation.comment}`,
+          `   Source: ${annotation.context.source.relativePath}:${range}`,
+          `   Canvas point: ${Math.round(annotation.point.x * 100)}% × ${Math.round(annotation.point.y * 100)}%`,
+          ...(annotation.occurrence > 0 ? [`   Rendered instance: ${annotation.occurrence + 1}`] : []),
+        ];
+      }),
+    ];
+    return lines.join("\n");
+  }
   if (!context) return trimmed;
-  const range = context.source.start === context.source.end
-    ? `${context.source.start}`
-    : `${context.source.start}-${context.source.end}`;
   return [
     trimmed,
     "",
     "---",
     "Design Space context",
     `- ${context.kind}: ${context.label}`,
-    `- Source: ${context.source.relativePath}:${range}`,
+    `- Source: ${context.source.relativePath}:${sourceRange(context)}`,
   ].join("\n");
+}
+
+function sourceRange(context: SourceFeedbackContext) {
+  return context.source.start === context.source.end
+    ? `${context.source.start}`
+    : `${context.source.start}-${context.source.end}`;
 }
 
 export function addSourceFeedbackAnnotation(

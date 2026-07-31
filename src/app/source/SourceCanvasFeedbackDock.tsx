@@ -1,5 +1,5 @@
 import { Button, Input, Tooltip } from "@heroui/react";
-import { ArrowUp, Cable, MessageSquare, Unplug } from "lucide-react";
+import { ArrowUp, Cable, MessageSquare, MessageSquarePlus, Unplug } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { SourceCodexChatModal } from "./SourceCodexChatModal";
@@ -7,6 +7,7 @@ import { SourceCodexConnectionModal } from "./SourceCodexConnectionModal";
 import {
   addSourceFeedbackAnnotation,
   formatSourceFeedback,
+  type SourceCanvasAnnotation,
   type SourceFeedbackContext,
   useSourceFeedbackAnnotations,
 } from "./source-feedback";
@@ -19,7 +20,11 @@ import {
 } from "./source-codex-feedback-client";
 
 export function SourceCanvasFeedbackDock(props: {
+  annotationMode?: boolean;
+  annotations?: readonly SourceCanvasAnnotation[];
   context?: SourceFeedbackContext;
+  onAnnotationModeChange?: (active: boolean) => void;
+  onAnnotationsSent?: () => void;
 }) {
   const [draft, setDraft] = useState("");
   const [origin, setOrigin] = useState<SourceCodexOrigin>();
@@ -31,6 +36,7 @@ export function SourceCanvasFeedbackDock(props: {
   const [error, setError] = useState<string>();
   const [sending, setSending] = useState(false);
   const comments = useSourceFeedbackAnnotations(props.context?.id);
+  const annotations = props.annotations ?? [];
 
   useEffect(() => {
     let active = true;
@@ -55,13 +61,17 @@ export function SourceCanvasFeedbackDock(props: {
   }, []);
 
   async function send() {
-    if (!origin || !draft.trim() || sending) return;
+    if (!origin || (!draft.trim() && !annotations.length) || sending) return;
     setSending(true);
     setError(undefined);
     try {
-      await sendSourceCodexFeedback(origin, formatSourceFeedback(draft, props.context));
-      if (props.context) addSourceFeedbackAnnotation(draft, props.context);
+      await sendSourceCodexFeedback(origin, formatSourceFeedback(draft, props.context, annotations));
+      if (props.context && draft.trim()) addSourceFeedbackAnnotation(draft, props.context);
+      for (const annotation of annotations) {
+        addSourceFeedbackAnnotation(annotation.comment, annotation.context);
+      }
       setDraft("");
+      props.onAnnotationsSent?.();
     } catch (cause: unknown) {
       if (cause instanceof SourceCodexTaskUnavailableError) {
         setOrigin(undefined);
@@ -83,7 +93,9 @@ export function SourceCanvasFeedbackDock(props: {
     ? "Connecting to Codex…"
       : writable
       ? props.context
-        ? `Comment on ${props.context.label}…`
+        ? annotations.length
+          ? `Add a message or send ${annotations.length} annotation${annotations.length === 1 ? "" : "s"}…`
+          : `Comment on ${props.context.label}…`
         : "Message the working Codex task…"
       : connected
         ? "Reconnect this Codex task to send…"
@@ -91,12 +103,43 @@ export function SourceCanvasFeedbackDock(props: {
 
   return (
     <>
-      <div
-        aria-label="Codex composer"
-        className={`relative flex h-10 min-w-64 max-w-[min(460px,calc(100vw-2rem))] flex-1 items-center gap-0.5 rounded-full border bg-[#0d0e10]/95 p-1 shadow-[0_18px_58px_rgba(0,0,0,0.32)] backdrop-blur-xl transition-colors ${
-          writable ? "border-white/10 focus-within:border-white/20" : "border-amber-300/15"
-        }`}
-      >
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <Tooltip closeDelay={80} delay={350}>
+          <Button
+            isIconOnly
+            aria-label={props.annotationMode
+              ? `Finish adding canvas annotations, ${annotations.length} saved`
+              : annotations.length
+                ? `Continue adding canvas annotations, ${annotations.length} saved`
+                : "Add a canvas annotation"}
+            aria-pressed={props.annotationMode}
+            className={`relative size-10 min-w-10 shrink-0 rounded-full border shadow-[0_14px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl ${
+              props.annotationMode || annotations.length
+                ? "border-amber-200/30 bg-amber-300 text-zinc-950 hover:bg-amber-200"
+                : "border-white/10 bg-[#0d0e10]/95 text-zinc-400 hover:bg-[#18191c] hover:text-zinc-100"
+            }`}
+            isDisabled={!props.context || !props.onAnnotationModeChange}
+            size="sm"
+            variant="ghost"
+            onPress={() => props.onAnnotationModeChange?.(!props.annotationMode)}
+          >
+            <MessageSquarePlus aria-hidden="true" size={15} />
+            {annotations.length ? (
+              <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full border-2 border-[#0d0e10] bg-amber-200 px-1 text-[8px] font-bold leading-3 text-zinc-950">
+                {annotations.length}
+              </span>
+            ) : null}
+          </Button>
+          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+            {props.annotationMode ? "Finish placing annotations" : "Comment on a precise canvas element"}
+          </Tooltip.Content>
+        </Tooltip>
+        <div
+          aria-label="Codex composer"
+          className={`relative flex h-10 min-w-64 max-w-[min(460px,calc(100vw-2rem))] flex-1 items-center gap-0.5 rounded-full border bg-[#0d0e10]/95 p-1 shadow-[0_18px_58px_rgba(0,0,0,0.32)] backdrop-blur-xl transition-colors ${
+            writable ? "border-white/10 focus-within:border-white/20" : "border-amber-300/15"
+          }`}
+        >
         {error ? (
           <div
             role="alert"
@@ -171,7 +214,7 @@ export function SourceCanvasFeedbackDock(props: {
             isIconOnly
             aria-label="Send to Codex"
             className="size-8 min-w-8 rounded-full bg-zinc-100 text-zinc-950 shadow-sm hover:bg-white"
-            isDisabled={!writable || !draft.trim()}
+            isDisabled={!writable || (!draft.trim() && !annotations.length)}
             isPending={sending}
             size="sm"
             variant="ghost"
@@ -183,6 +226,7 @@ export function SourceCanvasFeedbackDock(props: {
             {writable ? `Send to ${origin?.title}` : "Reconnect a Codex task to send"}
           </Tooltip.Content>
         </Tooltip>
+        </div>
       </div>
       <SourceCodexConnectionModal
         current={origin}

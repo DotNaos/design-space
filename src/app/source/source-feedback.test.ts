@@ -37,3 +37,30 @@ it("uses the component definition when no layer is selected", () => {
     label: "Button",
   });
 });
+
+it("formats multiple spatial annotations with source and canvas position", () => {
+  const context = sourceFeedbackContext(entry)!;
+  const message = formatSourceFeedback("Please apply these changes.", context, [
+    {
+      comment: "Increase the label contrast.",
+      context,
+      element: "<button>",
+      id: "annotation-1",
+      occurrence: 0,
+      point: { x: 0.42, y: 0.67 },
+    },
+    {
+      comment: "Tighten this spacing.",
+      context,
+      element: "<section>",
+      id: "annotation-2",
+      occurrence: 1,
+      point: { x: 0.8, y: 0.2 },
+    },
+  ]);
+
+  expect(message).toContain("Design Space annotations");
+  expect(message).toContain("1. <button> — Increase the label contrast.");
+  expect(message).toContain("Canvas point: 42% × 67%");
+  expect(message).toContain("Rendered instance: 2");
+});

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
@@ -58,6 +58,55 @@ it("keeps the Codex composer available in a library canvas", () => {
 
   expect(screen.getByLabelText("Codex composer")).toBeVisible();
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeVisible();
+});
+
+it("places, edits, and removes spatial canvas annotations", async () => {
+  const layer: SourceWorkspaceLayer = {
+    children: [],
+    id: "button-layer",
+    kind: "html",
+    label: "button",
+    source: { start: 12, end: 24 },
+  };
+  const entry = {
+    ...previewEntry("AnnotatedButton", async () => previewDefinition("Annotated button")),
+    layers: [layer],
+  };
+  render(<SourcePreviewFrame device="desktop" entry={entry} mode="design" runtime="react" styles={[]} />);
+
+  const toggle = screen.getByRole("button", { name: "Add a canvas annotation" });
+  await waitFor(() => expect(toggle).toBeEnabled());
+  await userEvent.click(toggle);
+  expect(screen.getByText("Select an element to comment")).toBeVisible();
+
+  const frame = await screen.findByTitle("AnnotatedButton desktop preview") as HTMLIFrameElement;
+  frame.getBoundingClientRect = () => ({ left: 0, top: 0, width: 960, height: 520 }) as DOMRect;
+  frame.contentDocument!.elementFromPoint = vi.fn(() => null);
+  const surface = screen.getByTestId("source-preview-selection-surface");
+  surface.getBoundingClientRect = () => ({ left: 0, top: 0, width: 960, height: 520 }) as DOMRect;
+  fireEvent.click(surface, { clientX: 480, clientY: 260 });
+
+  expect(screen.getByRole("form", { name: "Annotation for <button>" })).toBeVisible();
+  fireEvent.change(screen.getByRole("textbox", { name: "Annotation comment" }), {
+    target: { value: "Make this action clearer." },
+  });
+  await userEvent.click(screen.getByRole("button", { name: "Add" }));
+
+  const marker = await screen.findByRole("button", { name: "Edit annotation 1 for <button>" });
+  expect(marker).toHaveTextContent("1");
+  expect(screen.getByRole("button", { name: /Finish adding canvas annotations, 1 saved/ })).toBeVisible();
+
+  await userEvent.click(marker);
+  const editor = screen.getByRole("textbox", { name: "Annotation comment" });
+  expect(editor).toHaveValue("Make this action clearer.");
+  fireEvent.change(editor, { target: { value: "Clarify the primary action." } });
+  await userEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(screen.queryByRole("form", { name: "Annotation for <button>" })).not.toBeInTheDocument();
+
+  await userEvent.click(marker);
+  await userEvent.click(screen.getByRole("button", { name: "Delete annotation" }));
+  expect(screen.queryByRole("button", { name: "Edit annotation 1 for <button>" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Finish adding canvas annotations, 0 saved/ })).toBeVisible();
 });
 
 it("offers best-effort design generation from the empty canvas", async () => {

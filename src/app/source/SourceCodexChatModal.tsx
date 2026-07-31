@@ -1,4 +1,4 @@
-import { Button, Modal, TextArea } from "@heroui/react";
+import { Button, Input, Modal, TextArea } from "@heroui/react";
 import { ArrowUp, LoaderCircle, Plus, RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -360,7 +360,7 @@ export function SourceCodexChatModal(props: {
                     ))}
                   </div>
                 ) : null}
-                <input
+                <Input
                   ref={screenshotInputRef}
                   multiple
                   aria-label="Choose screenshots"

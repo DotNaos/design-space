@@ -29,7 +29,7 @@ export function mountSourceLayerHover(
     relativePath: string;
   },
   label?: string,
-  tone?: "component" | "layer",
+  tone?: "annotation" | "component" | "layer",
 ): () => void {
   return mountSourceLayerOutline(output, layerId, {
     externalOwner,
@@ -53,7 +53,7 @@ function mountSourceLayerOutline(
       relativePath: string;
     };
     label?: string;
-    tone: "component" | "layer";
+    tone: "annotation" | "component" | "layer";
     variant: "hover" | "selection";
   },
 ): () => void {
@@ -64,9 +64,11 @@ function mountSourceLayerOutline(
   const overlay = overlayRoot.ownerDocument.createElement("div");
   if (options.variant === "selection") overlay.dataset.designSpaceSourceSelection = layerId;
   else overlay.dataset.designSpaceSourceHover = layerId;
-  const color = options.tone === "component"
-    ? "#a78bfa"
-    : options.variant === "selection"
+  const color = options.tone === "annotation"
+    ? "#fbbf24"
+    : options.tone === "component"
+      ? "#a78bfa"
+      : options.variant === "selection"
       ? "#0d99ff"
       : "#72bfff";
   const outlineWidth = options.variant === "selection" ? 1.5 : 1;
