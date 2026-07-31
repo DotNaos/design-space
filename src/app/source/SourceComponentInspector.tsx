@@ -11,6 +11,8 @@ import type {
 import { SourceComponentPicker } from "./SourceComponentPicker";
 import { SourceDesignCaseControl } from "./SourceDesignCaseControl";
 import { SourceLayerDesignInspector } from "./SourceLayerDesignInspector";
+import { SourceFeedbackInspector } from "./SourceFeedbackInspector";
+import { sourceFeedbackContext } from "./source-feedback";
 import { TailwindClassField } from "../inspector/TailwindClassField";
 import type { SourceComponentCandidate } from "./source-slot-composition";
 import type { SourceLayerMetrics } from "./source-layer-design";
@@ -71,6 +73,7 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
               </div>
             </div>
           </section>
+          <SourceFeedbackInspector context={sourceFeedbackContext(props.entry, props.layer)} />
           <section aria-labelledby="outside-current-file-title" className="px-4 py-4">
             <div className="flex items-center gap-2 text-violet-300">
               <FileCode2 aria-hidden="true" size={14} />
@@ -134,6 +137,7 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
             </section>
           ) : null}
         </div>
+        <SourceFeedbackInspector context={sourceFeedbackContext(props.entry, props.layer)} />
         {props.entry.findings.length > 0 && (
           <section aria-label="Strict UI findings" className="border-b border-red-400/20 bg-red-400/[0.04] px-4 py-3">
             <header className="flex items-center gap-2 text-red-300">

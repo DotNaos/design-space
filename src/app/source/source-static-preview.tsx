@@ -1,7 +1,12 @@
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
+import type { CSSProperties } from "react";
 
-import type { ComponentDesignDefinition } from "../../shared/component-design";
+import type {
+  ComponentDesignDefinition,
+  ComponentDesignPreview,
+  ComponentDesignPreviewLength,
+} from "../../shared/component-design";
 import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { PreviewBoundary } from "../PreviewBoundary";
 import { SourcePreviewRuntimeContext } from "./SourcePreviewRuntime";
@@ -35,28 +40,82 @@ export function renderStaticSourcePreviewMarkup(props: SourcePreviewContentProps
 
 export function SourcePreviewContent(props: SourcePreviewContentProps) {
   const cases = propertyCases(props.entry, props.matrix);
+  const content = (
+    <div style={caseLayout(cases.length, props.centered && !props.definition.preview)}>
+      {cases.map((propertyCase) => (
+        <section key={propertyCase.label} style={caseStyle(cases.length)}>
+          {cases.length > 1 ? <p style={{ margin: "0 0 8px", color: "#71717a", font: "10px/1.4 ui-monospace,monospace" }}>{propertyCase.label}</p> : null}
+          <div style={caseContentStyle(cases.length, props.centered && !props.definition.preview)}>
+            <span data-design-space-preview-entry-root style={{ display: "contents" }}>
+              {props.definition.render(previewProps(props, propertyCase.values))}
+            </span>
+          </div>
+        </section>
+      ))}
+    </div>
+  );
   return (
     <PreviewBoundary resetKey={`${props.entry.id}:${props.caseName}:${props.matrix}`} errorTitle="Design preview crashed" errorMessage="Fix the colocated design or its required runtime context to recover.">
       <SourcePreviewRuntimeContext.Provider value>
-        <div style={cases.length > 1
-          ? { display: "grid", gridTemplateColumns: `repeat(${Math.min(cases.length, 3)}, minmax(0, 1fr))`, gap: 16, minHeight: "100%", padding: 16 }
-          : props.centered
-            ? { alignItems: "center", display: "flex", justifyContent: "center", minHeight: "100%", width: "100%" }
-            : { minHeight: "100%" }}>
-          {cases.map((propertyCase) => (
-            <section key={propertyCase.label} style={cases.length > 1 ? { minWidth: 0, border: "1px solid rgba(127,127,127,.22)", borderRadius: 8, padding: 12 } : undefined}>
-              {cases.length > 1 ? <p style={{ margin: "0 0 8px", color: "#71717a", font: "10px/1.4 ui-monospace,monospace" }}>{propertyCase.label}</p> : null}
-              <div style={cases.length > 1 && props.centered ? { alignItems: "center", display: "flex", justifyContent: "center", minHeight: 120 } : undefined}>
-                <span data-design-space-preview-entry-root style={{ display: "contents" }}>
-                  {props.definition.render(previewProps(props, propertyCase.values))}
-                </span>
-              </div>
-            </section>
-          ))}
-        </div>
+        {props.definition.preview ? (
+          <div style={{ alignItems: "center", display: "flex", justifyContent: "center", minHeight: "100%", width: "100%" }}>
+            <div
+              data-design-space-preview-environment
+              style={previewEnvironmentStyle(props.definition.preview)}
+            >
+              {content}
+            </div>
+          </div>
+        ) : content}
       </SourcePreviewRuntimeContext.Provider>
     </PreviewBoundary>
   );
+}
+
+function caseLayout(caseCount: number, centered?: boolean): CSSProperties {
+  if (caseCount > 1) {
+    return {
+      display: "grid",
+      gridTemplateColumns: `repeat(${Math.min(caseCount, 3)}, minmax(0, 1fr))`,
+      gap: 16,
+      minHeight: "100%",
+      padding: 16,
+    };
+  }
+  return centered
+    ? { alignItems: "center", display: "flex", justifyContent: "center", minHeight: "100%", width: "100%" }
+    : { minHeight: "100%" };
+}
+
+function caseStyle(caseCount: number): CSSProperties | undefined {
+  return caseCount > 1
+    ? { minWidth: 0, border: "1px solid rgba(127,127,127,.22)", borderRadius: 8, padding: 12 }
+    : undefined;
+}
+
+function caseContentStyle(caseCount: number, centered?: boolean): CSSProperties | undefined {
+  return caseCount > 1 && centered
+    ? { alignItems: "center", display: "flex", justifyContent: "center", minHeight: 120 }
+    : undefined;
+}
+
+function previewEnvironmentStyle(preview: Readonly<ComponentDesignPreview>): CSSProperties {
+  return {
+    alignItems: preview.layout === "center" ? "center" : undefined,
+    background: preview.background,
+    boxSizing: "border-box",
+    display: preview.layout === "center" ? "flex" : "block",
+    height: previewLength(preview.height),
+    justifyContent: preview.layout === "center" ? "center" : undefined,
+    minHeight: previewLength(preview.minHeight),
+    overflow: "auto",
+    padding: previewLength(preview.padding),
+    width: previewLength(preview.width) ?? "100%",
+  };
+}
+
+function previewLength(value: ComponentDesignPreviewLength | undefined): string | undefined {
+  return typeof value === "number" ? `${value}px` : value;
 }
 
 function previewProps(

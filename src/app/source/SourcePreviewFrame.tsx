@@ -10,7 +10,9 @@ import type {
 import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
 import { SourceCanvasContextHud } from "./SourceCanvasContextHud";
+import { SourceCanvasFeedbackDock } from "./SourceCanvasFeedbackDock";
 import { SourceHoverIdentityHud } from "./SourceHoverIdentityHud";
+import { sourceFeedbackContext } from "./source-feedback";
 import { SourceInstanceNavigator } from "./SourceInstanceNavigator";
 import type { SourceLayerMetrics, SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
 import { sourceLayerHitAtPreviewPoint, type SourceLayerHit } from "./source-preview-hit-testing";
@@ -83,6 +85,7 @@ export function SourcePreviewFrame(props: {
   const [contentSize, setContentSize] = useState<SourcePreviewContentSize>();
   const [revealTarget, setRevealTarget] = useState<{ key: string; rect: SourceLayerMetrics }>();
   const previewMode: SourcePreviewMode | "static" = props.mode ?? (props.selectionMode ? "design" : "static");
+  const feedbackContext = sourceFeedbackContext(props.entry, props.selectedLayer);
   const previewEntries = useMemo(() => props.entries ?? (props.entry ? [props.entry] : []), [props.entries, props.entry]);
   const selectableLayerIds = useMemo(() => sourceLayerIds(previewEntries), [previewEntries]);
   const externallyHoveredLayerHit = useMemo(() => props.hoveredLayer ? {
@@ -364,25 +367,35 @@ export function SourcePreviewFrame(props: {
       revealTarget={revealTarget?.key === revealKey ? revealTarget : undefined}
       selectionKey={props.entry?.id}
       selectionLabel={props.selectedLayerLabel ?? sourceCanvasLayerLabel(props.selectedLayer) ?? props.node?.label}
-      hud={props.workspaceMode ? (
-        <SourceCanvasContextHud
-          contextLabel={props.node?.label ?? props.entry?.label ?? "Component"}
-          mode={props.workspaceMode}
-          playing={previewMode === "play"}
-          onPlayChange={(playing) => props.onModeChange?.(playing ? "play" : "design")}
-          onReturnToPreview={props.onReturnToPreview}
-        >
-          {hoveredOwner ? <SourceHoverIdentityHud external={Boolean(hoveredExternalOwner)} owner={hoveredOwner} /> : null}
-        </SourceCanvasContextHud>
-      ) : hoveredOwner ? (
-        <SourceHoverIdentityHud external={Boolean(hoveredExternalOwner)} owner={hoveredOwner} />
-      ) : props.selectedLayer && selectedLayerOccurrenceCount > 1 ? (
-        <SourceInstanceNavigator
-          count={selectedLayerOccurrenceCount}
-          index={selectedOccurrence}
-          onChange={(occurrence) => props.onSelectLayer?.(props.selectedLayer!.id, occurrence)}
-        />
-      ) : undefined}
+      hud={(
+        <div className="flex w-[min(920px,calc(100vw-2rem))] max-w-full flex-col gap-1.5">
+          {hoveredOwner ? (
+            <div className="min-w-0">
+              <SourceHoverIdentityHud external={Boolean(hoveredExternalOwner)} owner={hoveredOwner} />
+            </div>
+          ) : !props.workspaceMode && props.selectedLayer && selectedLayerOccurrenceCount > 1 ? (
+            <div className="min-w-0">
+              <SourceInstanceNavigator
+                count={selectedLayerOccurrenceCount}
+                index={selectedOccurrence}
+                onChange={(occurrence) => props.onSelectLayer?.(props.selectedLayer!.id, occurrence)}
+              />
+            </div>
+          ) : null}
+          <div className="flex min-w-0 items-center gap-1.5">
+            {props.workspaceMode ? (
+              <SourceCanvasContextHud
+                contextLabel={props.node?.label ?? props.entry?.label ?? "Component"}
+                mode={props.workspaceMode}
+                playing={previewMode === "play"}
+                onPlayChange={(playing) => props.onModeChange?.(playing ? "play" : "design")}
+                onReturnToPreview={props.onReturnToPreview}
+              />
+            ) : null}
+            <SourceCanvasFeedbackDock context={feedbackContext} />
+          </div>
+        </div>
+      )}
       onDeviceChange={props.onDeviceChange ?? (() => undefined)}
       onModeChange={props.onModeChange}
       toolbarEnd={definition && selectedCase ? (

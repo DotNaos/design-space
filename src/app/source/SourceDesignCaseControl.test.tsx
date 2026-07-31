@@ -30,6 +30,41 @@ it("shows typed component states in Properties and changes the shared selection"
   expect(onCaseChange).toHaveBeenCalledWith("ready");
 });
 
+it("shows stateless props presets in the same Properties dropdown", async () => {
+  const onCaseChange = vi.fn();
+  const entry = statefulEntry();
+  entry.design = {
+    fileId: "status-design",
+    relativePath: "src/Status.design.tsx",
+    load: async () => ({
+      component: () => null,
+      defaults: {},
+      initialCase: "default",
+      isStateful: false,
+      cases: { default: {}, withButton: { label: "Action" } },
+      preview: { background: "#141518", width: 480 },
+      render: () => null,
+    }),
+  };
+  const { container } = render(
+    <SourceDesignCaseControl
+      entry={entry}
+      selectedCase="default"
+      onCaseChange={onCaseChange}
+    />,
+  );
+
+  await waitFor(() => {
+    expect(
+      container.querySelector<HTMLButtonElement>('button[aria-label="Props preset"]'),
+    ).not.toBeNull();
+  });
+  const select = container.querySelector<HTMLButtonElement>('button[aria-label="Props preset"]')!;
+  await userEvent.click(select);
+  await userEvent.click(await screen.findByRole("option", { name: "withButton" }));
+  expect(onCaseChange).toHaveBeenCalledWith("withButton");
+});
+
 function statefulEntry(): RuntimeSourceWorkspaceEntry {
   return {
     id: "status",

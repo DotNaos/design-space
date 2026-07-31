@@ -70,13 +70,35 @@ Both forms are normal TypeScript: their values MUST satisfy the real component p
 compiler MUST reject an `initialState` that is not a key of the declared `states` object.
 
 ```tsx
-export default defineComponentDesign(Button, {
+import { Button } from "./Button";
+import { Panel } from "./Panel";
+
+export default defineComponentDesign(Panel, {
   isStateful: false,
-  defaults: { variant: "solid", size: "md", isDisabled: false, slots: { label: "Button" } },
-  designs: { default: {}, disabled: { isDisabled: true } },
-  render: (props) => <Button {...props} />,
+  defaults: { tone: "neutral", slots: { content: <Button slots={{ label: "Continue" }} /> } },
+  preview: {
+    background: "#141518",
+    minHeight: 320,
+    padding: 24,
+    width: 480,
+    layout: "center",
+  },
+  designs: {
+    default: {},
+    success: { tone: "success" },
+    withSecondaryAction: {
+      slots: { content: <Button variant="secondary" slots={{ label: "Continue" }} /> },
+    },
+  },
+  render: (props) => <Panel {...props} />,
 });
 ```
+
+The optional `preview` object describes only the isolated canvas environment: its background, dimensions,
+padding, and placement. It MUST NOT change the component's own props or authored styles. Named `designs`
+or `states` are the typed props presets shown in the Properties dropdown. They MAY contain JSX values,
+including compatible components for typed slots, because the real props type remains the compiler-owned
+contract.
 
 Preview readiness follows an explicit state machine: missing design, checking, invalid design, ready,
 runtime crash, or last-valid preview while an edit is invalid. Only ready or last-valid evidence may

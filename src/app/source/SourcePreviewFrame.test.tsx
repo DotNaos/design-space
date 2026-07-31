@@ -45,6 +45,21 @@ it("requires a colocated design instead of executing the source component", () =
   expect(component).not.toHaveBeenCalled();
 });
 
+it("keeps the Codex composer available in a library canvas", () => {
+  render(
+    <SourcePreviewFrame
+      device="desktop"
+      entry={previewEntry("LibraryButton", async () => previewDefinition("Library button"))}
+      mode="design"
+      runtime="react"
+      styles={[]}
+    />,
+  );
+
+  expect(screen.getByLabelText("Codex composer")).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeVisible();
+});
+
 it("offers best-effort design generation from the empty canvas", async () => {
   const onGenerateDesign = vi.fn();
   const entry = {
@@ -414,6 +429,41 @@ it("centers an explicitly opened component inside the static canvas", async () =
     width: "100%",
   });
   expect(container).toHaveTextContent("Centered component");
+});
+
+it("renders the source-owned preview environment without styling the component", async () => {
+  const markup = await renderStaticSourcePreviewMarkup({
+    caseName: "default",
+    centered: true,
+    definition: {
+      ...previewDefinition("Framed component"),
+      preview: {
+        background: "#141518",
+        height: 320,
+        layout: "center",
+        padding: 24,
+        width: "min(100%, 480px)",
+      },
+    },
+    entry: previewEntry("framed", async () => previewDefinition("unused")),
+    matrix: false,
+  });
+  const container = document.createElement("div");
+  container.innerHTML = markup;
+  const environment = container.querySelector<HTMLElement>("[data-design-space-preview-environment]");
+  const component = environment?.querySelector("p");
+
+  expect(environment).toHaveStyle({
+    alignItems: "center",
+    background: "#141518",
+    display: "flex",
+    height: "320px",
+    justifyContent: "center",
+    padding: "24px",
+    width: "min(100%, 480px)",
+  });
+  expect(component).toHaveTextContent("Framed component");
+  expect(component).not.toHaveAttribute("style");
 });
 
 it("renders empty typed slots as purple canvas insertion targets", async () => {

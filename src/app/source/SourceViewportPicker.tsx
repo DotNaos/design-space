@@ -1,5 +1,5 @@
 import { Label, ListBox, Select, Slider, ToggleButton, Tooltip } from "@heroui/react";
-import { Crop, MonitorSmartphone, Scan } from "lucide-react";
+import { Crop, Frame, MonitorSmartphone, Scan } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { DesignSpaceDevice } from "../../shared/source-workspace";
@@ -11,11 +11,13 @@ export function SourceViewportPicker(props: {
   after?: ReactNode;
   clipToScreen: boolean;
   device: DesignSpaceDevice;
+  showDeviceFrame: boolean;
   node?: SourceTreeNode;
   presetId: string;
   responsiveWidth: number;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onClipToScreenChange: (clipToScreen: boolean) => void;
+  onShowDeviceFrameChange: (showDeviceFrame: boolean) => void;
   onPresetChange: (id: string) => void;
   onResponsiveWidthChange: (width: number) => void;
 }) {
@@ -61,6 +63,22 @@ export function SourceViewportPicker(props: {
           </Slider>
         </>
       )}
+      <Tooltip delay={350} closeDelay={80}>
+        <ToggleButton
+          isIconOnly
+          aria-label={props.showDeviceFrame ? "Hide device mockup" : "Show device mockup"}
+          className="size-6 min-w-6 rounded-md text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-300 data-[selected]:bg-sky-400/15 data-[selected]:text-sky-200"
+          isSelected={props.showDeviceFrame}
+          size="sm"
+          variant="ghost"
+          onChange={props.onShowDeviceFrameChange}
+        >
+          <Frame aria-hidden="true" size={12} />
+        </ToggleButton>
+        <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+          {props.showDeviceFrame ? "Hide device mockup" : "Show device mockup"}
+        </Tooltip.Content>
+      </Tooltip>
       <Tooltip delay={350} closeDelay={80}>
         <ToggleButton
           isIconOnly

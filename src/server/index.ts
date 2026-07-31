@@ -15,6 +15,8 @@ export * from "./virtual-target-plugin";
 export * from "./source-project-config";
 export * from "./source-file-index";
 export * from "./source-project-registration";
+export * from "./source-codex-plugin";
+export * from "./source-codex-service";
 export * from "./typescript-component-index";
 export { defineDesignSpace } from "../shared/source-workspace";
 export type { DesignSpaceProjectConfig } from "../shared/source-workspace";

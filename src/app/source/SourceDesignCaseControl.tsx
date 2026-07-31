@@ -41,7 +41,7 @@ export function SourceDesignCaseControl(props: {
   const cases = useMemo(() => Object.keys(definition?.cases ?? {}), [definition]);
   if (!design) return null;
 
-  const label = definition?.isStateful ? "Component state" : "Variant";
+  const label = definition?.isStateful ? "Component state" : "Props preset";
   const selectedCase = definition && cases.includes(props.selectedCase ?? "")
     ? props.selectedCase!
     : definition?.initialCase;

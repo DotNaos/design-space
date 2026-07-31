@@ -2,8 +2,32 @@ import type { ComponentProps, ComponentType, ReactNode } from "react";
 
 export type ComponentDesignValues<Props extends object> = Readonly<Record<string, Readonly<Partial<Props>>>>;
 
+export type ComponentDesignPreviewLength = number | string;
+
+export interface ComponentDesignPreview {
+  /**
+   * CSS color used behind the isolated component without changing the component.
+   */
+  background?: string;
+  /**
+   * Fixed or CSS-sized preview frame dimensions. Numbers are interpreted as px.
+   */
+  width?: ComponentDesignPreviewLength;
+  height?: ComponentDesignPreviewLength;
+  minHeight?: ComponentDesignPreviewLength;
+  /**
+   * Space between the preview frame and the component. Numbers are px.
+   */
+  padding?: ComponentDesignPreviewLength;
+  /**
+   * Placement of the rendered component inside its preview frame.
+   */
+  layout?: "start" | "center";
+}
+
 interface ComponentDesignBase<Component extends ComponentType<any>> {
   defaults: Readonly<ComponentProps<Component>>;
+  preview?: Readonly<ComponentDesignPreview>;
   render: (props: Readonly<ComponentProps<Component>>) => ReactNode;
 }
 
@@ -35,6 +59,7 @@ export interface ComponentDesignDefinition<Props extends object = Record<string,
   initialCase: string;
   isStateful: boolean;
   cases: ComponentDesignValues<Props>;
+  preview?: Readonly<ComponentDesignPreview>;
   render: (props: Readonly<Props>) => ReactNode;
 }
 
@@ -67,6 +92,7 @@ export function defineComponentDesign<Component extends ComponentType<any>>(
       initialCase: options.initialState,
       isStateful: true,
       cases: options.states,
+      preview: options.preview,
       render: options.render,
     };
   }
@@ -76,6 +102,7 @@ export function defineComponentDesign<Component extends ComponentType<any>>(
     initialCase: "default",
     isStateful: false,
     cases: options.designs,
+    preview: options.preview,
     render: options.render,
   };
 }

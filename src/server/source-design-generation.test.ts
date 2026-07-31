@@ -37,6 +37,9 @@ it("creates a compiled colocated design from compiler-derived props", async () =
   expect(source).toContain("as unknown as ComponentProps<typeof ComponentUnderDesign>");
   expect(source).toContain('import target from "virtual:design-space-target";');
   expect(source).toContain('entry: target.sourceWorkspace?.entries.find((entry) => entry.relativePath === "src/app/components/Panel/index.tsx" && entry.exportName === "Panel")');
+  expect(source).toContain('background: "#141518"');
+  expect(source).toContain("minHeight: 360");
+  expect(source).toContain('width: "min(100%, 640px)"');
   expect(source).toContain("designs: { default: {} }");
 });
 

@@ -44,3 +44,17 @@ it("switches between the selected screen and measured content bounds", async () 
   expect(screen.getByText("360 × 420")).toBeVisible();
   expect(screen.getByRole("button", { name: "Hug preview content" })).toBeVisible();
 });
+
+it("wraps the selected screen in a device mockup without changing its viewport", async () => {
+  render(
+    <SourceCanvasViewport device="mobile" onDeviceChange={vi.fn()}>
+      {(frame) => <output>{`${frame.width} × ${frame.height}`}</output>}
+    </SourceCanvasViewport>,
+  );
+
+  expect(screen.queryByLabelText("phone device frame")).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Show device mockup" }));
+  expect(screen.getByLabelText("phone device frame")).toBeVisible();
+  expect(screen.getByText("390 × 844")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Hide device mockup" })).toBeVisible();
+});

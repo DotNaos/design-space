@@ -13,7 +13,9 @@ import {
   loadRegisteredProject,
   LocalOperationService,
   resolveServerProjectRoot,
+  SourceCodexService,
   SourceDraftPreviewRegistry,
+  sourceCodexPlugin,
 } from "./src/server";
 import { createViteFileSystemPolicy } from "./src/server/vite-file-system-policy";
 import { targetTypeScriptAliases } from "./src/server/typescript-path-aliases";
@@ -39,6 +41,7 @@ export default defineConfig(async () => {
     resolveServerProjectRoot(resolve(root, "examples/source-target")),
   );
   const sourceDraftPreviews = new SourceDraftPreviewRegistry();
+  const sourceCodex = new SourceCodexService(undefined, root);
   const api = new LocalOperationService(
     new EditService(registeredTarget, { sourceDraftPreviews }),
     new DocumentService(registeredTarget),
@@ -55,6 +58,7 @@ export default defineConfig(async () => {
       enforcedPortless(),
       designSpaceTargetPlugin(registeredTarget, sourceDraftPreviews),
       designSpaceApiPlugin(api),
+      sourceCodexPlugin(sourceCodex),
       runningTargetPlugin(registeredTarget.project),
       react(),
       tailwindcss(),
@@ -62,6 +66,13 @@ export default defineConfig(async () => {
     server: {
       host: "127.0.0.1",
       port: serverPort,
+      proxy: {
+        "/__project-space": {
+          changeOrigin: true,
+          rewrite: (path: string) => path.replace(/^\/__project-space/, ""),
+          target: "http://project-space.localhost:1355",
+        },
+      },
       strictPort: true,
       fs: createViteFileSystemPolicy(root, registeredTarget.targetModulePath, registeredTarget.root, [
         registeredTarget.sourceLibrary?.development?.root ?? "",

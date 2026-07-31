@@ -85,6 +85,13 @@ export function generatedDesignSource(
     acceptsProps
       ? `  defaults: ${defaults.source} as unknown as ComponentProps<typeof ComponentUnderDesign>,`
       : "  defaults: {},",
+    "  preview: {",
+    '    background: "#141518",',
+    "    minHeight: 360,",
+    "    padding: 32,",
+    '    width: "min(100%, 640px)",',
+    '    layout: "center",',
+    "  },",
     "  designs: { default: {} },",
     acceptsProps
       ? "  render: (props: ComponentProps<typeof ComponentUnderDesign>) => <ComponentUnderDesign {...props} />,"

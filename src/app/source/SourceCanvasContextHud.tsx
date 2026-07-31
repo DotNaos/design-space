@@ -12,7 +12,7 @@ export function SourceCanvasContextHud(props: {
   onReturnToPreview?: () => void;
 }) {
   return (
-    <div className="flex max-w-[min(720px,calc(100vw-2rem))] items-center gap-1.5">
+    <div className="flex min-w-0 items-center gap-1.5">
       <div
         aria-label="Canvas context"
         className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-[#18191d]/95 p-0.5 pl-2 text-[10px] text-zinc-400 shadow-xl shadow-black/30 backdrop-blur"
