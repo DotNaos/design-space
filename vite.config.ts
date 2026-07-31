@@ -16,6 +16,7 @@ import {
   SourceCodexService,
   SourceDraftPreviewRegistry,
   sourceCodexPlugin,
+  workspaceControlPlugin,
 } from "./src/server";
 import { createViteFileSystemPolicy } from "./src/server/vite-file-system-policy";
 import { targetTypeScriptAliases } from "./src/server/typescript-path-aliases";
@@ -59,6 +60,7 @@ export default defineConfig(async () => {
       designSpaceTargetPlugin(registeredTarget, sourceDraftPreviews),
       designSpaceApiPlugin(api),
       sourceCodexPlugin(sourceCodex),
+      workspaceControlPlugin(),
       runningTargetPlugin(registeredTarget.project),
       react(),
       tailwindcss(),

@@ -19,6 +19,7 @@ import {
 
 import { useWorkspacePanelWidths } from "./use-workspace-panel-widths";
 import { useWorkspacePanelVisibility } from "./use-workspace-panel-visibility";
+import { useWorkspacePanelControl } from "./use-workspace-panel-control";
 import {
   clampPanelWidth,
   fitWorkspacePanelWidths,
@@ -66,6 +67,7 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
   const bounds = { left: leftBounds, right: rightBounds };
   const { widths, setWidths } = useWorkspacePanelWidths(props.namespace, bounds);
   const { visibility, setVisible, setExpanded, toggle } = useWorkspacePanelVisibility(props.namespace);
+  useWorkspacePanelControl({ setVisible, toggle });
   const [layoutWidth, setLayoutWidth] = useState(viewportWidth);
   const [snapFeedback, setSnapFeedback] = useState<{ side: PanelSide; state: PanelSnapFeedback }>();
   const fittedWidths = visibility.left && visibility.right
