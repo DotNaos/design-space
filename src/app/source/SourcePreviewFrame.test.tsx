@@ -563,10 +563,11 @@ it("renders empty typed slots as purple canvas insertion targets", async () => {
   const target = container.querySelector<HTMLElement>('[data-design-space-source-slot-name="content"]');
   expect(target).toHaveAccessibleName("content slot");
   expect(target).toHaveTextContent("content");
-  expect(target).toHaveTextContent("Slot");
+  expect(target).toHaveTextContent("Empty slot");
   expect(target).toHaveAttribute("data-design-space-source-layer-id", slot.id);
-  expect(target?.style.backgroundImage).toContain("radial-gradient");
-  expect(target?.style.backgroundSize).toBe("14px 14px");
+  expect(target?.style.backgroundImage).toContain("linear-gradient");
+  expect(target?.style.backgroundImage).toContain("90deg");
+  expect(target?.style.backgroundSize).toBe("24px 24px");
   expect(target?.style.backgroundColor).toContain("88");
   expect(target?.style.borderColor).toContain("192");
 });

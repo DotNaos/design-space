@@ -166,9 +166,9 @@ function SourceCanvasSlotMarker(props: { label: string; layerId: string }) {
       style={{
         alignItems: "center",
         backgroundColor: "rgba(88, 28, 135, .16)",
-        backgroundImage: "radial-gradient(circle, rgba(216, 180, 254, .09) 1px, transparent 1px)",
+        backgroundImage: "linear-gradient(rgba(216, 180, 254, .045) 1px, transparent 1px), linear-gradient(90deg, rgba(216, 180, 254, .045) 1px, transparent 1px)",
         backgroundPosition: "0 0",
-        backgroundSize: "14px 14px",
+        backgroundSize: "24px 24px",
         border: "1px solid rgba(192, 132, 252, .38)",
         borderRadius: 10,
         boxSizing: "border-box",
@@ -185,7 +185,7 @@ function SourceCanvasSlotMarker(props: { label: string; layerId: string }) {
       }}
     >
       <strong style={{ font: "600 12px/1.4 ui-monospace, SFMono-Regular, monospace" }}>{props.label}</strong>
-      <span style={{ color: "#71717a", font: "10px/1.4 ui-sans-serif, system-ui, sans-serif" }}>Slot</span>
+      <span style={{ color: "#71717a", font: "10px/1.4 ui-sans-serif, system-ui, sans-serif" }}>Empty slot</span>
     </span>
   );
 }
