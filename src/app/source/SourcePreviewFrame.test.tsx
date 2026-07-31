@@ -59,6 +59,39 @@ it("requires a colocated design instead of executing the source component", () =
   expect(component).not.toHaveBeenCalled();
 });
 
+it("does not load design JavaScript or execute the component on the Design page", async () => {
+  const load = vi.fn(async () => previewDefinition("must not render"));
+  const component = vi.fn(() => null);
+  const entry = {
+    ...previewEntry("StaticPanel", load),
+    component,
+    layers: [{
+      id: "static-panel-root",
+      label: "section",
+      kind: "html" as const,
+      source: { start: 0, end: 12 },
+      text: { value: "Static panel", start: 1, end: 11, syntax: "text" as const },
+      children: [],
+    }],
+  };
+
+  render(
+    <SourcePreviewFrame
+      device="desktop"
+      entry={entry}
+      mode="design"
+      runtime="react"
+      styles={[]}
+      workspaceMode="design"
+    />,
+  );
+
+  expect(await screen.findByTitle("StaticPanel desktop preview")).toBeVisible();
+  await waitFor(() => expect(screen.getByLabelText("Canvas context")).toHaveTextContent("Design · StaticPanel"));
+  expect(load).not.toHaveBeenCalled();
+  expect(component).not.toHaveBeenCalled();
+});
+
 it("keeps the Codex composer available in a library canvas", () => {
   render(
     <SourcePreviewFrame

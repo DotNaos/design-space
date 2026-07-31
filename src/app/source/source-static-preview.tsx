@@ -1,6 +1,6 @@
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
-import type { CSSProperties } from "react";
+import { createElement, type CSSProperties } from "react";
 
 import type {
   ComponentDesignDefinition,
@@ -30,6 +30,27 @@ export function renderStaticSourcePreviewMarkup(props: SourcePreviewContentProps
       try {
         flushSync(() => root.render(<SourcePreviewContent {...props} />));
         bindRenderedSlotLayers(container, props.slotLayers);
+        const markup = container.innerHTML;
+        root.unmount();
+        resolve(markup);
+      } catch (error) {
+        root.unmount();
+        reject(error);
+      }
+    });
+  });
+}
+
+export function renderStaticSourceDesignMarkup(props: {
+  entry: RuntimeSourceWorkspaceEntry;
+  slotLayers: readonly SourceWorkspaceLayer[];
+}): Promise<string> {
+  return new Promise((resolve, reject) => {
+    queueMicrotask(() => {
+      const container = document.createElement("div");
+      const root = createRoot(container);
+      try {
+        flushSync(() => root.render(<SourceStructureDesign entry={props.entry} slotLayers={props.slotLayers} />));
         const markup = container.innerHTML;
         root.unmount();
         resolve(markup);
@@ -158,7 +179,7 @@ function previewProps(
   return { ...values, slots };
 }
 
-function SourceCanvasSlotMarker(props: { label: string; layerId: string }) {
+function SourceCanvasSlotMarker(props: { fill?: boolean; label: string; layerId: string }) {
   return (
     <span
       aria-label={`${props.label} slot`}
@@ -178,8 +199,9 @@ function SourceCanvasSlotMarker(props: { label: string; layerId: string }) {
         display: "flex",
         flexDirection: "column",
         gap: 4,
+        height: props.fill ? "100%" : undefined,
         justifyContent: "center",
-        minHeight: "clamp(64px, 18vh, 144px)",
+        minHeight: props.fill ? "100%" : "clamp(64px, 18vh, 144px)",
         minWidth: 96,
         padding: 12,
         width: "100%",
@@ -189,6 +211,60 @@ function SourceCanvasSlotMarker(props: { label: string; layerId: string }) {
       <span style={{ color: "#71717a", font: "10px/1.4 ui-sans-serif, system-ui, sans-serif" }}>Empty slot</span>
     </span>
   );
+}
+
+function SourceStructureDesign(props: {
+  entry: RuntimeSourceWorkspaceEntry;
+  slotLayers: readonly SourceWorkspaceLayer[];
+}) {
+  const slotsById = new Map(props.slotLayers.map((slot) => [slot.id, slot]));
+  const slotsByComponent = new Map(props.slotLayers.flatMap((slot) => (
+    slot.children.filter((child) => child.kind === "component").map((child) => [child.id, slot] as const)
+  )));
+  const attached = new Set<string>();
+  const layers = (props.entry.layers ?? []).map((layer) => structureLayer(
+    layer,
+    slotsById,
+    slotsByComponent,
+    attached,
+    true,
+  ));
+  const remaining = props.slotLayers.filter((slot) => !attached.has(slot.id));
+  return (
+    <div data-design-space-preview-entry-root style={{ height: "100%", minHeight: "100%", width: "100%" }}>
+      {layers}
+      {remaining.map((slot) => <SourceCanvasSlotMarker key={slot.id} label={slot.label} layerId={slot.id} />)}
+    </div>
+  );
+}
+
+function structureLayer(
+  layer: SourceWorkspaceLayer,
+  slotsById: ReadonlyMap<string, SourceWorkspaceLayer>,
+  slotsByComponent: ReadonlyMap<string, SourceWorkspaceLayer>,
+  attached: Set<string>,
+  topLevel: boolean,
+): React.ReactNode {
+  const slot = layer.kind === "slot" ? slotsById.get(layer.id) ?? layer : slotsByComponent.get(layer.id);
+  if (slot) {
+    if (attached.has(slot.id)) return null;
+    attached.add(slot.id);
+    return <SourceCanvasSlotMarker key={layer.id} fill={topLevel} label={slot.label} layerId={slot.id} />;
+  }
+  if (layer.kind === "component") return null;
+  const tag = /^[a-z][a-z0-9-]*$/.test(layer.label) ? layer.label : "div";
+  const children = layer.children.map((child) => structureLayer(
+    child,
+    slotsById,
+    slotsByComponent,
+    attached,
+    false,
+  ));
+  return createElement(tag, {
+    className: layer.className?.value,
+    "data-design-space-source-layer-id": layer.id,
+    key: layer.id,
+  }, layer.text?.value, ...children);
 }
 
 function emptySlotValue(value: unknown): boolean {

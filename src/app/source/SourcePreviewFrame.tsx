@@ -23,7 +23,7 @@ import { measureSourcePreviewContent, type SourcePreviewContentSize } from "./so
 import { externalSourceLayerOwner, sourceEntryOwner, sourceLayerOwner } from "./source-layer-ownership";
 import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement, sourceLayerElements } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
-import { renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
+import { renderStaticSourceDesignMarkup, renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
 import type { SourceTreeNode } from "./source-workspace-tree";
 import type { SourceCanvasAncestryItem } from "./source-canvas-ancestry";
 
@@ -118,7 +118,14 @@ export function SourcePreviewFrame(props: {
     label: slot.label,
   })), [props.selectedLayer?.id, props.slotLayers]);
   const designId = props.entry?.design?.fileId;
+  const structuralDesign = props.workspaceMode === "design";
   useEffect(() => {
+    if (structuralDesign) {
+      setLoaded(undefined);
+      setLoadState("checking");
+      setLoadMessage(undefined);
+      return;
+    }
     const design = props.entry?.design;
     if (!design) {
       setLoaded(undefined);
@@ -145,7 +152,7 @@ export function SourcePreviewFrame(props: {
       setLoadMessage(error instanceof Error ? error.message : "The colocated design could not be loaded.");
     });
     return () => { active = false; };
-  }, [designId, props.entry?.design]);
+  }, [designId, props.entry?.design, structuralDesign]);
   const activeLoaded = loaded?.designId === designId ? loaded : undefined;
   const definition = activeLoaded?.definition;
   const caseNames = useMemo(() => Object.keys(definition?.cases ?? {}), [definition]);
@@ -157,7 +164,7 @@ export function SourcePreviewFrame(props: {
   const matrix = Boolean(designId && matrixByDesign[designId] && !props.selectedLayer);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const selectionSurfaceRef = useRef<HTMLDivElement | null>(null);
-  const previewState = unavailablePreviewState({
+  const previewState = structuralDesign && props.entry ? undefined : unavailablePreviewState({
     ...props,
     definition,
     loadMessage,
@@ -192,18 +199,17 @@ export function SourcePreviewFrame(props: {
   }, []);
 
   useEffect(() => {
-    if (!mounts || previewMode === "play" || !definition || !props.entry || !selectedCase) return;
+    if (!mounts || previewMode === "play" || !props.entry || (!structuralDesign && (!definition || !selectedCase))) return;
     let active = true;
     mounts.output.replaceChildren();
     mounts.staging.replaceChildren();
-    void renderStaticSourcePreviewMarkup({
-      caseName: selectedCase,
-      centered: props.centerContent,
-      definition,
-      entry: props.entry,
-      matrix,
-      slotLayers: props.slotLayers,
-    }).then((markup) => {
+    const render = structuralDesign
+      ? renderStaticSourceDesignMarkup({ entry: props.entry, slotLayers: props.slotLayers ?? [] })
+      : renderStaticSourcePreviewMarkup({
+        caseName: selectedCase!, centered: props.centerContent, definition: definition!, entry: props.entry,
+        matrix, slotLayers: props.slotLayers,
+      });
+    void render.then((markup) => {
       if (!active) return;
       mounts.staging.innerHTML = markup;
       if (projectionLayerId) {
@@ -219,7 +225,7 @@ export function SourcePreviewFrame(props: {
       showStaticPreviewMessage(mounts.output, error instanceof Error ? error.message : "The static design could not be rendered.", true);
     });
     return () => { active = false; };
-  }, [definition, matrix, mounts, previewMode, projectionLayerId, props.centerContent, props.entry, props.slotLayers, selectedCase]);
+  }, [definition, matrix, mounts, previewMode, projectionLayerId, props.centerContent, props.entry, props.slotLayers, selectedCase, structuralDesign]);
 
   const selectStaticLayer = (event: ReactMouseEvent<HTMLDivElement>) => {
     const frame = frameRef.current;
@@ -443,7 +449,7 @@ export function SourcePreviewFrame(props: {
       onSelectAncestry={props.onSelectAncestry}
       onSelectSlot={(slot) => props.onSelectLayer?.(slot.id, 0)}
       onModeChange={props.onModeChange}
-      toolbarEnd={definition && selectedCase ? (
+      toolbarEnd={!structuralDesign && definition && selectedCase ? (
         <SourceDesignControls
           caseNames={caseNames}
           isStateful={definition.isStateful}
