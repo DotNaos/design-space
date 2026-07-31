@@ -7,6 +7,7 @@ import {
   sourceCompositionRows,
   sourceFocusGraph,
   sourceFocusRows,
+  sourceIsolatedDesignRows,
   visibleSourceCompositionRows,
 } from "./source-focus-tree";
 import type { SourceTreeNode } from "./source-workspace-tree";
@@ -25,6 +26,26 @@ describe("focused source tree", () => {
       [1, "component", "Panel", "focus"],
       [2, "slot", "header", undefined],
       [3, "component", "Heading", undefined],
+    ]);
+  });
+
+  it("isolates the component definition without parent usage slots", () => {
+    const heading = node("Heading", entry("Heading"));
+    const panelUsage = component("Panel", [slot("header", [component("Heading")])]);
+    const panel = node("Panel", entry("Panel", [{
+      id: "html.panel",
+      label: "section",
+      kind: "html",
+      source: { start: 0, end: 10 },
+      children: [],
+    }]));
+    const app = node("App", entry("App", [panelUsage]));
+    const graph = sourceFocusGraph([app, panel, heading], "desktop");
+    const panelOccurrence = [...graph.occurrences.values()].find((occurrence) => occurrence.node.label === "Panel")!;
+
+    expect(sourceIsolatedDesignRows(graph, panelOccurrence.id).map((row) => [row.depth, row.kind, row.label])).toEqual([
+      [0, "component", "Panel"],
+      [1, "html", "<section>"],
     ]);
   });
 

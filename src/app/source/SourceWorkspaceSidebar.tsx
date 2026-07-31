@@ -45,6 +45,7 @@ import {
   sourceCompositionRows,
   sourceFocusGraph,
   sourceOccurrenceSubtree,
+  sourceIsolatedDesignRows,
   type SourceFocusGraph,
   type SourceFocusRow,
   type SourceOccurrence,
@@ -53,6 +54,7 @@ import {
 import { sourceSlotCandidates, type SourceComponentCandidate } from "./source-slot-composition";
 import { sourceTreeNodes, type SourceImplementation, type SourceTreeNode, type SourceTreeSelection } from "./source-workspace-tree";
 import { collapseSourceBranchesOutsideFocus } from "./source-tree-collapse";
+import { ancestorBranchKeys, ancestorRowKeys, renderedOccurrenceMatches, sourceRowOutsideActiveFile } from "./source-tree-row-state";
 import { useSourceTreeCollapsedState } from "./useSourceTreeCollapsedState";
 import { useVirtualSourceTree } from "./useVirtualSourceTree";
 
@@ -180,7 +182,7 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
   const focusId = definitionSelected
     ? undefined
     : graph.occurrences.has(props.focusId ?? "") ? props.focusId! : requestedRootFocus ?? initialFocusOccurrence(graph);
-  const rows = useMemo(() => sourceCompositionRows(graph, focusId), [focusId, graph]);
+  const rows = useMemo(() => props.designNavigation && focusId ? sourceIsolatedDesignRows(graph, focusId) : sourceCompositionRows(graph, focusId), [focusId, graph, props.designNavigation]);
   const activeCanvasIds = useMemo(() => sourceOccurrenceSubtree(graph, focusId), [focusId, graph]);
   const activePathKeys = useMemo(() => {
     const focusIndex = rows.findIndex((row) => (
@@ -265,7 +267,7 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
     return next;
   });
   useEffect(() => {
-    if (!props.expandFocus || !focusId || expandedFocusId.current === focusId) return;
+    if ((!props.expandFocus && !props.designNavigation) || !focusId || expandedFocusId.current === focusId) return;
     expandedFocusId.current = focusId;
     const focusRow = rows.find((row) => (
       row.kind === "component"
@@ -605,64 +607,6 @@ function FocusTreeRow(props: {
       )}
     </div>
   );
-}
-
-function renderedOccurrenceMatches(
-  selected: SourceWorkspaceSelection | undefined,
-  row: SourceFocusRow,
-): boolean {
-  return selected?.renderedLayerOccurrence === undefined
-    || row.renderedLayerOccurrence === undefined
-    || selected.renderedLayerOccurrence === row.renderedLayerOccurrence;
-}
-
-function sourceRowOutsideActiveFile(
-  row: SourceFocusRow,
-  graph: SourceFocusGraph,
-  nodes: ReturnType<typeof sourceTreeNodes>,
-  device: DesignSpaceDevice,
-  activeCanvasId?: string,
-): boolean {
-  if (
-    row.kind === "component"
-    && !row.layer
-    && row.occurrence?.id === activeCanvasId
-  ) {
-    return false;
-  }
-  const activeCanvasPath = activeCanvasId
-    ? graph.occurrences.get(activeCanvasId)?.entry?.relativePath
-    : undefined;
-  const sourceOwnerId = row.sourceOwnerId ?? row.occurrence?.usageOwnerId;
-  const sourceOwner = sourceOwnerId
-    ? nodes.find((node) => node.id === sourceOwnerId)
-    : row.occurrence?.node;
-  const ownerPath = sourceOwner?.implementations[device].entry?.relativePath
-    ?? row.occurrence?.entry?.relativePath
-    ?? "";
-  return Boolean(activeCanvasPath && ownerPath && ownerPath !== activeCanvasPath);
-}
-
-function ancestorBranchKeys(rows: readonly SourceFocusRow[], selectedIndex: number): ReadonlySet<string> {
-  const ancestors = ancestorRowKeys(rows, selectedIndex);
-  const keys = new Set<string>();
-  for (const row of rows) {
-    if (ancestors.has(row.key) && row.collapsible) keys.add(row.key);
-  }
-  return keys;
-}
-
-function ancestorRowKeys(rows: readonly SourceFocusRow[], selectedIndex: number): ReadonlySet<string> {
-  const keys = new Set<string>();
-  if (selectedIndex < 0) return keys;
-  let parentDepth = (rows[selectedIndex]?.depth ?? 0) - 1;
-  for (let index = selectedIndex - 1; index >= 0 && parentDepth >= 0; index -= 1) {
-    const row = rows[index]!;
-    if (row.depth !== parentDepth) continue;
-    keys.add(row.key);
-    parentDepth -= 1;
-  }
-  return keys;
 }
 
 function htmlLayerIcon(label: string) {

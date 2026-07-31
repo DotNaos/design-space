@@ -147,6 +147,27 @@ export function sourceCompositionRows(
   graph: SourceFocusGraph,
   selectedOccurrenceId?: string,
 ): readonly SourceFocusRow[] {
+  const roots = graph.roots.flatMap((id) => {
+    const occurrence = graph.occurrences.get(id);
+    return occurrence ? [occurrence] : [];
+  });
+  return sourceCompositionRowsFromRoots(graph, roots, selectedOccurrenceId);
+}
+
+export function sourceIsolatedDesignRows(
+  graph: SourceFocusGraph,
+  focusId: string,
+): readonly SourceFocusRow[] {
+  const focus = graph.occurrences.get(focusId);
+  return focus ? sourceCompositionRowsFromRoots(graph, [focus], focusId, new Set([focusId])) : [];
+}
+
+function sourceCompositionRowsFromRoots(
+  graph: SourceFocusGraph,
+  roots: readonly SourceOccurrence[],
+  selectedOccurrenceId?: string,
+  withoutUsageSlots: ReadonlySet<string> = new Set(),
+): readonly SourceFocusRow[] {
   const rows: SourceFocusRow[] = [];
   const renderedLayerCursors = new Map<string, number>();
 
@@ -155,7 +176,7 @@ export function sourceCompositionRows(
     depth: number,
     rowKey = occurrence.id,
   ) => {
-    const usageSlots = occurrenceSlots(occurrence);
+    const usageSlots = withoutUsageSlots.has(occurrence.id) ? [] : occurrenceSlots(occurrence);
     const localLayers = uniqueSourceLayers(occurrence.entry?.layers ?? []);
     const targetCursors = new Map<string, number>();
     rows.push(componentRow(
@@ -253,10 +274,7 @@ export function sourceCompositionRows(
     }
   };
 
-  for (const rootId of graph.roots) {
-    const root = graph.occurrences.get(rootId);
-    if (root) appendOccurrence(root, 0);
-  }
+  for (const root of roots) appendOccurrence(root, 0);
   return rows;
 }
 
