@@ -75,6 +75,7 @@ type PreviewCanvasProps = {
   worldHeight?: number;
   worldHeader?: React.ReactNode;
   worldHeaderHeight?: number;
+  pinWorldHeader?: boolean;
   worldFooter?: React.ReactNode;
   worldFooterHeight?: number;
   verticalAlignment?: "center" | "start";
@@ -599,6 +600,9 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
           footerHeight={worldFooterHeight}
           header={props.worldHeader}
           headerHeight={worldHeaderHeight}
+          headerInlineMargin={props.compact ? 12 : 16}
+          headerTop={props.compact ? 44 : 56}
+          pinHeader={props.pinWorldHeader}
           worldHeight={worldHeight}
           worldWidth={worldWidth}
         />

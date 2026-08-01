@@ -12,12 +12,15 @@ export function applyCanvasWorldChromeCamera(
   camera: CanvasCamera,
   layout: CanvasWorldChromeLayout,
 ): void {
-  positionChrome(root.querySelector<HTMLElement>('[data-canvas-world-chrome="header"]'), {
-    height: layout.headerHeight,
-    left: camera.x,
-    top: camera.y - layout.headerHeight,
-    width: layout.worldWidth * camera.scale,
-  });
+  const header = root.querySelector<HTMLElement>('[data-canvas-world-chrome="header"]');
+  if (!header?.hasAttribute("data-canvas-world-chrome-pinned")) {
+    positionChrome(header, {
+      height: layout.headerHeight,
+      left: camera.x,
+      top: camera.y - layout.headerHeight,
+      width: layout.worldWidth * camera.scale,
+    });
+  }
   positionChrome(root.querySelector<HTMLElement>('[data-canvas-world-chrome="footer"]'), {
     height: layout.footerHeight,
     left: camera.x,
@@ -32,6 +35,9 @@ export function CanvasWorldChrome(props: {
   footerHeight: number;
   header?: React.ReactNode;
   headerHeight: number;
+  headerInlineMargin?: number;
+  headerTop?: number;
+  pinHeader?: boolean;
   worldHeight: number;
   worldWidth: number;
 }) {
@@ -41,9 +47,16 @@ export function CanvasWorldChrome(props: {
         <div
           className="pointer-events-auto absolute"
           data-canvas-world-chrome="header"
+          data-canvas-world-chrome-pinned={props.pinHeader ? "" : undefined}
           data-design-space-canvas-chrome
           data-testid="canvas-world-header"
-          style={{
+          style={props.pinHeader ? {
+            height: props.headerHeight,
+            left: "50%",
+            top: props.headerTop ?? 56,
+            transform: "translateX(-50%)",
+            width: `min(calc(100% - ${(props.headerInlineMargin ?? 16) * 2}px), ${props.worldWidth}px)`,
+          } : {
             height: props.headerHeight,
             left: props.camera.x,
             top: props.camera.y - props.headerHeight,

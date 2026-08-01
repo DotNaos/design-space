@@ -4,12 +4,13 @@ import { afterEach, expect, it, vi } from "vitest";
 
 vi.mock("../components/PreviewCanvas/PreviewCanvas", () => ({
   PreviewCanvas: (props: {
+    pinWorldHeader?: boolean;
     preview: React.ReactNode;
     toolbar?: React.ReactNode;
     worldFooter?: React.ReactNode;
     worldHeader?: React.ReactNode;
   }) => (
-    <div>
+    <div data-pin-world-header={props.pinWorldHeader || undefined}>
       {props.toolbar}
       {props.worldHeader}
       {props.preview}
@@ -89,6 +90,7 @@ it("attaches an interactive ancestry path to the canvas", async () => {
   );
 
   const ancestry = screen.getByRole("navigation", { name: "Canvas ancestry" });
+  expect(document.querySelector('[data-pin-world-header="true"]')).toContainElement(ancestry);
   expect(ancestry).toHaveTextContent("From root");
   expect(ancestry).toHaveTextContent("App");
   expect(ancestry).toHaveTextContent("WorkspaceShell");

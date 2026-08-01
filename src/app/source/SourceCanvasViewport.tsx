@@ -136,6 +136,7 @@ export function SourceCanvasViewport(props: {
           />
         ) : undefined}
         worldHeaderHeight={ancestryHeight}
+        pinWorldHeader
         worldHeight={previewFrame.height}
         worldWidth={previewFrame.width}
         onSelect={() => undefined}
