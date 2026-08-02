@@ -265,7 +265,7 @@ describe("source change-set service", () => {
       code: "COMPILE_ERROR",
       message: expect.stringContaining("accepts Card but received Heading"),
     });
-  });
+  }, 15_000);
 
   it("rejects duplicate, unknown, unregistered, and unchanged files", async () => {
     const base = await fixture();

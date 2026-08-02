@@ -675,6 +675,7 @@ it("scrolls the source tree back to the current selection from its header", asyn
   const scroll = view.container.querySelector<HTMLElement>("[data-source-tree-scroll]");
   expect(scroll).not.toBeNull();
   Object.defineProperty(scroll!, "clientHeight", { configurable: true, value: 80 });
+  Object.defineProperty(scroll!, "scrollHeight", { configurable: true, value: 1_000 });
 
   await userEvent.click(screen.getByRole("button", { name: "Scroll to current selection" }));
 
