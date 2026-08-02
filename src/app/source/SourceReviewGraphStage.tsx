@@ -4,9 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  Focus,
-  PanelLeft,
-  PanelTop,
   Route,
 } from "lucide-react";
 
@@ -115,23 +112,54 @@ export function SourceReviewGraphModeControl(props: {
         label="Inputs above, outputs below"
         onPress={() => props.onChange("vertical")}
       >
-        <PanelTop size={12} />
+        <VerticalReviewGraphIcon />
       </GraphModeButton>
       <GraphModeButton
         active={props.layout === "horizontal"}
         label="Inputs left, outputs right"
         onPress={() => props.onChange("horizontal")}
       >
-        <PanelLeft size={12} />
+        <HorizontalReviewGraphIcon />
       </GraphModeButton>
       <GraphModeButton
         active={props.layout === "focus"}
         label="Focus on the current design"
         onPress={() => props.onChange("focus")}
       >
-        <Focus size={12} />
+        <FocusedReviewGraphIcon />
       </GraphModeButton>
     </div>
+  );
+}
+
+function VerticalReviewGraphIcon() {
+  return (
+    <svg aria-hidden="true" className="size-4" data-graph-layout-icon="vertical" fill="none" viewBox="0 0 16 16">
+      <rect height="2.5" rx="1.25" stroke="currentColor" strokeWidth="1.25" width="8" x="4" y="1" />
+      <rect height="5" rx="1.25" stroke="currentColor" strokeWidth="1.25" width="6" x="5" y="5.5" />
+      <rect height="2.5" rx="1.25" stroke="currentColor" strokeWidth="1.25" width="8" x="4" y="12.5" />
+      <path d="M8 3.5v2M8 10.5v2" stroke="currentColor" strokeWidth="1.25" />
+    </svg>
+  );
+}
+
+function HorizontalReviewGraphIcon() {
+  return (
+    <svg aria-hidden="true" className="size-4" data-graph-layout-icon="horizontal" fill="none" viewBox="0 0 16 16">
+      <rect height="8" rx="1.25" stroke="currentColor" strokeWidth="1.25" width="2.5" x="1" y="4" />
+      <rect height="6" rx="1.25" stroke="currentColor" strokeWidth="1.25" width="5" x="5.5" y="5" />
+      <rect height="8" rx="1.25" stroke="currentColor" strokeWidth="1.25" width="2.5" x="12.5" y="4" />
+      <path d="M3.5 8h2M10.5 8h2" stroke="currentColor" strokeWidth="1.25" />
+    </svg>
+  );
+}
+
+function FocusedReviewGraphIcon() {
+  return (
+    <svg aria-hidden="true" className="size-4" data-graph-layout-icon="focus" fill="none" viewBox="0 0 16 16">
+      <rect height="6" rx="1.5" stroke="currentColor" strokeWidth="1.25" width="6" x="5" y="5" />
+      <path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.25" />
+    </svg>
   );
 }
 
