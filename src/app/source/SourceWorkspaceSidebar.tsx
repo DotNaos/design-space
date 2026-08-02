@@ -37,6 +37,7 @@ import {
   sourceApprovalModeLabel,
 } from "./SourceApprovalStatus";
 import { SourceDesignStatus } from "./SourceDesignStatus";
+import { SourceDeviceTabs } from "./SourceDeviceTabs";
 import { centerSourceTreeRow, SourceTreeAnchorControls } from "./SourceTreeAnchorControls";
 import { SourceTreeHeaderAction } from "./SourceTreeHeaderAction";
 import {
@@ -78,6 +79,7 @@ export interface SourceWorkspaceSidebarProps {
   workspace: RuntimeSourceWorkspace;
   focusId?: string;
   onHover?: (selection: SourceWorkspaceSelection | undefined) => void;
+  onDeviceChange?: (device: DesignSpaceDevice) => void;
   onSelect: (selection: SourceWorkspaceSelection) => void;
   onFocus: (occurrenceId: string, selection: SourceWorkspaceSelection) => void;
   onOpenComponent?: (request: SourceComponentOpenRequest) => void;
@@ -344,6 +346,7 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
                 onFocus={props.onFocus}
                 onOpenComponent={props.onOpenComponent}
                 onHover={props.onHover}
+                onDeviceChange={props.onDeviceChange}
                 onSelect={props.onSelect}
                 onToggleBranch={toggleBranch}
               />
@@ -356,7 +359,6 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
       </div>
       <SourceTreeAnchorControls
         activeDirection={virtual.anchorDirection}
-        hasSelection={Boolean(props.selected)}
         selectedDirection={virtual.selectedDirection}
         onScrollToActive={virtual.scrollToAnchor}
         onScrollToSelected={revealSelected}
@@ -425,6 +427,7 @@ function FocusTreeRow(props: {
   onFocus: SourceWorkspaceSidebarProps["onFocus"];
   onOpenComponent: SourceWorkspaceSidebarProps["onOpenComponent"];
   onHover: SourceWorkspaceSidebarProps["onHover"];
+  onDeviceChange?: SourceWorkspaceSidebarProps["onDeviceChange"];
   onSelect: SourceWorkspaceSidebarProps["onSelect"];
   onToggleBranch: (key: string) => void;
 }) {
@@ -580,7 +583,7 @@ function FocusTreeRow(props: {
         ref={rowButton}
         aria-label={`${row.label}${row.role === "focus" ? ", focused" : ""}`}
         className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 text-left ${active ? "bg-sky-500/15 text-sky-100" : props.activePath ? "text-zinc-400 hover:bg-violet-500/[0.055] hover:text-zinc-200" : withinCanvas && !outsideActiveFile ? "text-zinc-300 hover:bg-white/[0.04] hover:text-zinc-100" : "text-zinc-600 hover:bg-white/[0.04] hover:text-zinc-400"}`}
-        fullWidth
+        fullWidth={!(openedCanvas && props.onDeviceChange)}
         size="sm"
         variant="ghost"
         onKeyDown={(event) => {
@@ -605,6 +608,14 @@ function FocusTreeRow(props: {
         <SourceDesignStatus
           designPath={suggestedSourceDesignPath(componentEntry, props.workspace.entries)}
           label={componentEntry.label}
+        />
+      ) : null}
+      {openedCanvas && props.onDeviceChange ? (
+        <SourceDeviceTabs
+          compact
+          device={props.device}
+          node={row.occurrence?.node}
+          onChange={props.onDeviceChange}
         />
       ) : null}
       {slot && row.occurrence && props.onApplySlot && (

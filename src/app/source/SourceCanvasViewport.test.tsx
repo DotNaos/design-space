@@ -19,8 +19,39 @@ vi.mock("../components/PreviewCanvas/PreviewCanvas", () => ({
 }));
 
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
+import type { SourceTreeNode } from "./source-workspace-tree";
 
 afterEach(cleanup);
+
+const node: SourceTreeNode = {
+  id: "app",
+  area: "components",
+  label: "App",
+  entries: [],
+  uses: [],
+  implementations: {
+    desktop: { requestedDevice: "desktop", sourceDevice: "desktop", state: "direct" },
+    tablet: { requestedDevice: "tablet", sourceDevice: "desktop", state: "fallback" },
+    mobile: { requestedDevice: "mobile", state: "missing" },
+  },
+};
+
+it("can leave device switching to the workspace sidebar", () => {
+  render(
+    <SourceCanvasViewport
+      ancestry={[{ id: "app", kind: "component", label: "App" }]}
+      device="desktop"
+      node={node}
+      showDeviceSwitcher={false}
+      onDeviceChange={vi.fn()}
+    >
+      {() => <div>Preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  expect(screen.queryByRole("group", { name: "Source implementation" })).not.toBeInTheDocument();
+  expect(screen.getByRole("navigation", { name: "Canvas ancestry" })).toBeVisible();
+});
 
 it("switches between the selected screen and measured content bounds", async () => {
   render(

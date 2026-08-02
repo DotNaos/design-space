@@ -32,6 +32,7 @@ export function SourceCanvasViewport(props: {
   node?: SourceTreeNode;
   mode?: SourcePreviewMode;
   showModeToggle?: boolean;
+  showDeviceSwitcher?: boolean;
   selectedLayer?: boolean;
   selectionKey?: string;
   selectionLabel?: string;
@@ -75,7 +76,8 @@ export function SourceCanvasViewport(props: {
     height: previewFrame.height + graphInsets.top + graphInsets.bottom,
     width: previewFrame.width + graphInsets.left + graphInsets.right,
   };
-  const hasCanvasDeviceSwitcher = Boolean(props.ancestry?.length && props.node);
+  const showDeviceSwitcher = props.showDeviceSwitcher !== false;
+  const hasCanvasDeviceSwitcher = showDeviceSwitcher && Boolean(props.ancestry?.length && props.node);
   const ancestryHeight = props.ancestry?.length ? 36 : 0;
 
   useEffect(() => {
@@ -124,7 +126,7 @@ export function SourceCanvasViewport(props: {
             onDeviceChange={changeDevice}
             onPresetChange={changePreset}
             onResponsiveWidthChange={(width) => setResponsiveWidth(Math.max(320, Math.min(1440, width)))}
-            showDeviceTabs={!hasCanvasDeviceSwitcher}
+            showDeviceTabs={showDeviceSwitcher && !hasCanvasDeviceSwitcher}
             onClipToScreenChange={setClipToScreen}
             onShowDeviceFrameChange={setShowDeviceFrame}
             after={(

@@ -654,11 +654,11 @@ it("reveals and highlights a layer selected from the canvas", async () => {
   expect(screen.getByRole("button", { name: "Collapse Dashboard" })).toHaveAttribute("aria-expanded", "true");
 });
 
-it("scrolls the source tree back to the current selection from its header", async () => {
+it("does not cover a visible selection with a locate control", () => {
   const graph = sourceFocusGraph(sourceTreeNodes(workspace), "desktop");
   const occurrenceId = initialFocusOccurrence(graph)!;
   const occurrence = graph.occurrences.get(occurrenceId)!;
-  const view = render(
+  render(
     <SourceWorkspaceSidebar
       {...callbacks}
       selected={{
@@ -672,15 +672,24 @@ it("scrolls the source tree back to the current selection from its header", asyn
       workspace={workspace}
     />,
   );
-  const scroll = view.container.querySelector<HTMLElement>("[data-source-tree-scroll]");
-  expect(scroll).not.toBeNull();
-  Object.defineProperty(scroll!, "clientHeight", { configurable: true, value: 80 });
-  Object.defineProperty(scroll!, "scrollHeight", { configurable: true, value: 1_000 });
-
-  await userEvent.click(screen.getByRole("button", { name: "Scroll to current selection" }));
-
-  await waitFor(() => expect(scroll!.scrollTop).toBeGreaterThan(0));
+  expect(screen.queryByRole("button", { name: /Scroll to current selection/ })).not.toBeInTheDocument();
   expect(screen.getByRole("treeitem", { name: "<section>" })).toHaveAttribute("aria-selected", "true");
+});
+
+it("switches device implementations from the open component row", async () => {
+  const onDeviceChange = vi.fn();
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      workspace={workspace}
+      onDeviceChange={onDeviceChange}
+    />,
+  );
+
+  const switcher = screen.getByRole("group", { name: "Source implementation" });
+  expect(switcher).toHaveClass("h-7");
+  await userEvent.click(within(switcher).getByRole("button", { name: /Mobile implementation/ }));
+  expect(onDeviceChange).toHaveBeenCalledWith("mobile");
 });
 
 it("highlights only the selected rendered instance of a repeated source layer", async () => {

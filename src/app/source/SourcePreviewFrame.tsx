@@ -408,6 +408,7 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
       mode={previewMode === "static" ? undefined : previewMode}
       node={props.node}
       selectedLayer={Boolean(props.selectedLayer)}
+      showDeviceSwitcher={!props.workspaceMode}
       showModeToggle={!props.workspaceMode || props.workspaceMode === "preview"}
       revealTarget={revealTarget?.key === revealKey ? revealTarget : undefined}
       reviewGraph={previewMode === "play" ? undefined : reviewGraph}

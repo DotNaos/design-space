@@ -11,17 +11,23 @@ const deviceLabels: Record<DesignSpaceDevice, string> = {
 };
 
 export function SourceDeviceTabs(props: {
+  compact?: boolean;
   device: DesignSpaceDevice;
   node?: SourceTreeNode;
   onChange: (device: DesignSpaceDevice) => void;
 }) {
   if (!props.node) return null;
   return (
-    <div role="group" aria-label="Source implementation" className="flex h-8 shrink-0 items-center gap-0.5 rounded-lg bg-white/[0.045] p-0.5">
+    <div
+      role="group"
+      aria-label="Source implementation"
+      className={`flex shrink-0 items-center gap-0.5 rounded-lg ${props.compact ? "h-7 bg-white/[0.035] p-0.5" : "h-8 bg-white/[0.045] p-0.5"}`}
+    >
       {designSpaceDevices.map((device) => (
         <DeviceTab
           key={device}
           active={props.device === device}
+          compact={props.compact}
           device={device}
           implementation={props.node!.implementations[device]}
           onPress={() => props.onChange(device)}
@@ -33,6 +39,7 @@ export function SourceDeviceTabs(props: {
 
 function DeviceTab(props: {
   active: boolean;
+  compact?: boolean;
   device: DesignSpaceDevice;
   implementation: SourceImplementation;
   onPress: () => void;
@@ -50,7 +57,7 @@ function DeviceTab(props: {
       isIconOnly
       aria-current={props.active ? "page" : undefined}
       aria-label={`${deviceLabels[props.device]} implementation${status ? `, ${status}` : ""}`}
-      className={`relative flex size-7 min-h-0 min-w-7 items-center justify-center rounded-md p-0 leading-none transition-colors ${props.active ? "bg-sky-400/15 text-sky-200" : "text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"}`}
+      className={`relative flex min-h-0 items-center justify-center rounded-md p-0 leading-none transition-colors ${props.compact ? "size-6 min-w-6" : "size-7 min-w-7"} ${props.active ? "bg-sky-400/15 text-sky-200" : "text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"}`}
       size="sm"
       variant="ghost"
       onPress={props.onPress}

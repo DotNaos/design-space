@@ -36,3 +36,10 @@ it("uses a compact canvas switcher and allows selecting missing implementations"
   await userEvent.click(screen.getByRole("button", { name: "Mobile implementation, Missing" }));
   expect(onChange).toHaveBeenCalledWith("mobile");
 });
+
+it("fits the implementation switcher into a component row", () => {
+  render(<SourceDeviceTabs compact device="desktop" node={node} onChange={vi.fn()} />);
+
+  expect(screen.getByRole("group", { name: "Source implementation" })).toHaveClass("h-7");
+  expect(screen.getByRole("button", { name: "Desktop implementation" })).toHaveClass("size-6", "min-w-6");
+});

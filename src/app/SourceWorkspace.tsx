@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import type { TargetModule } from "../shared/target-module";
-import type { SourceApprovalEvidence, SourceWorkspaceLayer } from "../shared/source-workspace";
+import type { DesignSpaceDevice, SourceApprovalEvidence, SourceWorkspaceLayer } from "../shared/source-workspace";
 import type { SignedSourceComponent } from "../shared/contracts";
 import { runLocalOperation } from "./api";
 import { ProjectFileBrowser } from "./documents/ProjectFileBrowser";
@@ -497,6 +497,11 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       setSigningEntryId(undefined);
     }
   };
+  const changeAppDevice = (device: DesignSpaceDevice) => selectedNode && setSelection((current) => ({
+    ...(current ?? {}),
+    nodeId: selectedNode.id,
+    device,
+  }));
   const renderAppSidebar = (headerLeading?: ReactNode) => (
     <SourceWorkspaceSidebar
       approvalReview={approvalReview}
@@ -528,6 +533,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       }}
       onOpenComponent={openComponent}
       onHover={setHoveredTreeSelection}
+      onDeviceChange={changeAppDevice}
       onApplySlot={applySlot}
       onPrepareSlotEdit={prepareSlotEdit}
       onSelect={(next) => {
@@ -824,11 +830,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         openDesign(occurrence.id, sourceComponentSelection(occurrence, requestedDevice));
       }}
       onGenerateDesign={previewEntry ? () => void designGeneration.generate("app", previewEntry.id) : undefined}
-      onDeviceChange={(device) => selectedNode && setSelection((current) => ({
-        ...(current ?? {}),
-        nodeId: selectedNode.id,
-        device,
-      }))}
+      onDeviceChange={changeAppDevice}
     />
   );
   const right = activity === "library"
