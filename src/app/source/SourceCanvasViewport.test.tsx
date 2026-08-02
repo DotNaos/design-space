@@ -161,17 +161,20 @@ it("reveals the real component subtree from a breadcrumb hover and navigates fro
 
   await userEvent.hover(screen.getByRole("button", { name: "App" }));
   const tree = await screen.findByRole("tree", { name: "App component tree" });
+  expect(tree).toHaveClass("overflow-auto");
   expect(within(tree).getByRole("treeitem", { name: "App" }).parentElement).toHaveClass("text-fuchsia-300");
   expect(within(tree).getByRole("treeitem", { name: /WorkspaceShell/ }).parentElement).toHaveClass("text-fuchsia-300");
-  expect(within(tree).getByRole("treeitem", { name: "WorkspaceStatus status" })).toHaveAttribute("aria-current", "location");
+  expect(within(tree).getByRole("treeitem", { name: "WorkspaceStatus" })).toHaveAttribute("aria-current", "location");
+  expect(within(tree).getByRole("treeitem", { name: "WorkspaceStatus" })).toHaveAttribute("data-slot-label", "status");
+  expect(within(tree).getByRole("treeitem", { name: "WorkspaceStatus" })).toHaveClass("min-w-max", "whitespace-nowrap");
   expect(within(tree).getAllByTestId("source-canvas-tree-component-icon")).toHaveLength(4);
-  expect(within(tree).getByRole("treeitem", { name: "Toolbar toolbar" })).not.toHaveAttribute("aria-current");
+  expect(within(tree).getByRole("treeitem", { name: "Toolbar" })).not.toHaveAttribute("aria-current");
 
   await userEvent.click(within(tree).getByRole("button", { name: "Collapse WorkspaceShell" }));
-  expect(within(tree).queryByRole("treeitem", { name: "WorkspaceStatus status" })).not.toBeInTheDocument();
+  expect(within(tree).queryByRole("treeitem", { name: "WorkspaceStatus" })).not.toBeInTheDocument();
   await userEvent.click(within(tree).getByRole("button", { name: "Expand WorkspaceShell" }));
 
-  await userEvent.click(within(tree).getByRole("treeitem", { name: "Toolbar toolbar" }));
+  await userEvent.click(within(tree).getByRole("treeitem", { name: "Toolbar" }));
   expect(onSelectAncestry).toHaveBeenCalledWith({
     children: [],
     id: "toolbar",

@@ -296,25 +296,27 @@ function SourceCanvasTreePopover(props: {
               <Component aria-hidden="true" className="text-fuchsia-300" size={13} />
               <span className="truncate">{props.item.label} tree</span>
             </div>
-            <div aria-label={`${props.item.label} component tree`} className="max-h-80 overflow-y-auto py-0.5" role="tree">
-              <SourceCanvasNavigationBranch
-                currentId={props.currentComponentId}
-                depth={0}
-                expandedIds={expandedIds}
-                node={root}
-                pathIds={props.pathIds}
-                onToggle={(node) => setExpandedIds((current) => {
-                  const next = new Set(current);
-                  if (next.has(node.id)) next.delete(node.id);
-                  else next.add(node.id);
-                  return next;
-                })}
-                onSelect={(node) => {
-                  setOpen(false);
-                  if (node.id === props.currentComponentId) return;
-                  props.onSelect?.({ children: node.children, id: node.id, kind: "component", label: node.label });
-                }}
-              />
+            <div aria-label={`${props.item.label} component tree`} className="max-h-80 overflow-auto py-0.5" role="tree">
+              <div className="min-w-max">
+                <SourceCanvasNavigationBranch
+                  currentId={props.currentComponentId}
+                  depth={0}
+                  expandedIds={expandedIds}
+                  node={root}
+                  pathIds={props.pathIds}
+                  onToggle={(node) => setExpandedIds((current) => {
+                    const next = new Set(current);
+                    if (next.has(node.id)) next.delete(node.id);
+                    else next.add(node.id);
+                    return next;
+                  })}
+                  onSelect={(node) => {
+                    setOpen(false);
+                    if (node.id === props.currentComponentId) return;
+                    props.onSelect?.({ children: node.children, id: node.id, kind: "component", label: node.label });
+                  }}
+                />
+              </div>
             </div>
           </div>
         </Popover.Dialog>
@@ -339,7 +341,7 @@ function SourceCanvasNavigationBranch(props: {
   return (
     <div role="none">
       <div
-        className={`flex h-7 w-full min-w-0 items-center rounded-lg pr-2 ${
+        className={`flex h-7 w-max min-w-full items-center rounded-lg pr-2 ${
           current
             ? "bg-fuchsia-400/16 text-fuchsia-200"
             : onPath
@@ -365,7 +367,8 @@ function SourceCanvasNavigationBranch(props: {
           aria-current={current ? "location" : undefined}
           aria-expanded={expandable ? expanded : undefined}
           aria-level={props.depth + 1}
-          className={`flex h-7 min-w-0 flex-1 items-center gap-2 text-[10px] ${current ? "font-medium" : ""}`}
+          className={`flex h-7 min-w-max flex-1 items-center gap-2 whitespace-nowrap text-[10px] ${current ? "font-medium" : ""}`}
+          data-slot-label={props.node.slotLabel}
           role="treeitem"
           type="button"
           onClick={() => props.onSelect(props.node)}
@@ -376,8 +379,7 @@ function SourceCanvasNavigationBranch(props: {
             data-testid="source-canvas-tree-component-icon"
             strokeWidth={1.8}
           />
-          <span className="min-w-0 flex-1 truncate text-left">{props.node.label}</span>
-          {props.node.slotLabel ? <span className="max-w-20 truncate text-[8px] text-zinc-600">{props.node.slotLabel}</span> : null}
+          <span className="text-left">{props.node.label}</span>
         </button>
       </div>
       {expanded ? props.node.children.map((child) => (
