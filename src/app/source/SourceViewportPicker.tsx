@@ -23,7 +23,7 @@ export function SourceViewportPicker(props: {
   onResponsiveWidthChange: (width: number) => void;
 }) {
   return (
-    <div className="pointer-events-auto flex h-9 min-w-0 items-center gap-1 px-0.5 lg:h-7">
+    <div className="pointer-events-auto flex h-8 min-w-0 items-center gap-1 px-0.5 lg:h-7">
       {props.showDeviceTabs !== false ? <SourceDeviceTabs device={props.device} node={props.node} onChange={props.onDeviceChange} /> : null}
       {props.showDeviceTabs !== false ? <span aria-hidden="true" className="h-5 w-px shrink-0 bg-white/10" /> : null}
       <MonitorSmartphone aria-hidden="true" className="hidden shrink-0 text-zinc-500 sm:block group-data-[narrow=true]/canvas-controls:hidden" size={13} />
@@ -37,7 +37,7 @@ export function SourceViewportPicker(props: {
           <Select.Value className="min-w-0 flex-1 truncate text-left" />
           <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
         </Select.Trigger>
-        <Select.Popover placement="bottom" className="max-h-80 min-w-56 overflow-y-auto rounded-lg border border-white/10 bg-[#18191c] p-1 shadow-2xl">
+        <Select.Popover placement="bottom" className="max-h-80 min-w-56 overflow-y-auto rounded-lg bg-[#18191c] p-1 shadow-2xl">
           <ListBox items={sourceViewportPresets}>
             {(preset) => <ListBox.Item id={preset.id} textValue={preset.label} className="flex min-h-9 cursor-default items-center rounded-md px-2 text-xs text-zinc-300 outline-none data-[focused]:bg-white/10 data-[selected]:text-sky-300">{preset.label}<ListBox.ItemIndicator className="ml-auto size-3" /></ListBox.Item>}
           </ListBox>
@@ -76,7 +76,7 @@ export function SourceViewportPicker(props: {
         >
           <Frame aria-hidden="true" size={12} />
         </ToggleButton>
-        <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+        <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
           {props.showDeviceFrame ? "Hide device mockup" : "Show device mockup"}
         </Tooltip.Content>
       </Tooltip>
@@ -92,7 +92,7 @@ export function SourceViewportPicker(props: {
         >
           {props.clipToScreen ? <Crop aria-hidden="true" size={12} /> : <Scan aria-hidden="true" size={12} />}
         </ToggleButton>
-        <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+        <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
           {props.clipToScreen ? "Clip to selected screen" : "Hug rendered content"}
         </Tooltip.Content>
       </Tooltip>

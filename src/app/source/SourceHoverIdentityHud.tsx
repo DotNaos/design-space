@@ -31,7 +31,7 @@ export function SourceHoverIdentityHud(props: {
           <ArrowRight aria-hidden="true" size={11} />
         </Button>
       ) : props.external ? (
-        <span className="shrink-0 border-l border-white/10 pl-2 text-[9px] font-medium uppercase tracking-[0.08em] text-fuchsia-300/75">
+        <span className="shrink-0 border-l border-white/10 pl-2 text-[9px] font-medium text-fuchsia-300/75">
           Double-click to open
         </span>
       ) : null}

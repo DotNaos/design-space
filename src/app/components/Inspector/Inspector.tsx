@@ -24,7 +24,7 @@ export function Inspector(props: InspectorProps) {
   return (
     <aside className={`${props.className ?? "flex w-72"} min-w-0 shrink-0 flex-col overflow-y-auto border-l border-white/10 bg-[#141518]`}>
       <div className="border-b border-white/10 px-4 py-3">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-600">Inspector</p>
+        <p className="text-[10px] text-zinc-600">Inspector</p>
         <h2 className="mt-1 text-sm font-medium text-zinc-100">{selectedSlot ? `${selectedSlot.label} slot` : props.componentLabel}</h2>
         <p className="mt-0.5 text-[10px] text-zinc-600">{selectedSlot ? (selectedSlot.count ? "Occupied slot" : "Empty declared slot") : (props.sourceLabel ?? "Target-owned adapter")}</p>
       </div>

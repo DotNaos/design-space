@@ -3,6 +3,8 @@ import type { SourceCanvasAncestryItem } from "./source-canvas-ancestry";
 import type { SourceLayerMetrics, SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
 import type { SourceTreeNode } from "./source-workspace-tree";
 import type { SourceSlotScope } from "./source-slot-navigation";
+import type { SourceComponentReviewCheckpointProps } from "./SourceComponentReviewCheckpoint";
+import type { ReactNode } from "react";
 
 export interface SourcePreviewFrameProps {
   ancestry?: readonly SourceCanvasAncestryItem[];
@@ -19,6 +21,7 @@ export interface SourcePreviewFrameProps {
   mode?: SourcePreviewMode;
   node?: SourceTreeNode;
   revealSelectedLayerKey?: number;
+  reviewCheckpoint?: Omit<SourceComponentReviewCheckpointProps, "onRequestChanges">;
   runtime: "react" | "react-native";
   selectedClassCss?: string;
   selectedClassName?: string;
@@ -33,6 +36,7 @@ export interface SourcePreviewFrameProps {
   slotTargetLabel?: string;
   styles: readonly string[];
   workspaceMode?: SourceWorkspaceMode;
+  workspaceNavigation?: ReactNode;
   onDesignCaseChange?: (caseName: string) => void;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
   onGenerateDesign?: () => void;

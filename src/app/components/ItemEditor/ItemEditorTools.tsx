@@ -85,7 +85,7 @@ export function ItemEditorTools(props: {
               className={`${desktop ? "absolute -right-1.5 h-5 w-0.5 rounded-l-full" : "absolute inset-x-3 bottom-0 h-0.5 rounded-t-full"} bg-sky-400 opacity-0 group-data-[selected]:opacity-100`}
             />
           </Tabs.Tab>
-          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[9px] font-medium text-zinc-200 shadow-xl" placement="right">{tool.label}</Tooltip.Content>
+          <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[9px] font-medium text-zinc-200 shadow-xl" placement="right">{tool.label}</Tooltip.Content>
           </Tooltip>
         ))}
       </Tabs.List>
@@ -146,7 +146,7 @@ export function ItemEditorTools(props: {
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2 text-xs text-zinc-200">
                       <span className="truncate">{slot.label}</span>
-                      {slot.min ? <span className="text-[8px] uppercase tracking-wide text-zinc-600">Required</span> : null}
+                      {slot.min ? <span className="text-[8px] text-zinc-600">Required</span> : null}
                     </span>
                     <span className="mt-0.5 block truncate text-[9px] text-zinc-600">{detail}</span>
                   </span>
@@ -202,7 +202,7 @@ function ToolHeading(props: { title: string; description: string; strictUi?: boo
           <span className="flex shrink-0 items-center gap-1 text-[9px] text-emerald-400/80">
             <ShieldCheck size={12} /> Strict UI
           </span>
-          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[9px] text-zinc-200 shadow-xl">Only controls that map deterministically to Tailwind CSS</Tooltip.Content>
+          <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[9px] text-zinc-200 shadow-xl">Only controls that map deterministically to Tailwind CSS</Tooltip.Content>
         </Tooltip>
       )}
     </div>

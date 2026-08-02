@@ -20,6 +20,7 @@ export function SourceWorkspaceCodeOverlay(props: {
   open: boolean;
   onHeightChange?: (height: number | undefined) => void;
   onOpenChange: (open: boolean) => void;
+  header?: React.ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -146,19 +147,24 @@ export function SourceWorkspaceCodeOverlay(props: {
             <span className="absolute left-1/2 top-1/2 h-0.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/10 transition-colors group-hover:bg-sky-300/70 group-focus-visible:bg-sky-300" />
           </div>
         )}
-        <Button
-          aria-expanded={props.open}
-          className="h-10 min-h-10 w-full shrink-0 justify-start gap-2 rounded-none px-4 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"
-          variant="ghost"
-          onPress={() => props.onOpenChange(!props.open)}
-        >
-          <Code2 aria-hidden="true" className="text-sky-400" size={14} />
-          Code
-          {props.open
-            ? <ChevronDown aria-hidden="true" className="ml-auto" size={13} />
-            : <ChevronUp aria-hidden="true" className="ml-auto" size={13} />}
-        </Button>
-        {props.open ? <div className="min-h-0 flex-1 border-t border-white/[0.06]">{props.code}</div> : null}
+        <div className="flex h-10 min-h-10 shrink-0 items-center gap-2 border-b border-white/[0.06] bg-[#101113] px-2">
+          <Button
+            isIconOnly={Boolean(props.header && props.open)}
+            aria-expanded={props.open}
+            aria-label={props.header && props.open ? "Collapse code" : "Code"}
+            className={`${props.header && props.open ? "size-7 min-w-7 justify-center px-0" : "h-8 min-w-0 flex-1 justify-start px-2"} shrink-0 gap-2 rounded-lg text-[10px] font-medium text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300`}
+            variant="ghost"
+            onPress={() => props.onOpenChange(!props.open)}
+          >
+            {props.header && props.open ? null : <Code2 aria-hidden="true" className="text-sky-400" size={14} />}
+            {props.header && props.open ? null : "Code"}
+            {props.open
+              ? <ChevronDown aria-hidden="true" className={props.header ? "" : "ml-auto"} size={13} />
+              : <ChevronUp aria-hidden="true" className="ml-auto" size={13} />}
+          </Button>
+          {props.open ? props.header : null}
+        </div>
+        {props.open ? <div className="min-h-0 flex-1">{props.code}</div> : null}
       </section>
     </div>
   );

@@ -39,7 +39,7 @@ export function DocumentNavigator(props: {
         <Button aria-label={`Create ${expectedKind}`} isIconOnly size="sm" variant="ghost" isDisabled={!props.canCreate} onPress={props.onCreate}><Plus size={14} /></Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
-        <p className="px-3 pb-1.5 text-[9px] font-medium uppercase tracking-[0.16em] text-zinc-600">{props.mode === "app" ? "Screens" : "Components"}</p>
+        <p className="px-3 pb-1.5 text-[9px] font-medium text-zinc-600">{props.mode === "app" ? "Screens" : "Components"}</p>
         {entries.map((entry) => {
           const active = entry.id === props.activeDocumentId;
           return (

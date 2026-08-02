@@ -344,8 +344,8 @@ export function LegacyWorkspace() {
       <style data-design-space-tailwind-preview>{itemEditorController.model?.previewCss ?? `${previewCss}\n${Object.values(compositionCss).join("\n")}`}</style>
       <TopBar
         targetLabel={target.project.label}
-        connected={connected}
         runtimeLabel={connected ? "Preview ready" : "Connecting…"}
+        connected={connected}
         canUndo={fixtureUndoStack.length > 0 || editor.undoStack.length > 0}
         canDiff={editable && tailwindReady && isDirty(editor) && editor.phase !== "stale" && editor.phase !== "compile-error"}
         canSave={editable && tailwindReady && editor.phase === "diff-ready" && Boolean(editor.preparedEdit)}

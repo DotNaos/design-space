@@ -19,7 +19,7 @@ export function DiffSheet({ desktopHidden, diff, saving, onClose, onSave }: Diff
   return (
     <Modal.Backdrop isOpen onOpenChange={(open) => { if (!open) onClose(); }} variant="transparent">
       <Modal.Container className="items-end p-0 lg:p-6" placement="bottom" size="lg">
-        <Modal.Dialog aria-label="Exact source diff" className="max-h-[70dvh] w-full rounded-b-none border border-white/10 bg-[#17181b] text-zinc-200 lg:rounded-xl">
+        <Modal.Dialog aria-label="Exact source diff" className="max-h-[70dvh] w-full rounded-b-none bg-[#17181b] text-zinc-200 lg:rounded-xl">
           <Modal.Header className="border-b border-white/10 px-3 py-2">
             <div className="flex w-full items-center gap-2">
               <CheckCircle2 size={14} className="shrink-0 text-emerald-400" />

@@ -1,4 +1,4 @@
-import { browserOperationSchema, libraryDevelopmentOperationSchema } from "../shared/contracts";
+import { browserOperationSchema, libraryDevelopmentOperationSchema, sourceApprovalOperationSchema } from "../shared/contracts";
 import { documentOperationSchema } from "../shared/document-transactions";
 import { DesignSpaceError } from "./errors";
 import type { DocumentService } from "./document-service";
@@ -15,16 +15,19 @@ export class LocalOperationService implements OperationExecutor {
   readonly #editService: EditService;
   readonly #documentService: DocumentService;
   readonly #libraryDevelopmentService?: OperationExecutor;
+  readonly #sourceApprovalService?: OperationExecutor;
   #disposed = false;
 
   constructor(
     editService: EditService,
     documentService: DocumentService,
     libraryDevelopmentService?: OperationExecutor,
+    sourceApprovalService?: OperationExecutor,
   ) {
     this.#editService = editService;
     this.#documentService = documentService;
     this.#libraryDevelopmentService = libraryDevelopmentService;
+    this.#sourceApprovalService = sourceApprovalService;
   }
 
   async execute(input: unknown): Promise<unknown> {
@@ -36,6 +39,12 @@ export class LocalOperationService implements OperationExecutor {
       return this.#libraryDevelopmentService.execute(input);
     }
     if (documentOperationSchema.safeParse(input).success) return this.#documentService.execute(input);
+    if (sourceApprovalOperationSchema.safeParse(input).success) {
+      if (!this.#sourceApprovalService) {
+        throw new DesignSpaceError("ACCESS_DENIED", "Component signing is not configured for this project");
+      }
+      return this.#sourceApprovalService.execute(input);
+    }
     if (browserOperationSchema.safeParse(input).success) return this.#editService.execute(input);
     throw new DesignSpaceError("INVALID_REQUEST", "The local operation is invalid");
   }

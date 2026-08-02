@@ -24,6 +24,8 @@ import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement, s
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
 import { renderStaticSourceDesignMarkup, renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
 import type { SourcePreviewFrameProps } from "./source-preview-frame-props";
+import { SourceComponentReviewCheckpoint } from "./SourceComponentReviewCheckpoint";
+import { sourceReviewGraphProperties, sourceReviewGraphSlots } from "./source-review-graph";
 
 export function sourceStaticProjectionLayerId(options: {
   entry?: RuntimeSourceWorkspaceEntry;
@@ -130,6 +132,28 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
   const selectedCase = definition && caseNames.includes(requestedCase ?? "")
     ? requestedCase!
     : definition?.initialCase;
+  const selectDesignCase = useCallback((next: string) => {
+    if (designId) setCaseByDesign((current) => ({ ...current, [designId]: next }));
+    props.onDesignCaseChange?.(next);
+  }, [designId, props.onDesignCaseChange]);
+  const reviewGraph = props.entry ? {
+    caseNames: structuralDesign ? [] : caseNames,
+    componentLabel: props.entry.label,
+    isStateful: definition?.isStateful ?? false,
+    properties: sourceReviewGraphProperties({
+      caseValues: selectedCase ? definition?.cases[selectedCase] : undefined,
+      defaults: definition?.defaults,
+      entry: props.entry,
+    }),
+    selectedCase: structuralDesign ? undefined : selectedCase,
+    slots: sourceReviewGraphSlots({
+      entry: props.entry,
+      selectedLayerId: props.selectedLayer?.id,
+      slotLayers: props.slotLayers,
+    }),
+    onCaseChange: structuralDesign ? undefined : selectDesignCase,
+    onSelectSlot: (slotId: string) => props.onSelectLayer?.(slotId, 0),
+  } : undefined;
   const matrixAvailable = Boolean(props.entry?.props.some((property) => (property.values?.length ?? 0) > 1));
   const matrix = Boolean(designId && matrixByDesign[designId] && !props.selectedLayer);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
@@ -387,6 +411,7 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
       selectedLayer={Boolean(props.selectedLayer)}
       showModeToggle={!props.workspaceMode}
       revealTarget={revealTarget?.key === revealKey ? revealTarget : undefined}
+      reviewGraph={previewMode === "play" ? undefined : reviewGraph}
       selectionKey={props.entry?.id}
       selectionLabel={props.selectedLayerLabel ?? sourceCanvasLayerLabel(props.selectedLayer) ?? props.node?.label}
       slotOwnerLabel={props.node?.label ?? props.entry?.label}
@@ -402,7 +427,7 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
         />
       ) : undefined}
       hud={(
-        <div className="flex w-[min(920px,calc(100vw-2rem))] max-w-full flex-col gap-1.5">
+        <div className="flex w-[min(600px,calc(100vw-2rem))] max-w-full flex-col gap-1.5">
           {!props.workspaceMode && props.selectedLayer && selectedLayerOccurrenceCount > 1 ? (
             <div className="min-w-0">
               <SourceInstanceNavigator
@@ -412,47 +437,51 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
               />
             </div>
           ) : null}
-          <div
-            className="flex min-w-0 flex-col items-center gap-1.5 sm:flex-row sm:items-end sm:justify-center"
-            data-testid="source-canvas-feedback-row"
-          >
-            {props.workspaceMode ? (
-              <SourceCanvasContextHud
-                contextLabel={props.node?.label ?? props.entry?.label ?? "Component"}
-                mode={props.workspaceMode}
-                playing={previewMode === "play"}
-                onPlayChange={(playing) => props.onModeChange?.(playing ? "play" : "design")}
-                onReturnToPreview={props.onReturnToPreview}
-              />
-            ) : null}
-            <SourceCanvasFeedbackDock
-              annotationMode={canvasAnnotations.active}
-              annotations={canvasAnnotations.annotations}
-              context={feedbackContext}
-              onAnnotationModeChange={previewMode === "design" && !previewState ? canvasAnnotations.setActive : undefined}
-              onAnnotationsSent={canvasAnnotations.clear}
-            />
-          </div>
+          <SourceCanvasFeedbackDock
+            annotationMode={canvasAnnotations.active}
+            annotations={canvasAnnotations.annotations}
+            context={feedbackContext}
+            meta={props.workspaceMode || props.reviewCheckpoint ? (
+              <>
+                {props.workspaceMode ? (
+                  <SourceCanvasContextHud
+                    contextLabel={props.node?.label ?? props.entry?.label ?? "Component"}
+                    mode={props.workspaceMode}
+                    playing={previewMode === "play"}
+                    onPlayChange={(playing) => props.onModeChange?.(playing ? "play" : "design")}
+                    onReturnToPreview={props.onReturnToPreview}
+                  />
+                ) : null}
+                {props.reviewCheckpoint ? (
+                  <SourceComponentReviewCheckpoint
+                    {...props.reviewCheckpoint}
+                    stateCount={caseNames.length || (props.entry?.design ? 1 : 0)}
+                    onRequestChanges={() => canvasAnnotations.setActive(true)}
+                  />
+                ) : null}
+              </>
+            ) : undefined}
+            onAnnotationModeChange={previewMode === "design" && !previewState ? canvasAnnotations.setActive : undefined}
+            onAnnotationsSent={canvasAnnotations.clear}
+          />
         </div>
       )}
       onDeviceChange={props.onDeviceChange ?? (() => undefined)}
       onSelectAncestry={props.onSelectAncestry}
       onSelectSlot={(slot) => props.onSelectLayer?.(slot.id, 0)}
       onModeChange={props.onModeChange}
-      toolbarEnd={!structuralDesign && definition && selectedCase ? (
-        <SourceDesignControls
-          caseNames={caseNames}
-          isStateful={definition.isStateful}
-          matrix={matrix}
-          matrixAvailable={matrixAvailable}
-          selectedCase={selectedCase}
-          stale={loadState === "invalid"}
-          onCaseChange={(next) => {
-            if (designId) setCaseByDesign((current) => ({ ...current, [designId]: next }));
-            props.onDesignCaseChange?.(next);
-          }}
-          onMatrixChange={() => designId && setMatrixByDesign((current) => ({ ...current, [designId]: !current[designId] }))}
-        />
+      toolbarEnd={props.workspaceNavigation || (!structuralDesign && definition && selectedCase) ? (
+        <>
+          {props.workspaceNavigation}
+          {!structuralDesign && definition && selectedCase ? (
+            <SourceDesignControls
+              matrix={matrix}
+              matrixAvailable={matrixAvailable}
+              stale={loadState === "invalid"}
+              onMatrixChange={() => designId && setMatrixByDesign((current) => ({ ...current, [designId]: !current[designId] }))}
+            />
+          ) : null}
+        </>
       ) : undefined}
     >
       {(frame) => (

@@ -34,6 +34,23 @@ it("keeps the source tree visible while opening code as a second left panel", as
   expect(screen.getByRole("separator", { name: "Resize code panel" })).toBeVisible();
 });
 
+it("combines the code panel toggle and file controls in one header", () => {
+  render(
+    <SourceWorkspaceCodeOverlay
+      code={<div>Monaco code</div>}
+      header={<div>App Source Design file Editable</div>}
+      open
+      onOpenChange={vi.fn()}
+    >
+      <div>Source tree</div>
+    </SourceWorkspaceCodeOverlay>,
+  );
+
+  const panel = screen.getByRole("region", { name: "Source code panel" });
+  expect(screen.getByRole("button", { name: "Collapse code" })).toBeVisible();
+  expect(screen.getByText("App Source Design file Editable").parentElement).toBe(panel.firstElementChild?.nextElementSibling);
+});
+
 it("resizes the open panel with the keyboard and resets it by double-click", () => {
   const onHeightChange = vi.fn();
   render(

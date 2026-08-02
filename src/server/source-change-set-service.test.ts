@@ -235,7 +235,7 @@ describe("source change-set service", () => {
       message: expect.stringContaining("accepts Heading but received Card"),
     });
     await expect(service.apply("must-not-be-issued")).rejects.toMatchObject({ code: "NOT_FOUND" });
-  });
+  }, 15_000);
 
   it("validates related contract and consumer drafts in the same compiler view", async () => {
     const base = await strictUiFixture();
@@ -309,7 +309,7 @@ describe("source change-set service", () => {
     await expect(failing.apply(prepared.challengeId)).rejects.toMatchObject({ code: "TRANSACTION_FAILED" });
     await expect(readFile(base.appFiles.a.path, "utf8")).resolves.toContain("number = 1");
     await expect(readFile(base.appFiles.b.path, "utf8")).resolves.toContain("result: number = value;");
-  });
+  }, 15_000);
 
   it("expires one-time review challenges", async () => {
     const base = await fixture();

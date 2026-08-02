@@ -13,7 +13,6 @@ import { SourceDesignCaseControl } from "./SourceDesignCaseControl";
 import { SourceLayerDesignInspector } from "./SourceLayerDesignInspector";
 import { SourceFeedbackInspector } from "./SourceFeedbackInspector";
 import { sourceFeedbackContext } from "./source-feedback";
-import { TailwindClassField } from "../inspector/TailwindClassField";
 import type { SourceComponentCandidate } from "./source-slot-composition";
 import type { SourceLayerMetrics } from "./source-layer-design";
 import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
@@ -59,33 +58,18 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
         aria-label="TypeScript component contract"
         className={`${props.className ?? "flex w-72"} min-h-0 min-w-0 shrink-0 flex-col border-l border-white/10 bg-[#141518]`}
       >
-        <ComponentInspectorHeader entry={props.entry} />
+        <ComponentInspectorHeader entry={props.entry} selectedRegion />
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <section aria-label="Selected component" className="border-b border-white/10 px-4 py-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <Component aria-hidden="true" className="mt-0.5 shrink-0 text-violet-400" size={17} />
-              <div className="min-w-0">
-                <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-zinc-600">Selected component</p>
-                <h3 className="mt-1 truncate text-sm font-semibold text-violet-200">{props.entry.label}</h3>
-                <p className="mt-1 truncate font-mono text-[9px] text-zinc-600" title={props.entry.relativePath}>
-                  {props.entry.relativePath}
-                </p>
-              </div>
-            </div>
-          </section>
           <SourceFeedbackInspector context={sourceFeedbackContext(props.entry, props.layer)} />
-          <section aria-labelledby="outside-current-file-title" className="px-4 py-4">
+          <section aria-labelledby="outside-current-file-title" className="px-4 py-3">
             <div className="flex items-center gap-2 text-violet-300">
               <FileCode2 aria-hidden="true" size={14} />
-              <h3 id="outside-current-file-title" className="text-[10px] font-medium uppercase tracking-[0.14em]">
+              <h3 id="outside-current-file-title" className="text-[10px] font-medium">
                 Outside the current file
               </h3>
             </div>
-            <p className="mt-2 text-[11px] leading-5 text-zinc-500">
-              Its properties belong to another source file. Open that file to inspect and edit this component.
-            </p>
           <Button
-            className="mt-4 w-full justify-center"
+            className="mt-3 w-full justify-center"
             size="sm"
             variant="primary"
             onPress={props.outsideCurrentFile.onOpen}
@@ -94,7 +78,7 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
             <ArrowUpRight aria-hidden="true" size={14} />
           </Button>
           {props.outsideCurrentFile.currentRelativePath ? (
-            <p className="mt-3 truncate text-[9px] text-zinc-700" title={props.outsideCurrentFile.currentRelativePath}>
+            <p className="mt-2 truncate text-[9px] text-zinc-700" title={props.outsideCurrentFile.currentRelativePath}>
               Used from {props.outsideCurrentFile.currentRelativePath}
             </p>
           ) : null}
@@ -115,34 +99,19 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
       <ComponentInspectorHeader entry={props.entry} />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="sticky top-0 z-20 bg-[#141518]/95 shadow-[0_1px_0_rgba(255,255,255,0.08),0_8px_20px_rgba(0,0,0,0.18)] backdrop-blur">
+        <div className="sticky top-0 z-20 border-b border-white/10 bg-[#141518]/95 backdrop-blur">
           <SourceDesignCaseControl
             entry={props.entry}
             selectedCase={props.selectedDesignCase}
             onCaseChange={props.onDesignCaseChange}
           />
-          {props.layer?.className ? (
-            <section aria-label="Tailwind classes" className="border-b border-white/10 bg-sky-400/[0.025] px-4 py-3 shadow-[inset_2px_0_0_rgba(56,189,248,0.24)]">
-              <TailwindClassField
-                compileError={props.styleEditor?.error}
-                disabled={!props.styleEditor?.editable}
-                label="className"
-                previewValue={previewClassName}
-                value={committedClassName}
-                onChange={(value) => {
-                  setPreviewClassName(undefined);
-                  props.styleEditor?.change(value);
-                }}
-              />
-            </section>
-          ) : null}
         </div>
         <SourceFeedbackInspector context={sourceFeedbackContext(props.entry, props.layer)} />
         {props.entry.findings.length > 0 && (
           <section aria-label="Strict UI findings" className="border-b border-red-400/20 bg-red-400/[0.04] px-4 py-3">
             <header className="flex items-center gap-2 text-red-300">
               <CircleAlert aria-hidden="true" size={14} />
-              <h3 className="text-[10px] font-medium uppercase tracking-[0.14em]">Strict UI</h3>
+              <h3 className="text-[10px] font-medium">Strict UI</h3>
               <span className="ml-auto text-[9px] tabular-nums">{props.entry.findings.length}</span>
             </header>
             <ul className="mt-2 space-y-2">
@@ -154,22 +123,21 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
             </ul>
           </section>
         )}
-        {props.layer && (
+        {props.layer?.kind === "html" && (
           <SourceLayerDesignInspector
             layer={props.layer}
             metrics={props.layerMetrics}
+            previewClassName={previewClassName}
             styleEditor={props.styleEditor}
             onClassNamePreviewChange={setPreviewClassName}
           />
         )}
         <ContractSection
-          emptyMessage="No non-slot props are declared."
           icon={<Braces aria-hidden="true" size={14} />}
           properties={regularProps}
           title="Props"
         />
         <ContractSection
-          emptyMessage="No slot props are declared."
           icon={<Component aria-hidden="true" size={14} />}
           properties={slots}
           slotLayers={props.slotLayers}
@@ -184,21 +152,23 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
   );
 }
 
-function ComponentInspectorHeader({ entry }: { entry: SourceWorkspaceEntry }) {
+function ComponentInspectorHeader({ entry, selectedRegion = false }: { entry: SourceWorkspaceEntry; selectedRegion?: boolean }) {
   return (
-    <header className="shrink-0 border-b border-white/10 px-4 py-3">
+    <header
+      aria-label={selectedRegion ? "Selected component" : undefined}
+      className="shrink-0 border-b border-white/10 px-4 py-2.5"
+      role={selectedRegion ? "region" : undefined}
+    >
       <div className="flex items-center gap-2">
         <FileCode2 aria-hidden="true" className="shrink-0 text-sky-400" size={15} />
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-100">{entry.label}</h2>
       </div>
-      <p className="mt-1 truncate text-[10px] text-zinc-600" title={entry.relativePath}>{entry.relativePath}</p>
-      <p className="mt-0.5 text-[9px] text-zinc-700">Export: {entry.exportName}</p>
+      <p className="mt-1 truncate pl-[23px] font-mono text-[9px] text-zinc-600" title={`${entry.relativePath} · ${entry.exportName}`}>{entry.relativePath}</p>
     </header>
   );
 }
 
 function ContractSection(props: {
-  emptyMessage: string;
   icon: React.ReactNode;
   properties: readonly (SourceComponentProp | SourceComponentSlot)[];
   slotLayers?: readonly SourceWorkspaceLayer[];
@@ -210,9 +180,9 @@ function ContractSection(props: {
 }) {
   return (
     <section aria-labelledby={`source-contract-${props.title.toLowerCase()}`} className="border-b border-white/10">
-      <header className="flex min-h-10 items-center gap-2 px-4 text-zinc-500">
+      <header className="flex h-9 items-center gap-2 px-4 text-zinc-500">
         {props.icon}
-        <h3 id={`source-contract-${props.title.toLowerCase()}`} className="text-[10px] font-medium uppercase tracking-[0.14em]">
+        <h3 id={`source-contract-${props.title.toLowerCase()}`} className="text-[10px] font-medium">
           {props.title}
         </h3>
         <span className="ml-auto text-[9px] tabular-nums text-zinc-700">{props.properties.length}</span>
@@ -231,9 +201,7 @@ function ContractSection(props: {
             />
           ))}
         </dl>
-      ) : (
-        <p className="px-4 pb-4 text-[10px] leading-4 text-zinc-600">{props.emptyMessage}</p>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -295,7 +263,7 @@ function SlotContractProperty(props: {
             onApply={(candidate, action) => props.onApplySlot?.(slotLayer, candidate, action)}
           />
         )}
-        <p className={`${slotLayer && props.onApplySlot ? "mt-2.5" : ""} mb-1.5 text-[8px] font-medium uppercase tracking-[0.12em] text-zinc-700`}>Accepts</p>
+        <p className={`${slotLayer && props.onApplySlot ? "mt-2.5" : ""} mb-1.5 text-[8px] font-medium text-zinc-700`}>Accepts</p>
         <div className="flex flex-wrap gap-1.5">
           {slot.accepts.map((accepted) => (
             <Chip key={accepted} className="h-5 border-white/[0.08] bg-white/[0.035] px-1.5 text-[9px] text-sky-300/80" size="sm" variant="secondary">

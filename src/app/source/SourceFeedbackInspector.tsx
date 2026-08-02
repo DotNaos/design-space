@@ -14,7 +14,7 @@ export function SourceFeedbackInspector(props: {
     <section aria-label="Comments" className="border-b border-white/10 px-4 py-3">
       <header className="flex items-center gap-2 text-violet-300">
         <MessageSquareText aria-hidden="true" size={14} />
-        <h3 className="text-[10px] font-medium uppercase tracking-[0.14em]">Comments</h3>
+        <h3 className="text-[10px] font-medium">Comments</h3>
         <span className="ml-auto text-[9px] tabular-nums text-zinc-600">{comments.length}</span>
       </header>
       <ul className="mt-2 space-y-2">

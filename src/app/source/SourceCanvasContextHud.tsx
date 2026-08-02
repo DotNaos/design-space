@@ -12,13 +12,14 @@ export function SourceCanvasContextHud(props: {
   onReturnToPreview?: () => void;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-1.5">
+    <div className="flex min-w-0 items-center gap-1">
       <div
         aria-label="Canvas context"
-        className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-[#18191d]/95 p-0.5 pl-2 text-[10px] text-zinc-400 shadow-xl shadow-black/30 backdrop-blur"
+        className="flex h-6 min-w-0 shrink items-center gap-0.5 pl-1 text-[9px] text-zinc-500"
       >
-        <span className="max-w-48 truncate">
-          {props.mode === "preview" ? "Preview" : `Design · ${props.contextLabel}`}
+        {props.mode === "design" ? <span className="sr-only">Design · {props.contextLabel}</span> : null}
+        <span aria-hidden={props.mode === "design" ? "true" : undefined} className="max-w-16 truncate" title={props.mode === "preview" ? "Preview" : `Design · ${props.contextLabel}`}>
+          {props.mode === "preview" ? "Preview" : "Design"}
         </span>
         {props.mode === "preview" ? (
           <HudButton
@@ -51,14 +52,14 @@ function HudButton(props: {
         isIconOnly
         aria-label={props.label}
         aria-pressed={props.active}
-        className={`size-7 min-w-7 rounded-md ${props.active ? "bg-sky-400/15 text-sky-200" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-200"}`}
+        className={`size-5 min-w-5 rounded ${props.active ? "bg-sky-400/15 text-sky-200" : "text-zinc-600 hover:bg-white/5 hover:text-zinc-200"}`}
         size="sm"
         variant="ghost"
         onPress={props.onPress}
       >
         {props.children}
       </Button>
-      <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+      <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
         {props.label}
       </Tooltip.Content>
     </Tooltip>

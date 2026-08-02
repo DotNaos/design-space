@@ -44,6 +44,11 @@ export async function registerSourceProject(
     editTargets: new Map(),
     editableFileIds,
     sourceWorkspace,
+    ...(config.approvals ? {
+      sourceApproval: {
+        policy: config.approvals.policy ?? ".project/approvals/policy.yaml",
+      },
+    } : {}),
     sourceComponentStore,
     sourceLibrary,
     libraryProject: config.library?.project,

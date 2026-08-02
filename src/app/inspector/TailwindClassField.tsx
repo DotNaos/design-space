@@ -108,7 +108,7 @@ export function TailwindClassField(props: {
             autoCapitalize="none"
             autoComplete="off"
             autoCorrect="off"
-            className={`min-h-11 w-full rounded-lg border bg-black/20 px-3 font-mono text-base outline-none lg:text-xs ${previewDiff ? "caret-transparent text-transparent" : "text-zinc-100"} ${diagnostic ? "border-rose-400/60 focus:border-rose-300" : "border-white/10 focus:border-sky-400"}`}
+            className={`min-h-11 w-full rounded-xl border-0 bg-black/20 px-3 font-mono text-base outline-none focus:ring-1 lg:text-xs ${previewDiff ? "caret-transparent text-transparent" : "text-zinc-100"} ${diagnostic ? "ring-rose-400/60 focus:ring-rose-300" : "focus:ring-sky-400/50"}`}
             role="combobox"
             spellCheck={false}
             onBlur={() => {
@@ -168,7 +168,7 @@ export function TailwindClassField(props: {
         <ListBox
           id={listboxId}
           aria-label="Tailwind suggestions"
-          className="absolute inset-x-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-lg border border-white/10 bg-[#1a1b1e] p-1 shadow-2xl"
+          className="absolute inset-x-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border-0 bg-[#1a1b1e] p-1 shadow-2xl"
           selectedKeys={[String(activeIndex)]}
           selectionMode="single"
           onAction={(key) => accept(completions[Number(key)])}

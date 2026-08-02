@@ -58,7 +58,7 @@ export function ItemEditorActions(props: {
 }) {
   return (
     <div aria-label="Item actions" className="flex h-11 shrink-0 items-center border-b border-white/10 bg-black/10 px-2">
-      <span className="px-2 text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-700">Instance</span>
+      <span className="px-2 text-[9px] font-medium text-zinc-700">Instance</span>
       <span aria-hidden="true" className="mx-1 h-4 w-px bg-white/10" />
       <EditorAction ariaLabel="Move up" disabled={!props.canMoveUp} icon={<ArrowUp size={15} />} onPress={() => props.onMove(-1)} />
       <EditorAction ariaLabel="Move down" disabled={!props.canMoveDown} icon={<ArrowDown size={15} />} onPress={() => props.onMove(1)} />

@@ -91,7 +91,7 @@ export function ComponentTree(props: ComponentTreeProps) {
           >
             <ListCollapse aria-hidden="true" size={14} />
           </Button>
-          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Collapse all · keeps selection visible</Tooltip.Content>
+          <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Collapse all · keeps selection visible</Tooltip.Content>
         </Tooltip>}
         {props.onInsert && (
           <ToggleButton
@@ -378,7 +378,7 @@ function ComponentRow(props: {
             <Code2 aria-hidden="true" size={12} />
             <span>{internals.nodeCount}</span>
           </Button>
-          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">{toggleLabel}</Tooltip.Content>
+          <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">{toggleLabel}</Tooltip.Content>
         </Tooltip>
         </span>
       )}

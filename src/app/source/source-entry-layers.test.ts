@@ -36,6 +36,32 @@ it("includes rendered slots without a composition contract", () => {
   expect(sourceEntrySlotLayers(entry)).toEqual([renderedSlot]);
 });
 
+it("attaches the component definition contract to an isolated slot placeholder", () => {
+  const renderedSlot: SourceWorkspaceLayer = {
+    id: "slot.status",
+    label: "status",
+    kind: "slot",
+    source: { start: 10, end: 20 },
+    children: [],
+  };
+  const contract = {
+    name: "status",
+    type: "ComponentSlot<typeof WorkspaceStatus>",
+    required: true,
+    multiple: false,
+    accepts: ["WorkspaceStatus"],
+    min: 1,
+    max: 1,
+  } as const;
+  const entry = {
+    ...sourceEntry(),
+    slots: [contract],
+    layers: [renderedSlot],
+  };
+
+  expect(sourceEntrySlotLayers(entry)).toEqual([{ ...renderedSlot, slotContract: contract }]);
+});
+
 it("turns a component-only root into one default content slot", () => {
   const child: SourceWorkspaceLayer = {
     id: "workspace-shell",

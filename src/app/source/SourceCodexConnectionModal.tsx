@@ -213,7 +213,7 @@ export function SourceCodexConnectionModal(props: {
                     <div className="space-y-3">
                       {taskGroups.map((group) => (
                         <section key={group.key} aria-label={group.label}>
-                          <div className="flex items-center gap-2 px-3 pb-1 pt-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-600">
+                          <div className="flex items-center gap-2 px-3 pb-1 pt-1 text-[9px] font-semibold text-zinc-600">
                             <Folder aria-hidden="true" size={10} />
                             <span className="min-w-0 truncate">{group.label}</span>
                             <span className="ml-auto tabular-nums text-zinc-700">{group.tasks.length}</span>

@@ -22,12 +22,12 @@ export function SourceCodexConnectionIndicator(props: {
       ? `${writable ? "Connected to" : "Read-only Codex task"} ${props.origin!.title}. Change Codex task`
       : "Connect Codex task";
   const tone = props.connection === "checking"
-    ? "border-white/8 bg-white/[0.03] text-zinc-500"
+    ? "text-zinc-500"
     : writable
-      ? "border-emerald-300/20 bg-emerald-300/[0.09] text-emerald-200 hover:bg-emerald-300/[0.14]"
+      ? "text-emerald-200 hover:bg-emerald-300/[0.08]"
       : connected
-        ? "border-amber-300/20 bg-amber-300/[0.08] text-amber-200 hover:bg-amber-300/[0.13]"
-        : "border-rose-300/20 bg-rose-300/[0.07] text-rose-200 hover:bg-rose-300/[0.12]";
+        ? "text-amber-200 hover:bg-amber-300/[0.08]"
+        : "text-rose-200 hover:bg-rose-300/[0.08]";
   const detail = props.connection === "checking"
     ? "Checking the current Codex task"
     : connected
@@ -38,16 +38,16 @@ export function SourceCodexConnectionIndicator(props: {
     <Tooltip closeDelay={80} delay={300}>
       <Button
         aria-label={accessibleLabel}
-        className={`h-7 min-w-0 max-w-36 shrink-0 gap-1.5 rounded-full border px-2.5 text-[10px] font-medium ${tone}`}
+        className={`h-6 min-w-0 max-w-32 shrink-0 gap-1.5 rounded-md px-1.5 text-[9px] font-medium ${tone}`}
         isDisabled={props.connection === "checking"}
         size="sm"
         variant="ghost"
         onPress={props.onPress}
       >
-        <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current shadow-[0_0_7px_currentColor]" />
+        <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />
         <span className="truncate">{label}</span>
       </Button>
-      <Tooltip.Content className="max-w-72 rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] leading-4 text-zinc-200 shadow-xl">
+      <Tooltip.Content className="max-w-72 rounded-lg bg-[#202126] px-2 py-1 text-[10px] leading-4 text-zinc-200 shadow-xl">
         {detail}
       </Tooltip.Content>
     </Tooltip>

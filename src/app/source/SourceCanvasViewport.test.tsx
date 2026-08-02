@@ -4,15 +4,14 @@ import { afterEach, expect, it, vi } from "vitest";
 
 vi.mock("../components/PreviewCanvas/PreviewCanvas", () => ({
   PreviewCanvas: (props: {
-    pinWorldHeader?: boolean;
+    canvasHeader?: React.ReactNode;
     preview: React.ReactNode;
     toolbar?: React.ReactNode;
     worldFooter?: React.ReactNode;
-    worldHeader?: React.ReactNode;
   }) => (
-    <div data-pin-world-header={props.pinWorldHeader || undefined}>
+    <div>
+      <div data-testid="fixed-canvas-header">{props.canvasHeader}</div>
       {props.toolbar}
-      {props.worldHeader}
       {props.preview}
       {props.worldFooter}
     </div>
@@ -90,7 +89,7 @@ it("attaches an interactive ancestry path to the canvas", async () => {
   );
 
   const ancestry = screen.getByRole("navigation", { name: "Canvas ancestry" });
-  expect(document.querySelector('[data-pin-world-header="true"]')).toContainElement(ancestry);
+  expect(screen.getByTestId("fixed-canvas-header")).toContainElement(ancestry);
   expect(ancestry).toHaveTextContent("From root");
   expect(ancestry).toHaveTextContent("App");
   expect(ancestry).toHaveTextContent("WorkspaceShell");
@@ -177,4 +176,38 @@ it("shows parent approval status only when supplied by approval review mode", ()
     .toHaveAttribute("data-approval-tone", "pending");
   expect(screen.getByText("slot:content").closest("[data-approval-tone]"))
     .not.toBeInTheDocument();
+});
+
+it("keeps the review graph inside the zoomable canvas while switching layouts", async () => {
+  render(
+    <SourceCanvasViewport
+      device="desktop"
+      onDeviceChange={vi.fn()}
+      reviewGraph={{
+        caseNames: ["default", "alternate path"],
+        componentLabel: "Layout",
+        isStateful: false,
+        properties: [],
+        selectedCase: "default",
+        slots: [],
+        onCaseChange: vi.fn(),
+      }}
+    >
+      {() => <div>Preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  const stage = screen.getByTestId("source-review-graph-stage");
+  expect(screen.getByTestId("source-review-graph-world")).toContainElement(stage);
+  expect(screen.queryByTestId("source-review-graph-overlay")).not.toBeInTheDocument();
+  expect(stage).toHaveAttribute("data-review-graph-layout", "vertical");
+
+  await userEvent.click(screen.getByRole("button", { name: "Inputs left, outputs right" }));
+  expect(stage).toHaveAttribute("data-review-graph-layout", "horizontal");
+
+  await userEvent.click(screen.getByRole("button", { name: "Focus on the current design" }));
+  expect(stage).toHaveAttribute("data-review-graph-layout", "focus");
+  expect(screen.queryByText("Properties")).not.toBeInTheDocument();
+  expect(screen.queryByText("Slots")).not.toBeInTheDocument();
+  expect(screen.getByTestId("source-review-case-carousel")).toHaveTextContent("default");
 });

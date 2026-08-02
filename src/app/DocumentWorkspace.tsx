@@ -368,14 +368,6 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
   ) : desktopEditor;
 
   const activity = sidebarView === "catalog" ? "library" : sidebarView === "files" ? "files" : "app";
-  const selectedCatalogLabel = catalog.find((entry) => entry.component.id === selectedCatalogId)?.component.label;
-  const breadcrumb = sidebarView === "catalog"
-    ? ["Library", selectedCatalogLabel ?? "Catalog"]
-    : sidebarView === "files"
-      ? ["Files"]
-      : document.kind === "screen"
-        ? ["App", "Pages", "Desktop", document.label]
-        : ["App", "Components", document.label];
 
   return (
     <div className="flex h-dvh w-full min-w-0 overflow-hidden bg-[#0d0e10] text-zinc-200">
@@ -394,9 +386,7 @@ export function DocumentWorkspace({ target }: { target: TargetModule }) {
         <WorkspaceTopBar
           targetLabel={target.project.label}
           documentLabel={modeDocumentAvailable ? document.label : `No ${modeDocumentKind} selected`}
-          breadcrumb={breadcrumb}
           focusLabel={componentFocus.label}
-          connected={controller.connected}
           strictUi={activeSession?.strictUi}
           checking={activeSession?.phase === "checking"}
           canUndo={!itemEditor.model && Boolean(activeSession?.past.length)} canRedo={!itemEditor.model && Boolean(activeSession?.future.length)}

@@ -30,7 +30,9 @@ export function sourceWithLayerClassName(
 ): string {
   if (binding.start < 0 || binding.end < binding.start || binding.end > source.length) return source;
   if (binding.insert && !value) return source;
-  if (binding.insert ? !isJsxAttributeInsertionPoint(source, binding.start) : !source.slice(binding.start, binding.end).startsWith("className")) {
+  if (binding.insert
+    ? !isJsxAttributeInsertionPoint(source, binding.start)
+    : !isCurrentClassNameBinding(source.slice(binding.start, binding.end), binding)) {
     return source;
   }
   const attribute = binding.syntax === "attribute"
@@ -38,6 +40,13 @@ export function sourceWithLayerClassName(
     : `className={${JSON.stringify(value)}}`;
   const replacement = `${binding.insert ? " " : ""}${attribute}`;
   return `${source.slice(0, binding.start)}${replacement}${source.slice(binding.end)}`;
+}
+
+function isCurrentClassNameBinding(current: string, binding: SourceLayerClassNameBinding): boolean {
+  if (binding.syntax === "expression") {
+    return current === `className={${JSON.stringify(binding.value)}}`;
+  }
+  return current === `className="${escapeJsxAttribute(binding.value)}"`;
 }
 
 function isJsxAttributeInsertionPoint(source: string, offset: number): boolean {

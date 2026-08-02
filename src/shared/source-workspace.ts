@@ -173,6 +173,8 @@ export interface SourceWorkspaceLayer {
   text?: SourceLayerTextBinding;
   /** Compiler-derived slot state for a component use. Present only on slot nodes. */
   slot?: SourceSlotUsage;
+  /** Definition-owned contract for an isolated Slot placeholder; it is not an editable component use. */
+  slotContract?: SourceComponentSlot;
 }
 
 export type SourceSlotValidity = "valid" | "missing" | "incompatible" | "full" | "optional";

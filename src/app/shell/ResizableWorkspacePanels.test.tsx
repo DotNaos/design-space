@@ -63,6 +63,67 @@ describe("ResizableWorkspacePanels", () => {
     expect(document.getElementById(showInspector.getAttribute("aria-controls")!)).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("can place the left panel toggle in a full-height panel header without a separate rail", () => {
+    render(
+      <ResizableWorkspacePanels
+        namespace={{ projectId: "demo", documentId: "header" }}
+        left={{
+          label: "Project panel",
+          content: ({ controls, visible, onToggle }) => (
+            <div>
+              <button aria-controls={controls} aria-expanded={visible} onClick={onToggle}>Inline project header</button>
+              Project
+            </div>
+          ),
+          defaultWidth: 260,
+          minWidth: 200,
+          maxWidth: 400,
+        }}
+        leftHeader={({ controls, visible, onToggle }) => (
+          visible ? null : <button aria-controls={controls} aria-expanded={visible} onClick={onToggle}>Collapsed project header</button>
+        )}
+        right={{ label: "Inspector panel", content: <div>Inspector</div>, defaultWidth: 300, minWidth: 240, maxWidth: 460 }}
+      >
+        <div>Canvas</div>
+      </ResizableWorkspacePanels>,
+    );
+
+    const headerToggle = screen.getByRole("button", { name: "Inline project header" });
+    expect(headerToggle.closest("[data-workspace-panel='left']")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Hide Project panel" })).not.toBeInTheDocument();
+    fireEvent.click(headerToggle);
+    const collapsedToggle = screen.getByRole("button", { name: "Collapsed project header" });
+    expect(collapsedToggle).toHaveAttribute("aria-expanded", "false");
+    expect(document.getElementById(collapsedToggle.getAttribute("aria-controls")!)).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("exposes external controls without reserving collapsed panel rails", () => {
+    render(
+      <ResizableWorkspacePanels
+        externalPanelControls
+        namespace={{ projectId: "demo", documentId: "external-controls" }}
+        left={{ label: "Project panel", content: <div>Project</div> }}
+        right={{ label: "Inspector panel", content: <div>Inspector</div> }}
+      >
+        {({ left, right }) => (
+          <div>
+            <button aria-controls={left.controls} onClick={left.onToggle}>{left.visible ? "Hide project" : "Show project"}</button>
+            <button aria-controls={right.controls} onClick={right.onToggle}>{right.visible ? "Hide inspector" : "Show inspector"}</button>
+            Canvas
+          </div>
+        )}
+      </ResizableWorkspacePanels>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide project" }));
+
+    expect(screen.getByRole("button", { name: "Show project" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Show Project panel" })).not.toBeInTheDocument();
+    expect(screen.getByText("Canvas").closest("[data-workspace-panel-layout]")).toHaveStyle({
+      gridTemplateColumns: "0px 1px minmax(320px, 1fr) 1px 320px",
+    });
+  });
+
   it("snaps a panel closed when it is dragged beyond its minimum width", () => {
     renderWorkspace();
     const left = screen.getByRole("separator", { name: "Resize Project panel" });

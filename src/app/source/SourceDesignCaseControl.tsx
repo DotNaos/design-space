@@ -47,13 +47,10 @@ export function SourceDesignCaseControl(props: {
     : definition?.initialCase;
 
   return (
-    <section aria-label={label} className={`border-b border-white/10 px-4 py-3 ${props.className ?? ""}`}>
+    <section aria-label={label} className={`px-4 py-2 ${props.className ?? ""}`}>
       <div className="flex items-center gap-2">
         <Component aria-hidden="true" className="text-violet-400" size={13} />
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[10px] font-medium text-zinc-300">{label}</h3>
-          <p className="mt-0.5 truncate text-[9px] text-zinc-600">{design.relativePath}</p>
-        </div>
+        <h3 className="min-w-0 flex-1 truncate text-[10px] font-medium text-zinc-400" title={design.relativePath}>{label}</h3>
         {definition && selectedCase ? (
           <Select
             aria-label={label}
@@ -61,11 +58,11 @@ export function SourceDesignCaseControl(props: {
             selectedKey={selectedCase}
             onSelectionChange={(key) => props.onCaseChange?.(String(key))}
           >
-            <Select.Trigger className="flex h-8 min-w-0 items-center gap-1.5 rounded-md border border-white/10 bg-black/20 px-2.5 text-[10px] text-zinc-300 outline-none data-[focus-visible]:border-sky-300/40">
+            <Select.Trigger className="flex h-7 min-w-0 items-center gap-1.5 rounded-lg border-0 bg-black/20 px-2.5 text-[10px] text-zinc-300 outline-none data-[focus-visible]:ring-1 data-[focus-visible]:ring-sky-300/40">
               <Select.Value className="min-w-0 flex-1 truncate text-left" />
               <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
             </Select.Trigger>
-            <Select.Popover placement="bottom end" className="max-h-64 min-w-40 overflow-y-auto rounded-lg border border-white/10 bg-[#18191c] p-1 shadow-2xl">
+            <Select.Popover placement="bottom end" className="max-h-64 min-w-40 overflow-y-auto rounded-lg bg-[#18191c] p-1 shadow-2xl">
               <ListBox items={cases.map((name) => ({ id: name, name }))}>
                 {(item) => (
                   <ListBox.Item

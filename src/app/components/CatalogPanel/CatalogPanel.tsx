@@ -44,7 +44,7 @@ export function CatalogPanel(props: { className?: string; entries: readonly Cata
             })}
           >
             <Disclosure.Heading>
-              <Disclosure.Trigger className="flex h-11 w-full items-center gap-2 px-3 text-left text-[10px] font-medium uppercase tracking-wider text-zinc-600 hover:text-zinc-300 lg:h-8">
+              <Disclosure.Trigger className="flex h-11 w-full items-center gap-2 px-3 text-left text-[10px] font-mediumr text-zinc-600 hover:text-zinc-300 lg:h-8">
                 <ChevronDown size={12} className={`transition-transform ${collapsed.has(group) ? "-rotate-90" : ""}`} />
                 {group}
                 <span className="ml-auto">{entries.length}</span>

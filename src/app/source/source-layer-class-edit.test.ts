@@ -89,3 +89,17 @@ it("refuses stale visual bindings instead of editing unrelated source", () => {
     },
   })).toBe(shifted);
 });
+
+it("refuses a stale className range after the attribute was edited in code", () => {
+  const original = 'export function Status() { return <div className="sr-only">Status</div>; }';
+  const edited = original.replace('className="sr-only"', 'className="sr-only rounded-none pl-4"');
+  const start = original.indexOf("className");
+  const binding = {
+    value: "sr-only",
+    start,
+    end: start + 'className="sr-only"'.length,
+    syntax: "attribute" as const,
+  };
+
+  expect(sourceWithLayerClassName(edited, binding, "sr-only rounded-none pl-[0px]")).toBe(edited);
+});

@@ -183,7 +183,7 @@ function TextFields(props: { property: PropertyOfKind<"text">; onChange: (proper
   };
   return (
     <div className="space-y-3 border-t border-white/5 pt-3">
-      <h4 className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">Text constraints</h4>
+      <h4 className="text-[10px] font-medium text-zinc-500">Text constraints</h4>
       <ContractSwitch label="Multiline" selected={props.property.multiline === true} onChange={(multiline) => props.onChange({ ...props.property, multiline })} />
       <OptionalNumberInput integer label="Maximum length" min={1} placeholder="No limit" value={props.property.maxLength} onChange={setMaxLength} />
       <ContractTextInput label="Placeholder" value={props.property.placeholder ?? ""} onChange={setPlaceholder} />
@@ -205,7 +205,7 @@ function TailwindFields(props: { property: PropertyOfKind<"tailwind">; onChange:
   return (
     <div className="space-y-3 border-t border-white/5 pt-3">
       <div className="flex items-center justify-between gap-3">
-        <h4 className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">Tailwind presets</h4>
+        <h4 className="text-[10px] font-medium text-zinc-500">Tailwind presets</h4>
         <Button size="sm" variant="ghost" onPress={addPreset}><Plus size={12} /> Preset</Button>
       </div>
       {presets.length === 0 ? <p className="text-[10px] text-zinc-600">No presets. Free-form Tailwind classes remain available.</p> : null}
@@ -247,7 +247,7 @@ function NumberFields(props: { property: PropertyOfKind<"number">; onChange: (pr
   };
   return (
     <div className="space-y-3 border-t border-white/5 pt-3">
-      <h4 className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">Number constraints</h4>
+      <h4 className="text-[10px] font-medium text-zinc-500">Number constraints</h4>
       <div className="grid grid-cols-2 gap-2">
         <OptionalNumberInput label="Minimum" value={props.property.min} onChange={(value) => setNumber("min", value)} />
         <OptionalNumberInput label="Maximum" value={props.property.max} onChange={(value) => setNumber("max", value)} />
@@ -284,7 +284,7 @@ function SelectFields(props: { property: PropertyOfKind<"select">; onChange: (pr
   return (
     <div className="space-y-3 border-t border-white/5 pt-3">
       <div className="flex items-center justify-between gap-3">
-        <h4 className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">Select options</h4>
+        <h4 className="text-[10px] font-medium text-zinc-500">Select options</h4>
         <Button size="sm" variant="ghost" onPress={addOption}><Plus size={12} /> Option</Button>
       </div>
       {props.property.options.map((option, index) => (

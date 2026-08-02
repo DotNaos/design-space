@@ -105,7 +105,8 @@ it("keeps the Codex composer available in a library canvas", () => {
 
   expect(screen.getByLabelText("Codex composer")).toBeVisible();
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeVisible();
-  expect(screen.getByTestId("source-canvas-feedback-row")).toHaveClass("flex-col", "sm:flex-row");
+  expect(screen.getByTestId("source-canvas-feedback-dock")).toHaveClass("flex-col", "rounded-2xl");
+  expect(screen.getByTestId("source-codex-session-stack")).toBeVisible();
   expect(screen.getByTestId("canvas-selection-identity-footer")).toHaveTextContent("LibraryButton");
   expect(screen.getByTestId("canvas-world-footer")).not.toContainElement(screen.getByTestId("canvas-hud"));
 });

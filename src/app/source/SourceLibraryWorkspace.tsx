@@ -1,5 +1,5 @@
 import { Button, Input, Label, ListBox, Select, TextField } from "@heroui/react";
-import { Component, Diamond, Library, LockKeyhole, PackageCheck, Radio, Search } from "lucide-react";
+import { Diamond, Library, LockKeyhole, PackageCheck, Radio, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type {
@@ -40,6 +40,7 @@ export interface SourceLibraryProps {
   selectionMode?: boolean;
   previewMode?: SourcePreviewMode;
   treeStateKey?: string;
+  workspaceNavigation?: ReactNode;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onDesignCaseChange?: (caseName: string) => void;
   onCatalogKindChange: (kind: SourceCatalogKind) => void;
@@ -83,7 +84,7 @@ export function SourceLibrarySidebar(
   return (
     <aside aria-label="Component catalog" className="flex h-full min-h-0 w-full flex-col bg-[#141518]">
       <header className="shrink-0 border-b border-white/10 px-4 py-4">
-        <div className="flex items-center gap-2"><Library className="text-sky-400" size={15} /><h2 className="text-sm font-semibold text-zinc-100">Components</h2></div>
+        <div className="flex items-center gap-2"><Library className="text-violet-300" size={15} /><h2 className="text-sm font-semibold text-zinc-100">Library</h2></div>
         <p className="mt-1 truncate font-mono text-[10px] text-zinc-500">
           {props.catalogKind === "app"
             ? props.appWorkspace?.sourceRoot ?? "App source"
@@ -92,23 +93,9 @@ export function SourceLibrarySidebar(
       </header>
 
       <div className="shrink-0 border-b border-white/10 p-3">
-        <div aria-label="Component source" className="grid grid-cols-2 rounded-lg bg-black/20 p-0.5" role="group">
-          <CatalogKindButton
-            active={props.catalogKind === "app"}
-            count={catalogComponents(props, "app").length}
-            label="App"
-            onPress={() => props.onCatalogKindChange("app")}
-          />
-          <CatalogKindButton
-            active={props.catalogKind === "library"}
-            count={catalogComponents(props, "library").length}
-            label="UI library"
-            onPress={() => props.onCatalogKindChange("library")}
-          />
-        </div>
         {props.catalogKind === "library" ? (
           <>
-            <div className="mt-3 grid grid-cols-2 gap-1">
+            <div className="grid grid-cols-2 gap-1">
               <SourceOption
                 active={props.mode === "development"}
                 description={props.catalog?.development ? "Editable" : "Not attached"}
@@ -198,7 +185,7 @@ function CatalogComponentRow(props: {
       >
         <Diamond className="shrink-0 text-violet-400/70" size={12} />
         <span className="min-w-0 flex-1 truncate">{props.component.label}</span>
-        <span className="shrink-0 text-[8px] uppercase tracking-wide text-zinc-700">
+        <span className="shrink-0 text-[8px] text-zinc-700">
           {props.component.category === "primitive" ? "Primitive" : props.component.category === "composed" ? "Component" : ""}
         </span>
       </Button>
@@ -213,24 +200,6 @@ function CatalogComponentRow(props: {
         </span>
       ) : null}
     </div>
-  );
-}
-
-function CatalogKindButton(props: { active: boolean; count: number; label: string; onPress: () => void }) {
-  return (
-    <Button
-      aria-pressed={props.active}
-      className={`h-8 min-w-0 rounded-md px-2 text-[10px] ${
-        props.active ? "bg-white/10 text-zinc-200" : "text-zinc-600"
-      }`}
-      size="sm"
-      variant="ghost"
-      onPress={props.onPress}
-    >
-      <Component aria-hidden="true" size={12} />
-      <span className="truncate">{props.label}</span>
-      <span className="tabular-nums text-zinc-600">{props.count}</span>
-    </Button>
   );
 }
 
@@ -254,7 +223,7 @@ function CategoryFilter(props: {
         <Select.Value className="min-w-0 flex-1 truncate text-left" />
         <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
       </Select.Trigger>
-      <Select.Popover placement="bottom" className="min-w-44 rounded-lg border border-white/10 bg-[#18191c] p-1 shadow-2xl">
+      <Select.Popover placement="bottom" className="min-w-44 rounded-lg bg-[#18191c] p-1 shadow-2xl">
         <ListBox items={options}>
           {(item) => (
             <ListBox.Item
@@ -324,6 +293,7 @@ export function SourceLibraryCanvas(props: SourceLibraryProps) {
       mode={props.previewMode}
       selectionMode={props.selectionMode}
       styles={source?.styles ?? []}
+      workspaceNavigation={props.workspaceNavigation}
       onGenerateDesign={(props.catalogKind === "app" || props.mode === "development") && props.onGenerateDesign
         ? () => props.onGenerateDesign?.(component.entry!)
         : undefined}
@@ -349,7 +319,7 @@ export function SourceLibraryInspector(props: SourceLibraryProps) {
   const app = props.catalogKind === "app";
   return (
     <aside aria-label="Component library evidence" className="h-full w-full bg-[#141518] p-5">
-      <div className="flex items-center gap-2 text-zinc-500"><PackageCheck size={14} /><span className="text-[10px] font-medium uppercase tracking-[0.14em]">{app ? "App component" : "Library evidence"}</span></div>
+      <div className="flex items-center gap-2 text-zinc-500"><PackageCheck size={14} /><span className="text-[10px] font-medium">{app ? "App component" : "Library evidence"}</span></div>
       <dl className="mt-5 space-y-4 text-xs">
         <div><dt className="text-zinc-600">{app ? "Source root" : "Package"}</dt><dd className="mt-1 font-mono text-zinc-300">{app ? props.appWorkspace?.sourceRoot ?? "src" : props.catalog?.packageName ?? props.library?.packageName ?? "Not configured"}</dd></div>
         <div><dt className="text-zinc-600">Selected source</dt><dd className="mt-1 text-zinc-300">{app ? component?.entry?.relativePath ?? "App source" : props.mode === "development" ? "Attached development source" : `Installed ${props.catalog?.release?.version ?? "package"}`}</dd></div>

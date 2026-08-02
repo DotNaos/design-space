@@ -122,6 +122,11 @@ their editable values in the code or property editor while keeping the three-kin
 A slot is never inferred from `children`, `ReactNode`, a prop name, rendered DOM, or a separate JSON file.
 A slot exists only when the component's TypeScript contract declares it explicitly as a Strict UI slot.
 
+Every Strict UI component MUST declare a finite child contract. A component that can own other Strict UI
+components declares a required `slots` property. A leaf declares `slots: NoSlots`, where `NoSlots` accepts
+only an empty object. This explicit empty contract terminates the component tree; omitting the contract does
+not mean that arbitrary children are allowed.
+
 `children` is forbidden on Strict UI components. Every Strict UI component props type MUST reject it:
 
 ```tsx
@@ -325,10 +330,35 @@ Code edits MUST update the preview immediately. Invalid code MUST keep the last 
 show exact diagnostics. Save, undo, redo, reset, stale-source detection, exact diff, and compile recovery
 are required IDE behavior, not optional polish.
 
+## Static design review workflow
+
+[`docs/design-review-graph.md`](./docs/design-review-graph.md) is the canonical human-review workflow.
+Design Space reviews an LLM-produced app as a graph of components:
+
+```text
+Properties ──> [ Component in one visual state ] ──> Slots ──> Child components
+```
+
+Properties are design inputs, named designs or States are finite visual forms, and Slots are the outgoing
+edges to child components. The reviewer examines Properties, States, and Slots, verifies the visual result,
+then follows the next occupied Slot. A whole app review traverses each configured device graph depth-first.
+
+The fixed Canvas header MUST keep the device and root-to-current path plus Property, State, and Slot controls
+outside the Canvas transform. The fixed footer MUST offer comment and return to the LLM, sign the current
+component, and continue. Signing is always one component at a time and requires a separate authenticated
+checkpoint for that exact component revision. Device, subtree, and whole-app completion are derived progress
+only; they MUST NOT replace the individual component signatures with a batch, root, or application signature.
+
 ## No parallel truth
 
 Design Space MUST NOT require or persist a redundant component or slot schema for TypeScript-first targets.
 It MUST NOT invent components, props, slots, accepted children, source paths, or application structure.
+
+Design Space MAY persist a compact, deterministic contract snapshot beside the existing approval drafts.
+That snapshot is derived only from the compiler-resolved props and Slot types and exists to make review and
+signing reproducible. It MUST NOT be authored independently, imported by the component, or treated as a
+fallback contract. Before review or signing, it MUST be regenerated and compared with the stored snapshot;
+missing or different derived material is stale evidence and fails closed.
 
 Legacy adapter and design-document targets MAY remain available during migration, but their JSON contracts
 are not the Strict UI source model and MUST NOT constrain the TypeScript-first architecture.

@@ -6,6 +6,24 @@ It is deliberately not part of a target application's production build and has n
 
 [`STRICT_UI.md`](./STRICT_UI.md) is the canonical product and architecture contract for the source model, component ownership, typed named slots, validation, and IDE behavior. Current legacy adapters and incomplete source-workspace behavior are transitional when they disagree with that contract.
 
+## Core workflow: review the graph
+
+Design Space exists to review static UI produced by an LLM. The app is a graph of components:
+
+```text
+Properties ──> [ Component in one visual state ] ──> Slots ──> Child components
+```
+
+The reviewer repeats one loop: inspect the design-relevant Properties, inspect each declared visual State,
+inspect the Slots, comment when something is wrong, then sign that one component as a human checkpoint. A
+whole app review starts at the configured Desktop, Tablet, or Mobile root and walks depth-first until every
+reachable component has its own current signature. Completion rolls up only as progress: there is no batch or
+root signature that replaces the individual component checkpoints.
+
+This is the core product concept. Read [`docs/design-review-graph.md`](./docs/design-review-graph.md) for the
+complete workflow before planning or changing Design Space. Read [`STRICT_UI.md`](./STRICT_UI.md) for the
+source and Slot rules that make the graph finite and verifiable.
+
 ## Try the included target
 
 Requirements: Bun and Portless.
@@ -115,9 +133,12 @@ The browser has one same-origin JSON endpoint and a closed set of schema-validat
 
 It cannot send repository roots, file paths, commands, shell text, executable paths, module paths, or extra fields. On the server, canonical roots and allowlisted files are rechecked against traversal and symlink escapes before reads and writes. Saves recheck the source hash, preserve all text outside the marked string, and replace the file atomically.
 
-Review approval remains outside Design Space. The signed Project CLI is the approval authority; browser state and local storage are never approval evidence.
+Design Space may request one component signature at a time through its fixed local server bridge. The signed
+Project CLI remains the approval authority and performs the authenticated device flow; browser state and local
+storage are never approval evidence. The browser cannot choose a repository, policy, executable, or arbitrary
+scope.
 
-Projects may opt into the read-only Source Tree approval checklist described in
+Projects may opt into the Source Tree approval checklist and one-component signing action described in
 [Cryptographic component approvals](docs/cryptographic-component-approvals.md).
 The checklist maps each component export to a stable Project approval scope and
 fails closed whenever policy or trusted verification evidence is unavailable.

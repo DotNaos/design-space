@@ -1,9 +1,10 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 import type { DesignSpaceDevice, RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import type { SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
 import type { SourceTreeNode } from "./source-workspace-tree";
 import type { SourceCanvasAncestryItem } from "./source-canvas-ancestry";
+import type { SourceComponentReviewCheckpointProps } from "./SourceComponentReviewCheckpoint";
 import type { SourceSlotScope } from "./source-slot-navigation";
 import { SourceCodeCanvas } from "./SourceCodeCanvas";
 import { SourcePreviewFrame } from "./SourcePreviewFrame";
@@ -25,6 +26,7 @@ export function SourceAppCanvas(props: {
   node?: SourceTreeNode;
   previewEntry?: RuntimeSourceWorkspaceEntry;
   revealSelectedLayerKey?: number;
+  reviewCheckpoint?: Omit<SourceComponentReviewCheckpointProps, "onRequestChanges">;
   runtime: "react" | "react-native";
   selectedClassCss?: string;
   selectedClassName?: string;
@@ -38,6 +40,7 @@ export function SourceAppCanvas(props: {
   slotTargetLabel?: string;
   styles: readonly string[];
   workspaceMode: SourceWorkspaceMode;
+  workspaceNavigation?: ReactNode;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onGenerateDesign?: () => void;
   onDesignCaseChange?: (caseName: string) => void;
@@ -75,6 +78,7 @@ export function SourceAppCanvas(props: {
             mode={props.mode}
             node={props.node}
             revealSelectedLayerKey={props.revealSelectedLayerKey}
+            reviewCheckpoint={props.reviewCheckpoint}
             runtime={props.runtime}
             selectedClassCss={props.selectedClassCss}
             selectedClassName={props.selectedClassName}
@@ -88,6 +92,7 @@ export function SourceAppCanvas(props: {
             slotTargetLabel={props.slotTargetLabel}
             styles={props.styles}
             workspaceMode={props.workspaceMode}
+            workspaceNavigation={props.workspaceNavigation}
             onDeviceChange={props.onDeviceChange}
             onDesignCaseChange={props.onDesignCaseChange}
             onGenerateDesign={props.onGenerateDesign}

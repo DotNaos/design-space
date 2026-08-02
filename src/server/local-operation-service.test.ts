@@ -45,6 +45,26 @@ it("routes library development operations and attaches the live server", async (
   expect(libraryExecute).toHaveBeenCalledWith({ type: "get-library-development" });
 });
 
+it("routes only the typed one-component signing operation", async () => {
+  const approvalExecute = vi.fn(async () => ({ state: "source-component-signed" }));
+  const service = new LocalOperationService(
+    { execute: vi.fn() } as unknown as EditService,
+    { execute: vi.fn() } as unknown as DocumentService,
+    undefined,
+    { execute: approvalExecute },
+  );
+
+  await expect(service.execute({ type: "sign-source-component", entryId: "entry.button" })).resolves.toEqual({
+    state: "source-component-signed",
+  });
+  await expect(service.execute({
+    type: "sign-source-component",
+    entryId: "entry.button",
+    root: "/tmp/other",
+  })).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+  expect(approvalExecute).toHaveBeenCalledTimes(1);
+});
+
 it("disposes the edit service once and rejects operations after shutdown", async () => {
   const editDispose = vi.fn();
   const service = new LocalOperationService(

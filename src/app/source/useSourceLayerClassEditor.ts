@@ -47,8 +47,15 @@ export function useSourceLayerClassEditor(options: {
   useEffect(() => {
     if (options.editor.draft !== lastCanvasDraft.current) {
       editBase.current = options.editor.draft;
+      setValue(binding?.value ?? "");
+      setTextValue(textBinding?.value ?? "");
+      setCss("");
+      setError(undefined);
+      setClassPreview(undefined);
+      setTextPreview(undefined);
+      lastCanvasDraft.current = undefined;
     }
-  }, [options.editor.draft]);
+  }, [binding?.value, options.editor.draft, textBinding?.value]);
 
   useEffect(() => {
     if (!binding || !options.connected) return;

@@ -219,6 +219,15 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
 
 export type BrowserOperation = z.infer<typeof browserOperationSchema>;
 
+export const sourceApprovalOperationSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("sign-source-component"),
+    entryId: opaqueIdSchema,
+  }).strict(),
+]);
+
+export type SourceApprovalOperation = z.infer<typeof sourceApprovalOperationSchema>;
+
 export const libraryDevelopmentOperationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("get-library-development") }).strict(),
   z.object({ type: z.literal("clone-library-development") }).strict(),
@@ -325,6 +334,12 @@ export interface GeneratedSourceDesign {
   scope: SourceDesignScope;
   entryId: string;
   relativePath: string;
+}
+
+export interface SignedSourceComponent {
+  state: "source-component-signed";
+  entryId: string;
+  approvals: import("./source-workspace").SourceApprovalEvidence;
 }
 
 export interface TailwindPreview {

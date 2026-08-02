@@ -26,8 +26,8 @@ it("renders its isolated design defaults without runtime context", () => {
   render(<>{design.render(design.defaults)}</>);
 
   expect(screen.getByRole("heading", { name: "Selected layer" })).toBeInTheDocument();
-  expect(screen.getByLabelText("Generated Tailwind classes")).toHaveTextContent(
-    "flex min-h-10 items-center",
+  expect(screen.getByRole("combobox", { name: "className" })).toHaveValue(
+    "flex min-h-10 items-center gap-2 border-b border-white/[0.06] px-4",
   );
 });
 

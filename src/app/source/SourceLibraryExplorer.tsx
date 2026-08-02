@@ -70,7 +70,7 @@ export function SourceLibraryExplorer(props: SourceLibraryExplorerProps) {
         <span className="min-w-0 flex-1 truncate text-[10px] font-medium text-zinc-300">
           {component?.label ?? "Layers"}
         </span>
-        <span className="text-[8px] uppercase tracking-[0.12em] text-zinc-700">Layers</span>
+        <span className="text-[8px] text-zinc-700">Layers</span>
       </header>
       <div className="min-h-0 flex-1">
         <SourceWorkspaceTree

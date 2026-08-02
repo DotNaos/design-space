@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Component,
   Diamond,
-  FileCode2,
   FilePlus2,
   Frame,
   House,
@@ -99,6 +98,7 @@ export interface SourceWorkspaceSidebarProps {
     onExit: () => void;
     onOpenParent?: () => void;
   };
+  headerLeading?: ReactNode;
 }
 
 export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
@@ -112,12 +112,9 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   };
   return (
     <aside aria-label="Source workspace" className={`${props.className ?? "flex w-80"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
-      <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
-        <FileCode2 aria-hidden="true" className="text-sky-400" size={16} />
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold text-zinc-100">Source tree</h2>
-          <p className="mt-0.5 truncate text-[9px] uppercase tracking-[0.14em] text-zinc-600">{props.workspace.sourceRoot} · {props.workspace.runtime === "react-native" ? "React Native" : "React"}</p>
-        </div>
+      <header className="flex min-h-12 shrink-0 items-center gap-1 border-b border-white/10 px-1.5">
+        {props.headerLeading}
+        <h2 className="sr-only">Source tree</h2>
         {props.workspace.entries.length > 0 && (
           <SourceTreeHeaderAction
             label="Collapse outside active component"
@@ -149,7 +146,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
           </SourceTreeHeaderAction>
         )}
         {props.workspace.capabilities?.createComponents && props.onCreateComponent && (
-          <Button aria-label="Create component" className="grid size-8 place-items-center rounded-md text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>
+          <Button aria-label="Create component" className="grid size-7 min-w-7 place-items-center rounded-lg text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>
             <FilePlus2 aria-hidden="true" size={14} />
           </Button>
         )}
@@ -452,7 +449,13 @@ function FocusTreeRow(props: {
   const Icon = row.kind === "component"
     ? openedCanvas ? Component : Diamond
     : row.kind === "html" ? htmlLayerIcon(row.label) : PanelTop;
-  const slot = row.kind === "slot" ? row.layer : undefined;
+  const rawSlot = row.kind === "slot" ? row.layer : undefined;
+  const definitionContract = rawSlot && !rawSlot.slot
+    ? row.occurrence?.entry?.slots.find((contract) => contract.name === rawSlot.label)
+    : undefined;
+  const slot = rawSlot && definitionContract
+    ? { ...rawSlot, slotContract: definitionContract }
+    : rawSlot;
   const status = slot?.slot;
   const sourceOwnerId = row.sourceOwnerId ?? row.occurrence?.usageOwnerId;
   const sourceOwner = sourceOwnerId

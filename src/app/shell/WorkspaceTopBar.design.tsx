@@ -8,7 +8,6 @@ export default defineComponentDesign(ComponentUnderDesign, {
   defaults: {
     targetLabel: "",
     documentLabel: "",
-    breadcrumb: [],
     connected: false,
     checking: false,
     canUndo: false,

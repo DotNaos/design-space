@@ -1,22 +1,19 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import type { StrictUiViolation } from "../../../shared/strict-ui";
 import {
   fitCanvas,
   revealCanvasRect,
   zoomCanvasAt,
   type CanvasCamera,
-  type CanvasWorldRect,
 } from "../../canvas-transform";
-import { indexPreviewDom, type PreviewDomSnapshot } from "../../dom/dom-snapshot";
+import { indexPreviewDom } from "../../dom/dom-snapshot";
 import { StrictUiIndicator, strictUiOutlineTone } from "../../strict-ui/StrictUiIndicator";
 import {
   buildStrictUiCanvasTargets,
   describeStrictUiMarker,
   type StrictUiCanvasTarget,
 } from "../../strict-ui/strict-ui-markers";
-import type { Selection, SlotState } from "../../types";
-import type { SelectionNavigationCommand } from "../../document/selection-navigation";
+import type { Selection } from "../../types";
 import {
   canvasGridPresentation,
   layoutEmptySlotOverlays,
@@ -49,50 +46,21 @@ import {
   sameViewRect,
   sameViewRectMap,
 } from "./preview-canvas-performance";
+import type { PreviewCanvasProps } from "./preview-canvas-props";
 
 export type { CanvasContextMenuRequest } from "./canvas-target-selection";
 
-type PreviewCanvasProps = {
-  className?: string;
-  toolbar?: React.ReactNode;
-  preview: React.ReactNode;
-  rootInstanceId: string;
-  selectedComponentInstanceId: string;
-  selectionLabel: string;
-  slots: readonly SlotState[];
-  selection?: Selection;
-  hoveredSelection?: Selection;
-  hud?: React.ReactNode;
-  highlightedInternalHtmlComponentId?: string;
-  htmlClassNames?: Readonly<Record<string, string>>;
-  cameraKey?: string;
-  revealTarget?: { key: string; rect: CanvasWorldRect };
-  strictUiViolations?: readonly StrictUiViolation[];
-  compact?: boolean;
-  staticPreview?: boolean;
-  forcedInteractionMode?: "select" | "interact";
-  worldWidth?: number;
-  worldHeight?: number;
-  worldHeader?: React.ReactNode;
-  worldHeaderHeight?: number;
-  pinWorldHeader?: boolean;
-  worldFooter?: React.ReactNode;
-  worldFooterHeight?: number;
-  verticalAlignment?: "center" | "start";
-  onSelect: (selection: Selection) => void;
-  onDeselect?: () => void;
-  onNavigate?: (command: SelectionNavigationCommand) => void;
-  onEditComponent?: (instanceId: string) => void;
-  onContextMenuRequest?: (request: CanvasContextMenuRequest) => void;
-  onDomSnapshot?: (snapshot: PreviewDomSnapshot) => void;
-};
 type MeasuredStrictUiTarget = { target: StrictUiCanvasTarget; rect: ViewRect };
 const defaultWorldWidth = 620;
 export function PreviewCanvas(props: PreviewCanvasProps) {
   const worldWidth = props.worldWidth ?? defaultWorldWidth;
   const worldHeight = props.worldHeight ?? 0;
   const worldHeaderHeight = props.worldHeader ? props.worldHeaderHeight ?? 36 : 0;
+  const canvasHeaderHeight = props.canvasHeader ? props.canvasHeaderHeight ?? 36 : 0;
   const worldFooterHeight = props.worldFooter ? props.worldFooterHeight ?? 32 : 0;
+  const hudBottomInset = props.hud
+    ? (props.compact ? 152 : 168) + worldFooterHeight
+    : 0;
   const viewportRef = useRef<HTMLElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const overlayChromeRef = useRef<HTMLDivElement>(null);
@@ -121,6 +89,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const [showGestureHint, setShowGestureHint] = useState(true);
   const [interactionMode, setInteractionMode] = useState<"select" | "interact">("select");
   const activeInteractionMode = props.forcedInteractionMode ?? interactionMode;
+  const narrowViewport = viewportSize.width > 0 && viewportSize.width < 1024;
   const strictUiTargets = useMemo(
     () => buildStrictUiCanvasTargets(props.strictUiViolations ?? [], props.rootInstanceId),
     [props.rootInstanceId, props.strictUiViolations],
@@ -159,12 +128,17 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     const world = worldRef.current;
     if (world) applyCanvasCamera(world, next);
     if (overlayChromeRef.current) applyCanvasWorldChromeCamera(overlayChromeRef.current, next, {
-      footerHeight: worldFooterHeight, headerHeight: worldHeaderHeight, worldHeight, worldWidth,
+      footerHeight: worldFooterHeight,
+      footerInlineMargin: props.compact ? 12 : 16,
+      footerBottom: props.compact ? 12 : 16,
+      headerHeight: worldHeaderHeight,
+      worldHeight,
+      worldWidth,
     });
     if (measuredOverlayRef.current) measuredOverlayRef.current.style.visibility = "hidden";
     if (cameraCommitTimer.current !== undefined) window.clearTimeout(cameraCommitTimer.current);
     cameraCommitTimer.current = window.setTimeout(commitPendingGestureCamera, 80);
-  }, [commitPendingGestureCamera, worldFooterHeight, worldHeaderHeight, worldHeight, worldWidth]);
+  }, [commitPendingGestureCamera, props.compact, worldFooterHeight, worldHeaderHeight, worldHeight, worldWidth]);
 
   const beginCameraInteraction = useCallback(() => {
     autoFit.current = false;
@@ -267,13 +241,13 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     if (!viewport || !world) return;
     if (viewport.clientWidth <= 0 || viewport.clientHeight <= 0 || world.offsetHeight <= 0) return;
     setCamera(fitCanvas(
-      { width: viewport.clientWidth, height: viewport.clientHeight },
+      { width: viewport.clientWidth, height: Math.max(1, viewport.clientHeight - hudBottomInset) },
       { width: worldWidth, height: Math.max(1, world.offsetHeight) },
       props.compact ? 12 : 16,
-      (props.compact ? 42 : 52) + worldHeaderHeight,
+      (props.compact ? 42 : 52) + worldHeaderHeight + canvasHeaderHeight,
       props.verticalAlignment,
     ));
-  }, [props.compact, props.verticalAlignment, setCamera, worldHeaderHeight, worldWidth]);
+  }, [canvasHeaderHeight, hudBottomInset, props.compact, props.verticalAlignment, setCamera, worldHeaderHeight, worldWidth]);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -554,9 +528,11 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       />
 
       <CanvasViewportControls
+        headerContent={props.canvasHeader}
+        headerHeight={canvasHeaderHeight}
         compact={props.compact}
         leadingContent={props.toolbar}
-        narrow={viewportSize.width > 0 && viewportSize.width < 760}
+        narrow={narrowViewport}
         showInteractionToggle={!props.staticPreview}
         gridMode={gridMode}
         gridVisible={gridVisible}
@@ -597,12 +573,15 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         <CanvasWorldChrome
           camera={camera}
           footer={props.worldFooter}
+          footerClassName={props.hud ? "bottom-32 lg:bottom-28" : "bottom-4"}
           footerHeight={worldFooterHeight}
+          footerInlineMargin={props.compact ? 12 : 16}
           header={props.worldHeader}
           headerHeight={worldHeaderHeight}
           headerInlineMargin={props.compact ? 12 : 16}
-          headerTop={props.compact ? 44 : 56}
+          headerTop={props.compact ? 44 : narrowViewport ? 92 : 56}
           pinHeader={props.pinWorldHeader}
+          pinFooter={props.pinWorldFooter}
           worldHeight={worldHeight}
           worldWidth={worldWidth}
         />
@@ -690,7 +669,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       </div>
 
       {props.hud ? (
-        <div data-testid="canvas-hud" className="pointer-events-auto absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-20 max-w-[calc(100%-2rem)] -translate-x-1/2 lg:bottom-4">
+        <div data-testid="canvas-hud" className="pointer-events-auto absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-20 max-w-[calc(100%-2rem)] -translate-x-1/2">
           {props.hud}
         </div>
       ) : showGestureHint && !props.compact ? (

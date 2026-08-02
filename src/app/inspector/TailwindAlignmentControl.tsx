@@ -52,12 +52,12 @@ export function TailwindAlignmentControl(props: {
           >
             <RotateCcw aria-hidden="true" size={11} />
           </Button>
-          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+          <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
             Reset alignment
           </Tooltip.Content>
         </Tooltip>
       </div>
-      <div className="grid h-20 grid-cols-3 grid-rows-3 gap-0.5 rounded-lg border border-white/10 bg-black/20 p-2">
+      <div className="grid h-20 grid-cols-3 grid-rows-3 gap-0.5 rounded-xl bg-black/20 p-2">
         {vertical.flatMap((row, rowIndex) => horizontal.map((column, columnIndex) => {
           const active = selection.row === rowIndex && selection.column === columnIndex;
           return (
@@ -74,14 +74,13 @@ export function TailwindAlignmentControl(props: {
               >
                 <span className={`size-1.5 rounded-full ${active ? "bg-sky-200" : "bg-zinc-600 group-hover:bg-zinc-400"}`} />
               </Button>
-              <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+              <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
                 {row.label} {column.label}
               </Tooltip.Content>
             </Tooltip>
           );
         }))}
       </div>
-      <p className="mt-1.5 text-[8px] leading-3 text-zinc-600">Left uses the CSS default and adds no justify class.</p>
     </div>
   );
 }

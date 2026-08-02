@@ -64,7 +64,7 @@ function DeviceTab(props: {
   return status ? (
     <Tooltip delay={350}>
       {button}
-      <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">{status}</Tooltip.Content>
+      <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">{status}</Tooltip.Content>
     </Tooltip>
   ) : button;
 }

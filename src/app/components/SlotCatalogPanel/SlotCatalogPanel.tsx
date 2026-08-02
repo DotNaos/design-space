@@ -25,7 +25,7 @@ export function SlotCatalogPanel(props: {
     <section aria-label={root ? "Choose root component" : `Add to ${props.slotLabel} slot`} className={`${props.className ?? "flex"} min-h-0 min-w-0 flex-col bg-[#141518] text-zinc-200`}>
       <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-white/10 px-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[9px] uppercase tracking-[0.14em] text-zinc-600">{root ? "Root components" : "Compatible components"}</p>
+          <p className="text-[9px] text-zinc-600">{root ? "Root components" : "Compatible components"}</p>
           <h2 className="mt-0.5 truncate text-sm font-semibold text-zinc-100">{root ? "Start this document" : `Insert into ${props.slotLabel}`}</h2>
         </div>
         <CloseButton aria-label="Close component picker" className="size-10 shrink-0 text-zinc-500 hover:bg-white/5 hover:text-white" onPress={props.onClose} />

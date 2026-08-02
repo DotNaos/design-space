@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -532,6 +532,15 @@ it("does not expose a separate Layers mode", () => {
   expect(screen.queryByRole("button", { name: /Show (component layers|composition tree)/ })).not.toBeInTheDocument();
 });
 
+it("keeps the source tree header focused on its local content", () => {
+  render(<SourceWorkspaceSidebar {...callbacks} headerLeading={<button>Workspace</button>} workspace={workspace} />);
+
+  expect(screen.getByRole("heading", { name: "Source tree" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Workspace" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: /Workspace source/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("tree", { name: "Source tree" })).toBeVisible();
+});
+
 it("collapses outside the active component without closing its path", async () => {
   render(<SourceWorkspaceSidebar {...callbacks} workspace={workspace} />);
 
@@ -669,7 +678,7 @@ it("scrolls the source tree back to the current selection from its header", asyn
 
   await userEvent.click(screen.getByRole("button", { name: "Scroll to current selection" }));
 
-  expect(scroll!.scrollTop).toBeGreaterThan(0);
+  await waitFor(() => expect(scroll!.scrollTop).toBeGreaterThan(0));
   expect(screen.getByRole("treeitem", { name: "<section>" })).toHaveAttribute("aria-selected", "true");
 });
 

@@ -22,7 +22,7 @@ export function SourceComponentCreateSheet(props: {
   return (
     <Modal.Backdrop isOpen={props.open} onOpenChange={(open) => { if (!open && !props.busy) props.onClose(); }} variant="blur">
       <Modal.Container className="items-end p-0 lg:p-4" placement="bottom" size="md">
-        <Modal.Dialog aria-label="Create component" className="w-full rounded-b-none border border-white/10 bg-[#17181b] text-zinc-200 lg:rounded-xl">
+        <Modal.Dialog aria-label="Create component" className="w-full rounded-b-none bg-[#17181b] text-zinc-200 lg:rounded-xl">
           <Modal.Header className="border-b border-white/10 px-4 py-3">
             <div className="flex w-full items-center gap-3">
               <span className="grid size-9 place-items-center rounded-lg bg-sky-500/10 text-sky-300"><Component size={17} /></span>

@@ -109,7 +109,7 @@ function LayoutGridMenu(props: {
             </Switch>
             <div className={props.settings.enabled ? "space-y-4" : "pointer-events-none space-y-4 opacity-40"}>
               <div>
-                <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-600">Spacing</p>
+                <p className="mb-2 text-[10px] font-medium text-zinc-600">Spacing</p>
                 <ToggleButtonGroup
                   aria-label="Layout grid spacing"
                   className="w-full"
@@ -128,7 +128,7 @@ function LayoutGridMenu(props: {
                 </ToggleButtonGroup>
               </div>
               <div>
-                <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-600">Color</p>
+                <p className="mb-2 text-[10px] font-medium text-zinc-600">Color</p>
                 <ColorSwatchPicker
                   aria-label="Layout grid color presets"
                   className="justify-between"
@@ -153,7 +153,7 @@ function LayoutGridMenu(props: {
                   <Label className="sr-only">Custom layout grid color</Label>
                   <ColorField.Group className="h-9 border-white/10 bg-black/20" variant="secondary">
                     <ColorField.Prefix className="pl-2"><ColorSwatch color={parsedColor} size="xs" /></ColorField.Prefix>
-                    <ColorField.Input aria-label="Custom layout grid color" className="font-mono text-xs uppercase text-zinc-300" />
+                    <ColorField.Input aria-label="Custom layout grid color" className="font-mono text-xs text-zinc-300" />
                   </ColorField.Group>
                 </ColorField>
               </div>

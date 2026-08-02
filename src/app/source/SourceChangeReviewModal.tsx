@@ -176,7 +176,7 @@ function ChangeChecklist(props: {
   return (
     <aside aria-label="Change approval checklist" className="min-h-0 overflow-y-auto border-b border-white/10 bg-[#141518] lg:border-b-0 lg:border-r">
       <div className="border-b border-white/[0.07] px-3 py-2">
-        <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-zinc-600">Changed files</p>
+        <p className="text-[9px] font-medium text-zinc-600">Changed files</p>
         <p className="mt-1 text-[10px] text-zinc-500">Select what to apply, then approve each current version.</p>
       </div>
       <div className="max-h-48 divide-y divide-white/[0.05] lg:max-h-none">
@@ -277,7 +277,7 @@ function ChangeComparison(props: { applying: boolean; change: SourceChangeReview
 function PreviewSide(props: { label: "After" | "Before"; preview: React.ReactNode }) {
   return (
     <section aria-label={`${props.label} change`} className="min-w-0 overflow-hidden rounded-md border border-white/[0.08] bg-[#0d0e10]">
-      <h3 className="border-b border-white/[0.07] px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">{props.label}</h3>
+      <h3 className="border-b border-white/[0.07] px-3 py-2 text-[10px] font-medium text-zinc-500">{props.label}</h3>
       <div aria-label={`${props.label} preview`} className="grid h-52 place-items-center overflow-auto bg-[#101113] p-4" role="region">
         {props.preview}
       </div>
@@ -290,7 +290,7 @@ function SourceDiff(props: { change: SourceChangeReviewItem }) {
     <section aria-label="Source diff" className="min-h-[22rem] flex-1 overflow-hidden rounded-md border border-white/[0.08] bg-[#0d0e10]">
       <header className="flex h-9 items-center gap-2 border-b border-white/[0.07] px-3">
         <Diff aria-hidden="true" className="text-sky-300" size={13} />
-        <h3 className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">Source diff</h3>
+        <h3 className="text-[10px] font-medium text-zinc-500">Source diff</h3>
         <span className="ml-auto text-[9px] text-zinc-600">Synchronized scroll</span>
       </header>
       <div className="h-[calc(100%-2.25rem)] min-h-0">

@@ -40,7 +40,8 @@ export async function verifySourceComponentApprovals(
   root: string,
   config: DesignSpaceProjectConfig,
   entries: readonly SourceWorkspaceEntry[],
-  run: SourceApprovalStatusRunner = runApprovalStatus,
+  run: SourceApprovalStatusRunner | undefined = runApprovalStatus,
+  registeredTrustRoot = process.env.PROJECT_APPROVAL_TRUST_ROOT?.trim(),
 ): Promise<SourceApprovalEvidence> {
   if (!config.approvals) {
     return {
@@ -49,7 +50,7 @@ export async function verifySourceComponentApprovals(
       components: {},
     };
   }
-  const trustRoot = process.env.PROJECT_APPROVAL_TRUST_ROOT?.trim();
+  const trustRoot = registeredTrustRoot;
   if (!trustRoot) {
     return {
       status: "unavailable",
@@ -58,7 +59,7 @@ export async function verifySourceComponentApprovals(
     };
   }
   try {
-    const report = approvalReport.parse(await run({
+    const report = approvalReport.parse(await (run ?? runApprovalStatus)({
       root,
       policy: config.approvals.policy ?? defaultPolicy,
       trustRoot,

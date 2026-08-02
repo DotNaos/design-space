@@ -18,8 +18,10 @@ export function SourceComponentPicker(props: {
   onApply: (candidate: SourceComponentCandidate, action: "add" | "replace") => void;
 }) {
   const usage = props.slot.slot;
-  const action = usage?.contract.multiple || !usage?.received.length ? "add" : "replace";
-  const full = Boolean(action === "add" && usage?.contract.max !== undefined && usage.received.length >= usage.contract.max);
+  const contract = usage?.contract ?? props.slot.slotContract;
+  const editable = Boolean(usage);
+  const action = contract?.multiple || !usage?.received.length ? "add" : "replace";
+  const full = Boolean(action === "add" && contract?.max !== undefined && (usage?.received.length ?? 0) >= contract.max);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [revealIncompatible, setRevealIncompatible] = useState(false);
@@ -29,7 +31,7 @@ export function SourceComponentPicker(props: {
     [props.candidates, query, revealIncompatible],
   );
   const apply = (candidate: SourceComponentCandidate) => {
-    if (!candidate.insertable || props.isBusy) return;
+    if (!editable || !candidate.insertable || props.isBusy) return;
     props.onApply(candidate, action);
     setOpen(false);
     setQuery("");
@@ -44,11 +46,13 @@ export function SourceComponentPicker(props: {
       <Button
         id={props.triggerId}
         data-design-space-canvas-action={props.appearance === "canvas" ? true : undefined}
-        aria-label={full
+        aria-label={!editable
+          ? `Show component types allowed in ${props.slot.label} slot`
+          : full
           ? `${props.slot.label} slot is full, ${usage?.received.length} of ${usage?.contract.max}`
           : `${action === "add" ? "Add to" : "Replace content in"} ${props.slot.label} slot`}
         className={props.appearance === "field"
-          ? "h-8 w-full min-w-0 justify-between gap-2 rounded-md border border-white/[0.08] bg-black/15 px-2.5 text-[10px] text-zinc-400 hover:border-white/15 hover:bg-white/[0.035] hover:text-zinc-200"
+          ? "h-8 w-full min-w-0 justify-between gap-2 rounded-lg border-0 bg-black/20 px-2.5 text-[10px] text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200"
           : props.appearance === "canvas"
             ? "h-full w-full min-w-0 rounded-none border border-transparent bg-transparent text-violet-200 hover:border-violet-300/80 hover:bg-violet-300/[0.08] hover:text-white"
             : "grid size-6 min-w-6 shrink-0 place-items-center rounded text-zinc-600 hover:bg-white/[0.06] hover:text-zinc-300"}
@@ -78,18 +82,18 @@ export function SourceComponentPicker(props: {
           />
         )}
       </Button>
-      <Popover.Content className="w-[min(22rem,calc(100vw-1rem))] rounded-xl border border-white/10 bg-[#1a1b1f] p-0 text-zinc-200 shadow-2xl" placement="bottom start">
+      <Popover.Content className="w-[min(22rem,calc(100vw-1rem))] rounded-xl bg-[#1a1b1f] p-0 text-zinc-200 shadow-2xl" placement="bottom start">
         <Popover.Dialog className="outline-none">
           <div className="border-b border-white/10 p-3">
             <Popover.Heading className="text-xs font-semibold text-zinc-100">
-              {action === "add" ? `Add to ${props.slot.label}` : `Replace ${props.slot.label}`}
+              {!editable ? `Allowed in ${props.slot.label}` : action === "add" ? `Add to ${props.slot.label}` : `Replace ${props.slot.label}`}
             </Popover.Heading>
-            <p className="mt-1 text-[9px] text-zinc-600">Accepts {usage?.contract.accepts.join(", ")}</p>
+            <p className="mt-1 text-[9px] text-zinc-600">Accepts {contract?.accepts.join(", ") || "no component types"}</p>
             <SearchField aria-label="Search compatible components" className="mt-3" fullWidth value={query} onChange={(value) => {
               setQuery(value);
               setActive(0);
             }}>
-              <SearchField.Group className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2.5 text-zinc-500 focus-within:border-sky-400/50">
+              <SearchField.Group className="flex h-9 items-center gap-2 rounded-xl border-0 bg-black/20 px-2.5 text-zinc-500 focus-within:ring-1 focus-within:ring-sky-400/50">
                 <SearchField.SearchIcon className="size-3.5" />
                 <SearchField.Input
                   autoFocus
@@ -127,7 +131,7 @@ export function SourceComponentPicker(props: {
                   aria-label={`${candidate.name}, ${candidate.compatible ? "compatible" : "incompatible"}`}
                   className={`min-h-12 w-full justify-start gap-2.5 rounded-lg px-2 text-left ${index === active ? "bg-sky-400/10 text-sky-100" : "text-zinc-300 hover:bg-white/[0.05]"}`}
                   fullWidth
-                  isDisabled={!candidate.insertable || props.isBusy}
+                  isDisabled={!editable || !candidate.insertable || props.isBusy}
                   variant="ghost"
                   onHoverStart={() => setActive(index)}
                   onPress={() => apply(candidate)}
@@ -141,7 +145,7 @@ export function SourceComponentPicker(props: {
                     <span className="block truncate text-[9px] text-zinc-600">{candidate.group} · {candidate.source}</span>
                     {candidate.explanation && <span className="block truncate text-[9px] text-amber-300/70">{candidate.explanation}</span>}
                   </span>
-                  {candidate.deviceState !== "available" && <span className="text-[8px] uppercase text-zinc-600">{candidate.deviceState}</span>}
+                  {candidate.deviceState !== "available" && <span className="text-[8px] text-zinc-600">{candidate.deviceState}</span>}
                 </Button>
               );
             })}
@@ -149,7 +153,7 @@ export function SourceComponentPicker(props: {
               <div className="px-4 py-8 text-center">
                 <SearchX aria-hidden="true" className="mx-auto text-zinc-700" size={18} />
                 <p className="mt-2 text-xs text-zinc-400">No matching compatible component.</p>
-                <p className="mt-1 text-[9px] leading-4 text-zinc-600">This slot accepts {usage?.contract.accepts.join(", ")}.</p>
+                <p className="mt-1 text-[9px] leading-4 text-zinc-600">This slot accepts {contract?.accepts.join(", ") || "no component types"}.</p>
               </div>
             )}
             {props.isBusy && candidates.length > 0 && (
@@ -176,7 +180,8 @@ export function SourceComponentPicker(props: {
 
 function slotPickerValue(slot: SourceWorkspaceLayer): string {
   const received = slot.slot?.received ?? [];
-  if (!received.length) return slot.slot?.contract.multiple ? "Choose components…" : "Choose component…";
+  const contract = slot.slot?.contract ?? slot.slotContract;
+  if (!received.length) return slot.slot ? contract?.multiple ? "Choose components…" : "Choose component…" : `Accepts ${contract?.accepts.join(", ") || "none"}`;
   if (received.length === 1) return received[0]!;
   return `${received.length} components`;
 }

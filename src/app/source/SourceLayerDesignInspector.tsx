@@ -2,6 +2,7 @@ import { Input, Label, NumberField, TextArea, TextField } from "@heroui/react";
 import { BoxSelect, Code2, Move, PaintBucket, SquareDashed, Type } from "lucide-react";
 
 import type { SourceWorkspaceLayer } from "../../shared/source-workspace";
+import { TailwindClassField } from "../inspector/TailwindClassField";
 import { TailwindMappedControls } from "../inspector/TailwindMappedControls";
 import {
   setSourceLayerDimension,
@@ -17,6 +18,7 @@ import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
 export function SourceLayerDesignInspector(props: {
   layer: SourceWorkspaceLayer;
   metrics?: SourceLayerMetrics;
+  previewClassName?: string;
   styleEditor?: SourceLayerClassEditor;
   onClassNamePreviewChange?: (value?: string) => void;
 }) {
@@ -27,14 +29,14 @@ export function SourceLayerDesignInspector(props: {
 
   return (
     <section aria-label="Design" className="border-b border-white/10">
-      <header className="flex min-h-11 items-center gap-2 border-b border-white/[0.06] px-4 text-zinc-500">
+      <header className="flex h-9 items-center gap-2 border-b border-white/[0.06] px-4 text-zinc-500">
         <BoxSelect aria-hidden="true" className="text-sky-400" size={14} />
-        <h3 id="source-layer-design" className="min-w-0 flex-1 truncate text-[10px] font-medium uppercase tracking-[0.14em]">Selected layer</h3>
+        <h3 aria-label="Selected layer" id="source-layer-design" className="min-w-0 flex-1 truncate text-[10px] font-medium">Layer</h3>
         <code className="max-w-28 truncate font-mono text-[9px] text-zinc-500">{layerLabel(props.layer)}</code>
       </header>
 
       <div className="divide-y divide-white/[0.06]">
-        <InspectorSection icon={Move} title="Position and size">
+        <InspectorSection icon={Move} title="Frame">
           <div className="grid grid-cols-4 gap-1.5">
             <Metric label="X" value={props.metrics?.x} />
             <Metric label="Y" value={props.metrics?.y} />
@@ -51,7 +53,6 @@ export function SourceLayerDesignInspector(props: {
               onChange={(value) => editor?.change(setSourceLayerDimension(className, "height", value))}
             />
           </div>
-          <p className="mt-2 text-[9px] leading-4 text-zinc-600">X and Y reflect the rendered flow. Width and height write pixel utilities to this layer.</p>
         </InspectorSection>
 
         {props.layer.className ? (
@@ -64,12 +65,12 @@ export function SourceLayerDesignInspector(props: {
           </div>
         ) : props.layer.classNameDynamic ? (
           <InspectorSection icon={SquareDashed} title="Layout">
-            <p className="text-[10px] leading-4 text-zinc-600">This layer computes className in TypeScript. Open Code to preserve that expression.</p>
+            <p className="text-[10px] text-zinc-600">Computed in code</p>
           </InspectorSection>
         ) : null}
 
         {props.layer.className && (
-          <InspectorSection icon={PaintBucket} title="Colors and border">
+          <InspectorSection icon={PaintBucket} title="Paint">
             <div className="divide-y divide-white/[0.05]">
               <PaintField
                 disabled={!editable}
@@ -108,20 +109,24 @@ export function SourceLayerDesignInspector(props: {
           <InspectorSection icon={Type} title="Content">
             <TextField fullWidth isDisabled={!editor?.textEditable} value={editor?.textValue ?? props.layer.text.value} onChange={(value) => editor?.changeText(value)}>
               <Label className="sr-only">Static text</Label>
-              <TextArea aria-label="Static text" className="min-h-16 w-full resize-y rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-xs leading-5 text-zinc-200 outline-none" rows={2} />
+              <TextArea aria-label="Static text" className="min-h-16 w-full resize-y rounded-lg border-0 bg-black/20 px-2.5 py-2 text-xs leading-5 text-zinc-200 outline-none focus:ring-1 focus:ring-sky-400/50" rows={2} />
             </TextField>
           </InspectorSection>
         )}
 
         {props.layer.className && (
-          <InspectorSection accent icon={Code2} title="Generated Tailwind">
-            <code
-              aria-label="Generated Tailwind classes"
-              className="block min-h-10 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-md border border-sky-300/20 bg-sky-950/25 px-3 py-2.5 font-mono text-[10px] font-medium leading-4 text-sky-100 shadow-[inset_0_1px_0_rgba(125,211,252,0.06)]"
-            >
-              {className || "No utilities"}
-            </code>
-            {editor?.error && <p className="mt-2 text-[9px] leading-4 text-red-300">{editor.error}</p>}
+          <InspectorSection icon={Code2} title="Classes">
+            <TailwindClassField
+              compileError={editor?.error}
+              disabled={!editable}
+              label="className"
+              previewValue={props.previewClassName}
+              value={className}
+              onChange={(value) => {
+                props.onClassNamePreviewChange?.();
+                editor?.change(value);
+              }}
+            />
           </InspectorSection>
         )}
       </div>
@@ -129,12 +134,14 @@ export function SourceLayerDesignInspector(props: {
   );
 }
 
-function InspectorSection(props: { accent?: boolean; children: React.ReactNode; icon: typeof Move; title: string }) {
+function InspectorSection(props: { children: React.ReactNode; icon: typeof Move; title: string }) {
   const Icon = props.icon;
   return (
-    <section className={`px-4 py-3 ${props.accent ? "bg-sky-400/[0.035] shadow-[inset_2px_0_0_rgba(56,189,248,0.32)]" : ""}`}>
-      <h4 className={`mb-2.5 flex items-center gap-1.5 text-[10px] font-medium ${props.accent ? "text-sky-200" : "text-zinc-400"}`}>
-        <Icon aria-hidden="true" className={props.accent ? "text-sky-400" : "text-zinc-600"} size={12} />
+    <section className="px-4 py-3">
+      <h4 className="mb-2 flex items-center gap-2 text-[10px] font-medium text-zinc-300">
+        <span className="grid size-4 shrink-0 place-items-center text-zinc-600">
+          <Icon aria-hidden="true" size={12} />
+        </span>
         {props.title}
       </h4>
       {props.children}
@@ -144,7 +151,7 @@ function InspectorSection(props: { accent?: boolean; children: React.ReactNode; 
 
 function Metric(props: { label: string; value?: number }) {
   return (
-    <div className="flex h-8 items-center gap-1 rounded-md border border-white/[0.08] bg-black/20 px-2">
+    <div className="flex h-8 items-center gap-1 rounded-lg bg-black/20 px-2">
       <span className="text-[9px] text-zinc-600">{props.label}</span>
       <span className="min-w-0 flex-1 truncate text-right font-mono text-[10px] text-zinc-400">{formatMetric(props.value)}</span>
     </div>
@@ -155,7 +162,7 @@ function DimensionField(props: { disabled: boolean; label: string; value?: numbe
   return (
     <NumberField isDisabled={props.disabled} minValue={0} value={Number.isFinite(props.value) ? Math.round(props.value!) : Number.NaN}>
       <Label className="sr-only">{props.label}</Label>
-      <NumberField.Group className="flex h-8 items-center rounded-md border border-white/[0.08] bg-black/20 px-2">
+      <NumberField.Group className="flex h-8 items-center rounded-lg bg-black/20 px-2 focus-within:ring-1 focus-within:ring-sky-400/50">
         <span aria-hidden="true" className="text-[9px] text-zinc-600">{props.label}</span>
         <NumberField.Input
           aria-label={props.label}
@@ -183,7 +190,7 @@ function PaintField(props: {
       <span className="text-[9px] text-zinc-500">{props.label}</span>
       <TextField isDisabled={props.disabled} value={props.value} onChange={props.onChange}>
         <Label className="sr-only">{props.label}</Label>
-        <div className="flex h-8 items-center gap-2 rounded-md border border-white/[0.08] bg-black/20 px-2 focus-within:border-sky-300/30">
+        <div className="flex h-8 items-center gap-2 rounded-lg bg-black/20 px-2 focus-within:ring-1 focus-within:ring-sky-400/50">
           <span
             aria-label={`${props.label} swatch`}
             className="size-3.5 shrink-0 rounded-sm border border-white/15 bg-[linear-gradient(135deg,transparent_45%,rgba(244,63,94,.8)_46%,rgba(244,63,94,.8)_54%,transparent_55%)]"

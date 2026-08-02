@@ -5,6 +5,7 @@ import * as monaco from "monaco-editor";
 import type { SourceLayerBinding } from "../../shared/source-workspace";
 import { configureMonacoTypeScript, sourceLanguageFor } from "./monaco-source-language";
 import { monacoModelPath } from "./monaco-model-path";
+import { currentDesignSpaceTheme, subscribeDesignSpaceTheme } from "../shell/design-space-theme";
 
 configureMonacoTypeScript();
 
@@ -43,7 +44,7 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
     const model = monaco.editor.createModel(props.value, sourceLanguageFor(props.path), uri);
     const editor = monaco.editor.create(container, {
       model,
-      theme: "vs-dark",
+      theme: currentDesignSpaceTheme() === "light" ? "vs" : "vs-dark",
       readOnly: props.readOnly,
       ariaLabel: "Source code",
       automaticLayout: true,
@@ -76,6 +77,10 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
       modelRef.current = undefined;
     };
   }, [modelId, props.path]);
+
+  useEffect(() => subscribeDesignSpaceTheme((theme) => {
+    monaco.editor.setTheme(theme === "light" ? "vs" : "vs-dark");
+  }), []);
 
   useEffect(() => {
     editorRef.current?.updateOptions({ readOnly: props.readOnly });

@@ -137,6 +137,10 @@ export interface RegisteredTarget {
   documentRegistration?: RegisteredDocumentRegistration;
   registrationPath?: string;
   sourceWorkspace?: IndexedSourceWorkspace;
+  /** Server-owned component approval configuration; never supplied by the browser. */
+  sourceApproval?: {
+    policy: string;
+  };
   sourceComponentStore?: RegisteredSourceComponentStore;
   sourceLibrary?: RegisteredSourceLibraryCatalog;
   libraryProject?: DesignSpaceLibraryProjectConfig;

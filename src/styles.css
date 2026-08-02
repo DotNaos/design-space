@@ -6,6 +6,7 @@
 @source inline("rounded-none rounded-xl rounded-2xl rounded-3xl p-4 p-6 p-8 shadow-none shadow-lg shadow-2xl bg-slate-900 bg-zinc-950 border border-zinc-700");
 
 @theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", sans-serif;
   --color-sky-50: #eff8ff;
   --color-sky-100: #dff1ff;
   --color-sky-200: #b9e2ff;
@@ -24,12 +25,164 @@ body {
   height: 100%;
   width: 100%;
   overflow: hidden;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   position: fixed;
   inset: 0;
   overflow: clip;
+}
+
+html[data-design-space-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-design-space-theme="light"] {
+  color-scheme: light;
+}
+
+html[data-design-space-theme="light"] body {
+  background: #f4f4f6;
+  color: #27272a;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="bg-[#0d0e10]"],
+  [class~="bg-[#0d0e11]"],
+  [class~="bg-[#0b0c0f]"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  background-color: #f4f4f6 !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="bg-[#101113]"],
+  [class~="bg-[#101114]"],
+  [class~="bg-[#101115]"],
+  [class~="bg-[#111214]"],
+  [class~="bg-[#111215]"],
+  [class~="bg-[#111216]"],
+  [class~="bg-[#121212]"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  background-color: #f8f8fa !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="bg-[#141518]"],
+  [class~="bg-[#141518]/95"],
+  [class~="bg-[#15161a]"],
+  [class~="bg-[#17181b]"],
+  [class~="bg-[#17181b]/90"],
+  [class~="bg-[#17181b]/95"],
+  [class~="bg-[#17181b]/96"],
+  [class~="bg-[#18191c]"],
+  [class~="bg-[#181a1f]"],
+  [class~="bg-[#191b20]"],
+  [class~="bg-[#1a1b1e]"],
+  [class~="bg-[#1a1b1f]"],
+  [class~="bg-[#1d1f24]"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  background-color: #ffffff !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="bg-[#0d0e10]/95"],
+  [class~="bg-[#101114]/96"],
+  [class~="bg-[#121212]/95"],
+  [class~="bg-[#121212]/98"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  background-color: rgb(255 255 255 / 0.96) !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="bg-[#17131d]/95"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  background-color: rgb(250 245 255 / 0.96) !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="bg-[#202126]"],
+  [class~="bg-[#22242a]"],
+  [class~="bg-[#25272e]"],
+  [class~="bg-[#292b31]"],
+  [class~="bg-[#2a2c33]"],
+  [class~="bg-[#2b2d33]"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  background-color: #e9e9ed !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="bg-black/20"],
+  [class~="bg-black/30"],
+  [class~="bg-black/35"],
+  [class~="bg-black/40"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  background-color: rgb(24 24 27 / 0.05) !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="bg-white/[0.04]"],
+  [class~="bg-white/[0.045]"],
+  [class~="bg-white/[0.05]"],
+  [class~="bg-white/[0.06]"],
+  [class~="bg-white/[0.08]"],
+  [class~="bg-white/[0.09]"],
+  [class~="bg-white/[0.10]"],
+  [class~="bg-white/[0.11]"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  background-color: rgb(24 24 27 / 0.07) !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="text-zinc-100"],
+  [class~="text-zinc-200"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  color: #27272a !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="text-zinc-300"],
+  [class~="text-zinc-400"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  color: #52525b !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="text-zinc-500"],
+  [class~="text-zinc-600"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  color: #71717a !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="text-zinc-700"],
+  [class~="text-zinc-800"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  color: #a1a1aa !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="border-white/5"],
+  [class~="border-white/10"],
+  [class~="border-white/15"],
+  [class~="border-white/20"],
+  [class~="border-white/[0.06]"],
+  [class~="border-white/[0.07]"],
+  [class~="border-white/[0.08]"],
+  [class~="border-white/[0.10]"],
+  [class~="border-white/[0.12]"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *) {
+  border-color: rgb(24 24 27 / 0.11) !important;
+}
+
+html[data-design-space-theme="light"] :where(
+  [class~="hover:bg-white/5"],
+  [class~="hover:bg-white/[0.04]"],
+  [class~="hover:bg-white/[0.05]"]
+):not([data-design-space-preview-entry-root], [data-design-space-preview-entry-root] *):hover {
+  background-color: rgb(24 24 27 / 0.07) !important;
 }
 
 .monaco-editor .design-space-source-selection {

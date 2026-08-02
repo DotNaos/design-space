@@ -71,7 +71,7 @@ export function SourceApprovalStatus(props: {
         <Icon aria-hidden="true" size={11} />
       </span>
       <Tooltip.Content
-        className="max-w-72 rounded-md border border-white/10 bg-[#202126] px-2.5 py-2 text-[10px] leading-4 text-zinc-200 shadow-xl"
+        className="max-w-72 rounded-lg bg-[#202126] px-2.5 py-2 text-[10px] leading-4 text-zinc-200 shadow-xl"
         placement="right"
       >
         <p className="font-medium">{appearance.label}</p>

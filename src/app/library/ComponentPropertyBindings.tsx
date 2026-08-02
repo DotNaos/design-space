@@ -32,7 +32,7 @@ export function ComponentPropertyBindings(props: {
       <div className="flex items-start gap-2">
         <Link2 aria-hidden="true" className="mt-0.5 shrink-0 text-sky-400" size={13} />
         <div>
-          <h4 className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-400">Implementation bindings</h4>
+          <h4 className="text-[10px] font-medium text-zinc-400">Implementation bindings</h4>
           <p className="mt-1 text-[10px] leading-4 text-zinc-600">Each public property controls exactly one compatible property in the component body.</p>
         </div>
       </div>

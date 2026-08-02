@@ -1,14 +1,13 @@
 import { Button } from "@heroui/react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, FileDiff, GitCompareArrows, LoaderCircle, Redo2, RotateCcw, Save, Shield, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, FileDiff, GitCompareArrows, LoaderCircle, Redo2, RotateCcw, Save, Shield, Undo2 } from "lucide-react";
 
 import type { StrictUiEvidence } from "../../shared/strict-ui";
-import { RunningTargetSwitcher } from "./RunningTargetSwitcher";
+import { DesignSpaceThemeToggle } from "./DesignSpaceThemeToggle";
+import { RunningTargetSwitcher, type WorkspaceSurfaceNavigation } from "./RunningTargetSwitcher";
 export function WorkspaceTopBar(props: {
   targetLabel: string;
   documentLabel: string;
-  breadcrumb: readonly string[];
   focusLabel?: string;
-  connected: boolean;
   strictUi?: StrictUiEvidence;
   checking: boolean;
   canUndo: boolean;
@@ -19,7 +18,10 @@ export function WorkspaceTopBar(props: {
   canSave: boolean;
   saving: boolean;
   pendingChanges?: number;
-  pageNavigation?: React.ReactNode;
+  leadingAction?: React.ReactNode;
+  trailingAction?: React.ReactNode;
+  showWorkspaceSwitcher?: boolean;
+  surfaceNavigation?: WorkspaceSurfaceNavigation;
   onUndo: () => void;
   onRedo: () => void;
   onReset: () => void;
@@ -30,48 +32,42 @@ export function WorkspaceTopBar(props: {
   onExitFocus?: () => void;
 }) {
   return (
-    <header className="flex h-12 shrink-0 items-center gap-1 border-b border-white/10 bg-[#101113] px-2 lg:h-14 lg:gap-0 lg:px-0">
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 lg:w-[280px] lg:flex-none lg:px-4">
+    <header className="relative flex h-12 shrink-0 items-center gap-1 border-b border-white/[0.08] bg-[#101113] px-2 lg:gap-0 lg:px-0">
+      <div className="flex min-w-0 items-center gap-1.5 lg:px-2">
+        {props.leadingAction}
         {props.focusLabel && props.onExitFocus && (
           <Button aria-label={`Back to ${props.documentLabel}`} className="size-9 shrink-0 lg:size-8" isIconOnly size="sm" variant="ghost" onPress={props.onExitFocus}>
             <ArrowLeft size={16} />
           </Button>
         )}
-        <div className="min-w-0 flex-1"><RunningTargetSwitcher targetLabel={props.targetLabel} /></div>
-        <ConnectionStatus connected={props.connected} />
         <div className="lg:hidden"><StrictStatusButton disabled={!props.canStrictUi} evidence={props.strictUi} checking={props.checking} onPress={props.onStrictUi} /></div>
       </div>
 
-      {props.pageNavigation ? <div className="hidden shrink-0 items-center px-2 lg:flex">{props.pageNavigation}</div> : null}
+      {props.showWorkspaceSwitcher === false ? null : (
+        <div className="absolute left-1/2 w-[min(46vw,240px)] -translate-x-1/2">
+          <RunningTargetSwitcher surfaceNavigation={props.surfaceNavigation} targetLabel={props.targetLabel} />
+        </div>
+      )}
 
-      <nav aria-label="Current document path" className="hidden min-w-0 flex-1 border-l border-white/10 px-5 text-xs text-zinc-500 lg:block">
-        <ol className="flex h-full min-w-0 items-center gap-2">
-          {props.breadcrumb.map((item, index) => (
-          <li className="contents" key={`${item}-${index}`}>
-            {index > 0 && <ChevronRight aria-hidden="true" className="shrink-0 text-zinc-700" size={13} />}
-            <span aria-current={!props.focusLabel && index === props.breadcrumb.length - 1 ? "page" : undefined} className={`truncate ${index === props.breadcrumb.length - 1 ? "font-semibold text-zinc-100" : ""}`}>{item}</span>
-          </li>
-        ))}
-          {props.focusLabel && <li className="contents"><ChevronRight aria-hidden="true" className="shrink-0 text-zinc-700" size={13} /><span aria-current="page" className="truncate font-semibold text-zinc-100">{props.focusLabel}</span></li>}
-        </ol>
-      </nav>
-
-      <div className="ml-auto flex shrink-0 items-center lg:gap-1 lg:px-3">
-        <Button aria-label="Undo" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canUndo} onPress={props.onUndo}><Undo2 size={15} /></Button>
-        <Button aria-label="Redo" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canRedo} onPress={props.onRedo}><Redo2 size={15} /></Button>
-        <Button aria-label="Reset document" isIconOnly className="size-9 lg:size-8" size="sm" variant="ghost" isDisabled={!props.canReset} onPress={props.onReset}><RotateCcw size={14} /></Button>
+      <div className="ml-auto flex shrink-0 items-center gap-0.5 lg:px-3">
+        {props.trailingAction}
+        <DesignSpaceThemeToggle />
+        <Button aria-label="Undo" isIconOnly className="hidden size-8 text-zinc-500 hover:text-zinc-200 min-[1120px]:inline-flex" size="sm" variant="ghost" isDisabled={!props.canUndo} onPress={props.onUndo}><Undo2 size={14} /></Button>
+        <Button aria-label="Redo" isIconOnly className="hidden size-8 text-zinc-500 hover:text-zinc-200 min-[1120px]:inline-flex" size="sm" variant="ghost" isDisabled={!props.canRedo} onPress={props.onRedo}><Redo2 size={14} /></Button>
+        <Button aria-label="Reset document" isIconOnly className="hidden size-8 text-zinc-500 hover:text-zinc-200 min-[1120px]:inline-flex" size="sm" variant="ghost" isDisabled={!props.canReset} onPress={props.onReset}><RotateCcw size={13} /></Button>
         {props.onReviewChanges ? (
           <Button
             aria-label={`Review ${props.pendingChanges ?? 0} pending changes`}
-            className={`h-8 gap-1.5 rounded-md px-2.5 text-[10px] ${(props.pendingChanges ?? 0) > 0 ? "bg-amber-400/10 text-amber-200 hover:bg-amber-400/15" : "text-zinc-600"}`}
+            className={`h-8 gap-1.5 rounded-md px-2 text-[10px] ${(props.pendingChanges ?? 0) > 0 ? "bg-amber-400/10 text-amber-200 hover:bg-amber-400/15" : "text-zinc-600"}`}
             isDisabled={(props.pendingChanges ?? 0) === 0}
             size="sm"
             variant="ghost"
             onPress={props.onReviewChanges}
           >
             <GitCompareArrows aria-hidden="true" size={13} />
-            <span>{props.pendingChanges ?? 0} changes</span>
-            {(props.pendingChanges ?? 0) > 0 ? <span className="rounded bg-amber-300/10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-amber-300">Draft</span> : null}
+            <span className="min-[1120px]:hidden">{props.pendingChanges ?? 0}</span>
+            <span className="hidden min-[1120px]:inline">{props.pendingChanges ?? 0} changes</span>
+            {(props.pendingChanges ?? 0) > 0 ? <span className="hidden rounded bg-amber-300/10 px-1 py-0.5 text-[8px] font-semibold text-amber-300 xl:inline">Draft</span> : null}
           </Button>
         ) : (
           <>
@@ -81,16 +77,6 @@ export function WorkspaceTopBar(props: {
         )}
       </div>
     </header>
-  );
-}
-
-function ConnectionStatus({ connected }: { connected: boolean }) {
-  const label = connected ? "Local preview connected" : "Local preview disconnected";
-  return (
-    <span aria-label={label} className="flex shrink-0 items-center gap-1.5 text-[10px] text-zinc-500" role="status">
-      <span aria-hidden="true" className={`size-1.5 rounded-full ${connected ? "bg-cyan-400" : "bg-zinc-600"}`} />
-      <span className="hidden xl:inline">{connected ? "Connected" : "Offline"}</span>
-    </span>
   );
 }
 

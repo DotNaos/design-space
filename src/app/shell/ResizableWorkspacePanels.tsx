@@ -47,14 +47,29 @@ export type WorkspacePanelDefinition = Partial<PanelWidthBounds> & {
   className?: string;
 };
 
+export type WorkspacePanelControls = {
+  controls: string;
+  visible: boolean;
+  onToggle: () => void;
+};
+
+export type WorkspacePanelsControls = {
+  left: WorkspacePanelControls;
+  right: WorkspacePanelControls;
+};
+
 export type ResizableWorkspacePanelsProps = {
   namespace: WorkspacePanelNamespace;
-  left: WorkspacePanelDefinition;
+  left: Omit<WorkspacePanelDefinition, "content"> & {
+    content: ReactNode | ((controls: WorkspacePanelControls) => ReactNode);
+  };
   right: WorkspacePanelDefinition;
-  children: ReactNode;
+  children: ReactNode | ((controls: WorkspacePanelsControls) => ReactNode);
   mobile?: ReactNode;
   className?: string;
   contentClassName?: string;
+  leftHeader?: (controls: WorkspacePanelControls) => ReactNode;
+  externalPanelControls?: boolean;
 };
 
 export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
@@ -78,7 +93,7 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
           ...leftBounds,
           maxWidth: Math.min(
             leftBounds.maxWidth,
-            layoutWidth - MINIMUM_CANVAS_WIDTH - SEPARATOR_WIDTH - (visibility.right ? 0 : COLLAPSED_PANEL_WIDTH),
+            layoutWidth - MINIMUM_CANVAS_WIDTH - SEPARATOR_WIDTH - (visibility.right || props.externalPanelControls ? 0 : COLLAPSED_PANEL_WIDTH),
           ),
         })
         : 0,
@@ -87,7 +102,7 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
           ...rightBounds,
           maxWidth: Math.min(
             rightBounds.maxWidth,
-            layoutWidth - MINIMUM_CANVAS_WIDTH - SEPARATOR_WIDTH - (visibility.left ? 0 : COLLAPSED_PANEL_WIDTH),
+            layoutWidth - MINIMUM_CANVAS_WIDTH - SEPARATOR_WIDTH - (visibility.left || props.externalPanelControls ? 0 : COLLAPSED_PANEL_WIDTH),
           ),
         })
         : 0,
@@ -96,12 +111,29 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
     left: visibility.left ? fittedWidths.left : 0,
     right: visibility.right ? fittedWidths.right : 0,
   };
+  const collapsedPanelWidth = props.externalPanelControls ? 0 : COLLAPSED_PANEL_WIDTH;
   const columnWidths = {
-    left: visibility.left ? fittedWidths.left : COLLAPSED_PANEL_WIDTH,
-    right: visibility.right ? fittedWidths.right : COLLAPSED_PANEL_WIDTH,
+    left: visibility.left ? fittedWidths.left : collapsedPanelWidth,
+    right: visibility.right ? fittedWidths.right : collapsedPanelWidth,
   };
   const dragCleanup = useRef<(() => void) | undefined>(undefined);
   const pendingSnap = useRef<{ side: PanelSide; state: PanelSnapFeedback } | undefined>(undefined);
+  const leftControls = {
+    controls: leftPanelId,
+    visible: visibility.left,
+    onToggle: () => toggle("left"),
+  };
+  const rightControls = {
+    controls: rightPanelId,
+    visible: visibility.right,
+    onToggle: () => toggle("right"),
+  };
+  const leftContent = typeof props.left.content === "function"
+    ? props.left.content(leftControls)
+    : props.left.content;
+  const centerContent = typeof props.children === "function"
+    ? props.children({ left: leftControls, right: rightControls })
+    : props.children;
 
   useEffect(() => () => dragCleanup.current?.(), []);
   useEffect(() => {
@@ -124,14 +156,14 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
 
   const maximumPanelWidth = useCallback((side: PanelSide) => {
     const other = side === "left" ? "right" : "left";
-    const otherMinimum = visibility[other] ? bounds[other].minWidth : COLLAPSED_PANEL_WIDTH;
+    const otherMinimum = visibility[other] ? bounds[other].minWidth : collapsedPanelWidth;
     const panelBudget = Math.max(
       bounds[side].minWidth + otherMinimum,
       layoutWidth - MINIMUM_CANVAS_WIDTH - SEPARATOR_WIDTH,
     );
     const available = Math.max(bounds[side].minWidth, panelBudget - displayWidths[other]);
     return Math.min(bounds[side].maxWidth, available);
-  }, [bounds, displayWidths, layoutWidth, visibility]);
+  }, [bounds, collapsedPanelWidth, displayWidths, layoutWidth, visibility]);
 
   const resizePanel = useCallback((side: PanelSide, requestedWidth: number) => {
     const width = clampPanelWidth(requestedWidth, {
@@ -226,7 +258,7 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
   }, [bounds, displayWidths, layoutWidth, maximumPanelWidth, resizePanel, setExpanded, setVisible, visibility.expanded]);
 
   if (!isDesktop) {
-    return <>{props.mobile ?? props.children}</>;
+    return <>{props.mobile ?? centerContent}</>;
   }
 
   return (
@@ -244,14 +276,17 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
       }}
     >
       <WorkspacePanel
-        content={props.left.content}
+        content={leftContent}
         contentClassName={props.left.className}
         controls={leftPanelId}
         label={props.left.label}
+        header={props.leftHeader?.(leftControls)}
+        managedHeader={Boolean(props.leftHeader)}
         side="left"
         suppressed={visibility.expanded === "right"}
         visible={visibility.left}
         workspaceExpanded={visibility.expanded === "left"}
+        hideToggle={props.externalPanelControls}
         onToggle={() => toggle("left")}
       />
       <WorkspacePanelSeparator
@@ -274,7 +309,7 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
         aria-hidden={visibility.expanded !== null}
         className={`min-h-0 min-w-0 overflow-hidden ${visibility.expanded ? "invisible" : ""} ${props.contentClassName ?? ""}`}
       >
-        {props.children}
+        {centerContent}
       </div>
       <WorkspacePanelSeparator
         bounds={rightBounds}
@@ -301,6 +336,7 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
         suppressed={visibility.expanded === "left"}
         visible={visibility.right}
         workspaceExpanded={visibility.expanded === "right"}
+        hideToggle={props.externalPanelControls}
         onToggle={() => toggle("right")}
       />
     </div>
@@ -312,16 +348,46 @@ function WorkspacePanel(props: {
   contentClassName?: string;
   controls: string;
   label: string;
+  header?: ReactNode;
+  hideToggle?: boolean;
+  managedHeader?: boolean;
   side: keyof WorkspacePanelWidths;
   suppressed: boolean;
   visible: boolean;
   workspaceExpanded: boolean;
   onToggle: () => void;
 }) {
+  if (props.managedHeader) {
+    return (
+      <section
+        className="flex min-h-0 min-w-0 flex-col overflow-hidden"
+        data-workspace-panel={props.side}
+        data-workspace-panel-collapsed={!props.visible || undefined}
+        data-workspace-panel-expanded={props.workspaceExpanded || undefined}
+        data-workspace-panel-suppressed={props.suppressed || undefined}
+      >
+        {props.header}
+        <div
+          id={props.controls}
+          aria-label={props.label}
+          aria-hidden={!props.visible || props.suppressed}
+          className={`min-h-0 min-w-0 flex-1 overflow-hidden ${
+            props.visible && !props.suppressed ? props.contentClassName ?? "" : "hidden"
+          }`}
+          role="region"
+        >
+          {props.content}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       className={`grid min-h-0 min-w-0 overflow-hidden ${
-        props.visible
+        props.hideToggle
+          ? "grid-cols-[minmax(0,1fr)]"
+          : props.visible
           ? props.side === "left"
             ? "grid-cols-[minmax(0,1fr)_36px]"
             : "grid-cols-[36px_minmax(0,1fr)]"
@@ -343,15 +409,17 @@ function WorkspacePanel(props: {
       >
         {props.content}
       </div>
-      <div className={`${props.visible && props.side === "left" ? "order-2" : "order-1"} flex min-w-0 justify-center`}>
-        <WorkspacePanelToggle
-          controls={props.controls}
-          label={props.label}
-          side={props.side}
-          visible={props.visible}
-          onToggle={props.onToggle}
-        />
-      </div>
+      {props.hideToggle ? null : (
+        <div className={`${props.visible && props.side === "left" ? "order-2" : "order-1"} flex min-w-0 justify-center`}>
+          <WorkspacePanelToggle
+            controls={props.controls}
+            label={props.label}
+            side={props.side}
+            visible={props.visible}
+            onToggle={props.onToggle}
+          />
+        </div>
+      )}
     </section>
   );
 }
@@ -428,7 +496,7 @@ function WorkspacePanelToggle(props: {
         aria-controls={props.controls}
         aria-expanded={props.visible}
         aria-label={`${props.visible ? "Hide" : "Show"} ${props.label}`}
-        className="mt-2 size-7 min-w-7 rounded-md border border-white/10 bg-[#17181b]/95 text-zinc-500 shadow-lg shadow-black/20 backdrop-blur hover:bg-[#202126] hover:text-zinc-200"
+        className="mt-2 size-7 min-w-7 rounded-lg border-0 bg-[#17181b]/95 text-zinc-500 shadow-lg shadow-black/20 backdrop-blur hover:bg-[#202126] hover:text-zinc-200"
         data-workspace-panel-toggle={props.side}
         size="sm"
         variant="ghost"
@@ -436,7 +504,7 @@ function WorkspacePanelToggle(props: {
       >
         <PanelToggleIcon side={props.side} visible={props.visible} />
       </Button>
-      <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
+      <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
         {props.visible ? "Hide" : "Show"} {props.label}
       </Tooltip.Content>
     </Tooltip>

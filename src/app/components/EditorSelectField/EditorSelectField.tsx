@@ -42,7 +42,7 @@ export function EditorSelectField(props: {
         <span className="sr-only">{props.ariaLabel}</span>
       </Label>
       <Select.Trigger
-        className={`${compact ? "mt-1 min-h-11 px-2 text-xs lg:min-h-10" : "mt-1 min-h-11 px-3 text-base lg:text-sm"} flex w-full items-center gap-2 rounded-lg border border-white/10 bg-black/20 text-zinc-200 outline-none transition-[border-color,background-color,transform] duration-150 hover:border-white/20 hover:bg-white/[0.035] data-[focus-visible]:border-sky-400 data-[pressed]:scale-[0.995] motion-reduce:transition-none`}
+        className={`${compact ? "mt-1 min-h-11 px-2 text-xs lg:min-h-10" : "mt-1 min-h-11 px-3 text-base lg:text-sm"} flex w-full items-center gap-2 rounded-xl border-0 bg-black/20 text-zinc-200 outline-none transition-[background-color,box-shadow,transform] duration-150 hover:bg-white/[0.05] data-[focus-visible]:ring-1 data-[focus-visible]:ring-sky-400/50 data-[pressed]:scale-[0.995] motion-reduce:transition-none`}
       >
         <Select.Value className="min-w-0 flex-1 truncate text-left">{selected?.label}</Select.Value>
         <Select.Indicator className="size-4 shrink-0 text-zinc-500 transition-transform duration-150 data-[open=true]:rotate-180 motion-reduce:transition-none" />
@@ -50,7 +50,7 @@ export function EditorSelectField(props: {
       <Select.Popover
         UNSTABLE_portalContainer={portalContainer ?? undefined}
         placement="bottom start"
-        className="max-h-72 w-[var(--trigger-width)] overflow-y-auto rounded-xl border border-white/10 bg-[#18191c] p-1 shadow-2xl outline-none entering:animate-in entering:fade-in entering:zoom-in-95 exiting:animate-out exiting:fade-out exiting:zoom-out-95 motion-reduce:transition-none"
+        className="max-h-72 w-[var(--trigger-width)] overflow-y-auto rounded-2xl border-0 bg-[#18191c] p-1 shadow-2xl outline-none entering:animate-in entering:fade-in entering:zoom-in-95 exiting:animate-out exiting:fade-out exiting:zoom-out-95 motion-reduce:transition-none"
       >
         <ListBox items={props.options}>
           {(option) => (

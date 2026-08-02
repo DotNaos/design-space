@@ -9,7 +9,10 @@ export function sourceEntrySlotLayers(
   const visit = (layers: readonly SourceWorkspaceLayer[] | undefined) => {
     for (const layer of layers ?? []) {
       if (layer.kind === "slot") {
-        if (!layer.slot) slots.push(layer);
+        if (!layer.slot) {
+          const contract = entry.slots.find((slot) => slot.name === layer.label);
+          slots.push(contract ? { ...layer, slotContract: contract } : layer);
+        }
         continue;
       }
       if (layer.kind === "component") {
@@ -50,12 +53,14 @@ function implicitComponentSlots(
 }
 
 function defaultSlot(entry: RuntimeSourceWorkspaceEntry): SourceWorkspaceLayer {
+  const contract = entry.slots.find((slot) => slot.name === "content");
   return {
     id: `${entry.id}:design-slot:content`,
     label: "content",
     kind: "slot",
     source: { start: entry.source.end, end: entry.source.end },
     children: [],
+    ...(contract ? { slotContract: contract } : {}),
   };
 }
 

@@ -10,7 +10,7 @@ export interface SourcePreviewModeToggleProps {
 
 export function SourcePreviewModeToggle(props: SourcePreviewModeToggleProps) {
   return (
-    <div aria-label="Canvas mode" className="flex h-9 items-center gap-0.5 rounded-lg border border-white/[0.08] bg-black/20 p-0.5" role="group">
+    <div aria-label="Canvas mode" className="flex h-9 items-center gap-0.5 rounded-xl bg-black/20 p-0.5" role="group">
       <ModeButton active={props.mode === "design"} label="Design mode" onPress={() => props.onChange("design")}><MousePointer2 size={13} /></ModeButton>
       <ModeButton active={props.mode === "play"} label="Play mode" onPress={() => props.onChange("play")}><Play size={13} /></ModeButton>
     </div>
@@ -31,7 +31,7 @@ function ModeButton(props: { active: boolean; children: React.ReactNode; label: 
       >
         {props.children}
       </Button>
-      <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">{props.label}</Tooltip.Content>
+      <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">{props.label}</Tooltip.Content>
     </Tooltip>
   );
 }

@@ -1,148 +1,98 @@
-import { Input, Label, TextField } from "@heroui/react";
+import { Magnet } from "lucide-react";
+import { startTransition, useEffect, useRef, useState } from "react";
 
-import { replaceTailwindUtilityGroup } from "./tailwind-utility";
+import { BoxModelUnitTabs } from "./BoxModelUnitTabs";
+import { BoxModelValueRows } from "./TailwindBoxModelValueRows";
+import { BoxModelDiagram, type BoxFocus } from "./TailwindBoxModelDiagram";
+import type { BoxUnit } from "./tailwind-box-model-values";
 
-type BoxKind = "margin" | "border" | "padding";
-type BoxSide = "top" | "right" | "bottom" | "left";
+export { readBoxSource, readBoxValue, setBoxUniformValue, setBoxValue, snapBoxPixels } from "./tailwind-box-model-values";
 
-const sides: readonly BoxSide[] = ["top", "right", "bottom", "left"];
-const prefix: Record<BoxKind, string> = { margin: "m", border: "border", padding: "p" };
-const sideSuffix: Record<BoxSide, string> = { top: "t", right: "r", bottom: "b", left: "l" };
-const scalePixels: Record<string, string> = {
-  "0": "0",
-  px: "1px",
-  "0.5": "2px",
-  "1": "4px",
-  "1.5": "6px",
-  "2": "8px",
-  "2.5": "10px",
-  "3": "12px",
-  "3.5": "14px",
-  "4": "16px",
-  "5": "20px",
-  "6": "24px",
-  "8": "32px",
-  "10": "40px",
-  "12": "48px",
-  "16": "64px",
-  "20": "80px",
-  "24": "96px",
-};
+const detentFlashMs = 130;
 
-export function TailwindBoxModelControl(props: { value: string; onChange: (value: string) => void }) {
+export function TailwindBoxModelControl(props: {
+  value: string;
+  onChange: (value: string) => void;
+  onPreviewChange?: (value?: string) => void;
+}) {
+  const [hovered, setHovered] = useState<BoxFocus>();
+  const [dragged, setDragged] = useState<BoxFocus>();
+  const [edited, setEdited] = useState<BoxFocus>();
+  const [isDetent, setIsDetent] = useState(false);
+  const [unit, setUnit] = useState<BoxUnit>("tailwind");
+  const [interactionValue, setInteractionValue] = useState<string>();
+  const detentTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const interactionValueRef = useRef<string | undefined>(undefined);
+  const onPreviewChangeRef = useRef(props.onPreviewChange);
+  onPreviewChangeRef.current = props.onPreviewChange;
+  const focus = edited ?? dragged ?? hovered;
+  const value = interactionValue ?? props.value;
+
+  useEffect(() => () => {
+    clearTimeout(detentTimer.current);
+    onPreviewChangeRef.current?.();
+  }, []);
+
+  const previewInteraction = (next: string) => {
+    interactionValueRef.current = next;
+    setInteractionValue(next);
+    startTransition(() => props.onPreviewChange?.(next));
+  };
+
+  const commitInteraction = (next?: string) => {
+    const finalValue = next ?? interactionValueRef.current;
+    interactionValueRef.current = undefined;
+    setInteractionValue(undefined);
+    if (finalValue !== undefined && finalValue !== props.value) props.onChange(finalValue);
+    startTransition(() => props.onPreviewChange?.());
+  };
+
+  /** Every rung the drag clicks past flashes the band, so the snap is felt as well as seen. */
+  const flashDetent = () => {
+    setIsDetent(true);
+    clearTimeout(detentTimer.current);
+    detentTimer.current = setTimeout(() => setIsDetent(false), detentFlashMs);
+  };
+
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-[9px] text-zinc-600">Box model</span>
-        <span className="text-[8px] text-zinc-600">px, auto, or var(…)</span>
+    <div className="min-w-0">
+      <div className="mb-2 flex min-h-7 items-center justify-between gap-3">
+        <span className="shrink-0 text-[9px] font-semibold tracking-[-0.01em] text-zinc-400">Box model</span>
+        <BoxModelUnitTabs value={unit} onChange={setUnit} />
       </div>
-      <div className="space-y-1.5 rounded-lg border border-white/10 bg-black/20 p-2">
-        <BoxRow kind="margin" value={props.value} onChange={props.onChange} />
-        <BoxRow kind="border" value={props.value} onChange={props.onChange} />
-        <BoxRow kind="padding" value={props.value} onChange={props.onChange} />
-      </div>
-    </div>
-  );
-}
 
-function BoxRow(props: { kind: BoxKind; value: string; onChange: (value: string) => void }) {
-  return (
-    <div className={`rounded-md border px-1.5 py-1.5 ${props.kind === "margin" ? "border-amber-300/15 bg-amber-300/[0.03]" : props.kind === "border" ? "border-violet-300/15 bg-violet-300/[0.03]" : "border-emerald-300/15 bg-emerald-300/[0.03]"}`}>
-      <div className="mb-1 text-[8px] font-medium capitalize tracking-wide text-zinc-500">{props.kind}</div>
-      <div className="grid grid-cols-4 gap-1">
-        {sides.map((side) => (
-          <BoxValueField
-            key={side}
-            kind={props.kind}
-            side={side}
-            value={readBoxValue(props.value, props.kind, side)}
-            onChange={(value) => props.onChange(setBoxValue(props.value, props.kind, side, value))}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function BoxValueField(props: { kind: BoxKind; side: BoxSide; value: string; onChange: (value: string) => void }) {
-  return (
-    <TextField value={props.value} onChange={props.onChange}>
-      <Label className="sr-only">{props.kind} {props.side}</Label>
-      <Input
-        aria-label={`${props.kind} ${props.side}`}
-        className="h-7 w-full rounded border border-white/[0.07] bg-black/25 px-1 text-center font-mono text-[9px] text-zinc-300 outline-none focus:border-sky-300/40"
-        placeholder={props.side[0]!.toUpperCase()}
+      <BoxModelDiagram
+        dragged={dragged}
+        edited={edited}
+        focus={focus}
+        isDetent={isDetent}
+        unit={unit}
+        value={value}
+        onChange={props.onChange}
+        onCloseEditor={() => setEdited(undefined)}
+        onDetent={flashDetent}
+        onDrag={setDragged}
+        onEdit={setEdited}
+        onHover={setHovered}
+        onInteractionChange={previewInteraction}
+        onInteractionEnd={commitInteraction}
       />
-    </TextField>
+
+      <BoxModelValueRows
+        focus={focus}
+        unit={unit}
+        value={value}
+        onBlur={() => setHovered(undefined)}
+        onChange={props.onChange}
+        onFocus={setHovered}
+        onInteractionChange={previewInteraction}
+        onInteractionEnd={commitInteraction}
+      />
+
+      <div className="mt-1.5 flex items-center justify-end gap-1 px-0.5 text-[8px] font-medium tracking-[-0.01em] text-zinc-600">
+        <Magnet aria-hidden="true" size={9} />
+        {unit === "tailwind" ? "Tailwind scale · 1 = 0.25 rem = 4 px" : unit === "rem" ? "Fixed root · 1 rem = 16 px" : "Pixels · Tailwind 1 = 4 px"}
+      </div>
+    </div>
   );
-}
-
-export function readBoxValue(className: string, kind: BoxKind, side: BoxSide): string {
-  const tokens = className.split(/\s+/).filter((token) => token && !hasVariant(token));
-  const candidates = boxCandidates(kind, side);
-  for (const candidate of candidates) {
-    const token = [...tokens].reverse().find((utility) => candidate.pattern.test(utility));
-    if (token) return displayBoxValue(token, candidate.utilityPrefix);
-  }
-  return "";
-}
-
-export function setBoxValue(className: string, kind: BoxKind, side: BoxSide, rawValue: string): string {
-  const sidePrefix = `${prefix[kind]}${kind === "border" ? `-${sideSuffix[side]}` : sideSuffix[side]}`;
-  const next = boxUtility(sidePrefix, rawValue, kind);
-  const sidePattern = kind === "border"
-    ? borderWidthPattern(sideSuffix[side])
-    : new RegExp(`^${sidePrefix}-.+$`);
-  return replaceTailwindUtilityGroup(className, [], next, (utility) => sidePattern.test(utility));
-}
-
-function boxCandidates(kind: BoxKind, side: BoxSide): Array<{ pattern: RegExp; utilityPrefix: string }> {
-  if (kind === "border") {
-    const sideName = sideSuffix[side];
-    return [
-      { pattern: borderWidthPattern(sideName), utilityPrefix: `border-${sideName}` },
-      { pattern: /^border(?:-(?:0|2|4|8|\[(?:-?\d+(?:\.\d+)?(?:px|rem|em|%)?|var\(.+\))\]))?$/, utilityPrefix: "border" },
-    ];
-  }
-  const base = prefix[kind];
-  const axis = side === "left" || side === "right" ? "x" : "y";
-  return [
-    { pattern: new RegExp(`^${base}${sideSuffix[side]}-.+$`), utilityPrefix: `${base}${sideSuffix[side]}` },
-    { pattern: new RegExp(`^${base}${axis}-.+$`), utilityPrefix: `${base}${axis}` },
-    { pattern: new RegExp(`^${base}-.+$`), utilityPrefix: base },
-  ];
-}
-
-function borderWidthPattern(side: string): RegExp {
-  return new RegExp(`^border-${side}(?:-(?:0|2|4|8|\\[(?:-?\\d+(?:\\.\\d+)?(?:px|rem|em|%)?|var\\(.+\\))\\]))?$`);
-}
-
-function displayBoxValue(token: string, utilityPrefix: string): string {
-  if (token === utilityPrefix || token === "border") return "1px";
-  const suffix = token.slice(utilityPrefix.length + 1);
-  const arbitrary = suffix.match(/^\[(.+)\]$/)?.[1];
-  if (arbitrary) return arbitrary.replace(/_/g, " ");
-  if (utilityPrefix.startsWith("border")) return `${suffix}px`;
-  return scalePixels[suffix] ?? suffix;
-}
-
-function boxUtility(utilityPrefix: string, rawValue: string, kind: BoxKind): string {
-  const value = rawValue.trim();
-  if (!value) return "";
-  if (kind === "border" && value === "1px") return utilityPrefix;
-  if (value === "auto" && kind !== "border") return `${utilityPrefix}-auto`;
-  if (/^-?\d+(?:\.\d+)?$/.test(value)) return `${utilityPrefix}-[${value}px]`;
-  const scale = Object.entries(scalePixels).find(([, pixels]) => pixels === value)?.[0];
-  if (scale && kind !== "border") return `${utilityPrefix}-${scale}`;
-  return `${utilityPrefix}-[${value.replace(/\s+/g, "_")}]`;
-}
-
-function hasVariant(token: string): boolean {
-  let depth = 0;
-  for (const character of token) {
-    if (character === "[") depth += 1;
-    else if (character === "]") depth = Math.max(0, depth - 1);
-    else if (character === ":" && depth === 0) return true;
-  }
-  return false;
 }

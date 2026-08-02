@@ -104,7 +104,7 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
           <Select.Value className="min-w-0 flex-1 truncate text-left" />
           <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
         </Select.Trigger>
-        <Select.Popover className="min-w-64 rounded-lg border border-white/10 bg-[#18191c] p-1 shadow-2xl" placement="bottom">
+        <Select.Popover className="min-w-64 rounded-lg bg-[#18191c] p-1 shadow-2xl" placement="bottom">
           <ListBox items={status.worktrees}>
             {(worktree) => (
               <ListBox.Item

@@ -10,8 +10,6 @@ function renderTopBar(overrides: Partial<Parameters<typeof WorkspaceTopBar>[0]> 
   const props: Parameters<typeof WorkspaceTopBar>[0] = {
     targetLabel: "Demo target",
     documentLabel: "Quarterly planning",
-    breadcrumb: ["App", "Pages", "Desktop", "Quarterly planning"],
-    connected: true,
     checking: false,
     canUndo: true,
     canRedo: true,
@@ -33,13 +31,38 @@ function renderTopBar(overrides: Partial<Parameters<typeof WorkspaceTopBar>[0]> 
 }
 
 describe("WorkspaceTopBar", () => {
-  it("shows project context and local status without a product wordmark", () => {
+  it("shows only the project context without a connection label or product wordmark", () => {
     renderTopBar();
 
     expect(screen.getByText("Demo target")).toBeInTheDocument();
-    expect(screen.getByLabelText("Current document path")).toHaveTextContent("AppPagesDesktopQuarterly planning");
-    expect(screen.getByRole("status", { name: "Local preview connected" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Current document path")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByText("Connected")).not.toBeInTheDocument();
     expect(screen.queryByText("Design Space")).not.toBeInTheDocument();
+  });
+
+  it("switches the current project between its app and library from the top bar", async () => {
+    const onChange = vi.fn();
+    renderTopBar({
+      surfaceNavigation: {
+        value: "app",
+        libraryLabel: "@dotnaos/react-ui",
+        onChange,
+      },
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /Current workspace: Demo target, App/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /Library/ }));
+
+    expect(onChange).toHaveBeenCalledWith("library");
+    expect(screen.queryByRole("button", { name: /Workspace source/ })).not.toBeInTheDocument();
+  });
+
+  it("anchors the workspace switcher to the true center of the top bar", () => {
+    renderTopBar();
+
+    expect(screen.getByRole("button", { name: /Current workspace:/ }).parentElement)
+      .toHaveClass("absolute", "left-1/2", "-translate-x-1/2");
   });
 
   it("removes the mode switch and keeps strict UI, diff, and save actions available", async () => {

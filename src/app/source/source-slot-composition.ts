@@ -28,7 +28,7 @@ export function sourceSlotCandidates(
   device: DesignSpaceDevice,
   ownerPath: string,
 ): readonly SourceComponentCandidate[] {
-  const accepted = new Set(slot.slot?.contract.accepts.map(shortName) ?? []);
+  const accepted = new Set((slot.slot?.contract ?? slot.slotContract)?.accepts.map(shortName) ?? []);
   const project = nodes.flatMap((node): SourceComponentCandidate[] => {
     const implementation = node.implementations[device];
     const entry = implementation.entry ?? node.entries[0];

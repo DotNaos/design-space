@@ -102,8 +102,11 @@ describe("mobile item editor", () => {
     render(
       <MobileItemEditor
         componentLabel="Stack"
-        controls={[{ id: "style", label: "Classes", kind: "tailwind", prop: "classes" }]}
-        controlValues={{ classes: "flex gap-3" }}
+        controls={[
+          { id: "style", label: "Classes", kind: "tailwind", prop: "classes" },
+          { id: "spacing", label: "Spacing", kind: "tailwind", prop: "spacing" },
+        ]}
+        controlValues={{ classes: "flex gap-3", spacing: "p-4" }}
         previewCss=""
         slots={[]}
         compilePending={false}
@@ -121,14 +124,13 @@ describe("mobile item editor", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Size" }));
-    fireEvent.click(screen.getByRole("button", { name: /Width Tailwind utility/ }));
-    const listbox = screen.getByRole("listbox", { name: "Width Tailwind utility" });
+    fireEvent.click(screen.getByRole("button", { name: /Classes Tailwind property/ }));
+    const listbox = screen.getByRole("listbox", { name: "Tailwind property" });
     expect(listbox).toBeVisible();
     fireEvent.keyDown(listbox, { key: "Escape", code: "Escape" });
 
     expect(onCancel).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "Edit Stack" })).toBeVisible();
-    expect(screen.queryByRole("listbox", { name: "Width Tailwind utility" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox", { name: "Tailwind property" })).not.toBeInTheDocument();
   });
 });

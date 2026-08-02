@@ -56,7 +56,7 @@ export function WorkspaceSidebar(props: {
         <FolderKanban aria-hidden="true" className="shrink-0 text-sky-400" size={16} />
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-semibold text-zinc-100">{props.active === "tree" ? "App" : auxiliaryTitle}</h1>
-          <p className="mt-0.5 truncate text-[9px] uppercase tracking-[0.14em] text-zinc-600">{props.projectLabel}</p>
+          <p className="mt-0.5 truncate text-[9px] text-zinc-600">{props.projectLabel}</p>
         </div>
         {props.active === "tree" && (
           <>

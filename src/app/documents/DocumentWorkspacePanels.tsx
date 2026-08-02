@@ -282,7 +282,7 @@ function LibraryBrowseState(props: { label?: string; readOnly: boolean }) {
 function LibraryInspectorState(props: { label?: string; readOnly: boolean }) {
   return (
     <section aria-label="Library component access" className="h-full w-full bg-[#141518] px-4 py-5">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-sky-400">Library access</p>
+      <p className="text-[9px] font-semibold text-sky-400">Library access</p>
       <h2 className="mt-2 text-sm font-semibold text-zinc-100">{props.label ?? "No component selected"}</h2>
       {props.label ? (
         <dl className="mt-5 space-y-4 text-[11px]">

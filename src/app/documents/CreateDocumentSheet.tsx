@@ -33,12 +33,12 @@ export function CreateDocumentSheet(props: {
   return (
     <Modal.Backdrop isOpen={props.open} onOpenChange={(open) => { if (!open && !props.busy) props.onClose(); }} variant="blur">
       <Modal.Container className="items-end p-0 lg:p-4" placement="bottom" size="md">
-        <Modal.Dialog aria-label={`Create ${kindLabel}`} className="max-h-[82dvh] w-full rounded-b-none border border-white/10 bg-[#17181b] text-zinc-200 lg:rounded-xl">
+        <Modal.Dialog aria-label={`Create ${kindLabel}`} className="max-h-[82dvh] w-full rounded-b-none bg-[#17181b] text-zinc-200 lg:rounded-xl">
           <Modal.Header className="border-b border-white/10 px-4 py-3">
             <div className="flex w-full items-center gap-3">
               <span className="grid size-9 place-items-center rounded-lg bg-sky-500/10 text-sky-300"><FilePlus2 size={17} /></span>
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] uppercase tracking-[0.16em] text-zinc-500">Target-owned recipe</p>
+                <p className="text-[9px] text-zinc-500">Target-owned recipe</p>
                 <Modal.Heading className="mt-0.5 text-base font-semibold">Create {kindLabel}</Modal.Heading>
               </div>
               <Button aria-label={`Close create ${kindLabel}`} isIconOnly className="size-11" isDisabled={props.busy} size="sm" variant="ghost" onPress={props.onClose}><X size={16} /></Button>

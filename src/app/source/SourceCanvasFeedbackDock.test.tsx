@@ -73,8 +73,8 @@ it("sends pending canvas annotations without requiring a separate message", asyn
   expect(onAnnotationsSent).toHaveBeenCalledOnce();
 });
 
-it("shows the connected task and keeps the composer enabled", async () => {
-  render(<SourceCanvasFeedbackDock context={context} onAnnotationModeChange={vi.fn()} />);
+it("keeps context, the connected task, and the composer in one compact dock", async () => {
+  render(<SourceCanvasFeedbackDock context={context} meta={<span>Design · Button</span>} onAnnotationModeChange={vi.fn()} />);
 
   const indicator = await screen.findByRole("button", {
     name: "Connected to Design Space. Change Codex task",
@@ -82,7 +82,10 @@ it("shows the connected task and keeps the composer enabled", async () => {
   expect(indicator).toHaveTextContent("Design Space");
   expect(indicator).toHaveClass("text-emerald-200");
   const composer = screen.getByLabelText("Codex composer");
-  expect(screen.getByTestId("source-codex-session-stack")).toContainElement(indicator);
+  const sessionRow = screen.getByTestId("source-codex-session-stack");
+  expect(sessionRow).toContainElement(indicator);
+  expect(sessionRow).toHaveTextContent("Design · Button");
+  expect(screen.getByTestId("source-canvas-feedback-dock")).toContainElement(composer);
   expect(composer).not.toContainElement(indicator);
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeEnabled();
 });

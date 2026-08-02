@@ -14,8 +14,8 @@ export function SourceTreeHeaderAction(props: {
         aria-label={props.label}
         aria-pressed={props.active}
         className={props.active
-          ? "grid size-8 place-items-center rounded-md bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20"
-          : "grid size-8 place-items-center rounded-md text-zinc-500 hover:text-zinc-100"}
+          ? "grid size-7 min-w-7 place-items-center rounded-lg bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20"
+          : "grid size-7 min-w-7 place-items-center rounded-lg text-zinc-500 hover:text-zinc-100"}
         size="sm"
         variant="ghost"
         onPress={props.onPress}
@@ -23,7 +23,7 @@ export function SourceTreeHeaderAction(props: {
         {props.children}
       </Button>
       <Tooltip.Content
-        className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl"
+        className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl"
         placement="bottom"
       >
         {props.label}

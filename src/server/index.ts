@@ -15,6 +15,8 @@ export * from "./virtual-target-plugin";
 export * from "./source-project-config";
 export * from "./source-file-index";
 export * from "./source-project-registration";
+export * from "./source-approval-registration";
+export * from "./source-approval-service";
 export * from "./source-codex-plugin";
 export * from "./source-codex-service";
 export * from "./workspace-control-plugin";

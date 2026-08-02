@@ -27,8 +27,7 @@ describe("preview canvas", () => {
     expect(screen.getByTestId("canvas-hud")).not.toHaveClass("pointer-events-none");
     expect(screen.getByTestId("canvas-world-footer")).toHaveTextContent("Selected component");
     expect(screen.getByTestId("canvas-hud")).toHaveClass(
-      "bottom-[calc(5rem+env(safe-area-inset-bottom))]",
-      "lg:bottom-4",
+      "bottom-[calc(1rem+env(safe-area-inset-bottom))]",
     );
   });
 
@@ -512,6 +511,7 @@ describe("preview canvas", () => {
     const placeholder = await screen.findByRole("button", { name: "Add to empty Footer slot" });
     expect(placeholder).toHaveStyle({ height: "32px" });
 
+    fireEvent.click(screen.getByRole("button", { name: "Canvas" }));
     for (let step = 0; step < 4; step += 1) {
       fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
     }

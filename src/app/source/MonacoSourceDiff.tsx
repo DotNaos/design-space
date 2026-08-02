@@ -5,6 +5,7 @@ import * as monaco from "monaco-editor";
 
 import { configureMonacoTypeScript, sourceLanguageFor } from "./monaco-source-language";
 import { monacoModelPath } from "./monaco-model-path";
+import { currentDesignSpaceTheme, subscribeDesignSpaceTheme } from "../shell/design-space-theme";
 
 configureMonacoTypeScript();
 
@@ -49,7 +50,7 @@ export function MonacoSourceDiff(props: { modified: string; original: string; pa
       renderSideBySide: true,
       scrollBeyondLastLine: false,
       smoothScrolling: true,
-      theme: "vs-dark",
+      theme: currentDesignSpaceTheme() === "light" ? "vs" : "vs-dark",
       useInlineViewWhenSpaceIsLimited: false,
     });
     editor.setModel({ original, modified });
@@ -63,6 +64,10 @@ export function MonacoSourceDiff(props: { modified: string; original: string; pa
       modifiedRef.current = undefined;
     };
   }, [modelId, props.path]);
+
+  useEffect(() => subscribeDesignSpaceTheme((theme) => {
+    monaco.editor.setTheme(theme === "light" ? "vs" : "vs-dark");
+  }), []);
 
   useEffect(() => {
     if (originalRef.current?.getValue() !== props.original) originalRef.current?.setValue(props.original);

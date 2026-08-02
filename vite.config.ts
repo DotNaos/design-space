@@ -14,6 +14,7 @@ import {
   LocalOperationService,
   resolveServerProjectRoot,
   SourceCodexService,
+  SourceApprovalService,
   SourceDraftPreviewRegistry,
   sourceCodexPlugin,
   workspaceControlPlugin,
@@ -47,6 +48,7 @@ export default defineConfig(async () => {
     new EditService(registeredTarget, { sourceDraftPreviews }),
     new DocumentService(registeredTarget),
     new LibraryDevelopmentProjectService(registeredTarget),
+    new SourceApprovalService(registeredTarget),
   );
 
   return {

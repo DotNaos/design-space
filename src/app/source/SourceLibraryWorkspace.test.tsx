@@ -166,8 +166,7 @@ it("keeps the flat catalog, selected component layers, and code in one explorer"
   expect(screen.getByText("<button>")).toBeVisible();
 });
 
-it("shows app-built components as a separate flat catalog", async () => {
-  const change = vi.fn();
+it("can render app-built components without adding another source switch", () => {
   render(
     <SourceLibrarySidebar
       appWorkspace={{ ...catalog.development!, entries: [entry] }}
@@ -176,7 +175,7 @@ it("shows app-built components as a separate flat catalog", async () => {
       device="desktop"
       library={library}
       mode="development"
-      onCatalogKindChange={change}
+      onCatalogKindChange={vi.fn()}
       onDeviceChange={vi.fn()}
       onModeChange={vi.fn()}
       onSelect={vi.fn()}
@@ -186,8 +185,27 @@ it("shows app-built components as a separate flat catalog", async () => {
   expect(screen.getByRole("button", { name: /Button/ })).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
   expect(screen.getByText("src")).toBeVisible();
-  await userEvent.click(screen.getByRole("button", { name: /UI library/ }));
-  expect(change).toHaveBeenCalledWith("library");
+  expect(screen.queryByRole("group", { name: "Component source" })).not.toBeInTheDocument();
+});
+
+it("labels the library locally without duplicating the global workspace switch", () => {
+  render(
+    <SourceLibrarySidebar
+      catalog={catalog}
+      catalogKind="library"
+      device="desktop"
+      library={library}
+      mode="development"
+      onCatalogKindChange={vi.fn()}
+      onDeviceChange={vi.fn()}
+      onModeChange={vi.fn()}
+      onSelect={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole("heading", { name: "Library" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: /Workspace source/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Development/ })).toBeVisible();
 });
 
 it("generates a missing design only for the attached development source", async () => {

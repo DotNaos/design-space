@@ -1,5 +1,6 @@
 import { Button } from "@heroui/react";
 import { ChevronDown, Code2, FileDiff, Redo2, RotateCcw, Save, Undo2 } from "lucide-react";
+import { DesignSpaceThemeToggle } from "../../shell/DesignSpaceThemeToggle";
 
 type TopBarProps = {
   targetLabel: string;
@@ -32,6 +33,7 @@ export function TopBar(props: TopBarProps) {
       </div>
 
       <div className="ml-auto flex items-center gap-0.5 lg:gap-1.5">
+        <DesignSpaceThemeToggle />
         <span className="mr-2 hidden items-center gap-1.5 text-[11px] text-zinc-500 lg:flex">
           <span className={`size-1.5 rounded-full ${props.connected ? "bg-emerald-400" : "bg-amber-400"}`} /> {props.runtimeLabel}
         </span>

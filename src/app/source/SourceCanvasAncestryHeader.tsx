@@ -61,7 +61,7 @@ export function SourceCanvasAncestryHeader(props: {
   return (
     <div
       ref={headerRef}
-      className="flex h-9 min-w-0 overflow-hidden rounded-t-md border border-b-0 border-white/[0.12] bg-[#15161a] text-[10px] text-zinc-500"
+      className="flex h-9 min-w-0 overflow-hidden border-b border-white/[0.12] bg-[#15161a] text-[10px] text-zinc-500"
       data-design-space-canvas-chrome
       onPointerDown={(event) => event.stopPropagation()}
     >
