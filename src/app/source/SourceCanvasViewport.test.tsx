@@ -125,8 +125,12 @@ it("attaches an interactive ancestry path to the canvas", async () => {
   expect(ancestry).toHaveTextContent("App");
   expect(ancestry).toHaveTextContent("WorkspaceShell");
   expect(ancestry).toHaveTextContent("slot:content");
+  const appCrumb = within(ancestry).getByRole("button", { name: "App" });
+  expect(appCrumb).toHaveClass("rounded-full");
+  expect(appCrumb.querySelector("[aria-hidden='true']")).toHaveClass("rounded-full");
   expect(screen.getByText("slot:content").closest("[aria-current]"))
     .toHaveAttribute("aria-current", "location");
+  expect(screen.getByText("slot:content").closest("[aria-current]")).toHaveClass("rounded-full");
   expect(screen.getByText("slot:content").previousElementSibling).not.toHaveClass("ring-1");
   expect(document.querySelector("[data-preview-frame-mode]")).not.toHaveClass("shadow-2xl");
 
@@ -134,6 +138,7 @@ it("attaches an interactive ancestry path to the canvas", async () => {
   expect(onSelectAncestry).toHaveBeenCalledWith({ id: "app", kind: "component", label: "App" });
 
   expect(screen.getByRole("button", { name: "slot:content" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "slot:content" })).toHaveClass("rounded-full");
   expect(screen.getByRole("button", { name: "slot:toolbar" })).toHaveAttribute("data-slot-scope", "shared");
   await userEvent.click(screen.getByRole("button", { name: "slot:status" }));
   expect(onSelectSlot).toHaveBeenCalledWith({ active: false, id: "status", label: "status", scope: "tree" });
@@ -163,7 +168,7 @@ it("reveals the real component subtree from a breadcrumb hover and navigates fro
   const currentCrumb = within(ancestry).getByText("WorkspaceStatus").closest("[aria-current]");
   expect(currentCrumb).not.toBeNull();
   expect(currentCrumb).toHaveClass("rounded-full", "bg-purple-500", "!px-2.5", "text-[8px]", "text-white");
-  expect(currentCrumb?.querySelector("[aria-hidden='true']")).toHaveClass("bg-white/20", "text-white");
+  expect(currentCrumb?.querySelector("[aria-hidden='true']")).toHaveClass("rounded-full", "bg-white/20", "text-white");
 
   await userEvent.hover(screen.getByRole("button", { name: "App" }));
   const tree = await screen.findByRole("tree", { name: "App component tree" });

@@ -140,7 +140,7 @@ export function SourceCanvasAncestryHeader(props: {
               <>
                 <span
                   aria-hidden="true"
-                  className={`grid size-3.5 shrink-0 place-items-center rounded text-[8px] tabular-nums ${badgeClasses}`}
+                  className={`grid size-3.5 shrink-0 place-items-center rounded-full text-[8px] tabular-nums ${badgeClasses}`}
                 >
                   {index}
                 </span>
@@ -153,7 +153,7 @@ export function SourceCanvasAncestryHeader(props: {
                 {item.kind === "component" && item.children ? (
                   <SourceCanvasTreePopover
                     approvalLabel={approval?.label}
-                    className={`flex h-6 items-center gap-1 px-1.5 outline-none focus-visible:ring-1 ${approvalClasses ?? (current ? "rounded-full bg-purple-500 !px-2.5 text-[8px] font-medium text-white hover:bg-purple-400 focus-visible:ring-purple-300" : "rounded-md text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100 focus-visible:ring-sky-300")}`}
+                    className={`flex h-6 items-center gap-1 rounded-full px-1.5 outline-none focus-visible:ring-1 ${approvalClasses ?? (current ? "bg-purple-500 !px-2.5 text-[8px] font-medium text-white hover:bg-purple-400 focus-visible:ring-purple-300" : "text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100 focus-visible:ring-sky-300")}`}
                     content={content}
                     current={current}
                     currentComponentId={currentComponentId}
@@ -165,7 +165,7 @@ export function SourceCanvasAncestryHeader(props: {
                   <span
                     aria-current={current ? "location" : undefined}
                     aria-label={approval ? `${item.label} · ${approval.label}` : undefined}
-                    className={`flex h-6 items-center gap-1 px-1.5 ${approvalClasses ?? slotClasses ?? (current ? "rounded-full bg-purple-500 !px-2.5 text-[8px] font-medium text-white" : "rounded-md text-zinc-400")}`}
+                    className={`flex h-6 items-center gap-1 rounded-full px-1.5 ${approvalClasses ?? slotClasses ?? (current ? "bg-purple-500 !px-2.5 text-[8px] font-medium text-white" : "text-zinc-400")}`}
                     data-approval-tone={approval?.tone}
                     data-slot-scope={item.kind === "slot" ? item.scope : undefined}
                     title={approval?.label}
@@ -175,7 +175,7 @@ export function SourceCanvasAncestryHeader(props: {
                 ) : (
                   <Button
                     aria-label={approval ? `${item.label} · ${approval.label}` : undefined}
-                    className={`flex h-6 items-center gap-1 rounded-md px-1.5 outline-none hover:bg-white/[0.08] focus-visible:ring-1 focus-visible:ring-sky-300 ${approvalClasses ?? "text-zinc-400 hover:text-zinc-100"}`}
+                    className={`flex h-6 items-center gap-1 rounded-full px-1.5 outline-none hover:bg-white/[0.08] focus-visible:ring-1 focus-visible:ring-sky-300 ${approvalClasses ?? "text-zinc-400 hover:text-zinc-100"}`}
                     data-approval-tone={approval?.tone}
                     size="sm"
                     variant="ghost"

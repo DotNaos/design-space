@@ -23,13 +23,13 @@ function DenseSlotPicker(props: {
     <Dropdown>
       <Button
         aria-label={`Choose child slot of ${owner} · ${props.slots.length} slots${active ? ` · Current ${active.label}` : ""}`}
-        className={`h-6 min-w-0 max-w-40 gap-1 rounded-md px-2 text-[9px] outline-none focus-visible:ring-1 ${active?.scope === "shared" ? "bg-sky-400/15 text-sky-300 focus-visible:ring-sky-300" : active ? "bg-fuchsia-400/15 text-fuchsia-300 focus-visible:ring-fuchsia-300" : "bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200 focus-visible:ring-zinc-400"}`}
+        className={`h-6 min-w-0 max-w-40 gap-1 rounded-full px-2 text-[9px] outline-none focus-visible:ring-1 ${active?.scope === "shared" ? "bg-sky-400/15 text-sky-300 focus-visible:ring-sky-300" : active ? "bg-fuchsia-400/15 text-fuchsia-300 focus-visible:ring-fuchsia-300" : "bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200 focus-visible:ring-zinc-400"}`}
         data-slot-scope={active?.scope}
         size="sm"
         variant="ghost"
       >
         <span className="min-w-0 truncate">{active ? `slot:${active.label}` : "Slots"}</span>
-        <span className="shrink-0 rounded bg-black/20 px-1 text-[8px] tabular-nums text-current/70">
+        <span className="shrink-0 rounded-full bg-black/20 px-1 text-[8px] tabular-nums text-current/70">
           {props.slots.length}
         </span>
         <ChevronDown aria-hidden="true" className="shrink-0 opacity-60" size={10} />
@@ -76,7 +76,7 @@ function InlineSlotTabs(props: {
   return (
     <div
       aria-label={props.ownerLabel ? `Child slots of ${props.ownerLabel}` : "Child slots"}
-      className="flex items-center gap-0.5 rounded bg-black/15 p-0.5"
+      className="flex items-center gap-0.5 rounded-full bg-black/15 p-0.5"
       role="group"
     >
       {props.slots.map((slot) => (
@@ -86,7 +86,7 @@ function InlineSlotTabs(props: {
           aria-description={slot.scope === "shared" ? "Shared component boundary" : "App tree slot"}
           aria-current={slot.active ? "location" : undefined}
           aria-pressed={slot.active}
-          className={`h-6 min-w-0 shrink-0 rounded-md px-2 text-[9px] outline-none transition-colors focus-visible:ring-1 ${slot.scope === "shared" ? slot.active ? "bg-sky-400/15 font-medium text-sky-300 focus-visible:ring-sky-300" : "text-sky-400/70 hover:bg-sky-400/[0.08] hover:text-sky-200 focus-visible:ring-sky-300" : slot.active ? "bg-fuchsia-400/15 font-medium text-fuchsia-300 focus-visible:ring-fuchsia-300" : "text-zinc-500 hover:bg-fuchsia-400/[0.08] hover:text-fuchsia-200 focus-visible:ring-fuchsia-300"}`}
+          className={`h-6 min-w-0 shrink-0 rounded-full px-2 text-[9px] outline-none transition-colors focus-visible:ring-1 ${slot.scope === "shared" ? slot.active ? "bg-sky-400/15 font-medium text-sky-300 focus-visible:ring-sky-300" : "text-sky-400/70 hover:bg-sky-400/[0.08] hover:text-sky-200 focus-visible:ring-sky-300" : slot.active ? "bg-fuchsia-400/15 font-medium text-fuchsia-300 focus-visible:ring-fuchsia-300" : "text-zinc-500 hover:bg-fuchsia-400/[0.08] hover:text-fuchsia-200 focus-visible:ring-fuchsia-300"}`}
           data-slot-scope={slot.scope}
           size="sm"
           variant="ghost"
