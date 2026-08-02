@@ -24,11 +24,11 @@ it("uses a compact canvas switcher and allows selecting missing implementations"
   const onChange = vi.fn();
   render(<SourceDeviceTabs device="desktop" node={node} onChange={onChange} />);
 
-  expect(screen.getByRole("group", { name: "Source implementation" })).toHaveClass("h-7");
+  expect(screen.getByRole("group", { name: "Source implementation" })).toHaveClass("h-8");
   expect(screen.getByRole("button", { name: "Desktop implementation" }))
     .toHaveAttribute("aria-current", "page");
   expect(screen.getByRole("button", { name: "Desktop implementation" }))
-    .toHaveClass("items-center", "justify-center", "p-0");
+    .toHaveClass("size-7", "items-center", "justify-center", "p-0");
   expect(screen.queryByText("Desktop")).not.toBeInTheDocument();
   expect(screen.queryByText("Tablet")).not.toBeInTheDocument();
   expect(screen.queryByText("Mobile")).not.toBeInTheDocument();

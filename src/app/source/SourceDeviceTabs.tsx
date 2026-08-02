@@ -17,7 +17,7 @@ export function SourceDeviceTabs(props: {
 }) {
   if (!props.node) return null;
   return (
-    <div role="group" aria-label="Source implementation" className="flex h-7 shrink-0 items-center rounded-md bg-black/15 p-0.5">
+    <div role="group" aria-label="Source implementation" className="flex h-8 shrink-0 items-center gap-0.5 rounded-lg bg-white/[0.045] p-0.5">
       {designSpaceDevices.map((device) => (
         <DeviceTab
           key={device}
@@ -50,13 +50,13 @@ function DeviceTab(props: {
       isIconOnly
       aria-current={props.active ? "page" : undefined}
       aria-label={`${deviceLabels[props.device]} implementation${status ? `, ${status}` : ""}`}
-      className={`relative flex size-6 min-h-0 min-w-6 items-center justify-center rounded p-0 leading-none transition-colors ${props.active ? "bg-white/10 text-sky-200" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}
+      className={`relative flex size-7 min-h-0 min-w-7 items-center justify-center rounded-md p-0 leading-none transition-colors ${props.active ? "bg-sky-400/15 text-sky-200" : "text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"}`}
       size="sm"
       variant="ghost"
       onPress={props.onPress}
     >
       <span className="relative flex size-4 shrink-0 items-center justify-center">
-        <DeviceIcon aria-hidden="true" className={`block ${props.implementation.state === "missing" ? "text-zinc-700" : props.implementation.state === "fallback" ? "text-amber-300" : ""}`} size={13} />
+        <DeviceIcon aria-hidden="true" className={`block ${props.implementation.state === "missing" ? "text-zinc-700" : props.implementation.state === "fallback" ? "text-amber-300" : ""}`} size={15} />
         {(props.implementation.state === "missing" || props.implementation.state === "fallback") && <span aria-hidden="true" className="absolute h-px w-3 -rotate-45 bg-current" />}
       </span>
     </Button>

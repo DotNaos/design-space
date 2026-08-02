@@ -90,12 +90,13 @@ it("attaches an interactive ancestry path to the canvas", async () => {
 
   const ancestry = screen.getByRole("navigation", { name: "Canvas ancestry" });
   expect(screen.getByTestId("fixed-canvas-header")).toContainElement(ancestry);
-  expect(ancestry).toHaveTextContent("From root");
+  expect(ancestry).not.toHaveTextContent("From root");
   expect(ancestry).toHaveTextContent("App");
   expect(ancestry).toHaveTextContent("WorkspaceShell");
   expect(ancestry).toHaveTextContent("slot:content");
   expect(screen.getByText("slot:content").closest("[aria-current]"))
     .toHaveAttribute("aria-current", "location");
+  expect(screen.getByText("slot:content").previousElementSibling).not.toHaveClass("ring-1");
   expect(document.querySelector("[data-preview-frame-mode]")).not.toHaveClass("shadow-2xl");
 
   await userEvent.click(screen.getByRole("button", { name: /App/ }));

@@ -23,7 +23,7 @@ function DenseSlotPicker(props: {
     <Dropdown>
       <Button
         aria-label={`Choose child slot of ${owner} · ${props.slots.length} slots${active ? ` · Current ${active.label}` : ""}`}
-        className={`h-6 min-w-0 max-w-40 gap-1 rounded px-2 text-[9px] outline-none focus-visible:ring-1 ${active?.scope === "shared" ? "bg-sky-400/15 text-sky-300 ring-1 ring-inset ring-sky-400/35 focus-visible:ring-sky-300" : active ? "bg-fuchsia-400/15 text-fuchsia-300 ring-1 ring-inset ring-fuchsia-400/35 focus-visible:ring-fuchsia-300" : "bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200 focus-visible:ring-zinc-400"}`}
+        className={`h-6 min-w-0 max-w-40 gap-1 rounded-md px-2 text-[9px] outline-none focus-visible:ring-1 ${active?.scope === "shared" ? "bg-sky-400/15 text-sky-300 focus-visible:ring-sky-300" : active ? "bg-fuchsia-400/15 text-fuchsia-300 focus-visible:ring-fuchsia-300" : "bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200 focus-visible:ring-zinc-400"}`}
         data-slot-scope={active?.scope}
         size="sm"
         variant="ghost"
@@ -86,7 +86,7 @@ function InlineSlotTabs(props: {
           aria-description={slot.scope === "shared" ? "Shared component boundary" : "App tree slot"}
           aria-current={slot.active ? "location" : undefined}
           aria-pressed={slot.active}
-          className={`h-6 min-w-0 shrink-0 rounded px-2 text-[9px] outline-none transition-colors focus-visible:ring-1 ${slot.scope === "shared" ? slot.active ? "bg-sky-400/15 font-medium text-sky-300 ring-1 ring-inset ring-sky-400/35 focus-visible:ring-sky-300" : "text-sky-400/70 hover:bg-sky-400/[0.08] hover:text-sky-200 focus-visible:ring-sky-300" : slot.active ? "bg-fuchsia-400/15 font-medium text-fuchsia-300 ring-1 ring-inset ring-fuchsia-400/35 focus-visible:ring-fuchsia-300" : "text-zinc-500 hover:bg-fuchsia-400/[0.08] hover:text-fuchsia-200 focus-visible:ring-fuchsia-300"}`}
+          className={`h-6 min-w-0 shrink-0 rounded-md px-2 text-[9px] outline-none transition-colors focus-visible:ring-1 ${slot.scope === "shared" ? slot.active ? "bg-sky-400/15 font-medium text-sky-300 focus-visible:ring-sky-300" : "text-sky-400/70 hover:bg-sky-400/[0.08] hover:text-sky-200 focus-visible:ring-sky-300" : slot.active ? "bg-fuchsia-400/15 font-medium text-fuchsia-300 focus-visible:ring-fuchsia-300" : "text-zinc-500 hover:bg-fuchsia-400/[0.08] hover:text-fuchsia-200 focus-visible:ring-fuchsia-300"}`}
           data-slot-scope={slot.scope}
           size="sm"
           variant="ghost"
