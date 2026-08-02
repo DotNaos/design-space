@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -106,6 +106,47 @@ it("attaches an interactive ancestry path to the canvas", async () => {
   expect(screen.getByRole("button", { name: "slot:toolbar" })).toHaveAttribute("data-slot-scope", "shared");
   await userEvent.click(screen.getByRole("button", { name: "slot:status" }));
   expect(onSelectSlot).toHaveBeenCalledWith({ active: false, id: "status", label: "status", scope: "tree" });
+});
+
+it("reveals the real component subtree from a breadcrumb hover and navigates from it", async () => {
+  const onSelectAncestry = vi.fn();
+  const toolbar = { children: [], id: "toolbar", label: "Toolbar", slotLabel: "toolbar" };
+  const status = { children: [], id: "status", label: "WorkspaceStatus", slotLabel: "status" };
+  const shell = { children: [status, toolbar], id: "shell", label: "WorkspaceShell", slotLabel: "content" };
+  render(
+    <SourceCanvasViewport
+      ancestry={[
+        { children: [shell], id: "app", kind: "component", label: "App" },
+        { children: [status, toolbar], id: "shell", kind: "component", label: "WorkspaceShell" },
+        { id: "status", kind: "component", label: "WorkspaceStatus" },
+      ]}
+      device="desktop"
+      onDeviceChange={vi.fn()}
+      onSelectAncestry={onSelectAncestry}
+    >
+      {() => <div>Preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  await userEvent.hover(screen.getByRole("button", { name: "App" }));
+  const tree = await screen.findByRole("tree", { name: "App component tree" });
+  expect(within(tree).getByRole("treeitem", { name: "App" }).parentElement).toHaveClass("text-fuchsia-300");
+  expect(within(tree).getByRole("treeitem", { name: /WorkspaceShell/ }).parentElement).toHaveClass("text-fuchsia-300");
+  expect(within(tree).getByRole("treeitem", { name: "WorkspaceStatus status" })).toHaveAttribute("aria-current", "location");
+  expect(within(tree).getAllByTestId("source-canvas-tree-component-icon")).toHaveLength(4);
+  expect(within(tree).getByRole("treeitem", { name: "Toolbar toolbar" })).not.toHaveAttribute("aria-current");
+
+  await userEvent.click(within(tree).getByRole("button", { name: "Collapse WorkspaceShell" }));
+  expect(within(tree).queryByRole("treeitem", { name: "WorkspaceStatus status" })).not.toBeInTheDocument();
+  await userEvent.click(within(tree).getByRole("button", { name: "Expand WorkspaceShell" }));
+
+  await userEvent.click(within(tree).getByRole("treeitem", { name: "Toolbar toolbar" }));
+  expect(onSelectAncestry).toHaveBeenCalledWith({
+    children: [],
+    id: "toolbar",
+    kind: "component",
+    label: "Toolbar",
+  });
 });
 
 it("collapses dense sibling slots into a compact picker", async () => {

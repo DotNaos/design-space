@@ -107,8 +107,13 @@ it("keeps the Codex composer available in a library canvas", () => {
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeVisible();
   expect(screen.getByTestId("source-canvas-feedback-dock")).toHaveClass("flex-col", "rounded-2xl");
   expect(screen.getByTestId("source-codex-session-stack")).toBeVisible();
-  expect(screen.getByTestId("canvas-selection-identity-footer")).toHaveTextContent("LibraryButton");
-  expect(screen.getByTestId("canvas-world-footer")).not.toContainElement(screen.getByTestId("canvas-hud"));
+  const identity = screen.getByTestId("canvas-selection-identity-footer");
+  const hud = screen.getByTestId("canvas-hud");
+  const dock = screen.getByTestId("source-canvas-feedback-dock");
+  expect(identity).toHaveTextContent("LibraryButton");
+  expect(hud).toContainElement(identity);
+  expect(dock.compareDocumentPosition(identity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByTestId("canvas-world-footer")).not.toBeInTheDocument();
 });
 
 it("places, edits, and removes spatial canvas annotations", async () => {

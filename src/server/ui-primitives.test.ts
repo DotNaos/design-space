@@ -11,6 +11,8 @@ const allowedNativeButtons: Readonly<Record<string, number>> = {
   "components/ComponentTree/ComponentTree.tsx": 4,
   // These exact-position hit targets are part of the transformed canvas geometry.
   "components/PreviewCanvas/PreviewCanvas.tsx": 2,
+  // The breadcrumb flyout is a compact composite ARIA tree with explorer disclosure.
+  "source/SourceCanvasAncestryHeader.tsx": 1,
 };
 
 describe("HeroUI primitive boundary", () => {

@@ -11,7 +11,7 @@ export function SourceHoverIdentityHud(props: {
   return (
     <div
       aria-hidden={props.action ? undefined : true}
-      className="flex h-8 w-full min-w-0 items-center gap-2 rounded-b-md border border-t-0 border-fuchsia-400/25 bg-[#17131d]/95 px-2.5 text-[11px] backdrop-blur"
+      className="flex h-8 w-full min-w-0 items-center gap-2 rounded-xl bg-[#18171c] px-3 text-[11px] shadow-[0_10px_30px_rgba(0,0,0,0.28)]"
       data-testid="canvas-selection-identity-footer"
     >
       <Diamond aria-hidden="true" className="size-3 shrink-0 text-fuchsia-400" strokeWidth={2} />
@@ -22,7 +22,7 @@ export function SourceHoverIdentityHud(props: {
       </span>
       {props.action ? (
         <Button
-          className="ml-auto h-6 min-h-0 shrink-0 gap-1 rounded-md px-2 text-[10px] text-fuchsia-100"
+          className="ml-auto h-6 min-h-0 shrink-0 gap-1 rounded-lg bg-fuchsia-400/10 px-2 text-[10px] text-fuchsia-100 hover:bg-fuchsia-400/16"
           size="sm"
           variant="secondary"
           onPress={props.action.onPress}
@@ -31,7 +31,7 @@ export function SourceHoverIdentityHud(props: {
           <ArrowRight aria-hidden="true" size={11} />
         </Button>
       ) : props.external ? (
-        <span className="shrink-0 border-l border-white/10 pl-2 text-[9px] font-medium text-fuchsia-300/75">
+        <span className="shrink-0 pl-2 text-[9px] font-medium text-fuchsia-300/75">
           Double-click to open
         </span>
       ) : null}

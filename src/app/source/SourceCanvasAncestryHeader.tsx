@@ -1,8 +1,12 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@heroui/react";
-import { ChevronRight } from "lucide-react";
+import { Button, Popover } from "@heroui/react";
+import { ChevronRight, Component, Diamond } from "lucide-react";
 
-import type { SourceCanvasAncestryItem, SourceCanvasSlotTab } from "./source-canvas-ancestry";
+import type {
+  SourceCanvasAncestryItem,
+  SourceCanvasNavigationNode,
+  SourceCanvasSlotTab,
+} from "./source-canvas-ancestry";
 import { SourceCanvasSlotChooser } from "./SourceCanvasSlotChooser";
 
 export function SourceCanvasAncestryHeader(props: {
@@ -26,6 +30,8 @@ export function SourceCanvasAncestryHeader(props: {
     ...pathItems.map((item) => `${item.kind}:${item.id}`),
     ...(props.slots?.map((slot) => `choice:${slot.id}:${slot.active}`) ?? []),
   ].join("/");
+  const componentPath = new Set(pathItems.filter((item) => item.kind === "component").map((item) => item.id));
+  const currentComponentId = [...pathItems].reverse().find((item) => item.kind === "component")?.id;
   const displayEntries = useMemo(() => {
     const indexedItems = pathItems.map((item, index) => ({ index, item }));
     if (expandedPathKey === pathKey || indexedItems.length <= pathCapacity) {
@@ -144,7 +150,18 @@ export function SourceCanvasAncestryHeader(props: {
             return (
               <li className="flex shrink-0 items-center" key={`${item.kind}:${item.id}`}>
                 {visibleIndex > 0 ? <ChevronRight aria-hidden="true" className="mx-0.5 shrink-0 text-zinc-700" size={10} /> : null}
-                {current || !props.onSelect || item.kind !== "component" ? (
+                {item.kind === "component" && item.children ? (
+                  <SourceCanvasTreePopover
+                    approvalLabel={approval?.label}
+                    className={`flex h-6 items-center gap-1 rounded-md px-1.5 outline-none hover:bg-white/[0.08] focus-visible:ring-1 focus-visible:ring-sky-300 ${approvalClasses ?? (current ? "font-medium text-fuchsia-300" : "text-zinc-400 hover:text-zinc-100")}`}
+                    content={content}
+                    current={current}
+                    currentComponentId={currentComponentId}
+                    item={item}
+                    pathIds={componentPath}
+                    onSelect={props.onSelect}
+                  />
+                ) : current || !props.onSelect || item.kind !== "component" ? (
                   <span
                     aria-current={current ? "location" : undefined}
                     aria-label={approval ? `${item.label} · ${approval.label}` : undefined}
@@ -182,6 +199,199 @@ export function SourceCanvasAncestryHeader(props: {
           ) : null}
         </ol>
       </nav>
+    </div>
+  );
+}
+
+function SourceCanvasTreePopover(props: {
+  approvalLabel?: string;
+  className: string;
+  content: React.ReactNode;
+  current: boolean;
+  currentComponentId?: string;
+  item: SourceCanvasAncestryItem;
+  pathIds: ReadonlySet<string>;
+  onSelect?: (item: SourceCanvasAncestryItem) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set([props.item.id, ...props.pathIds]));
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const pointerInside = useRef(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const clearClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = undefined;
+  };
+  const openTree = () => {
+    clearClose();
+    setExpandedIds((current) => new Set([...current, props.item.id, ...props.pathIds]));
+    setOpen(true);
+  };
+  const scheduleClose = () => {
+    clearClose();
+    closeTimer.current = setTimeout(() => {
+      if (
+        pointerInside.current
+        || triggerRef.current?.matches(":hover")
+        || contentRef.current?.matches(":hover")
+        || contentRef.current?.contains(document.activeElement)
+      ) return;
+      setOpen(false);
+    }, 240);
+  };
+  useLayoutEffect(() => () => clearClose(), []);
+  const root: SourceCanvasNavigationNode = {
+    children: props.item.children ?? [],
+    id: props.item.id,
+    label: props.item.label,
+  };
+
+  return (
+    <Popover isOpen={open} onOpenChange={(next) => {
+      if (next) openTree();
+      else scheduleClose();
+    }}>
+      <Button
+        ref={triggerRef}
+        aria-current={props.current ? "location" : undefined}
+        aria-label={props.approvalLabel ? `${props.item.label} · ${props.approvalLabel}` : undefined}
+        className={props.className}
+        data-approval-tone={props.item.approval?.tone}
+        size="sm"
+        variant="ghost"
+        onFocus={openTree}
+        onPointerEnter={(event) => {
+          if (event.pointerType === "touch") return;
+          pointerInside.current = true;
+          openTree();
+        }}
+        onPointerLeave={() => {
+          pointerInside.current = false;
+          scheduleClose();
+        }}
+        onPress={() => {
+          if (!props.current) props.onSelect?.(props.item);
+        }}
+      >
+        {props.content}
+      </Button>
+      <Popover.Content
+        ref={contentRef}
+        className="z-50 w-[min(18rem,calc(100vw-1rem))] rounded-xl bg-[#1b1c20] p-1.5 text-zinc-200 shadow-[0_18px_48px_rgba(0,0,0,0.55)] [&[data-entering=true]]:animate-none [&[data-exiting=true]]:animate-none"
+        offset={0}
+        placement="bottom start"
+        onPointerEnter={() => {
+          pointerInside.current = true;
+          clearClose();
+        }}
+        onPointerLeave={() => {
+          pointerInside.current = false;
+          scheduleClose();
+        }}
+      >
+        <Popover.Dialog className="outline-none">
+          <div>
+            <div className="flex items-center gap-2 px-2 py-1.5 text-[10px] font-medium text-zinc-300">
+              <Component aria-hidden="true" className="text-fuchsia-300" size={13} />
+              <span className="truncate">{props.item.label} tree</span>
+            </div>
+            <div aria-label={`${props.item.label} component tree`} className="max-h-80 overflow-y-auto py-0.5" role="tree">
+              <SourceCanvasNavigationBranch
+                currentId={props.currentComponentId}
+                depth={0}
+                expandedIds={expandedIds}
+                node={root}
+                pathIds={props.pathIds}
+                onToggle={(node) => setExpandedIds((current) => {
+                  const next = new Set(current);
+                  if (next.has(node.id)) next.delete(node.id);
+                  else next.add(node.id);
+                  return next;
+                })}
+                onSelect={(node) => {
+                  setOpen(false);
+                  if (node.id === props.currentComponentId) return;
+                  props.onSelect?.({ children: node.children, id: node.id, kind: "component", label: node.label });
+                }}
+              />
+            </div>
+          </div>
+        </Popover.Dialog>
+      </Popover.Content>
+    </Popover>
+  );
+}
+
+function SourceCanvasNavigationBranch(props: {
+  currentId?: string;
+  depth: number;
+  expandedIds: ReadonlySet<string>;
+  node: SourceCanvasNavigationNode;
+  pathIds: ReadonlySet<string>;
+  onSelect: (node: SourceCanvasNavigationNode) => void;
+  onToggle: (node: SourceCanvasNavigationNode) => void;
+}) {
+  const current = props.node.id === props.currentId;
+  const onPath = props.pathIds.has(props.node.id);
+  const expandable = props.node.children.length > 0;
+  const expanded = expandable && props.expandedIds.has(props.node.id);
+  return (
+    <div role="none">
+      <div
+        className={`flex h-7 w-full min-w-0 items-center rounded-lg pr-2 ${
+          current
+            ? "bg-fuchsia-400/16 text-fuchsia-200"
+            : onPath
+              ? "bg-fuchsia-400/[0.06] text-fuchsia-300"
+              : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
+        }`}
+        style={{ paddingLeft: `${4 + props.depth * 14}px` }}
+      >
+        {expandable ? (
+          <Button
+            isIconOnly
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${props.node.label}`}
+            aria-pressed={expanded}
+            className="size-5 min-w-5 shrink-0 rounded-md text-current hover:bg-white/[0.06]"
+            size="sm"
+            variant="ghost"
+            onPress={() => props.onToggle(props.node)}
+          >
+            <ChevronRight aria-hidden="true" className={`transition-transform ${expanded ? "rotate-90" : ""}`} size={10} />
+          </Button>
+        ) : <span aria-hidden="true" className="w-5 shrink-0" />}
+        <button
+          aria-current={current ? "location" : undefined}
+          aria-expanded={expandable ? expanded : undefined}
+          aria-level={props.depth + 1}
+          className={`flex h-7 min-w-0 flex-1 items-center gap-2 text-[10px] ${current ? "font-medium" : ""}`}
+          role="treeitem"
+          type="button"
+          onClick={() => props.onSelect(props.node)}
+        >
+          <Diamond
+            aria-hidden="true"
+            className={`size-3 shrink-0 ${onPath ? "text-fuchsia-300" : "text-zinc-600"}`}
+            data-testid="source-canvas-tree-component-icon"
+            strokeWidth={1.8}
+          />
+          <span className="min-w-0 flex-1 truncate text-left">{props.node.label}</span>
+          {props.node.slotLabel ? <span className="max-w-20 truncate text-[8px] text-zinc-600">{props.node.slotLabel}</span> : null}
+        </button>
+      </div>
+      {expanded ? props.node.children.map((child) => (
+        <SourceCanvasNavigationBranch
+          currentId={props.currentId}
+          depth={props.depth + 1}
+          expandedIds={props.expandedIds}
+          key={child.id}
+          node={child}
+          pathIds={props.pathIds}
+          onSelect={props.onSelect}
+          onToggle={props.onToggle}
+        />
+      )) : null}
     </div>
   );
 }

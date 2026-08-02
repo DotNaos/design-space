@@ -1,5 +1,5 @@
 import { Button, Input, Tooltip } from "@heroui/react";
-import { ArrowUp, MessageSquare, MessageSquarePlus } from "lucide-react";
+import { ArrowUp, Maximize2, MessageSquarePlus } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { SourceCodexChatModal } from "./SourceCodexChatModal";
@@ -117,7 +117,7 @@ export function SourceCanvasFeedbackDock(props: {
             onPress={() => setConnectionOpen(true)}
           />
         </div>
-        <div className="grid h-11 min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] items-center px-1 sm:grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]">
+        <div className="grid h-11 min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] items-center px-1">
           <Tooltip closeDelay={80} delay={350}>
             <Button
               isIconOnly
@@ -171,13 +171,13 @@ export function SourceCanvasFeedbackDock(props: {
               <Button
                 isIconOnly
                 aria-label="Open full Codex conversation"
-                className="relative size-7 min-w-7 shrink-0 rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100"
+                className="relative size-7 min-w-7 shrink-0 rounded-lg text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100"
                 isDisabled={!connected}
                 size="sm"
                 variant="ghost"
                 onPress={() => setConversationOpen(true)}
               >
-                <MessageSquare aria-hidden="true" size={14} />
+                <Maximize2 aria-hidden="true" data-testid="source-codex-expand-icon" size={14} />
                 {comments.length ? (
                   <span className="absolute right-1 top-1 size-1.5 rounded-full bg-violet-400 ring-2 ring-[#0d0e10]" />
                 ) : null}
@@ -204,7 +204,7 @@ export function SourceCanvasFeedbackDock(props: {
               <Button
                 isIconOnly
                 aria-label="Send to Codex"
-                className="size-7 min-w-7 rounded-md bg-zinc-100 text-zinc-950 hover:bg-white"
+                className="ml-auto size-7 min-w-7 rounded-full bg-zinc-100 text-zinc-950 hover:bg-white"
                 isDisabled={!writable || (!draft.trim() && !annotations.length)}
                 isPending={sending}
                 size="sm"
@@ -218,7 +218,6 @@ export function SourceCanvasFeedbackDock(props: {
               </Tooltip.Content>
             </Tooltip>
           </div>
-          <span aria-hidden="true" className="hidden size-8 sm:block" />
         </div>
       </div>
       <SourceCodexConnectionModal

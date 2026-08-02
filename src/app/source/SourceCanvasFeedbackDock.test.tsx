@@ -88,6 +88,8 @@ it("keeps context, the connected task, and the composer in one compact dock", as
   expect(screen.getByTestId("source-canvas-feedback-dock")).toContainElement(composer);
   expect(composer).not.toContainElement(indicator);
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Open full Codex conversation" })).toContainElement(screen.getByTestId("source-codex-expand-icon"));
+  expect(screen.getByRole("button", { name: "Send to Codex" })).toHaveClass("ml-auto", "rounded-full");
 });
 
 it("disables composer actions while no Codex task is connected", async () => {

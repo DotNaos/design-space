@@ -416,18 +416,8 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
       selectionLabel={props.selectedLayerLabel ?? sourceCanvasLayerLabel(props.selectedLayer) ?? props.node?.label}
       slotOwnerLabel={props.node?.label ?? props.entry?.label}
       slotTabs={canvasSlotTabs}
-      footer={selectedOwner ? (
-        <SourceHoverIdentityHud
-          action={props.onOpenSlotTarget && props.slotTargetLabel ? {
-            label: props.slotTargetLabel,
-            onPress: props.onOpenSlotTarget,
-          } : undefined}
-          external={Boolean(props.onOpenLayerOwner && selectedOwner.fileId !== props.entry?.fileId)}
-          owner={selectedOwner}
-        />
-      ) : undefined}
       hud={(
-        <div className="flex w-[min(600px,calc(100vw-2rem))] max-w-full flex-col gap-1.5">
+        <div className="flex w-[min(820px,calc(100vw-2rem))] max-w-full flex-col gap-1.5">
           {!props.workspaceMode && props.selectedLayer && selectedLayerOccurrenceCount > 1 ? (
             <div className="min-w-0">
               <SourceInstanceNavigator
@@ -464,6 +454,16 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
             onAnnotationModeChange={previewMode === "design" && !previewState ? canvasAnnotations.setActive : undefined}
             onAnnotationsSent={canvasAnnotations.clear}
           />
+          {selectedOwner ? (
+            <SourceHoverIdentityHud
+              action={props.onOpenSlotTarget && props.slotTargetLabel ? {
+                label: props.slotTargetLabel,
+                onPress: props.onOpenSlotTarget,
+              } : undefined}
+              external={Boolean(props.onOpenLayerOwner && selectedOwner.fileId !== props.entry?.fileId)}
+              owner={selectedOwner}
+            />
+          ) : null}
         </div>
       )}
       onDeviceChange={props.onDeviceChange ?? (() => undefined)}
