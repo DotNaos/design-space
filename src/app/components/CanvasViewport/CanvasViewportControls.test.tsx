@@ -57,10 +57,14 @@ describe("CanvasViewportControls", () => {
     );
 
     expect(screen.getByTestId("canvas-viewport-toolbar")).toHaveAttribute("data-layout", "nested");
+    expect(screen.getByRole("navigation", { name: "Canvas toolbar sections" })).toHaveClass("justify-center", "rounded-full");
+    expect(screen.getByRole("button", { name: "Viewport" })).toHaveClass("bg-[#303239]", "text-white", "rounded-full");
+    expect(screen.getByTestId("canvas-toolbar-actions")).toHaveClass("justify-center", "rounded-full");
     expect(screen.getByText("Mobile viewport actions")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Fit canvas" })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Canvas" }));
+    expect(screen.getByRole("button", { name: "Canvas" })).toHaveClass("bg-[#303239]", "text-white");
     expect(screen.getByRole("button", { name: "Fit canvas" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Reset zoom to 100%" })).toBeVisible();
     expect(screen.queryByText("Mobile viewport actions")).not.toBeInTheDocument();

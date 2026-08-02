@@ -959,8 +959,16 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
                 leadingAction: (
                   <WorkspaceSidebarToggle
                     label="mobile sidebar"
-                    visible={mobilePane !== "canvas"}
-                    onToggle={() => setMobilePane((current) => current === "canvas" ? "tree" : "canvas")}
+                    visible={mobilePane !== "canvas" && mobilePane !== "inspect"}
+                    onToggle={() => setMobilePane((current) => current !== "canvas" && current !== "inspect" ? "canvas" : "tree")}
+                  />
+                ),
+                trailingAction: (
+                  <WorkspaceSidebarToggle
+                    label="properties panel"
+                    side="right"
+                    visible={mobilePane === "inspect"}
+                    onToggle={() => setMobilePane((current) => current === "inspect" ? "canvas" : "inspect")}
                   />
                 ),
               })}

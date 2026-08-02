@@ -80,7 +80,8 @@ it("keeps the connected task above the compact annotation composer", async () =>
     name: "Connected to Design Space. Change Codex task",
   });
   expect(indicator).toHaveTextContent("Design Space");
-  expect(indicator).toHaveClass("text-emerald-200");
+  expect(indicator).toHaveClass("text-zinc-300");
+  expect(screen.getByTestId("source-codex-connection-dot")).toHaveClass("bg-emerald-400");
   const composer = screen.getByLabelText("Codex composer");
   const actionRow = screen.getByTestId("source-codex-dock-actions");
   const expand = screen.getByRole("button", { name: "Open full Codex conversation" });
@@ -101,7 +102,7 @@ it("disables composer actions while no Codex task is connected", async () => {
 
   const connect = await screen.findByRole("button", { name: "Connect Codex task" });
   expect(connect).toHaveTextContent("Connect Codex");
-  expect(connect).toHaveClass("text-rose-200");
+  expect(connect).toHaveClass("text-zinc-400");
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Add a canvas annotation" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Open full Codex conversation" })).toBeDisabled();

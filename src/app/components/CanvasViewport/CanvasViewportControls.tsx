@@ -77,14 +77,14 @@ export function CanvasViewportControls(props: CanvasViewportControlsProps) {
         <div
           data-testid="canvas-viewport-toolbar"
           data-layout="nested"
-          className={`group/canvas-controls absolute left-12 right-2 z-20 overflow-hidden rounded-xl bg-[#17181b]/96 shadow-[0_8px_24px_rgba(0,0,0,0.22)] backdrop-blur-sm ${props.narrow ? "" : "mx-auto max-w-[760px]"}`}
+          className={`group/canvas-controls absolute left-12 right-2 z-20 ${props.narrow ? "" : "mx-auto max-w-[760px]"}`}
           data-narrow={props.narrow || undefined}
           style={{ top: toolbarTop }}
           onPointerDown={(event) => event.stopPropagation()}
           onPointerMove={(event) => event.stopPropagation()}
           onPointerUp={(event) => event.stopPropagation()}
         >
-          <nav aria-label="Canvas toolbar sections" className="flex h-7 items-end gap-1 border-b border-white/[0.06] px-1">
+          <nav aria-label="Canvas toolbar sections" className="mx-auto flex h-8 w-fit min-w-56 items-center justify-center rounded-full bg-[#17181b] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.22)]">
             {props.leadingContent ? (
               <NarrowToolbarTab active={toolbarTab === "viewport"} label="Viewport" onPress={() => setToolbarTab("viewport")}>
                 <MonitorSmartphone size={12} />
@@ -99,11 +99,14 @@ export function CanvasViewportControls(props: CanvasViewportControlsProps) {
               </NarrowToolbarTab>
             ) : null}
           </nav>
-          <div className="flex h-9 min-w-0 items-center overflow-x-auto px-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div
+            data-testid="canvas-toolbar-actions"
+            className="mx-auto mt-2 flex h-9 w-fit max-w-full min-w-0 items-center justify-center overflow-x-auto rounded-full bg-[#17181b] px-2 shadow-[0_8px_24px_rgba(0,0,0,0.22)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
             {toolbarTab === "viewport" ? (
-              <div className="min-w-0 shrink-0">{props.leadingContent}</div>
+              <div className="flex min-w-0 shrink-0 items-center justify-center">{props.leadingContent}</div>
             ) : toolbarTab === "signing" ? (
-              <div className="flex min-w-0 flex-1 items-center px-1">{props.signingContent}</div>
+              <div className="flex min-w-0 items-center justify-center px-1">{props.signingContent}</div>
             ) : (
               <CanvasActions {...props} compact />
             )}
@@ -136,14 +139,13 @@ function NarrowToolbarTab(props: {
   return (
     <Button
       aria-current={props.active ? "page" : undefined}
-      className={`relative h-6 gap-1 rounded-none px-2 text-[9px] ${props.active ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-200"}`}
+      className={`h-7 min-w-20 flex-1 justify-center gap-1 rounded-full px-3 text-[9px] transition-colors ${props.active ? "bg-[#303239] text-white" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200"}`}
       size="sm"
       variant="ghost"
       onPress={props.onPress}
     >
       {props.children}
       {props.label}
-      {props.active ? <span aria-hidden="true" className="absolute inset-x-1 bottom-0 h-0.5 rounded-t-full bg-sky-300" /> : null}
     </Button>
   );
 }

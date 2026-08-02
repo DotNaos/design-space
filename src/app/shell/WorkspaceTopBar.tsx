@@ -50,7 +50,6 @@ export function WorkspaceTopBar(props: {
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-0.5 lg:px-3">
-        {props.trailingAction}
         <DesignSpaceThemeToggle />
         <Button aria-label="Undo" isIconOnly className="hidden size-8 text-zinc-500 hover:text-zinc-200 min-[1120px]:inline-flex" size="sm" variant="ghost" isDisabled={!props.canUndo} onPress={props.onUndo}><Undo2 size={14} /></Button>
         <Button aria-label="Redo" isIconOnly className="hidden size-8 text-zinc-500 hover:text-zinc-200 min-[1120px]:inline-flex" size="sm" variant="ghost" isDisabled={!props.canRedo} onPress={props.onRedo}><Redo2 size={14} /></Button>
@@ -75,6 +74,7 @@ export function WorkspaceTopBar(props: {
             <Button aria-label={props.saving ? "Saving" : "Save"} isIconOnly className={`size-9 lg:size-8 ${props.canSave ? "bg-sky-500 text-white hover:bg-sky-400" : "bg-white/[0.04] text-zinc-600"}`} size="sm" isDisabled={!props.canSave} onPress={props.onSave}>{props.saving ? <LoaderCircle className="animate-spin" size={15} /> : <Save size={15} />}</Button>
           </>
         )}
+        {props.trailingAction}
       </div>
     </header>
   );

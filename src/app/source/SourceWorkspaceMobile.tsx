@@ -1,6 +1,7 @@
 import { Button, Tooltip } from "@heroui/react";
 import {
   ChevronLeft,
+  ChevronRight,
   FileCode2,
   Library,
   SlidersHorizontal,
@@ -23,6 +24,7 @@ export function SourceWorkspaceMobile(props: {
   onPaneChange: (pane: MobilePane) => void;
 }) {
   const open = props.mobilePane !== "canvas";
+  const fromRight = props.mobilePane === "inspect";
   const openPane = (pane: MobilePane, activity?: SourceWorkspaceActivity) => {
     if (activity) props.onActivityChange(activity);
     props.onPaneChange(pane);
@@ -38,8 +40,9 @@ export function SourceWorkspaceMobile(props: {
       <aside
         aria-label="Mobile workspace sidebar"
         aria-hidden={!open}
-        className={`absolute inset-y-0 left-0 z-30 h-full w-[min(88vw,360px)] overflow-hidden border-r border-white/[0.08] bg-[#101113] shadow-[18px_0_48px_rgba(0,0,0,0.38)] transition-[transform,opacity] duration-300 ease-[cubic-bezier(.22,.8,.22,1)] ${open ? "translate-x-0 opacity-100" : "pointer-events-none -translate-x-full opacity-0"}`}
+        className={`absolute inset-y-0 z-30 h-full w-[min(88vw,360px)] overflow-hidden bg-[#101113] transition-[transform,opacity] duration-300 ease-[cubic-bezier(.22,.8,.22,1)] ${fromRight ? "right-0 border-l border-white/[0.08] shadow-[-18px_0_48px_rgba(0,0,0,0.38)]" : "left-0 border-r border-white/[0.08] shadow-[18px_0_48px_rgba(0,0,0,0.38)]"} ${open ? "translate-x-0 opacity-100" : `pointer-events-none opacity-0 ${fromRight ? "translate-x-full" : "-translate-x-full"}`}`}
         data-open={open || undefined}
+        data-side={fromRight ? "right" : "left"}
       >
         {open ? (
           <div className="flex h-full w-[min(88vw,360px)] min-w-0 flex-col bg-[#141518]">
@@ -69,7 +72,7 @@ export function SourceWorkspaceMobile(props: {
                 variant="ghost"
                 onPress={() => props.onPaneChange("canvas")}
               >
-                <ChevronLeft size={15} />
+                {fromRight ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
               </Button>
             </footer>
           </div>

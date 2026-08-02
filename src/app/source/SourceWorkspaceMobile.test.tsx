@@ -56,6 +56,16 @@ describe("SourceWorkspaceMobile", () => {
     expect(props.onPaneChange).toHaveBeenCalledWith("canvas");
   });
 
+  it("opens the inspector as a right-hand floating drawer", () => {
+    renderMobile({ mobilePane: "inspect" });
+
+    const sidebar = screen.getByRole("complementary", { name: "Mobile workspace sidebar" });
+    expect(sidebar).toHaveAttribute("data-side", "right");
+    expect(sidebar).toHaveClass("right-0", "border-l");
+    expect(screen.getByText("Inspector panel")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Inspect" })).toHaveAttribute("aria-current", "page");
+  });
+
   it("switches the drawer between structure, files, and library without page-mode tabs", async () => {
     const { props } = renderMobile({ mobilePane: "tree" });
 
