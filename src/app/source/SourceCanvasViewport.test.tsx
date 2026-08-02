@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -191,6 +191,30 @@ it("reveals the real component subtree from a breadcrumb hover and navigates fro
     id: "toolbar",
     kind: "component",
     label: "Toolbar",
+  });
+});
+
+it("dismisses the breadcrumb tree when pressing outside it", async () => {
+  const shell = { children: [], id: "shell", label: "WorkspaceShell", slotLabel: "content" };
+  render(
+    <SourceCanvasViewport
+      ancestry={[
+        { children: [shell], id: "app", kind: "component", label: "App" },
+        { id: "shell", kind: "component", label: "WorkspaceShell" },
+      ]}
+      device="desktop"
+      onDeviceChange={vi.fn()}
+    >
+      {() => <button type="button">Outside the tree</button>}
+    </SourceCanvasViewport>,
+  );
+
+  await userEvent.hover(screen.getByRole("button", { name: "App" }));
+  expect(await screen.findByRole("tree", { name: "App component tree" })).toBeVisible();
+
+  await userEvent.click(screen.getByText("Outside the tree"));
+  await waitFor(() => {
+    expect(screen.queryByRole("tree", { name: "App component tree" })).not.toBeInTheDocument();
   });
 });
 

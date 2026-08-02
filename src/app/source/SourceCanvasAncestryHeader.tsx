@@ -228,6 +228,11 @@ function SourceCanvasTreePopover(props: {
     setExpandedIds((current) => new Set([...current, props.item.id, ...props.pathIds]));
     setOpen(true);
   };
+  const closeTree = () => {
+    clearClose();
+    pointerInside.current = false;
+    setOpen(false);
+  };
   const scheduleClose = () => {
     clearClose();
     closeTimer.current = setTimeout(() => {
@@ -250,7 +255,7 @@ function SourceCanvasTreePopover(props: {
   return (
     <Popover isOpen={open} onOpenChange={(next) => {
       if (next) openTree();
-      else scheduleClose();
+      else closeTree();
     }}>
       <Button
         ref={triggerRef}
@@ -260,7 +265,6 @@ function SourceCanvasTreePopover(props: {
         data-approval-tone={props.item.approval?.tone}
         size="sm"
         variant="ghost"
-        onFocus={openTree}
         onPointerEnter={(event) => {
           if (event.pointerType === "touch") return;
           pointerInside.current = true;
