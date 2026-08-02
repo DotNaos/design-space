@@ -1,11 +1,26 @@
 import { Label, ListBox, Select, Slider, ToggleButton, Tooltip } from "@heroui/react";
-import { Crop, Frame, MonitorSmartphone, Scan } from "lucide-react";
+import { Crop, Frame, Monitor, Scan, Scaling, Smartphone, Tablet } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { DesignSpaceDevice } from "../../shared/source-workspace";
 import { SourceDeviceTabs } from "./SourceDeviceTabs";
 import type { SourceTreeNode } from "./source-workspace-tree";
-import { sourceViewportPresets } from "./source-viewports";
+import { sourceViewportPresets, type SourceViewportPreset } from "./source-viewports";
+
+function ViewportDeviceIcon(props: { device: SourceViewportPreset["device"]; className?: string }) {
+  const iconProps = { "aria-hidden": true as const, className: props.className, size: 12, strokeWidth: 1.8 };
+  if (props.device === "desktop") return <Monitor {...iconProps} />;
+  if (props.device === "tablet") return <Tablet {...iconProps} />;
+  if (props.device === "mobile") return <Smartphone {...iconProps} />;
+  return <Scaling {...iconProps} />;
+}
+
+const viewportSectionLabel: Partial<Record<string, string>> = {
+  responsive: "Responsive",
+  "desktop-1440": "Desktop",
+  "tablet-1024": "Tablet",
+  "mobile-430": "Mobile",
+};
 
 export function SourceViewportPicker(props: {
   after?: ReactNode;
@@ -22,24 +37,36 @@ export function SourceViewportPicker(props: {
   onPresetChange: (id: string) => void;
   onResponsiveWidthChange: (width: number) => void;
 }) {
+  const selectedPreset = sourceViewportPresets.find((preset) => preset.id === props.presetId);
   return (
     <div className="pointer-events-auto flex h-8 min-w-0 items-center gap-1 px-0.5 lg:h-7">
       {props.showDeviceTabs !== false ? <SourceDeviceTabs device={props.device} node={props.node} onChange={props.onDeviceChange} /> : null}
       {props.showDeviceTabs !== false ? <span aria-hidden="true" className="h-5 w-px shrink-0 bg-white/10" /> : null}
-      <MonitorSmartphone aria-hidden="true" className="hidden shrink-0 text-zinc-500 sm:block group-data-[narrow=true]/canvas-controls:hidden" size={13} />
       <Select
         aria-label="Preview dimensions"
-        className="w-28 min-w-0 shrink sm:w-36 lg:w-44 group-data-[narrow=true]/canvas-controls:w-24"
+        className="w-[4.75rem] shrink-0"
         selectedKey={props.presetId}
         onSelectionChange={(key) => props.onPresetChange(String(key))}
       >
-        <Select.Trigger className="flex h-6 min-w-0 items-center gap-1 bg-transparent text-[10px] text-zinc-300 outline-none">
-          <Select.Value className="min-w-0 flex-1 truncate text-left" />
+        <Select.Trigger className="flex h-6 min-w-0 items-center gap-1 bg-transparent text-zinc-300 outline-none">
+          <Select.Value className="flex min-w-0 flex-1 items-center gap-1 text-left leading-none text-zinc-300">
+            <ViewportDeviceIcon device={selectedPreset?.device ?? "responsive"} className="shrink-0 text-zinc-400" />
+            <span className="text-[8px] font-medium">{selectedPreset?.compactLabel}</span>
+          </Select.Value>
           <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
         </Select.Trigger>
-        <Select.Popover placement="bottom" className="max-h-80 min-w-56 overflow-y-auto rounded-lg bg-[#18191c] p-1 shadow-2xl">
-          <ListBox items={sourceViewportPresets}>
-            {(preset) => <ListBox.Item id={preset.id} textValue={preset.label} className="flex min-h-9 cursor-default items-center rounded-md px-2 text-xs text-zinc-300 outline-none data-[focused]:bg-white/10 data-[selected]:text-sky-300">{preset.label}<ListBox.ItemIndicator className="ml-auto size-3" /></ListBox.Item>}
+        <Select.Popover placement="bottom" className="max-h-80 min-w-52 overflow-y-auto rounded-xl bg-[#1a1b1e] p-1.5 shadow-2xl">
+          <ListBox items={sourceViewportPresets} className="flex flex-col gap-0">
+            {(preset) => (
+              <ListBox.Item id={preset.id} textValue={preset.label} className="group !block !min-h-0 cursor-default !rounded-none !bg-transparent !p-0 outline-none">
+                {viewportSectionLabel[preset.id] ? <span className={`block px-2.5 pb-1 text-[9px] font-medium text-zinc-500 ${preset.id === "responsive" ? "pt-0.5" : "pt-2"}`}>{viewportSectionLabel[preset.id]}</span> : null}
+                <span className="flex h-7 items-center gap-2 rounded-lg px-2.5 text-[11px] text-zinc-300 group-data-[focused]:bg-white/[0.07] group-data-[selected]:bg-white/10 group-data-[selected]:text-sky-300">
+                  <ViewportDeviceIcon device={preset.device} className="shrink-0 text-zinc-500" />
+                  <span>{preset.device === "responsive" ? "Fluid" : preset.label.split(" · ")[1]}</span>
+                  <ListBox.ItemIndicator className="ml-auto size-3" />
+                </span>
+              </ListBox.Item>
+            )}
           </ListBox>
         </Select.Popover>
       </Select>
