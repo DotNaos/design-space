@@ -73,8 +73,8 @@ it("sends pending canvas annotations without requiring a separate message", asyn
   expect(onAnnotationsSent).toHaveBeenCalledOnce();
 });
 
-it("keeps context, the connected task, and the composer in one compact dock", async () => {
-  render(<SourceCanvasFeedbackDock context={context} meta={<span>Design · Button</span>} onAnnotationModeChange={vi.fn()} />);
+it("keeps the connected task above the compact annotation composer", async () => {
+  render(<SourceCanvasFeedbackDock context={context} onAnnotationModeChange={vi.fn()} />);
 
   const indicator = await screen.findByRole("button", {
     name: "Connected to Design Space. Change Codex task",
@@ -82,13 +82,16 @@ it("keeps context, the connected task, and the composer in one compact dock", as
   expect(indicator).toHaveTextContent("Design Space");
   expect(indicator).toHaveClass("text-emerald-200");
   const composer = screen.getByLabelText("Codex composer");
-  const sessionRow = screen.getByTestId("source-codex-session-stack");
-  expect(sessionRow).toContainElement(indicator);
-  expect(sessionRow).toHaveTextContent("Design · Button");
+  const actionRow = screen.getByTestId("source-codex-dock-actions");
+  const expand = screen.getByRole("button", { name: "Open full Codex conversation" });
   expect(screen.getByTestId("source-canvas-feedback-dock")).toContainElement(composer);
+  expect(actionRow).toContainElement(indicator);
   expect(composer).not.toContainElement(indicator);
+  expect(composer).toContainElement(screen.getByRole("button", { name: "Add a canvas annotation" }));
+  expect(actionRow).toContainElement(expand);
+  expect(composer).not.toContainElement(expand);
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeEnabled();
-  expect(screen.getByRole("button", { name: "Open full Codex conversation" })).toContainElement(screen.getByTestId("source-codex-expand-icon"));
+  expect(expand).toContainElement(screen.getByTestId("source-codex-expand-icon"));
   expect(screen.getByRole("button", { name: "Send to Codex" })).toHaveClass("ml-auto", "rounded-full");
 });
 

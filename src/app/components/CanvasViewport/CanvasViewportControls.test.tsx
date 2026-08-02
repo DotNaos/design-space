@@ -65,4 +65,36 @@ describe("CanvasViewportControls", () => {
     expect(screen.getByRole("button", { name: "Reset zoom to 100%" })).toBeVisible();
     expect(screen.queryByText("Mobile viewport actions")).not.toBeInTheDocument();
   });
+
+  it("opens component signing as its own toolbar section", async () => {
+    render(
+      <CanvasViewportControls
+        gridMode="dots"
+        gridVisible={false}
+        interactionMode="select"
+        layoutGrid={defaultCanvasLayoutGrid}
+        leadingContent={<span>Viewport actions</span>}
+        scale={1}
+        signingContent={<section aria-label="Component signing">WorkspaceStatus fingerprint</section>}
+        onFit={vi.fn()}
+        onGridModeChange={vi.fn()}
+        onGridVisibleChange={vi.fn()}
+        onLayoutGridChange={vi.fn()}
+        onReset={vi.fn()}
+        onToggleInteractionMode={vi.fn()}
+        onZoomIn={vi.fn()}
+        onZoomOut={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-viewport-toolbar")).toHaveAttribute("data-layout", "nested");
+    expect(screen.queryByLabelText("Component signing")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Signing" }));
+    expect(screen.getByLabelText("Component signing")).toHaveTextContent("WorkspaceStatus fingerprint");
+    expect(screen.queryByText("Viewport actions")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Viewport" }));
+    expect(screen.getByText("Viewport actions")).toBeVisible();
+  });
 });

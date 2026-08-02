@@ -90,6 +90,8 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const [interactionMode, setInteractionMode] = useState<"select" | "interact">("select");
   const activeInteractionMode = props.forcedInteractionMode ?? interactionMode;
   const narrowViewport = viewportSize.width > 0 && viewportSize.width < 1024;
+  const nestedToolbar = narrowViewport || Boolean(props.toolbarSigning);
+  const toolbarInset = props.compact ? 42 : nestedToolbar ? 88 : 52;
   const strictUiTargets = useMemo(
     () => buildStrictUiCanvasTargets(props.strictUiViolations ?? [], props.rootInstanceId),
     [props.rootInstanceId, props.strictUiViolations],
@@ -244,10 +246,10 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       { width: viewport.clientWidth, height: Math.max(1, viewport.clientHeight - hudBottomInset) },
       { width: worldWidth, height: Math.max(1, world.offsetHeight) },
       props.compact ? 12 : 16,
-      (props.compact ? 42 : 52) + worldHeaderHeight + canvasHeaderHeight,
+      toolbarInset + worldHeaderHeight + canvasHeaderHeight,
       props.verticalAlignment,
     ));
-  }, [canvasHeaderHeight, hudBottomInset, props.compact, props.verticalAlignment, setCamera, worldHeaderHeight, worldWidth]);
+  }, [canvasHeaderHeight, hudBottomInset, props.compact, props.verticalAlignment, setCamera, toolbarInset, worldHeaderHeight, worldWidth]);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -298,7 +300,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
     setGridRootRect(undefined);
     setShowGestureHint(true);
     setInteractionMode("select");
-    setCamera({ x: 16, y: props.compact ? 44 : 56, scale: 1 });
+    setCamera({ x: 16, y: props.compact ? 44 : nestedToolbar ? 92 : 56, scale: 1 });
     fit();
     scheduleMeasure();
     const settleFrame = requestAnimationFrame(() => {
@@ -306,7 +308,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
       scheduleMeasure();
     });
     return () => cancelAnimationFrame(settleFrame);
-  }, [fit, props.cameraKey, props.compact, scheduleMeasure, setCamera, touchGestures.resetTouchGestures, worldHeaderHeight]);
+  }, [fit, nestedToolbar, props.cameraKey, props.compact, scheduleMeasure, setCamera, touchGestures.resetTouchGestures, worldHeaderHeight]);
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
     const target = props.revealTarget;
@@ -533,6 +535,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         compact={props.compact}
         leadingContent={props.toolbar}
         narrow={narrowViewport}
+        signingContent={props.toolbarSigning}
         showInteractionToggle={!props.staticPreview}
         gridMode={gridMode}
         gridVisible={gridVisible}
@@ -579,7 +582,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
           header={props.worldHeader}
           headerHeight={worldHeaderHeight}
           headerInlineMargin={props.compact ? 12 : 16}
-          headerTop={props.compact ? 44 : narrowViewport ? 92 : 56}
+          headerTop={props.compact ? 44 : nestedToolbar ? 92 : 56}
           pinHeader={props.pinWorldHeader}
           pinFooter={props.pinWorldFooter}
           worldHeight={worldHeight}

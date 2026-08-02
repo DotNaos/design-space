@@ -42,6 +42,7 @@ export function SourceCanvasViewport(props: {
   revealTarget?: { key: string; rect: CanvasWorldRect };
   reviewGraph?: SourceReviewGraph;
   toolbarEnd?: React.ReactNode;
+  toolbarSigning?: React.ReactNode;
   onSelectAncestry?: (item: SourceCanvasAncestryItem) => void;
   onSelectSlot?: (slot: SourceCanvasSlotTab) => void;
   onDeviceChange: (device: DesignSpaceDevice) => void;
@@ -137,6 +138,7 @@ export function SourceCanvasViewport(props: {
             )}
           />
         )}
+        toolbarSigning={props.toolbarSigning}
         preview={(
           <div className="relative" style={{ height: canvasWorld.height, width: canvasWorld.width }}>
             <div className="absolute" style={{ left: graphFrame.left, top: graphFrame.top }}>

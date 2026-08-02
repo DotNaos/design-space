@@ -1,6 +1,6 @@
 import { Button, Input, Tooltip } from "@heroui/react";
 import { ArrowUp, Maximize2, MessageSquarePlus } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 
 import { SourceCodexChatModal } from "./SourceCodexChatModal";
 import { SourceCodexConnectionIndicator } from "./SourceCodexConnectionIndicator";
@@ -24,7 +24,6 @@ export function SourceCanvasFeedbackDock(props: {
   annotationMode?: boolean;
   annotations?: readonly SourceCanvasAnnotation[];
   context?: SourceFeedbackContext;
-  meta?: ReactNode;
   onAnnotationModeChange?: (active: boolean) => void;
   onAnnotationsSent?: () => void;
 }) {
@@ -106,48 +105,36 @@ export function SourceCanvasFeedbackDock(props: {
   return (
     <>
       <div
-        className="mx-auto flex w-full max-w-[min(560px,100%)] flex-col overflow-visible rounded-2xl bg-[#101114]/96 shadow-[0_14px_38px_rgba(0,0,0,0.32)] backdrop-blur-xl"
+        className="mx-auto flex w-full max-w-[min(560px,100%)] flex-col overflow-visible rounded-2xl bg-[#18191d]/96 shadow-[0_14px_38px_rgba(0,0,0,0.32)] backdrop-blur-xl"
         data-testid="source-canvas-feedback-dock"
       >
-        <div className={`flex h-7 min-w-0 items-center gap-1 border-b border-white/[0.06] px-1.5 ${props.meta ? "justify-between" : "justify-end"}`} data-testid="source-codex-session-stack">
-          {props.meta ? <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">{props.meta}</div> : null}
+        <div className="flex h-7 min-w-0 items-center justify-between gap-1 rounded-t-2xl bg-black/20 px-1.5" data-testid="source-codex-dock-actions">
           <SourceCodexConnectionIndicator
             connection={connection}
             origin={origin}
             onPress={() => setConnectionOpen(true)}
           />
-        </div>
-        <div className="grid h-11 min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] items-center px-1">
           <Tooltip closeDelay={80} delay={350}>
             <Button
               isIconOnly
-              aria-label={props.annotationMode
-                ? `Finish adding canvas annotations, ${annotations.length} saved`
-                : annotations.length
-                  ? `Continue adding canvas annotations, ${annotations.length} saved`
-                  : "Add a canvas annotation"}
-              aria-pressed={props.annotationMode}
-              className={`relative size-8 min-w-8 shrink-0 rounded-lg ${
-                props.annotationMode || annotations.length
-                  ? "bg-amber-300 text-zinc-950 hover:bg-amber-200"
-                  : "text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100"
-              }`}
-              isDisabled={!writable || !props.context || !props.onAnnotationModeChange}
+              aria-label="Open full Codex conversation"
+              className="relative size-6 min-w-6 shrink-0 rounded-full text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100"
+              isDisabled={!connected}
               size="sm"
               variant="ghost"
-              onPress={() => props.onAnnotationModeChange?.(!props.annotationMode)}
+              onPress={() => setConversationOpen(true)}
             >
-              <MessageSquarePlus aria-hidden="true" size={15} />
-              {annotations.length ? (
-                  <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full border-2 border-[#101114] bg-amber-200 px-1 text-[8px] font-bold leading-3 text-zinc-950">
-                  {annotations.length}
-                </span>
+              <Maximize2 aria-hidden="true" data-testid="source-codex-expand-icon" size={13} />
+              {comments.length ? (
+                <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-violet-400 ring-2 ring-[#0d0e10]" />
               ) : null}
             </Button>
             <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
-              {props.annotationMode ? "Finish placing annotations" : "Comment on a precise canvas element"}
+              Open full conversation · {comments.length} saved comment{comments.length === 1 ? "" : "s"}
             </Tooltip.Content>
           </Tooltip>
+        </div>
+        <div className="flex h-11 min-w-0 items-center px-1">
           <div
             aria-label="Codex composer"
             aria-disabled={!connected}
@@ -170,20 +157,31 @@ export function SourceCanvasFeedbackDock(props: {
             <Tooltip closeDelay={80} delay={350}>
               <Button
                 isIconOnly
-                aria-label="Open full Codex conversation"
-                className="relative size-7 min-w-7 shrink-0 rounded-lg text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100"
-                isDisabled={!connected}
+                aria-label={props.annotationMode
+                  ? `Finish adding canvas annotations, ${annotations.length} saved`
+                  : annotations.length
+                    ? `Continue adding canvas annotations, ${annotations.length} saved`
+                    : "Add a canvas annotation"}
+                aria-pressed={props.annotationMode}
+                className={`relative size-7 min-w-7 shrink-0 rounded-lg ${
+                  props.annotationMode || annotations.length
+                    ? "bg-amber-300 text-zinc-950 hover:bg-amber-200"
+                    : "text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100"
+                }`}
+                isDisabled={!writable || !props.context || !props.onAnnotationModeChange}
                 size="sm"
                 variant="ghost"
-                onPress={() => setConversationOpen(true)}
+                onPress={() => props.onAnnotationModeChange?.(!props.annotationMode)}
               >
-                <Maximize2 aria-hidden="true" data-testid="source-codex-expand-icon" size={14} />
-                {comments.length ? (
-                  <span className="absolute right-1 top-1 size-1.5 rounded-full bg-violet-400 ring-2 ring-[#0d0e10]" />
+                <MessageSquarePlus aria-hidden="true" size={14} />
+                {annotations.length ? (
+                  <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full border-2 border-[#18191d] bg-amber-200 px-1 text-[8px] font-bold leading-3 text-zinc-950">
+                    {annotations.length}
+                  </span>
                 ) : null}
               </Button>
               <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
-                Open full conversation · {comments.length} saved comment{comments.length === 1 ? "" : "s"}
+                {props.annotationMode ? "Finish placing annotations" : "Comment on a precise canvas element"}
               </Tooltip.Content>
             </Tooltip>
             <Input

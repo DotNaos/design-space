@@ -10,6 +10,7 @@ export interface PreviewCanvasProps {
   canvasHeader?: React.ReactNode;
   canvasHeaderHeight?: number;
   toolbar?: React.ReactNode;
+  toolbarSigning?: React.ReactNode;
   preview: React.ReactNode;
   rootInstanceId: string;
   selectedComponentInstanceId: string;

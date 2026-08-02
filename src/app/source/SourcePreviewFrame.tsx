@@ -8,7 +8,6 @@ import type {
 } from "../../shared/source-workspace";
 import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
-import { SourceCanvasContextHud } from "./SourceCanvasContextHud";
 import { SourceCanvasFeedbackDock } from "./SourceCanvasFeedbackDock";
 import { sourceCanvasAnnotationTargetAtPoint, SourceCanvasAnnotationOverlay, useSourceCanvasAnnotations } from "./SourceCanvasAnnotations";
 import { SourceDesignControls } from "./SourceDesignControls";
@@ -409,13 +408,20 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
       mode={previewMode === "static" ? undefined : previewMode}
       node={props.node}
       selectedLayer={Boolean(props.selectedLayer)}
-      showModeToggle={!props.workspaceMode}
+      showModeToggle={!props.workspaceMode || props.workspaceMode === "preview"}
       revealTarget={revealTarget?.key === revealKey ? revealTarget : undefined}
       reviewGraph={previewMode === "play" ? undefined : reviewGraph}
       selectionKey={props.entry?.id}
       selectionLabel={props.selectedLayerLabel ?? sourceCanvasLayerLabel(props.selectedLayer) ?? props.node?.label}
       slotOwnerLabel={props.node?.label ?? props.entry?.label}
       slotTabs={canvasSlotTabs}
+      toolbarSigning={props.reviewCheckpoint ? (
+        <SourceComponentReviewCheckpoint
+          {...props.reviewCheckpoint}
+          stateCount={caseNames.length || (props.entry?.design ? 1 : 0)}
+          onRequestChanges={() => canvasAnnotations.setActive(true)}
+        />
+      ) : undefined}
       hud={(
         <div className="flex w-[min(820px,calc(100vw-2rem))] max-w-full flex-col gap-1.5">
           {!props.workspaceMode && props.selectedLayer && selectedLayerOccurrenceCount > 1 ? (
@@ -431,26 +437,6 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
             annotationMode={canvasAnnotations.active}
             annotations={canvasAnnotations.annotations}
             context={feedbackContext}
-            meta={props.workspaceMode || props.reviewCheckpoint ? (
-              <>
-                {props.workspaceMode ? (
-                  <SourceCanvasContextHud
-                    contextLabel={props.node?.label ?? props.entry?.label ?? "Component"}
-                    mode={props.workspaceMode}
-                    playing={previewMode === "play"}
-                    onPlayChange={(playing) => props.onModeChange?.(playing ? "play" : "design")}
-                    onReturnToPreview={props.onReturnToPreview}
-                  />
-                ) : null}
-                {props.reviewCheckpoint ? (
-                  <SourceComponentReviewCheckpoint
-                    {...props.reviewCheckpoint}
-                    stateCount={caseNames.length || (props.entry?.design ? 1 : 0)}
-                    onRequestChanges={() => canvasAnnotations.setActive(true)}
-                  />
-                ) : null}
-              </>
-            ) : undefined}
             onAnnotationModeChange={previewMode === "design" && !previewState ? canvasAnnotations.setActive : undefined}
             onAnnotationsSent={canvasAnnotations.clear}
           />
