@@ -1,0 +1,44 @@
+import type { StrictUiViolation } from "../../../shared/strict-ui";
+import type { CanvasWorldRect } from "../../canvas-transform";
+import type { PreviewDomSnapshot } from "../../dom/dom-snapshot";
+import type { SelectionNavigationCommand } from "../../document/selection-navigation";
+import type { Selection, SlotState } from "../../types";
+import type { CanvasContextMenuRequest } from "./canvas-target-selection";
+
+export interface PreviewCanvasProps {
+  className?: string;
+  canvasHeader?: React.ReactNode;
+  canvasHeaderHeight?: number;
+  toolbar?: React.ReactNode;
+  preview: React.ReactNode;
+  rootInstanceId: string;
+  selectedComponentInstanceId: string;
+  selectionLabel: string;
+  slots: readonly SlotState[];
+  selection?: Selection;
+  hoveredSelection?: Selection;
+  hud?: React.ReactNode;
+  highlightedInternalHtmlComponentId?: string;
+  htmlClassNames?: Readonly<Record<string, string>>;
+  cameraKey?: string;
+  revealTarget?: { key: string; rect: CanvasWorldRect };
+  strictUiViolations?: readonly StrictUiViolation[];
+  compact?: boolean;
+  staticPreview?: boolean;
+  forcedInteractionMode?: "select" | "interact";
+  worldWidth?: number;
+  worldHeight?: number;
+  worldHeader?: React.ReactNode;
+  worldHeaderHeight?: number;
+  pinWorldHeader?: boolean;
+  pinWorldFooter?: boolean;
+  worldFooter?: React.ReactNode;
+  worldFooterHeight?: number;
+  verticalAlignment?: "center" | "start";
+  onSelect: (selection: Selection) => void;
+  onDeselect?: () => void;
+  onNavigate?: (command: SelectionNavigationCommand) => void;
+  onEditComponent?: (instanceId: string) => void;
+  onContextMenuRequest?: (request: CanvasContextMenuRequest) => void;
+  onDomSnapshot?: (snapshot: PreviewDomSnapshot) => void;
+}

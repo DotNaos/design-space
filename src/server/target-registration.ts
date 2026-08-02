@@ -12,6 +12,9 @@ import {
 } from "./managed-document-registration";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { readRegisteredFile } from "./registered-file-reader";
+import type { IndexedSourceWorkspace } from "./source-file-index";
+import type { RegisteredSourceComponentStore } from "./source-component-creation";
+import type { DesignSpaceLibraryProjectConfig } from "../shared/source-workspace";
 
 export interface EditValidationContext {
   fileId: string;
@@ -128,9 +131,28 @@ export interface RegisteredTarget {
   targetModulePath: string;
   files: Map<string, RegisteredFile>;
   editTargets: ReadonlyMap<string, RegisteredEditTarget>;
+  /** Opaque IDs for complete source files explicitly approved for editing. */
+  editableFileIds?: ReadonlySet<string>;
   tailwindCompiler?: TrustedTailwindCompiler;
   documentRegistration?: RegisteredDocumentRegistration;
   registrationPath?: string;
+  sourceWorkspace?: IndexedSourceWorkspace;
+  /** Server-owned component approval configuration; never supplied by the browser. */
+  sourceApproval?: {
+    policy: string;
+  };
+  sourceComponentStore?: RegisteredSourceComponentStore;
+  sourceLibrary?: RegisteredSourceLibraryCatalog;
+  libraryProject?: DesignSpaceLibraryProjectConfig;
+}
+
+export interface RegisteredSourceLibraryCatalog {
+  packageName: string;
+  development?: IndexedSourceWorkspace;
+  release?: {
+    version: string;
+    modulePath?: string;
+  };
 }
 
 const trustedConfigShape = z

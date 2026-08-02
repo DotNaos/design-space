@@ -1,7 +1,7 @@
 import type { SelectionTarget } from "../../model";
-import { DiffSheet } from "../components/DiffSheet";
-import { SlotCatalogDialog } from "../components/SlotCatalogDialog";
-import { WorkspaceContextMenu } from "../components/WorkspaceContextMenu";
+import { DiffSheet } from "../components/DiffSheet/DiffSheet";
+import { SlotCatalogDialog } from "../components/SlotCatalogDialog/SlotCatalogDialog";
+import { WorkspaceContextMenu } from "../components/WorkspaceContextMenu/WorkspaceContextMenu";
 import type { useDocumentCreationFlow } from "../document/use-document-creation-flow";
 import type { useDocumentSelectionInteractions } from "../document/use-document-selection-interactions";
 import type { useDocumentItemEditor } from "../document/use-document-item-editor";

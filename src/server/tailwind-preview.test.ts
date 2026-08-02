@@ -1,6 +1,10 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { compileTailwindPreview } from "./tailwind-preview";
+import { compileTailwindPreview, compileWorkspaceTailwindPreview } from "./tailwind-preview";
 
 describe("target Tailwind preview compiler", () => {
   const context = { projectId: "demo", sources: {}, sourceVersions: {} };
@@ -67,5 +71,55 @@ describe("target Tailwind preview compiler", () => {
     const isolated = await compileTailwindPreview("m-1");
     expect(isolated.css).toContain(".m-1");
     expect(isolated.css).not.toContain(".p-\\[255px\\]");
+  });
+
+  it("compiles source preview utilities from the selected workspace CSS root", async () => {
+    const root = await mkdtemp(join(tmpdir(), "design-space-library-tailwind-"));
+    const styles = join(root, "library.css");
+    await writeFile(styles, "@theme { --color-library-brand: #123456; }\n@tailwind utilities;\n");
+    try {
+      const result = await compileWorkspaceTailwindPreview("bg-library-brand", root, [styles]);
+      expect(result.css).toContain(".bg-library-brand");
+      expect(result.css).toContain("var(--color-library-brand)");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  it("loads an exported package stylesheet without requiring package.json to be exported", async () => {
+    const root = await mkdtemp(join(tmpdir(), "design-space-library-tailwind-export-"));
+    const packageRoot = join(root, "node_modules", "@example", "design");
+    const workspaceStyles = join(root, "library.css");
+    await mkdir(packageRoot, { recursive: true });
+    await writeFile(join(packageRoot, "package.json"), JSON.stringify({
+      name: "@example/design",
+      exports: { "./styles.css": { style: "./styles.css" } },
+    }));
+    await writeFile(join(packageRoot, "styles.css"), "@theme { --color-exported-brand: #123456; }\n");
+    await writeFile(workspaceStyles, "@import \"@example/design/styles.css\";\n@tailwind utilities;\n");
+    try {
+      const result = await compileWorkspaceTailwindPreview("bg-exported-brand", root, [workspaceStyles]);
+      expect(result.css).toContain(".bg-exported-brand");
+      expect(result.css).toContain("var(--color-exported-brand)");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  it("rejects workspace stylesheets that escape the registered root", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "design-space-library-tailwind-boundary-"));
+    const root = join(parent, "workspace");
+    const outside = join(parent, "outside.css");
+    const styles = join(root, "library.css");
+    await mkdir(root, { recursive: true });
+    await writeFile(outside, "@theme { --color-outside: #123456; }\n");
+    await writeFile(styles, `@import ${JSON.stringify(outside)};\n@tailwind utilities;\n`);
+    try {
+      await expect(compileWorkspaceTailwindPreview("bg-outside", root, [styles])).rejects.toMatchObject({
+        code: "COMPILE_ERROR",
+      });
+    } finally {
+      await rm(parent, { force: true, recursive: true });
+    }
   });
 });

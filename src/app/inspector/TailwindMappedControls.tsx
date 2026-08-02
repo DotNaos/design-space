@@ -1,17 +1,9 @@
-import { Button, Label, Slider, ToggleButton, Tooltip } from "@heroui/react";
+import { Button, Label, Slider, Tooltip } from "@heroui/react";
 import {
-  AlignCenterVertical,
-  AlignEndVertical,
-  AlignHorizontalJustifyCenter,
-  AlignHorizontalJustifyEnd,
-  AlignHorizontalJustifyStart,
-  AlignHorizontalSpaceBetween,
-  AlignStartVertical,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  ChevronDown,
   Columns3,
   EyeOff,
   LayoutGrid,
@@ -21,17 +13,24 @@ import {
   Scaling,
   Sparkles,
   Square,
-  StretchHorizontal,
   type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { startTransition, useRef, useState } from "react";
 
-import { EditorSelectField, type EditorSelectOption } from "../components/EditorSelectField";
+import { EditorSelectField, type EditorSelectOption } from "../components/EditorSelectField/EditorSelectField";
+import { EditorIconTabs } from "../components/EditorIconTabs/EditorIconTabs";
+import { TailwindAlignmentControl } from "./TailwindAlignmentControl";
+import { TailwindBoxModelControl } from "./TailwindBoxModelControl";
+import { TailwindSizeControl } from "./TailwindSizeControl";
+import { parseTailwindToken, replaceTailwindUtilityGroup } from "./tailwind-utility";
+
+export { replaceTailwindUtilityGroup } from "./tailwind-utility";
 
 type UtilityOption = { label: string; value: string; icon?: LucideIcon };
 type UtilityGroup = {
   id: string;
   label: string;
+  icon?: LucideIcon;
   options: readonly UtilityOption[];
   matches: (utility: string) => boolean;
 };
@@ -59,48 +58,34 @@ const segmentedGroups: readonly UtilityGroup[] = [
     ],
     matches: match(/^flex-(?:row|row-reverse|col|col-reverse)$/),
   },
-  {
-    id: "align",
-    label: "Align",
-    options: [
-      { label: "Start", value: "items-start", icon: AlignStartVertical },
-      { label: "Center", value: "items-center", icon: AlignCenterVertical },
-      { label: "End", value: "items-end", icon: AlignEndVertical },
-      { label: "Stretch", value: "items-stretch", icon: StretchHorizontal },
-    ],
-    matches: match(/^items-(?:start|end(?:-safe)?|center(?:-safe)?|baseline(?:-last)?|stretch)$/),
-  },
-  {
-    id: "justify",
-    label: "Justify",
-    options: [
-      { label: "Start", value: "justify-start", icon: AlignHorizontalJustifyStart },
-      { label: "Center", value: "justify-center", icon: AlignHorizontalJustifyCenter },
-      { label: "End", value: "justify-end", icon: AlignHorizontalJustifyEnd },
-      { label: "Space between", value: "justify-between", icon: AlignHorizontalSpaceBetween },
-    ],
-    matches: match(/^justify-(?:normal|start|end(?:-safe)?|center(?:-safe)?|between|around|evenly|stretch|baseline)$/),
-  },
 ];
 
 const spacingGroups: readonly UtilityGroup[] = [
-  scaleGroup("gap", "Gap", "gap", /^gap-(?![xy]-).+$/),
-  scaleGroup("gap-x", "Gap X", "gap-x", /^gap-x-.+$/),
-  scaleGroup("gap-y", "Gap Y", "gap-y", /^gap-y-.+$/),
-  scaleGroup("padding", "Padding", "p", /^p-.+$/),
-  scaleGroup("padding-x", "Padding X", "px", /^px-.+$/),
-  scaleGroup("padding-y", "Padding Y", "py", /^py-.+$/),
+  scaleGroup("gap", "Gap", "gap", /^gap-(?![xy]-).+$/, Columns3),
+  scaleGroup("gap-x", "Gap X", "gap-x", /^gap-x-.+$/, ArrowRight),
+  scaleGroup("gap-y", "Gap Y", "gap-y", /^gap-y-.+$/, ArrowDown),
 ];
 
-const sizeGroups: readonly UtilityGroup[] = [
-  keywordGroup("width", "Width", "w", /^w-.+$/),
-  keywordGroup("height", "Height", "h", /^h-.+$/),
-];
+const gridColumnsGroup: UtilityGroup = {
+  id: "grid-columns",
+  label: "Columns",
+  options: labeledOptions([
+    ["1", "grid-cols-1"],
+    ["2", "grid-cols-2"],
+    ["3", "grid-cols-3"],
+    ["4", "grid-cols-4"],
+    ["5", "grid-cols-5"],
+    ["6", "grid-cols-6"],
+    ["12", "grid-cols-12"],
+  ]),
+  matches: match(/^grid-cols-.+$/),
+};
 
 const appearanceGroups: readonly UtilityGroup[] = [
   {
     id: "radius",
     label: "Radius",
+    icon: Square,
     options: labeledOptions([
       ["None", "rounded-none"],
       ["Small", "rounded-sm"],
@@ -116,6 +101,7 @@ const appearanceGroups: readonly UtilityGroup[] = [
   {
     id: "opacity",
     label: "Opacity",
+    icon: EyeOff,
     options: labeledOptions([
       ["0%", "opacity-0"],
       ["25%", "opacity-25"],
@@ -128,6 +114,7 @@ const appearanceGroups: readonly UtilityGroup[] = [
   {
     id: "shadow",
     label: "Shadow",
+    icon: Sparkles,
     options: labeledOptions([
       ["None", "shadow-none"],
       ["Small", "shadow-sm"],
@@ -141,172 +128,272 @@ const appearanceGroups: readonly UtilityGroup[] = [
   },
 ];
 
-export function TailwindMappedControls(props: { value: string; onChange: (value: string) => void }) {
+export function TailwindMappedControls(props: {
+  value: string;
+  onChange: (value: string) => void;
+  onPreviewChange?: (value?: string) => void;
+}) {
+  const layout = baseLayoutDisplay(props.value);
+  const showGap = layout === "flex" || layout === "grid" || hasBaseGap(props.value);
   return (
     <fieldset>
       <legend className="sr-only">Visual Tailwind controls</legend>
       <div className="divide-y divide-white/[0.06]">
-        <ControlSection initialOpen icon={LayoutGrid} title="Layout">
+        <ControlSection icon={LayoutGrid} title="Layout">
           <div className="grid grid-cols-1 gap-y-3">
-            {segmentedGroups.map((group) => (
-              <SegmentedUtilityControl key={group.id} current={props.value} group={group} onChange={props.onChange} />
-            ))}
+            <SegmentedUtilityControl current={props.value} group={segmentedGroups[0]!} onChange={props.onChange} onPreviewChange={props.onPreviewChange} />
+            {layout === "flex" && (
+              <SegmentedUtilityControl current={props.value} group={segmentedGroups[1]!} onChange={props.onChange} onPreviewChange={props.onPreviewChange} />
+            )}
+            {layout === "grid" && (
+              <SelectGrid current={props.value} groups={[gridColumnsGroup]} onChange={props.onChange} />
+            )}
+            {(layout === "flex" || layout === "grid") && (
+              <TailwindAlignmentControl value={props.value} onChange={props.onChange} onPreviewChange={props.onPreviewChange} />
+            )}
           </div>
         </ControlSection>
-        <ControlSection initialOpen icon={MoveDiagonal2} title="Spacing">
-          <SliderGrid current={props.value} groups={spacingGroups} onChange={props.onChange} />
+        <ControlSection icon={MoveDiagonal2} title="Spacing">
+          {showGap ? (
+            <SliderGrid
+              current={props.value}
+              groups={spacingGroups}
+              onChange={props.onChange}
+              onPreviewChange={props.onPreviewChange}
+            />
+          ) : null}
+          <div className={showGap ? "mt-3" : ""}>
+            <TailwindBoxModelControl
+              value={props.value}
+              onChange={props.onChange}
+              onPreviewChange={props.onPreviewChange}
+            />
+          </div>
         </ControlSection>
         <ControlSection icon={Scaling} title="Size">
-          <SelectGrid current={props.value} groups={sizeGroups} onChange={props.onChange} />
+          <TailwindSizeControl value={props.value} onChange={props.onChange} />
         </ControlSection>
         <ControlSection icon={Sparkles} title="Appearance">
-          <SliderGrid current={props.value} groups={appearanceGroups} onChange={props.onChange} />
+          <SliderGrid
+            current={props.value}
+            groups={appearanceGroups}
+            onChange={props.onChange}
+            onPreviewChange={props.onPreviewChange}
+          />
         </ControlSection>
       </div>
     </fieldset>
   );
 }
 
-export function replaceTailwindUtilityGroup(
-  current: string,
-  group: readonly string[],
-  next: string,
-  matches: (utility: string) => boolean = (utility) => group.includes(utility),
-): string {
-  const candidates = new Set(group);
-  const tokens = current.split(/\s+/).filter(Boolean);
-  const result: string[] = [];
-  let replaced = false;
-
-  for (const token of tokens) {
-    const parsed = parseTailwindToken(token);
-    const belongsToGroup = !parsed.modified && (candidates.has(parsed.utility) || matches(parsed.utility));
-    if (!belongsToGroup) {
-      result.push(token);
-      continue;
-    }
-    if (!replaced && next) result.push(withImportance(next, parsed.importance));
-    replaced = true;
-  }
-
-  if (!replaced && next) result.push(next);
-  return result.join(" ");
-}
-
 function SegmentedUtilityControl(props: {
   current: string;
   group: UtilityGroup;
   onChange: (value: string) => void;
+  onPreviewChange?: (value?: string) => void;
 }) {
   const selection = findBaseSelection(props.current, props.group);
+  const valueFor = (next: string) => replaceSegmentedUtility(props.current, props.group, next);
+  const change = (next: string) => props.onChange(valueFor(next));
   return (
     <div className="min-w-0">
       <div className="mb-1 flex min-h-4 items-center gap-1.5">
         <span className="text-[9px] text-zinc-600">{props.group.label}</span>
         {selection.custom && <span className="min-w-0 truncate text-[8px] text-amber-300/80">Custom · {selection.token}</span>}
       </div>
-      <div className="flex min-h-10 overflow-hidden rounded-lg border border-white/10 bg-black/20 p-0.5">
-        <SegmentButton
-          active={!selection.token}
-          icon={Minus}
-          label={`${props.group.label}: Auto`}
-          onPress={() => props.onChange(replaceTailwindUtilityGroup(props.current, optionValues(props.group), "", props.group.matches))}
-        />
-        {props.group.options.map((option) => (
-          <SegmentButton
-            key={option.value}
-            active={!selection.custom && selection.utility === option.value}
-            icon={option.icon ?? Square}
-            label={`${props.group.label}: ${option.label}`}
-            onPress={() => props.onChange(replaceTailwindUtilityGroup(props.current, optionValues(props.group), option.value, props.group.matches))}
-          />
-        ))}
-      </div>
+      <EditorIconTabs
+        ariaLabel={`${props.group.label} options`}
+        tabs={[
+          { icon: <Minus aria-hidden="true" size={14} strokeWidth={1.7} />, label: `${props.group.label}: Auto`, value: "" },
+          ...props.group.options.map((option) => {
+            const Icon = option.icon ?? Square;
+            return { icon: <Icon aria-hidden="true" size={14} strokeWidth={1.7} />, label: `${props.group.label}: ${option.label}`, value: option.value };
+          }),
+        ]}
+        value={selection.custom ? undefined : selection.utility}
+        onChange={change}
+        onPreview={(value) => props.onPreviewChange?.(valueFor(value))}
+        onPreviewEnd={() => props.onPreviewChange?.()}
+      />
     </div>
   );
 }
 
-function SegmentButton(props: { active: boolean; icon: LucideIcon; label: string; onPress: () => void }) {
-  const Icon = props.icon;
-  return (
-    <Tooltip delay={350} closeDelay={80}>
-      <ToggleButton
-        isIconOnly
-        aria-label={props.label}
-        className={`min-h-9 min-w-0 flex-1 rounded-md px-0 transition-colors ${props.active ? "bg-sky-400/15 text-sky-200" : "text-zinc-600 hover:bg-white/[0.05] hover:text-zinc-300"}`}
-        isSelected={props.active}
-        size="sm"
-        variant="ghost"
-        onChange={props.onPress}
-      >
-        <Icon aria-hidden="true" size={14} strokeWidth={1.7} />
-      </ToggleButton>
-      <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">{props.label}</Tooltip.Content>
-    </Tooltip>
-  );
+function replaceSegmentedUtility(current: string, group: UtilityGroup, next: string): string {
+  let prepared = current;
+  if (next && group.id === "direction" && !hasBaseLayoutDisplay(current, /^(?:flex|inline-flex)$/)) {
+    prepared = replaceDisplayUtility(current, "flex");
+  }
+  return replaceTailwindUtilityGroup(prepared, optionValues(group), next, group.matches);
 }
 
-function SliderGrid(props: { current: string; groups: readonly UtilityGroup[]; onChange: (value: string) => void }) {
+function replaceDisplayUtility(current: string, next: string): string {
+  const display = segmentedGroups[0]!;
+  return replaceTailwindUtilityGroup(current, optionValues(display), next, display.matches);
+}
+
+function hasBaseLayoutDisplay(current: string, pattern: RegExp): boolean {
+  return current.split(/\s+/).filter(Boolean).some((token) => {
+    const parsed = parseTailwindToken(token);
+    return !parsed.modified && pattern.test(parsed.utility);
+  });
+}
+
+function baseLayoutDisplay(current: string): "flex" | "grid" | "other" {
+  if (hasBaseLayoutDisplay(current, /^(?:flex|inline-flex)$/)) return "flex";
+  if (hasBaseLayoutDisplay(current, /^(?:grid|inline-grid)$/)) return "grid";
+  return "other";
+}
+
+function hasBaseGap(current: string): boolean {
+  return current.split(/\s+/).filter(Boolean).some((token) => {
+    const parsed = parseTailwindToken(token);
+    return !parsed.modified && /^gap(?:-[xy])?-.+$/.test(parsed.utility);
+  });
+}
+
+function SliderGrid(props: {
+  current: string;
+  groups: readonly UtilityGroup[];
+  onChange: (value: string) => void;
+  onPreviewChange?: (value?: string) => void;
+}) {
   return <div className="grid gap-3">{props.groups.map((group) => <SliderUtilityControl key={group.id} {...props} group={group} />)}</div>;
 }
 
-function SliderUtilityControl(props: { current: string; group: UtilityGroup; onChange: (value: string) => void }) {
+function SliderUtilityControl(props: {
+  current: string;
+  group: UtilityGroup;
+  onChange: (value: string) => void;
+  onPreviewChange?: (value?: string) => void;
+}) {
   const selection = findBaseSelection(props.current, props.group);
+  const [interactionIndex, setInteractionIndex] = useState<number>();
+  const pendingIndex = useRef<number | undefined>(undefined);
+  const Icon = props.group.icon ?? Sparkles;
   const steps = [{ label: "Auto", value: "" }, ...props.group.options];
+  const labelIndexes = sliderLabelIndexes(props.group.id, steps.length);
   const selectedIndex = selection.custom ? 0 : Math.max(0, steps.findIndex((step) => step.value === selection.utility));
-  const output = selection.custom ? `Custom · ${selection.token}` : steps[selectedIndex]?.label ?? "Auto";
-  const setIndex = (next: number | number[]) => {
-    const index = snapSliderIndex(Array.isArray(next) ? next[0] : next, steps.length - 1);
-    const value = steps[index]?.value ?? "";
-    props.onChange(replaceTailwindUtilityGroup(props.current, optionValues(props.group), value, props.group.matches));
-  };
-  const reset = () => props.onChange(replaceTailwindUtilityGroup(props.current, optionValues(props.group), "", props.group.matches));
-  return (
-    <Slider
-      aria-label={`${props.group.label} Tailwind value`}
-      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1"
-      maxValue={steps.length - 1}
-      minValue={0}
-      step={1}
-      value={selectedIndex}
-      onChange={setIndex}
-    >
-      <Label className="text-[9px] text-zinc-600">{props.group.label}</Label>
-      <span className="flex items-center gap-1">
-        <Slider.Output className={`max-w-36 truncate text-[9px] ${selection.custom ? "text-amber-300/80" : "text-zinc-400"}`}>{output}</Slider.Output>
-        <Tooltip delay={350} closeDelay={80}>
-          <Button
-            isIconOnly
-            aria-label={`Reset ${props.group.label} to Auto`}
-            className="size-6 min-w-6 rounded text-zinc-600 hover:bg-white/5 hover:text-zinc-300"
-            size="sm"
-            variant="ghost"
-            onPress={reset}
-          >
-            <RotateCcw aria-hidden="true" size={11} />
-          </Button>
-          <Tooltip.Content className="rounded-md border border-white/10 bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Reset {props.group.label} to Auto</Tooltip.Content>
-        </Tooltip>
-      </span>
-      <Slider.Track data-slider-group={props.group.id} className="relative col-span-2 h-7 w-full cursor-pointer">
-        <span className="absolute left-0 top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-white/10" />
-        <Slider.Fill className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-sky-400" />
-        {steps.map((step, index) => (
-          <span
-            key={`${props.group.id}-${step.value || "auto"}`}
-            aria-hidden="true"
-            className={`pointer-events-none absolute top-1/2 h-2 w-px -translate-x-1/2 -translate-y-1/2 rounded-full ${!selection.custom && index === selectedIndex ? "bg-sky-100" : "bg-zinc-500/80"}`}
-            data-slider-step={step.value || "auto"}
-            style={{ left: `${steps.length === 1 ? 0 : (index / (steps.length - 1)) * 100}%` }}
-          />
-        ))}
-        <Slider.Thumb
-          aria-valuetext={output}
-          className="top-1/2 size-5 rounded-full border-2 border-[#141518] bg-sky-300 shadow-md outline-none ring-offset-2 ring-offset-[#141518] data-[focus-visible]:ring-2 data-[focus-visible]:ring-sky-300"
-        />
-      </Slider.Track>
-    </Slider>
+  const displayedIndex = interactionIndex ?? selectedIndex;
+  const output = interactionIndex === undefined && selection.custom
+    ? `Custom · ${selection.token}`
+    : steps[displayedIndex]?.label ?? "Auto";
+  const indexOf = (next: number | number[]) => (
+    snapSliderIndex(Array.isArray(next) ? next[0] : next, steps.length - 1)
   );
+  const valueAt = (index: number) => replaceTailwindUtilityGroup(
+    props.current,
+    optionValues(props.group),
+    steps[index]?.value ?? "",
+    props.group.matches,
+  );
+  const previewIndex = (next: number | number[]) => {
+    const index = snapSliderIndex(Array.isArray(next) ? next[0] : next, steps.length - 1);
+    pendingIndex.current = index;
+    setInteractionIndex(index);
+    startTransition(() => props.onPreviewChange?.(valueAt(index)));
+  };
+  const commitIndex = (index: number) => {
+    pendingIndex.current = undefined;
+    setInteractionIndex(undefined);
+    const value = valueAt(index);
+    if (value !== props.current) props.onChange(value);
+    startTransition(() => props.onPreviewChange?.());
+  };
+  const commitPending = () => {
+    if (pendingIndex.current === undefined) return;
+    commitIndex(pendingIndex.current);
+  };
+  const reset = () => {
+    pendingIndex.current = undefined;
+    setInteractionIndex(undefined);
+    props.onChange(valueAt(0));
+    startTransition(() => props.onPreviewChange?.());
+  };
+  return (
+    <div onBlurCapture={commitPending} onPointerCancelCapture={commitPending}>
+      <Slider
+        aria-label={`${props.group.label} Tailwind value`}
+        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2"
+        maxValue={steps.length - 1}
+        minValue={0}
+        step={1}
+        value={displayedIndex}
+        onChange={previewIndex}
+        onChangeEnd={(next) => commitIndex(indexOf(next))}
+      >
+        <Label className="flex items-center gap-1.5 text-[9px] text-zinc-500">
+          <Icon aria-hidden="true" className="text-zinc-600" size={11} />
+          {props.group.label}
+        </Label>
+        <span className="flex items-center gap-1">
+          <Slider.Output className={`max-w-36 truncate text-[9px] ${selection.custom ? "text-amber-300/80" : "text-zinc-400"}`}>{output}</Slider.Output>
+          <Tooltip delay={350} closeDelay={80}>
+            <Button
+              isIconOnly
+              aria-label={`Reset ${props.group.label} to Auto`}
+              className="size-6 min-w-6 rounded text-zinc-600 hover:bg-white/5 hover:text-zinc-300"
+              size="sm"
+              variant="ghost"
+              onPress={reset}
+            >
+              <RotateCcw aria-hidden="true" size={11} />
+            </Button>
+            <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">Reset {props.group.label} to Auto</Tooltip.Content>
+          </Tooltip>
+        </span>
+        <Slider.Track data-slider-group={props.group.id} className="relative col-span-2 mx-3.5 mt-0.5 !h-8 w-[calc(100%-1.75rem)] cursor-pointer !border-x-0 !bg-transparent">
+          <span className="absolute left-0 top-2 h-1 w-full -translate-y-1/2 rounded-full bg-[#33363d]" />
+          <Slider.Fill className="absolute left-0 top-2 !h-1 -translate-y-1/2 rounded-full !bg-[#2997ff]" />
+          {steps.map((step, index) => (
+            <span
+              key={`${props.group.id}-${step.value || "auto"}`}
+              aria-hidden="true"
+              className="pointer-events-none absolute top-[23px] h-0.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#686b73]"
+              data-slider-step={step.value || "auto"}
+              style={{ left: `${steps.length === 1 ? 0 : (index / (steps.length - 1)) * 100}%` }}
+            />
+          ))}
+          <Slider.Thumb
+            aria-valuetext={output}
+            className="!top-2 !h-7 !w-8 !rounded-none !bg-transparent !shadow-none outline-none ring-offset-2 ring-offset-[#141518] after:!h-4 after:!w-7 after:!rounded-full after:!border-0 after:!bg-[#f4f5f7] after:!shadow-[0_1px_2px_#000000,0_3px_8px_#000000] data-[focus-visible]:ring-2 data-[focus-visible]:ring-[#2997ff]"
+            data-slider-thumb-shape="horizontal-pill"
+          />
+        </Slider.Track>
+        <div aria-hidden="true" className="relative col-span-2 mx-3.5 h-3.5 w-[calc(100%-1.75rem)]" data-slider-labels={props.group.id}>
+          {labelIndexes.map((index) => (
+            <span
+              key={`${props.group.id}-label-${index}`}
+              className="absolute top-0 whitespace-nowrap text-[8px] font-medium tracking-[-0.01em] text-zinc-600"
+              data-slider-label={steps[index]?.value || "auto"}
+              style={{
+                left: `${steps.length === 1 ? 0 : (index / (steps.length - 1)) * 100}%`,
+                transform: index === 0 ? "none" : index === steps.length - 1 ? "translateX(-100%)" : "translateX(-50%)",
+              }}
+            >
+              {compactSliderLabel(steps[index]?.label ?? "")}
+            </span>
+          ))}
+        </div>
+      </Slider>
+    </div>
+  );
+}
+
+function sliderLabelIndexes(groupId: string, stepCount: number): number[] {
+  const preferred: Record<string, number[]> = {
+    radius: [0, 2, 4, 6, 8],
+    opacity: [0, 1, 3, 5],
+    shadow: [0, 2, 4, 5, 7],
+  };
+  return (preferred[groupId] ?? [0, Math.floor((stepCount - 1) / 2), stepCount - 1])
+    .filter((index, position, indexes) => index >= 0 && index < stepCount && indexes.indexOf(index) === position);
+}
+
+function compactSliderLabel(label: string): string {
+  if (label === "Extra large") return "XL";
+  if (label === "2× extra large") return "2XL";
+  return label;
 }
 
 export function snapSliderIndex(value: number | undefined, maxIndex: number): number {
@@ -335,24 +422,17 @@ function SelectGrid(props: { current: string; groups: readonly UtilityGroup[]; o
   );
 }
 
-function ControlSection(props: { icon: LucideIcon; title: string; children: React.ReactNode; initialOpen?: boolean }) {
+function ControlSection(props: { icon: LucideIcon; title: string; children: React.ReactNode }) {
   const Icon = props.icon;
-  const [open, setOpen] = useState(Boolean(props.initialOpen));
   return (
-    <section className="py-1 first:pt-0">
-      <h4>
-        <Button
-          aria-expanded={open}
-          className="flex min-h-9 w-full items-center justify-start gap-1.5 rounded-none px-0 text-left text-[10px] font-medium text-zinc-400 hover:text-zinc-200"
-          variant="ghost"
-          onPress={() => setOpen((value) => !value)}
-        >
-          <Icon aria-hidden="true" className="text-zinc-600" size={12} />
-          <span className="flex-1">{props.title}</span>
-          <ChevronDown aria-hidden="true" className={`text-zinc-600 transition-transform ${open ? "rotate-180" : ""}`} size={13} />
-        </Button>
+    <section className="py-3 first:pt-2">
+      <h4 className="mb-2 flex items-center gap-2 text-[10px] font-medium text-zinc-300">
+        <span className="grid size-4 shrink-0 place-items-center text-zinc-600">
+          <Icon aria-hidden="true" size={12} />
+        </span>
+        {props.title}
       </h4>
-      {open && <div className="pb-3">{props.children}</div>}
+      <div>{props.children}</div>
     </section>
   );
 }
@@ -379,33 +459,11 @@ function optionValues(group: UtilityGroup): string[] {
   return group.options.map((option) => option.value);
 }
 
-function parseTailwindToken(token: string) {
-  let bracketDepth = 0;
-  let variantEnd = -1;
-  for (let index = 0; index < token.length; index += 1) {
-    if (token[index] === "[") bracketDepth += 1;
-    else if (token[index] === "]") bracketDepth = Math.max(0, bracketDepth - 1);
-    else if (token[index] === ":" && bracketDepth === 0) variantEnd = index;
-  }
-  const rawUtility = token.slice(variantEnd + 1);
-  const importance = rawUtility.startsWith("!") ? "prefix" : rawUtility.endsWith("!") ? "suffix" : undefined;
-  return {
-    modified: variantEnd >= 0,
-    utility: rawUtility.replace(/^!/, "").replace(/!$/, ""),
-    importance,
-  } as const;
-}
-
-function withImportance(value: string, importance: "prefix" | "suffix" | undefined): string {
-  if (importance === "prefix") return `!${value}`;
-  if (importance === "suffix") return `${value}!`;
-  return value;
-}
-
-function scaleGroup(id: string, label: string, prefix: string, pattern: RegExp): UtilityGroup {
+function scaleGroup(id: string, label: string, prefix: string, pattern: RegExp, icon?: LucideIcon): UtilityGroup {
   return {
     id,
     label,
+    icon,
     options: labeledOptions([
       ["0", `${prefix}-0`],
       ["4 px", `${prefix}-1`],
@@ -416,21 +474,6 @@ function scaleGroup(id: string, label: string, prefix: string, pattern: RegExp):
       ["24 px", `${prefix}-6`],
       ["28 px", `${prefix}-7`],
       ["32 px", `${prefix}-8`],
-    ]),
-    matches: match(pattern),
-  };
-}
-
-function keywordGroup(id: string, label: string, prefix: string, pattern: RegExp): UtilityGroup {
-  return {
-    id,
-    label,
-    options: labeledOptions([
-      ["CSS auto", `${prefix}-auto`],
-      ["Full", `${prefix}-full`],
-      ["Fit content", `${prefix}-fit`],
-      ["Min content", `${prefix}-min`],
-      ["Max content", `${prefix}-max`],
     ]),
     matches: match(pattern),
   };

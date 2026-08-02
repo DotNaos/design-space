@@ -59,7 +59,7 @@ export function ComponentWorkshop(props: {
   return (
     <aside className={`${props.className ?? "flex w-80"} h-full min-h-0 min-w-0 shrink-0 scroll-pb-[calc(7rem+env(safe-area-inset-bottom))] flex-col overflow-y-auto overscroll-contain border-l border-white/10 bg-[#141518] lg:scroll-pb-0`}>
       <header className="sticky top-0 z-10 border-b border-white/10 bg-[#141518]/95 px-4 py-3 backdrop-blur">
-        <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-sky-400">Component workshop</p>
+        <p className="text-[9px] font-medium text-sky-400">Component workshop</p>
         <h2 className="mt-1 text-sm font-semibold text-zinc-100">{definition.label}</h2>
         <p className="mt-1 text-[10px] text-zinc-600">{props.recipe?.label ?? "Target-owned component recipe"}</p>
       </header>

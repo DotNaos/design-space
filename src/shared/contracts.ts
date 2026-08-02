@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { opaqueIdSchema, sourceVersionSchema } from "./ids";
+import type { SourceDesignScope } from "./source-design";
+import type { SourceComponentProp, SourceComponentSlot, SourceStrictUiFinding, SourceWorkspaceLayer } from "./source-workspace";
 
 export { opaqueIdSchema, sourceVersionSchema } from "./ids";
 
@@ -154,9 +156,51 @@ export const componentControlSchema = componentControlUnionSchema.superRefine((c
 export type ComponentControl = z.infer<typeof componentControlSchema>;
 
 export const browserOperationSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("compile-tailwind"), value: z.string().max(10_000) }).strict(),
+  z.object({
+    type: z.literal("compile-tailwind"),
+    value: z.string().max(10_000),
+    scope: z.enum(["app", "library-development"]).optional(),
+  }).strict(),
   z.object({ type: z.literal("analyze-tailwind"), value: z.string().max(10_000), cursor: z.number().int().min(0).max(10_000) }).strict(),
-  z.object({ type: z.literal("read-project-file"), fileId: opaqueIdSchema }).strict(),
+  z.object({
+    type: z.literal("read-project-file"),
+    fileId: opaqueIdSchema,
+    scope: z.enum(["app", "library-development"]).optional(),
+  }).strict(),
+  z.object({
+    type: z.literal("analyze-source-file-draft"),
+    fileId: opaqueIdSchema,
+    source: z.string().max(512 * 1024),
+    scope: z.enum(["app", "library-development"]).optional(),
+  }).strict(),
+  z.object({
+    type: z.literal("prepare-project-file-edit"),
+    fileId: opaqueIdSchema,
+    baseVersion: sourceVersionSchema,
+    source: z.string().max(512 * 1024),
+  }).strict(),
+  z.object({ type: z.literal("save-project-file-edit"), challengeId: z.string().uuid() }).strict(),
+  z.object({
+    type: z.literal("prepare-source-change-set"),
+    scope: z.enum(["app", "library-development"]),
+    supersedesChallengeId: z.string().uuid().optional(),
+    changes: z.array(z.object({
+      fileId: opaqueIdSchema,
+      baseVersion: sourceVersionSchema,
+      source: z.string().max(512 * 1024),
+    }).strict()).min(1).max(50),
+  }).strict(),
+  z.object({ type: z.literal("apply-source-change-set"), challengeId: z.string().uuid() }).strict(),
+  z.object({
+    type: z.literal("prepare-source-component-create"),
+    name: z.string().trim().regex(/^[A-Z][A-Za-z0-9]{1,63}$/),
+  }).strict(),
+  z.object({ type: z.literal("save-source-component-create"), challengeId: z.string().uuid() }).strict(),
+  z.object({
+    type: z.literal("generate-source-design"),
+    scope: z.enum(["app", "library-development"]),
+    entryId: opaqueIdSchema,
+  }).strict(),
   z.object({ type: z.literal("read-source"), editTargetId: opaqueIdSchema }).strict(),
   z
     .object({
@@ -175,6 +219,27 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
 
 export type BrowserOperation = z.infer<typeof browserOperationSchema>;
 
+export const sourceApprovalOperationSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("sign-source-component"),
+    entryId: opaqueIdSchema,
+  }).strict(),
+]);
+
+export type SourceApprovalOperation = z.infer<typeof sourceApprovalOperationSchema>;
+
+export const libraryDevelopmentOperationSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("get-library-development") }).strict(),
+  z.object({ type: z.literal("clone-library-development") }).strict(),
+  z.object({
+    type: z.literal("start-library-development"),
+    worktreeId: opaqueIdSchema,
+  }).strict(),
+  z.object({ type: z.literal("stop-library-development") }).strict(),
+]);
+
+export type LibraryDevelopmentOperation = z.infer<typeof libraryDevelopmentOperationSchema>;
+
 export interface SourceSnapshot {
   editTargetId: string;
   value: string;
@@ -186,6 +251,95 @@ export interface ProjectFileSnapshot {
   label: string;
   source: string;
   version: string;
+}
+
+export interface SourceDraftComponent {
+  filePath: string;
+  exportName: string;
+  label: string;
+  props: readonly SourceComponentProp[];
+  slots: readonly SourceComponentSlot[];
+  findings: readonly SourceStrictUiFinding[];
+  source: { start: number; end: number };
+  uses: readonly string[];
+  layers: readonly SourceWorkspaceLayer[];
+}
+
+export interface SourceDraftAnalysis {
+  fileId: string;
+  components: readonly SourceDraftComponent[];
+}
+
+export interface PreparedProjectFileEdit {
+  challengeId: string;
+  fileId: string;
+  baseVersion: string;
+  nextVersion: string;
+  diff: string;
+  expiresAt: string;
+}
+
+export interface SavedProjectFileEdit extends ProjectFileSnapshot {
+  previousVersion: string;
+}
+
+export interface SourceChangeReviewEvidence {
+  changeId: string;
+  fileId: string;
+  label: string;
+  baseVersion: string;
+  nextVersion: string;
+  beforeSource: string;
+  afterSource: string;
+  diff: string;
+}
+
+export interface PreparedSourceChangeSet {
+  state: "source-change-set-ready";
+  challengeId: string;
+  scope: SourceDesignScope;
+  changes: readonly SourceChangeReviewEvidence[];
+  expiresAt: string;
+}
+
+export interface AppliedSourceChangeSet {
+  state: "source-change-set-applied";
+  scope: SourceDesignScope;
+  changes: readonly {
+    changeId: string;
+    fileId: string;
+    label: string;
+    previousVersion: string;
+    version: string;
+  }[];
+}
+
+export interface PreparedSourceComponentCreate {
+  state: "source-component-create-ready";
+  challengeId: string;
+  name: string;
+  relativePath: string;
+  diff: string;
+  expiresAt: string;
+}
+
+export interface SavedSourceComponentCreate {
+  state: "source-component-created";
+  name: string;
+  relativePath: string;
+}
+
+export interface GeneratedSourceDesign {
+  state: "source-design-generated";
+  scope: SourceDesignScope;
+  entryId: string;
+  relativePath: string;
+}
+
+export interface SignedSourceComponent {
+  state: "source-component-signed";
+  entryId: string;
+  approvals: import("./source-workspace").SourceApprovalEvidence;
 }
 
 export interface TailwindPreview {

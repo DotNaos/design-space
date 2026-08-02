@@ -1,8 +1,28 @@
 # Design Space
 
-Design Space is a standalone, local-first UI IDE for React projects. A target project owns its adapter catalog, fixture, safe file display, and edit allowlist; starts Design Space from its own directory; and gets a direct React preview, component and file browsing, explicit child slots, Tailwind editing, exact source diffs, and guarded local saves.
+Design Space is a standalone, local-first UI IDE for React projects. Its default workspace renders the project's real exported TSX components, reads props and slots from their TypeScript types, and derives the file tree from the selected frontend project. It does not require a generated component, slot, or file manifest.
 
 It is deliberately not part of a target application's production build and has no deployment configuration.
+
+[`STRICT_UI.md`](./STRICT_UI.md) is the canonical product and architecture contract for the source model, component ownership, typed named slots, validation, and IDE behavior. Current legacy adapters and incomplete source-workspace behavior are transitional when they disagree with that contract.
+
+## Core workflow: review the graph
+
+Design Space exists to review static UI produced by an LLM. The app is a graph of components:
+
+```text
+Properties ──> [ Component in one visual state ] ──> Slots ──> Child components
+```
+
+The reviewer repeats one loop: inspect the design-relevant Properties, inspect each declared visual State,
+inspect the Slots, comment when something is wrong, then sign that one component as a human checkpoint. A
+whole app review starts at the configured Desktop, Tablet, or Mobile root and walks depth-first until every
+reachable component has its own current signature. Completion rolls up only as progress: there is no batch or
+root signature that replaces the individual component checkpoints.
+
+This is the core product concept. Read [`docs/design-review-graph.md`](./docs/design-review-graph.md) for the
+complete workflow before planning or changing Design Space. Read [`STRICT_UI.md`](./STRICT_UI.md) for the
+source and Slot rules that make the graph finite and verifiable.
 
 ## Try the included target
 
@@ -15,17 +35,62 @@ bun run dev
 
 Open the stable Portless URL printed by the command, normally `http://design-space.localhost:1355`.
 
+The included default target is a checked-in `clients/web` snapshot generated from
+[`DotNaos/project-template`](https://github.com/DotNaos/project-template) at commit
+`829a34a8ca91d69f81225fab380244614694ce1a`, plus the documented Design Space source paths. Its exact origin is recorded in `examples/source-target/project-template-origin.json`.
+
 Raw Vite startup is blocked. `DESIGN_SPACE_ALLOW_DIRECT=1` is a noisy debugging escape hatch, not the normal workflow.
 
 ## Start from a target repository
 
-Install Design Space as a development dependency and add a script such as `"design-space": "design-space"`. Running that script from the target repository discovers exactly one fixed server file: `design-space.server.ts`. The CLI accepts no root, path, command, or module arguments.
+Install Design Space as a development dependency and add a script such as `"design-space": "design-space"`. Run that script from the frontend project root, for example `clients/web`. That root owns a minimal `.designspace.ts`:
 
-The server file exports a trusted `registration` with the project label, `design-space.config.tsx` target module, opaque file IDs, and opaque edit-target IDs. See `examples/demo-target/design-space.server.ts`. Those server file IDs are the authoritative source browser and automatically include newly created managed documents. The React config owns the full adapter catalog and default component fixture; see `examples/demo-target/design-space.config.tsx`.
+```ts
+import { defineDesignSpace } from "@dotnaos/design-space/source-workspace";
 
-This split is intentional: the local developer chooses the target by the directory where the CLI starts, while the browser can only use the fixed opaque operations made available by that registration.
+export default defineDesignSpace({
+  project: { id: "web", label: "Web app" },
+  tablet: { fallback: "desktop" },
+});
+```
 
-## What the first milestone includes
+App implementations are device-first. Each device owns its layout and pages, while reusable components are grouped once by component name:
+
+```text
+src/app/
+  desktop/
+    layout.tsx
+    pages/
+  tablet/
+    layout.tsx
+    pages/
+  mobile/
+    layout.tsx
+    pages/
+  components/
+    ComponentName/
+      desktop.tsx
+      tablet.tsx
+      mobile.tsx
+```
+
+Only real exported React components make a device path configured. Tablet may explicitly reuse Desktop or Mobile; no other device fallback is inferred. The editor lists each reusable component once and switches between its available device implementations. Component props and explicitly named Strict UI slots come from the exported component's TypeScript props type. `children` is forbidden, broad `ReactNode` props are not slot evidence, and the preview never persists a parallel JSON description of that contract.
+
+Canvas execution is supplied by a colocated `.design.tsx` module. Design Space never calls an indexed source component with guessed or empty props. The design imports the real component, provides concrete preview values, and uses `defineComponentDesign`; TypeScript remains the only property and slot schema. Named `designs` or `states` are typed props presets selectable in Properties, and may provide compatible JSX content. An optional `preview` object controls only the isolated canvas background, dimensions, padding, and placement. Literal unions and booleans become automatic property-matrix axes. Use the explicit `isStateful` boolean only when the component has named semantic states. The complete normative contract lives in `STRICT_UI.md`.
+
+The TypeScript-first workspace provides indexing, rendering, navigation, contract inspection, and guarded whole-file TypeScript editing with an exact diff before save. Components with required props are not executed until source-owned preview arguments exist.
+
+The same contract can be placed at a React Native project root with `runtime: "react-native"`. Design Space currently indexes its source tree and TypeScript contracts separately; a simulator renderer is still required before native preview can be marked ready.
+
+The component-library connection is derived from the frontend project's package dependencies. A normal package version is shown as a read-only release. `workspace:`, `file:`, or `link:` dependencies prove that a development source is connected; Design Space does not claim it is editable until that second project root has its own trusted write registration.
+
+The CLI accepts no root, path, command, or module arguments. The local developer chooses the target by the directory where the CLI starts, while the browser receives only the server-indexed files and exports.
+
+## Legacy document targets
+
+The previous `design-space.server.ts` adapter/document target remains available for compatibility and for its guarded document-save workflow. See `examples/demo-target/design-space.server.ts` and `examples/demo-target/design-space.config.tsx`. New source workspaces should use `.designspace.ts` and real TSX instead of adding `.design.json` component descriptions.
+
+## What the legacy document milestone includes
 
 - Direct React adapter execution through a server-selected virtual module. There is no iframe boundary to design around.
 - An expandable target-owned component catalog and a project/file browser.
@@ -68,7 +133,15 @@ The browser has one same-origin JSON endpoint and a closed set of schema-validat
 
 It cannot send repository roots, file paths, commands, shell text, executable paths, module paths, or extra fields. On the server, canonical roots and allowlisted files are rechecked against traversal and symlink escapes before reads and writes. Saves recheck the source hash, preserve all text outside the marked string, and replace the file atomically.
 
-Review approval remains outside Design Space. The signed Project CLI is the approval authority; browser state and local storage are never approval evidence.
+Design Space may request one component signature at a time through its fixed local server bridge. The signed
+Project CLI remains the approval authority and performs the authenticated device flow; browser state and local
+storage are never approval evidence. The browser cannot choose a repository, policy, executable, or arbitrary
+scope.
+
+Projects may opt into the Source Tree approval checklist and one-component signing action described in
+[Cryptographic component approvals](docs/cryptographic-component-approvals.md).
+The checklist maps each component export to a stable Project approval scope and
+fails closed whenever policy or trusted verification evidence is unavailable.
 
 ## Local-only proof
 

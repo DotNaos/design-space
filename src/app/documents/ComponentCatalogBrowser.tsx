@@ -59,7 +59,7 @@ export function ComponentCatalogBrowser(props: ComponentCatalogBrowserProps) {
             <section key={group} aria-label={`${group} components`}>
               <Button
                 aria-expanded={!collapsed}
-                className="min-h-11 w-full justify-start rounded-none px-3 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600 lg:min-h-9"
+                className="min-h-11 w-full justify-start rounded-none px-3 text-[10px] font-medium text-zinc-600 lg:min-h-9"
                 fullWidth
                 size="sm"
                 variant="ghost"

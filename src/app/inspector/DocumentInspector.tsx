@@ -2,8 +2,8 @@ import { Button } from "@heroui/react";
 
 import type { ComponentControl } from "../../shared/contracts";
 import type { DesignValue } from "../../shared/design-document";
-import { ItemEditorActions, ItemEditorIdentity } from "../components/ItemEditorChrome";
-import { ItemEditorTools } from "../components/ItemEditorTools";
+import { ItemEditorActions, ItemEditorIdentity } from "../components/ItemEditor/ItemEditorChrome";
+import { ItemEditorTools } from "../components/ItemEditor/ItemEditorTools";
 import type { SlotState } from "../types";
 
 export function DocumentInspector(props: {

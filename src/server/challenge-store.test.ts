@@ -47,4 +47,14 @@ describe("ChallengeStore", () => {
       expect.objectContaining({ code: "VALIDATION_ERROR" }),
     );
   });
+
+  it("removes a superseded challenge only when it belongs to the expected owner", () => {
+    const store = new ChallengeStore<{ expiresAt: number; owner: string }>({ now: () => 0 });
+    store.set("challenge", { expiresAt: 10, owner: "app" });
+
+    expect(store.remove("challenge", (value) => value.owner === "library")).toBe(false);
+    expect(store.has("challenge")).toBe(true);
+    expect(store.remove("challenge", (value) => value.owner === "app")).toBe(true);
+    expect(store.has("challenge")).toBe(false);
+  });
 });

@@ -1,0 +1,6 @@
+{
+  "repository": "https://github.com/DotNaos/project-template.git",
+  "commit": "829a34a8ca91d69f81225fab380244614694ce1a",
+  "generatedProject": "project-design-space-target-daa2facd",
+  "note": "Generated web client snapshot. Formatting, the local tsconfig extension, fixture-only ambient declarations, and Design Space source paths were adapted for this embedded proof."
+}

@@ -38,6 +38,15 @@ describe("MobileDock", () => {
     expect(onChange).toHaveBeenCalledWith("canvas");
   });
 
+  it("exposes Design and Preview as explicit mobile pages", async () => {
+    const onPageChange = vi.fn();
+    render(<MobileDock active="canvas" page="design" onChange={vi.fn()} onPageChange={onPageChange} />);
+
+    expect(screen.getByRole("button", { name: "Open Design page" })).toHaveAttribute("aria-current", "page");
+    await userEvent.click(screen.getByRole("button", { name: "Open Preview page" }));
+    expect(onPageChange).toHaveBeenCalledWith("preview");
+  });
+
   it("does not render the mobile HUD on a laptop viewport", () => {
     Object.defineProperty(window, "matchMedia", {
       configurable: true,

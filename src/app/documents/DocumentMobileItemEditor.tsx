@@ -1,6 +1,6 @@
 import type { SelectionTarget } from "../../model";
 import type { TargetFileEntry } from "../../shared/target-module";
-import { MobileItemEditor } from "../components/MobileItemEditor";
+import { MobileItemEditor } from "../components/MobileItemEditor/MobileItemEditor";
 import type { useDocumentItemEditor } from "../document/use-document-item-editor";
 import type { SlotState } from "../types";
 

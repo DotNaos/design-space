@@ -1,6 +1,34 @@
+import type {
+  ComponentProps,
+  ComponentType,
+  ReactElement,
+} from "react";
 import { z } from "zod";
 
 import { opaqueIdSchema, sourceVersionSchema } from "./ids";
+
+declare const strictUiSlotCardinality: unique symbol;
+
+/** One explicitly typed Strict UI component insertion point. */
+export type ComponentSlot<Allowed extends ComponentType<any>> =
+  ReactElement<ComponentProps<Allowed>, Allowed>;
+
+/**
+ * An ordered Strict UI slot collection. Min and Max are compiler-visible
+ * contract metadata consumed by Design Space validation.
+ */
+export type ComponentSlotList<
+  Allowed extends ComponentType<any>,
+  Min extends number = 0,
+  Max extends number = number,
+> = readonly ComponentSlot<Allowed>[] & {
+  readonly [strictUiSlotCardinality]?: readonly [Min, Max];
+};
+
+/** Explicitly rejects React's implicit children composition. */
+export interface StrictUiProps {
+  children?: never;
+}
 
 export const strictUiSeveritySchema = z.enum(["error", "warning", "info"]);
 export type StrictUiSeverity = z.infer<typeof strictUiSeveritySchema>;

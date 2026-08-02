@@ -8,9 +8,9 @@ const appRoot = join(dirname(fileURLToPath(import.meta.url)), "../app");
 
 const allowedNativeButtons: Readonly<Record<string, number>> = {
   // Roving tree-item focus and branch disclosure are one composite ARIA tree.
-  "components/ComponentTree.tsx": 4,
+  "components/ComponentTree/ComponentTree.tsx": 4,
   // These exact-position hit targets are part of the transformed canvas geometry.
-  "components/PreviewCanvas.tsx": 2,
+  "components/PreviewCanvas/PreviewCanvas.tsx": 2,
 };
 
 describe("HeroUI primitive boundary", () => {

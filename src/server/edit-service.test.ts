@@ -304,6 +304,7 @@ describe("local edit service", () => {
         sourceFileIds: ["file.card"],
       },
       { type: "run-command", command: "echo unsafe" },
+      { type: "prepare-source-component-create", name: "Owned", path: "/tmp/owned.tsx" },
     ];
     for (const attempt of attempts) {
       await expect(service.execute(attempt)).rejects.toMatchObject({ code: "INVALID_REQUEST" });
@@ -322,6 +323,40 @@ describe("local edit service", () => {
       fileId: "file.card",
       label: "component.tsx",
       source: `const cardClass = ${marker} "rounded-xl p-4";\n`,
+    });
+  });
+
+  it("previews and atomically saves complete TypeScript files only when the source project approved them", async () => {
+    const { componentPath, registered, service } = await fixture();
+    const snapshot = await service.readProjectFile("file.card");
+    await expect(service.execute({
+      type: "prepare-project-file-edit",
+      fileId: "file.card",
+      baseVersion: snapshot.version,
+      source: "export const value = 2;\n",
+    })).rejects.toMatchObject({ code: "ACCESS_DENIED" });
+
+    const sourceService = new EditService({ ...registered, editableFileIds: new Set(["file.card"]) });
+    const nextSource = "export function Card() { return <article>Updated</article>; }\n";
+    const prepared = await sourceService.prepareProjectFileEdit("file.card", nextSource, snapshot.version);
+    expect(prepared.diff).toContain("+export function Card() { return <article>Updated</article>; }");
+    expect(await readFile(componentPath, "utf8")).toContain("rounded-xl p-4");
+
+    const saved = await sourceService.saveProjectFileEdit(prepared.challengeId);
+    expect(saved).toMatchObject({ fileId: "file.card", source: nextSource, previousVersion: snapshot.version });
+    expect(await readFile(componentPath, "utf8")).toBe(nextSource);
+  });
+
+  it("rejects malformed complete TypeScript edits and stale source versions", async () => {
+    const { componentPath, registered, service } = await fixture();
+    const sourceService = new EditService({ ...registered, editableFileIds: new Set(["file.card"]) });
+    const snapshot = await service.readProjectFile("file.card");
+    await expect(sourceService.prepareProjectFileEdit("file.card", "export function Broken( {", snapshot.version)).rejects.toMatchObject({
+      code: "COMPILE_ERROR",
+    });
+    await writeFile(componentPath, "export const changed = true;\n", "utf8");
+    await expect(sourceService.prepareProjectFileEdit("file.card", "export const next = true;\n", snapshot.version)).rejects.toMatchObject({
+      code: "STALE_SOURCE",
     });
   });
 

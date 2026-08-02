@@ -1,0 +1,28 @@
+{
+  "name": "@project-design-space-target-daa2facd/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && vite build",
+    "check": "tsc -p tsconfig.json",
+    "dev": "vite --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@project-design-space-target-daa2facd/client": "workspace:*",
+    "@clerk/react": "^6.11.3",
+    "@dotnaos/react-ui": "^0.0.5",
+    "@tailwindcss/vite": "^4.1.11",
+    "@vitejs/plugin-react": "^5.0.0",
+    "lucide-react": "^0.562.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tailwindcss": "^4.1.11",
+    "vite": "^7.0.6"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "typescript": "^5.9.2"
+  }
+}

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { SelectionTarget } from "../../model";
 import type { DesignDocument } from "../../shared/design-document";
 import type { TargetFileEntry, TargetModule } from "../../shared/target-module";
-import type { CanvasContextMenuRequest } from "../components/PreviewCanvas";
+import type { CanvasContextMenuRequest } from "../components/PreviewCanvas/PreviewCanvas";
 import type { useDocumentItemEditor } from "./use-document-item-editor";
 import type { SlotState } from "../types";
 import { resolveDocumentAdapter, wouldCreateAuthoredComponentCycle } from "./document-adapters";

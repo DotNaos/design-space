@@ -2,7 +2,7 @@ import { expect, it, vi } from "vitest";
 
 import type { DocumentService } from "./document-service";
 import type { EditService } from "./edit-service";
-import { LocalOperationService } from "./local-operation-service";
+import { LocalOperationService, type OperationExecutor } from "./local-operation-service";
 
 it("routes only typed legacy and document operations to their isolated services", async () => {
   const editExecute = vi.fn(async () => ({ kind: "edit" }));
@@ -25,6 +25,44 @@ it("routes only typed legacy and document operations to their isolated services"
   });
   expect(editExecute).toHaveBeenCalledTimes(1);
   expect(documentExecute).toHaveBeenCalledTimes(3);
+});
+
+it("routes library development operations and attaches the live server", async () => {
+  const libraryExecute = vi.fn(async () => ({ state: "stopped" }));
+  const attachServer = vi.fn();
+  const libraryService = { execute: libraryExecute, attachServer } satisfies OperationExecutor;
+  const service = new LocalOperationService(
+    { execute: vi.fn() } as unknown as EditService,
+    { execute: vi.fn() } as unknown as DocumentService,
+    libraryService,
+  );
+  const server = { restart: vi.fn() };
+
+  service.attachServer(server as never);
+  await expect(service.execute({ type: "get-library-development" })).resolves.toEqual({ state: "stopped" });
+
+  expect(attachServer).toHaveBeenCalledWith(server);
+  expect(libraryExecute).toHaveBeenCalledWith({ type: "get-library-development" });
+});
+
+it("routes only the typed one-component signing operation", async () => {
+  const approvalExecute = vi.fn(async () => ({ state: "source-component-signed" }));
+  const service = new LocalOperationService(
+    { execute: vi.fn() } as unknown as EditService,
+    { execute: vi.fn() } as unknown as DocumentService,
+    undefined,
+    { execute: approvalExecute },
+  );
+
+  await expect(service.execute({ type: "sign-source-component", entryId: "entry.button" })).resolves.toEqual({
+    state: "source-component-signed",
+  });
+  await expect(service.execute({
+    type: "sign-source-component",
+    entryId: "entry.button",
+    root: "/tmp/other",
+  })).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+  expect(approvalExecute).toHaveBeenCalledTimes(1);
 });
 
 it("disposes the edit service once and rejects operations after shutdown", async () => {

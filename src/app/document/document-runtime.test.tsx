@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { DesignDocument } from "../../shared/design-document";
 import type { TargetModule } from "../../shared/target-module";
-import { PreviewCanvas } from "../components/PreviewCanvas";
+import { PreviewCanvas } from "../components/PreviewCanvas/PreviewCanvas";
 import { indexPreviewDom } from "../dom/dom-snapshot";
 import { DesignDocumentPreview, renderDesignDocument } from "./document-runtime";
 

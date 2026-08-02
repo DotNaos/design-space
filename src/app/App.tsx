@@ -5,17 +5,18 @@ import { createEditorState, editorReducer, isDirty } from "../editor";
 import { projectPreviewSlots, type SelectionTarget } from "../model";
 import type { PreparedEdit, SavedEdit, SourceSnapshot, TailwindPreview } from "../shared/contracts";
 import type { ComponentFixture } from "../shared/target-module";
-import { ActivityRail, type WorkspaceMode } from "./components/ActivityRail";
-import { CatalogPanel } from "./components/CatalogPanel";
-import { ComponentTree } from "./components/ComponentTree";
-import { DiffSheet } from "./components/DiffSheet";
-import { FileBrowser } from "./components/FileBrowser";
-import { Inspector } from "./components/Inspector";
-import { MobileItemEditor } from "./components/MobileItemEditor";
-import { MobileNavigation, type MobileWorkspaceMode } from "./components/MobileNavigation";
-import { PreviewCanvas } from "./components/PreviewCanvas";
-import { SlotCatalogDialog } from "./components/SlotCatalogDialog";
-import { TopBar } from "./components/TopBar";
+import { ActivityRail, type WorkspaceMode } from "./components/ActivityRail/ActivityRail";
+import { CatalogPanel } from "./components/CatalogPanel/CatalogPanel";
+import { ComponentTree } from "./components/ComponentTree/ComponentTree";
+import { DiffSheet } from "./components/DiffSheet/DiffSheet";
+import { WorkspaceShell, WorkspaceStatus } from "./components/WorkspaceShell";
+import { FileBrowser } from "./components/FileBrowser/FileBrowser";
+import { Inspector } from "./components/Inspector/Inspector";
+import { MobileItemEditor } from "./components/MobileItemEditor/MobileItemEditor";
+import { MobileNavigation, type MobileWorkspaceMode } from "./components/MobileNavigation/MobileNavigation";
+import { PreviewCanvas } from "./components/PreviewCanvas/PreviewCanvas";
+import { SlotCatalogDialog } from "./components/SlotCatalogDialog/SlotCatalogDialog";
+import { TopBar } from "./components/TopBar/TopBar";
 import { LocalOperationError, runLocalOperation } from "./api";
 import { PreviewBoundary } from "./PreviewBoundary";
 import {
@@ -30,6 +31,8 @@ import {
 import type { SlotState } from "./types";
 import { useItemEditor } from "./use-item-editor";
 import { DocumentWorkspace } from "./DocumentWorkspace";
+import { SourceWorkspace } from "./SourceWorkspace";
+import { useSourcePreviewRuntime } from "./source/SourcePreviewRuntime";
 import { createPortableDraftId } from "./document/design-id";
 import { isLegacyPrepareCompileFailure } from "./legacy-prepare-error";
 import { usesDocumentWorkspace } from "./workspace-selection";
@@ -40,10 +43,26 @@ type SlotSelection = Extract<SelectionTarget, { kind: "slot" }>;
 type FixtureUndo = { fixture: ComponentFixture; compositionCss: Readonly<Record<string, string>>; undoRootEdit: boolean };
 
 export function App() {
-  return usesDocumentWorkspace(target) ? <DocumentWorkspace target={target} /> : <LegacyWorkspace />;
+  const previewRuntime = useSourcePreviewRuntime();
+  if (target.sourceWorkspace) {
+    return <WorkspaceShell slots={{
+      status: <WorkspaceStatus />,
+      content: <SourceWorkspace nestedPreview={previewRuntime} target={target} />,
+    }} />;
+  }
+  if (usesDocumentWorkspace(target)) {
+    return <WorkspaceShell slots={{
+      status: <WorkspaceStatus />,
+      content: <DocumentWorkspace target={target} />,
+    }} />;
+  }
+  return <WorkspaceShell slots={{
+    status: <WorkspaceStatus />,
+    content: <LegacyWorkspace />,
+  }} />;
 }
 
-function LegacyWorkspace() {
+export function LegacyWorkspace() {
   const [revealedInternals, setRevealedInternals] = useState<ReadonlySet<string>>(() => new Set());
   const [fixture, setFixture] = useState<ComponentFixture>(target.defaultFixture);
   const [fixtureUndoStack, setFixtureUndoStack] = useState<FixtureUndo[]>([]);
@@ -325,8 +344,8 @@ function LegacyWorkspace() {
       <style data-design-space-tailwind-preview>{itemEditorController.model?.previewCss ?? `${previewCss}\n${Object.values(compositionCss).join("\n")}`}</style>
       <TopBar
         targetLabel={target.project.label}
-        connected={connected}
         runtimeLabel={connected ? "Preview ready" : "Connecting…"}
+        connected={connected}
         canUndo={fixtureUndoStack.length > 0 || editor.undoStack.length > 0}
         canDiff={editable && tailwindReady && isDirty(editor) && editor.phase !== "stale" && editor.phase !== "compile-error"}
         canSave={editable && tailwindReady && editor.phase === "diff-ready" && Boolean(editor.preparedEdit)}

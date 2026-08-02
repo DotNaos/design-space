@@ -52,7 +52,7 @@ it("builds an empty authored slot on mobile, edits the item, saves, and reloads 
   });
 
   const first = render(<DocumentWorkspace target={target} />);
-  expect((await screen.findAllByText("Mobile home")).length).toBeGreaterThan(0);
+  expect(await screen.findByRole("main", { name: "Preview canvas" })).toBeInTheDocument();
   await waitFor(() => expect(runLocalOperationMock).toHaveBeenCalledWith({
     type: "compile-tailwind",
     value: "p-4",
@@ -186,10 +186,10 @@ it("blocks an unsourced fallback after the initial read fails and recovers on fo
 
   render(<DocumentWorkspace target={target} />);
   expect(await screen.findByText("Document workspace blocked")).toBeInTheDocument();
-  expect(screen.queryByText("Mobile home")).not.toBeInTheDocument();
+  expect(screen.queryByRole("main", { name: "Preview canvas" })).not.toBeInTheDocument();
 
   window.dispatchEvent(new Event("focus"));
-  expect((await screen.findAllByText("Mobile home")).length).toBeGreaterThan(0);
+  expect(await screen.findByRole("main", { name: "Preview canvas" })).toBeInTheDocument();
 });
 
 it("lets a connected empty project create its first screen", async () => {
@@ -219,7 +219,7 @@ it("shows truthful empty project Components and requires a fresh create diff aft
   });
 
   render(<DocumentWorkspace target={target} />);
-  expect((await screen.findAllByText("Only screen")).length).toBeGreaterThan(0);
+  expect(await screen.findByRole("main", { name: "Preview canvas" })).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Open Project" }));
   await userEvent.click(screen.getByRole("button", { name: "Components" }));
 

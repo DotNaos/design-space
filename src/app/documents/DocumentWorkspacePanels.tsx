@@ -4,11 +4,11 @@ import { Library } from "lucide-react";
 import type { ComponentTreeRow, SelectionTarget } from "../../model";
 import type { StrictUiViolation } from "../../shared/strict-ui";
 import type { TargetDocumentEntry, TargetFileEntry } from "../../shared/target-module";
-import type { CanvasContextMenuRequest } from "../components/PreviewCanvas";
-import { ComponentTree } from "../components/ComponentTree";
-import { PreviewCanvas } from "../components/PreviewCanvas";
-import type { CatalogEntry } from "../components/CatalogPanel";
-import { SlotCatalogPanel } from "../components/SlotCatalogPanel";
+import type { CanvasContextMenuRequest } from "../components/PreviewCanvas/PreviewCanvas";
+import { ComponentTree } from "../components/ComponentTree/ComponentTree";
+import { PreviewCanvas } from "../components/PreviewCanvas/PreviewCanvas";
+import type { CatalogEntry } from "../components/CatalogPanel/CatalogPanel";
+import { SlotCatalogPanel } from "../components/SlotCatalogPanel/SlotCatalogPanel";
 import type { DocumentAdapterView } from "../document/document-adapters";
 import type { SelectionNavigationCommand } from "../document/selection-navigation";
 import type { MobilePane } from "../shell/MobileDock";
@@ -282,7 +282,7 @@ function LibraryBrowseState(props: { label?: string; readOnly: boolean }) {
 function LibraryInspectorState(props: { label?: string; readOnly: boolean }) {
   return (
     <section aria-label="Library component access" className="h-full w-full bg-[#141518] px-4 py-5">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-sky-400">Library access</p>
+      <p className="text-[9px] font-semibold text-sky-400">Library access</p>
       <h2 className="mt-2 text-sm font-semibold text-zinc-100">{props.label ?? "No component selected"}</h2>
       {props.label ? (
         <dl className="mt-5 space-y-4 text-[11px]">

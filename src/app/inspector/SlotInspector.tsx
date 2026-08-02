@@ -24,7 +24,7 @@ export function SlotInspector(props: {
   return (
     <aside aria-label={`${props.slot.label} slot inspector`} className={`${props.className ?? "flex"} min-h-0 min-w-0 flex-col overflow-y-auto bg-[#141518]`}>
       <header className="border-b border-white/10 px-4 py-3">
-        <p className="text-[9px] uppercase tracking-[0.14em] text-zinc-600">Slot</p>
+        <p className="text-[9px] text-zinc-600">Slot</p>
         <div className="mt-1 flex items-center gap-2">
           <CircleDot className={props.slot.count ? "text-emerald-400" : "text-zinc-600"} size={14} />
           <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-100">{props.slot.label}</h2>
