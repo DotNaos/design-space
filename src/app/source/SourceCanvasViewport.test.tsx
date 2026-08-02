@@ -159,6 +159,12 @@ it("reveals the real component subtree from a breadcrumb hover and navigates fro
     </SourceCanvasViewport>,
   );
 
+  const ancestry = screen.getByRole("navigation", { name: "Canvas ancestry" });
+  const currentCrumb = within(ancestry).getByText("WorkspaceStatus").closest("[aria-current]");
+  expect(currentCrumb).not.toBeNull();
+  expect(currentCrumb).toHaveClass("rounded-full", "bg-purple-500", "!px-2.5", "text-[8px]", "text-white");
+  expect(currentCrumb?.querySelector("[aria-hidden='true']")).toHaveClass("bg-white/20", "text-white");
+
   await userEvent.hover(screen.getByRole("button", { name: "App" }));
   const tree = await screen.findByRole("tree", { name: "App component tree" });
   expect(tree).toHaveClass("overflow-auto");
