@@ -110,6 +110,14 @@ it("defaults to the main checkout directly below the projects directory", async 
 
   render(<LibraryDevelopmentSourceControl onModeChange={vi.fn()} />);
 
+  const worktrees = await screen.findByRole("button", { name: "Development library worktree" });
+  await userEvent.click(worktrees);
+  const search = screen.getByRole("textbox", { name: "Search branches" });
+  await userEvent.type(search, "main");
+  expect(screen.getByRole("option", { name: "main" })).toBeVisible();
+  expect(screen.queryByRole("option", { name: "feature/designs" })).not.toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+
   await userEvent.click(await screen.findByRole("button", { name: "Start development source" }));
 
   await waitFor(() => expect(runLocalOperation).toHaveBeenLastCalledWith({
