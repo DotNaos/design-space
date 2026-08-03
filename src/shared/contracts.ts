@@ -240,6 +240,22 @@ export const libraryDevelopmentOperationSchema = z.discriminatedUnion("type", [
 
 export type LibraryDevelopmentOperation = z.infer<typeof libraryDevelopmentOperationSchema>;
 
+const packageVersionSchema = z.string()
+  .trim()
+  .min(1)
+  .max(80)
+  .regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/);
+
+export const libraryReleaseOperationSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("get-library-releases") }).strict(),
+  z.object({
+    type: z.literal("install-library-release"),
+    version: packageVersionSchema,
+  }).strict(),
+]);
+
+export type LibraryReleaseOperation = z.infer<typeof libraryReleaseOperationSchema>;
+
 export interface SourceSnapshot {
   editTargetId: string;
   value: string;

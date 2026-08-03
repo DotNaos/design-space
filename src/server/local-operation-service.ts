@@ -1,4 +1,4 @@
-import { browserOperationSchema, libraryDevelopmentOperationSchema, sourceApprovalOperationSchema } from "../shared/contracts";
+import { browserOperationSchema, libraryDevelopmentOperationSchema, libraryReleaseOperationSchema, sourceApprovalOperationSchema } from "../shared/contracts";
 import { documentOperationSchema } from "../shared/document-transactions";
 import { DesignSpaceError } from "./errors";
 import type { DocumentService } from "./document-service";
@@ -15,6 +15,7 @@ export class LocalOperationService implements OperationExecutor {
   readonly #editService: EditService;
   readonly #documentService: DocumentService;
   readonly #libraryDevelopmentService?: OperationExecutor;
+  readonly #libraryReleaseService?: OperationExecutor;
   readonly #sourceApprovalService?: OperationExecutor;
   #disposed = false;
 
@@ -23,11 +24,13 @@ export class LocalOperationService implements OperationExecutor {
     documentService: DocumentService,
     libraryDevelopmentService?: OperationExecutor,
     sourceApprovalService?: OperationExecutor,
+    libraryReleaseService?: OperationExecutor,
   ) {
     this.#editService = editService;
     this.#documentService = documentService;
     this.#libraryDevelopmentService = libraryDevelopmentService;
     this.#sourceApprovalService = sourceApprovalService;
+    this.#libraryReleaseService = libraryReleaseService;
   }
 
   async execute(input: unknown): Promise<unknown> {
@@ -37,6 +40,12 @@ export class LocalOperationService implements OperationExecutor {
         throw new DesignSpaceError("ACCESS_DENIED", "Library development is not configured for this project");
       }
       return this.#libraryDevelopmentService.execute(input);
+    }
+    if (libraryReleaseOperationSchema.safeParse(input).success) {
+      if (!this.#libraryReleaseService) {
+        throw new DesignSpaceError("ACCESS_DENIED", "Library releases are not configured for this project");
+      }
+      return this.#libraryReleaseService.execute(input);
     }
     if (documentOperationSchema.safeParse(input).success) return this.#documentService.execute(input);
     if (sourceApprovalOperationSchema.safeParse(input).success) {
@@ -51,6 +60,7 @@ export class LocalOperationService implements OperationExecutor {
 
   attachServer(server: ViteDevServer): void {
     this.#libraryDevelopmentService?.attachServer?.(server);
+    this.#libraryReleaseService?.attachServer?.(server);
   }
 
   dispose(): void {
@@ -58,5 +68,6 @@ export class LocalOperationService implements OperationExecutor {
     this.#disposed = true;
     this.#editService.dispose();
     this.#libraryDevelopmentService?.dispose?.();
+    this.#libraryReleaseService?.dispose?.();
   }
 }

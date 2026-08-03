@@ -77,6 +77,20 @@ export interface LibraryDevelopmentProjectStatus {
   worktrees: readonly LibraryDevelopmentWorktree[];
 }
 
+export interface LibraryReleaseVersion {
+  version: string;
+  publishedAt?: string;
+  deprecated?: string;
+}
+
+export interface LibraryReleaseStatus {
+  packageName: string;
+  currentVersion?: string;
+  requestedVersion?: string;
+  latestVersion?: string;
+  versions: readonly LibraryReleaseVersion[];
+}
+
 /** Keeps .designspace.ts type-safe without introducing a generated manifest. */
 export function defineDesignSpace<const Config extends DesignSpaceProjectConfig>(config: Config): Config {
   return config;

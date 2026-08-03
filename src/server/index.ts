@@ -7,6 +7,7 @@ export * from "./errors";
 export * from "./project-loader";
 export * from "./local-operation-service";
 export * from "./library-development-project";
+export * from "./library-release-service";
 export * from "./managed-document-registration";
 export * from "./tailwind-preview";
 export * from "./tailwind-intelligence-service";

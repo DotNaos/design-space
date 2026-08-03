@@ -1,5 +1,5 @@
 import { Input, Label, TextField } from "@heroui/react";
-import { Library, PackageCheck, Radio, Search } from "lucide-react";
+import { Library, Radio, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { DesignSpaceDevice, RuntimeSourceLibraryCatalog, RuntimeSourceWorkspace, RuntimeSourceWorkspaceEntry, SourceWorkspaceLibrary } from "../../shared/source-workspace";
@@ -7,6 +7,7 @@ import { filterSourceCatalog, selectedSourceCatalogComponent, sourceCatalogCompo
 import type { SourceLibraryMode } from "./useSourceLibraryRuntime";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 import { LibraryDevelopmentSourceControl } from "./LibraryDevelopmentSourceControl";
+import { LibraryReleaseSourceControl } from "./LibraryReleaseSourceControl";
 import { CatalogComponentRow } from "./CatalogComponentRow";
 import { CategoryFilter } from "./CategoryFilter";
 import { SourceOption } from "./SourceOption";
@@ -97,13 +98,10 @@ export function SourceLibrarySidebar(
                 label="Development"
                 onPress={() => props.onModeChange("development")}
               />
-              <SourceOption
+              <LibraryReleaseSourceControl
                 active={props.mode === "release"}
-                description={props.catalog?.release?.version ?? "Not installed"}
-                disabled={!props.catalog?.release}
-                icon={<PackageCheck aria-hidden="true" size={12} />}
-                label="Installed"
-                onPress={() => props.onModeChange("release")}
+                fallbackVersion={props.catalog?.release?.version ?? props.library?.version}
+                onModeChange={props.onModeChange}
               />
             </div>
             <LibraryDevelopmentSourceControl onModeChange={props.onModeChange} />

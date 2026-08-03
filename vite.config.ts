@@ -10,6 +10,7 @@ import {
   DocumentService,
   EditService,
   LibraryDevelopmentProjectService,
+  LibraryReleaseService,
   loadRegisteredProject,
   LocalOperationService,
   resolveServerProjectRoot,
@@ -49,6 +50,7 @@ export default defineConfig(async () => {
     new DocumentService(registeredTarget),
     new LibraryDevelopmentProjectService(registeredTarget),
     new SourceApprovalService(registeredTarget),
+    new LibraryReleaseService(registeredTarget),
   );
 
   return {
