@@ -220,7 +220,7 @@ function CategoryFilter(props: {
       onSelectionChange={(key) => props.onChange(String(key) as SourceLibraryCategory)}
     >
       <Select.Trigger className="flex h-8 w-full items-center gap-1.5 rounded-lg bg-black/25 px-2.5 text-[10px] text-zinc-300 outline-none ring-1 ring-inset ring-white/[0.07] data-[focus-visible]:ring-sky-400/30">
-        <Select.Value className="min-w-0 flex-1 truncate text-left" />
+        <Select.Value className="min-w-0 flex-1 truncate text-left !text-[10px] !leading-none" />
         <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
       </Select.Trigger>
       <Select.Popover placement="bottom" className="min-w-44 rounded-lg bg-[#18191c] p-1 shadow-2xl">
