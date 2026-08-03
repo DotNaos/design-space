@@ -76,10 +76,14 @@ it("shows native development and release sources with a design coverage audit", 
   );
 
   expect(screen.getByText("1/2")).toBeVisible();
+  expect(screen.getByRole("group", { name: "Components" })).toBeVisible();
+  expect(screen.getByRole("group", { name: "Primitives" })).toBeVisible();
   expect(screen.getByLabelText("Card design missing")).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /Button/, pressed: true })).toBeVisible();
-  expect(screen.getByRole("button", { name: /Card/ })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Button", pressed: true })).toHaveClass("bg-purple-500", "text-white");
+  expect(screen.getByRole("button", { name: "Card" })).toBeVisible();
+  expect(screen.queryByText("Component")).not.toBeInTheDocument();
+  expect(screen.queryByText("Primitive")).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: /Development/ }));
   expect(change).toHaveBeenCalledWith("development");
 });

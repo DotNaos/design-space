@@ -12,5 +12,6 @@ it("explains a missing design and its expected colocated path", () => {
     "title",
     "Design file missing · src/components/Button.design.tsx",
   );
-  expect(screen.getByLabelText("Button design missing").querySelector("svg")).toHaveClass("text-red-400/80");
+  expect(screen.getByLabelText("Button design missing")).toHaveClass("rounded-full", "bg-rose-500", "text-white");
+  expect(screen.getByLabelText("Button design missing").querySelector("svg")).toHaveClass("text-white");
 });

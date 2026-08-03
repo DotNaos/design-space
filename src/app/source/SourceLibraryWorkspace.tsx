@@ -73,6 +73,10 @@ export function SourceLibrarySidebar(
     () => filterSourceCatalog(components, query, props.catalogKind === "app" ? "all" : category),
     [category, components, props.catalogKind, query],
   );
+  const sections = useMemo(
+    () => catalogSections(visible, props.catalogKind),
+    [props.catalogKind, visible],
+  );
   const selected = selectedSourceCatalogComponent(components, props.selected)?.id;
   useEffect(() => {
     const fallback = visible[0];
@@ -139,14 +143,21 @@ export function SourceLibrarySidebar(
         : "min-h-0 flex-1"}
       >
         <div aria-label="Component list" className="min-h-0 overflow-y-auto py-2" role="list">
-          {visible.map((component) => (
-            <CatalogComponentRow
-              component={component}
-              key={component.id}
-              selected={selected === component.id}
-              source={selectedCatalogWorkspace(props)}
-              onSelect={props.onSelect}
-            />
+          {sections.map((section) => (
+            <div aria-label={section.label} className="pb-2" key={section.id} role={section.label ? "group" : undefined}>
+              {section.label ? (
+                <h3 className="px-4 pb-1.5 pt-2 text-[9px] font-medium text-zinc-500">{section.label}</h3>
+              ) : null}
+              {section.components.map((component) => (
+                <CatalogComponentRow
+                  component={component}
+                  key={component.id}
+                  selected={selected === component.id}
+                  source={selectedCatalogWorkspace(props)}
+                  onSelect={props.onSelect}
+                />
+              ))}
+            </div>
           ))}
           {!visible.length ? (
             <p className="px-5 py-10 text-center text-xs leading-5 text-zinc-600">
@@ -176,18 +187,15 @@ function CatalogComponentRow(props: {
         aria-pressed={props.selected}
         className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-2 pr-9 text-left text-xs ${
           props.selected
-            ? "bg-sky-500/15 text-sky-100"
+            ? "bg-purple-500 text-white hover:bg-purple-400"
             : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
         }`}
         fullWidth
         variant="ghost"
         onPress={() => props.onSelect(props.component.id)}
       >
-        <Diamond className="shrink-0 text-violet-400/70" size={12} />
+        <Diamond className={`shrink-0 ${props.selected ? "text-white/80" : "text-violet-400/70"}`} size={12} />
         <span className="min-w-0 flex-1 truncate">{props.component.label}</span>
-        <span className="shrink-0 text-[8px] text-zinc-700">
-          {props.component.category === "primitive" ? "Primitive" : props.component.category === "composed" ? "Component" : ""}
-        </span>
       </Button>
       {!props.component.entry?.design ? (
         <span className="absolute right-2">
@@ -201,6 +209,14 @@ function CatalogComponentRow(props: {
       ) : null}
     </div>
   );
+}
+
+function catalogSections(components: readonly SourceCatalogComponent[], kind: SourceCatalogKind) {
+  if (kind === "app") return [{ id: "app", label: undefined, components }];
+  return [
+    { id: "composed", label: "Components", components: components.filter((component) => component.category === "composed") },
+    { id: "primitive", label: "Primitives", components: components.filter((component) => component.category === "primitive") },
+  ].filter((section) => section.components.length > 0);
 }
 
 function CategoryFilter(props: {
