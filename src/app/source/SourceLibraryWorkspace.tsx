@@ -95,7 +95,7 @@ export function SourceLibrarySidebar(
       <div className="shrink-0 bg-white/[0.012] px-3 py-2.5">
         {props.catalogKind === "library" ? (
           <>
-            <div className="grid grid-cols-2 rounded-xl bg-white/[0.035] p-1">
+            <div className="grid grid-cols-2 rounded-full bg-white/[0.035] p-1">
               <SourceOption
                 active={props.mode === "development"}
                 description={props.catalog?.development ? "Editable" : "Not attached"}
@@ -219,7 +219,7 @@ function CategoryFilter(props: {
       selectedKey={props.value}
       onSelectionChange={(key) => props.onChange(String(key) as SourceLibraryCategory)}
     >
-      <Select.Trigger className="flex h-8 w-full items-center gap-1.5 rounded-lg bg-white/[0.045] px-2.5 text-[10px] text-zinc-300 outline-none transition-colors data-[focus-visible]:bg-white/[0.08]">
+      <Select.Trigger className="flex h-8 w-full items-center gap-1.5 rounded-full bg-white/[0.045] px-3 text-[10px] text-zinc-300 outline-none transition-colors data-[focus-visible]:bg-white/[0.08]">
         <Select.Value className="min-w-0 flex-1 truncate text-left !text-[10px] !leading-none" />
         <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
       </Select.Trigger>
@@ -252,7 +252,7 @@ function SourceOption(props: {
   return (
     <Button
       aria-pressed={props.active}
-      className={`h-9 w-full min-w-0 justify-start gap-1.5 rounded-lg px-2 text-left transition-colors ${
+      className={`h-9 w-full min-w-0 justify-start gap-1.5 rounded-full px-2.5 text-left transition-colors ${
         props.active ? "bg-white/[0.08] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.04]"
       }`}
       fullWidth

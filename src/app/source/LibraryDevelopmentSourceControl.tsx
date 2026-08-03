@@ -110,7 +110,7 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
           setWorktreeQuery("");
         }}
       >
-        <Select.Trigger className="flex h-9 min-w-0 items-center gap-2 rounded-lg bg-white/[0.055] px-2.5 text-[10px] text-zinc-300 outline-none transition-colors data-[focus-visible]:bg-white/[0.09]">
+        <Select.Trigger className="flex h-9 min-w-0 items-center gap-2 rounded-full bg-white/[0.055] px-3 text-[10px] text-zinc-300 outline-none transition-colors data-[focus-visible]:bg-white/[0.09]">
           <GitBranch className="size-3 shrink-0 text-zinc-500" />
           <span className="min-w-0 flex-1 truncate text-left font-medium">{selected?.branch ?? "Choose branch"}</span>
           <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
