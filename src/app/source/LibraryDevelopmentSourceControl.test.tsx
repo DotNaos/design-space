@@ -72,6 +72,7 @@ it("starts the selected worktree as the editable development source", async () =
   expect(await screen.findByRole("button", { name: "Development library worktree" })).toHaveTextContent(readyWorktree.branch);
   expect(screen.queryByText(readyWorktree.path)).not.toBeInTheDocument();
   const start = await screen.findByRole("button", { name: "Start development source" });
+  expect(start).toHaveTextContent("Start");
   await userEvent.click(start);
 
   await waitFor(() => expect(runLocalOperation).toHaveBeenLastCalledWith({
@@ -147,6 +148,7 @@ it("stops development and returns to the installed release", async () => {
   render(<LibraryDevelopmentSourceControl onModeChange={onModeChange} />);
 
   const stop = await screen.findByRole("button", { name: "Stop development source" });
+  expect(stop).toHaveTextContent("Stop");
   await userEvent.click(stop);
 
   await waitFor(() => expect(runLocalOperation).toHaveBeenLastCalledWith({

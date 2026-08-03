@@ -96,7 +96,7 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
   }
 
   return (
-    <div className="mt-2 grid grid-cols-[minmax(0,1fr)_2.25rem] gap-1.5">
+    <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
       <Select
         aria-label="Development library worktree"
         className="min-w-0"
@@ -152,20 +152,19 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
       </Select>
       <Button
         aria-label={status.state === "running" ? "Stop development source" : "Start development source"}
-        className={`size-9 rounded-lg ${
+        className={`h-9 gap-1.5 rounded-full px-3 text-[10px] font-semibold text-white transition-colors ${
           status.state === "running"
-            ? "bg-rose-400/10 text-rose-300"
-            : "bg-emerald-400/10 text-emerald-300"
+            ? "bg-rose-500 hover:bg-rose-400"
+            : "bg-sky-500 hover:bg-sky-400"
         }`}
         isDisabled={Boolean(busy) || (status.state !== "running" && !selected?.packageReady)}
-        isIconOnly
         size="sm"
-        variant="ghost"
         onPress={() => void run(status.state === "running" ? "stop" : "start")}
       >
         {busy
           ? <LoaderCircle className="animate-spin" size={12} />
           : status.state === "running" ? <Square size={11} /> : <Play size={12} />}
+        <span>{status.state === "running" ? "Stop" : "Start"}</span>
       </Button>
       {error ? <div className="col-span-2"><OperationError message={error} /></div> : null}
     </div>
