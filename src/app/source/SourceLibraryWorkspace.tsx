@@ -252,9 +252,10 @@ function SourceOption(props: {
   return (
     <Button
       aria-pressed={props.active}
-      className={`h-9 min-w-0 justify-start gap-1.5 rounded-lg px-2 text-left transition-colors ${
+      className={`h-9 w-full min-w-0 justify-start gap-1.5 rounded-lg px-2 text-left transition-colors ${
         props.active ? "bg-white/[0.08] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.04]"
       }`}
+      fullWidth
       isDisabled={props.disabled}
       variant="ghost"
       onPress={props.onPress}
