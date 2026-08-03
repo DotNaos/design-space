@@ -91,7 +91,7 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
   }
 
   return (
-    <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
+    <div className="mt-2 grid grid-cols-[minmax(0,1fr)_2.25rem] gap-1.5">
       <Select
         aria-label="Development library worktree"
         className="min-w-0"
@@ -99,26 +99,23 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
         selectedKey={selection}
         onSelectionChange={(key) => setSelection(String(key))}
       >
-        <Select.Trigger className="flex h-8 min-w-0 items-center gap-1.5 rounded-md border border-white/10 bg-black/20 px-2 text-[10px] text-zinc-300 outline-none data-[focus-visible]:border-sky-300/40">
+        <Select.Trigger className="flex h-9 min-w-0 items-center gap-2 rounded-lg bg-black/25 px-2.5 text-[10px] text-zinc-300 outline-none ring-1 ring-inset ring-white/[0.07] data-[focus-visible]:ring-sky-400/30">
           <GitBranch className="size-3 shrink-0 text-zinc-500" />
-          <Select.Value className="min-w-0 flex-1 truncate text-left" />
+          <span className="min-w-0 flex-1 truncate text-left font-medium">{selected?.branch ?? "Choose branch"}</span>
           <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
         </Select.Trigger>
         <Select.Popover className="min-w-64 rounded-lg bg-[#18191c] p-1 shadow-2xl" placement="bottom">
           <ListBox items={status.worktrees}>
             {(worktree) => (
               <ListBox.Item
-                className="flex min-h-10 cursor-default items-center rounded-md px-2 text-xs text-zinc-300 outline-none data-[disabled]:opacity-40 data-[focused]:bg-white/10 data-[selected]:text-sky-300"
+                className="flex min-h-8 cursor-default items-center gap-2 rounded-md px-2 text-[10px] text-zinc-300 outline-none data-[disabled]:opacity-40 data-[focused]:bg-white/10 data-[selected]:text-sky-300"
                 id={worktree.id}
                 isDisabled={!worktree.packageReady}
                 textValue={worktree.branch}
               >
-                <span className="min-w-0">
-                  <span className="block truncate">{worktree.branch}</span>
-                  <span className="block truncate font-mono text-[9px] text-zinc-600">
-                    {worktree.packageReady ? worktree.path : "UI package missing"}
-                  </span>
-                </span>
+                <GitBranch className="size-3 shrink-0 text-zinc-600" />
+                <span className="min-w-0 flex-1 truncate">{worktree.branch}</span>
+                {!worktree.packageReady ? <span className="shrink-0 text-[8px] text-amber-300/70">Package missing</span> : null}
                 <ListBox.ItemIndicator className="ml-auto size-3 shrink-0" />
               </ListBox.Item>
             )}
@@ -127,7 +124,7 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
       </Select>
       <Button
         aria-label={status.state === "running" ? "Stop development source" : "Start development source"}
-        className={`size-8 rounded-md ${
+        className={`size-9 rounded-lg ${
           status.state === "running"
             ? "bg-rose-400/10 text-rose-300"
             : "bg-emerald-400/10 text-emerald-300"

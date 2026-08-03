@@ -92,10 +92,10 @@ export function SourceLibrarySidebar(
         </p>
       </header>
 
-      <div className="shrink-0 border-b border-white/10 p-3">
+      <div className="shrink-0 border-b border-white/10 px-3 py-2.5">
         {props.catalogKind === "library" ? (
           <>
-            <div className="grid grid-cols-2 gap-1">
+            <div className="grid grid-cols-2 rounded-xl bg-black/20 p-1">
               <SourceOption
                 active={props.mode === "development"}
                 description={props.catalog?.development ? "Editable" : "Not attached"}
@@ -116,17 +116,17 @@ export function SourceLibrarySidebar(
             <LibraryDevelopmentSourceControl onModeChange={props.onModeChange} />
           </>
         ) : null}
-        <div className="mt-3 flex items-center justify-between text-[9px] text-zinc-600">
+        <div className="mt-2.5 flex items-center justify-between px-0.5 text-[9px] text-zinc-600">
           <span>Design coverage</span>
           <span className={ready === components.length && ready > 0 ? "text-emerald-400" : "text-amber-300"}>
             {ready}/{components.length}
           </span>
         </div>
-        <TextField className="mt-3" value={query} onChange={setQuery}>
+        <TextField className="mt-2.5" value={query} onChange={setQuery}>
           <Label className="sr-only">Search components</Label>
-          <div className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2">
+          <div className="flex h-9 items-center gap-2 rounded-lg bg-black/25 px-2.5 ring-1 ring-inset ring-white/[0.07] focus-within:ring-sky-400/30">
             <Search aria-hidden="true" className="shrink-0 text-zinc-600" size={13} />
-            <Input className="min-w-0 flex-1 bg-transparent text-xs text-zinc-300 outline-none" placeholder="Search components" />
+            <Input className="min-w-0 flex-1 bg-transparent text-[11px] text-zinc-300 outline-none placeholder:text-zinc-600" placeholder="Search components" />
           </div>
         </TextField>
         {props.catalogKind === "library" ? (
@@ -219,7 +219,7 @@ function CategoryFilter(props: {
       selectedKey={props.value}
       onSelectionChange={(key) => props.onChange(String(key) as SourceLibraryCategory)}
     >
-      <Select.Trigger className="flex h-8 w-full items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-2.5 text-[10px] text-zinc-300 outline-none data-[focus-visible]:border-sky-300/40">
+      <Select.Trigger className="flex h-8 w-full items-center gap-1.5 rounded-lg bg-black/25 px-2.5 text-[10px] text-zinc-300 outline-none ring-1 ring-inset ring-white/[0.07] data-[focus-visible]:ring-sky-400/30">
         <Select.Value className="min-w-0 flex-1 truncate text-left" />
         <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
       </Select.Trigger>
@@ -252,8 +252,8 @@ function SourceOption(props: {
   return (
     <Button
       aria-pressed={props.active}
-      className={`h-11 min-w-0 justify-start gap-2 rounded-md border px-2 text-left ${
-        props.active ? "border-sky-400/30 bg-sky-400/[0.05]" : "border-white/10"
+      className={`h-9 min-w-0 justify-start gap-1.5 rounded-lg px-2 text-left transition-colors ${
+        props.active ? "bg-white/[0.08] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.04]"
       }`}
       isDisabled={props.disabled}
       variant="ghost"
@@ -261,8 +261,8 @@ function SourceOption(props: {
     >
       <span className={props.active ? "text-sky-300" : "text-zinc-600"}>{props.icon}</span>
       <span className="min-w-0">
-        <span className="block truncate text-[11px] font-medium text-zinc-300">{props.label}</span>
-        <span className="block truncate text-[9px] text-zinc-600">{props.description}</span>
+        <span className="block truncate text-[10px] font-medium leading-3.5">{props.label}</span>
+        <span className="block truncate text-[8px] leading-3 text-zinc-600">{props.description}</span>
       </span>
     </Button>
   );

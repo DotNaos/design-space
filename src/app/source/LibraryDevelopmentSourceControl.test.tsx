@@ -69,6 +69,8 @@ it("starts the selected worktree as the editable development source", async () =
 
   render(<LibraryDevelopmentSourceControl onModeChange={onModeChange} />);
 
+  expect(await screen.findByRole("button", { name: "Development library worktree" })).toHaveTextContent(readyWorktree.branch);
+  expect(screen.queryByText(readyWorktree.path)).not.toBeInTheDocument();
   const start = await screen.findByRole("button", { name: "Start development source" });
   await userEvent.click(start);
 
