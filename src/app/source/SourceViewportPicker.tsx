@@ -1,19 +1,12 @@
 import { Label, ListBox, Select, Slider, ToggleButton, Tooltip } from "@heroui/react";
-import { Crop, Frame, Monitor, Scan, Scaling, Smartphone, Tablet } from "lucide-react";
+import { Crop, Frame, Scan } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { DesignSpaceDevice } from "../../shared/source-workspace";
 import { SourceDeviceTabs } from "./SourceDeviceTabs";
 import type { SourceTreeNode } from "./source-workspace-tree";
-import { sourceViewportPresets, type SourceViewportPreset } from "./source-viewports";
-
-function ViewportDeviceIcon(props: { device: SourceViewportPreset["device"]; className?: string }) {
-  const iconProps = { "aria-hidden": true as const, className: props.className, size: 12, strokeWidth: 1.8 };
-  if (props.device === "desktop") return <Monitor {...iconProps} />;
-  if (props.device === "tablet") return <Tablet {...iconProps} />;
-  if (props.device === "mobile") return <Smartphone {...iconProps} />;
-  return <Scaling {...iconProps} />;
-}
+import { sourceViewportPresets } from "./source-viewports";
+import { ViewportDeviceIcon } from "./ViewportDeviceIcon";
 
 const viewportSectionLabel: Partial<Record<string, string>> = {
   responsive: "Responsive",

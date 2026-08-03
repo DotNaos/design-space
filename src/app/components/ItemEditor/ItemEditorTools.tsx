@@ -1,5 +1,5 @@
 import { Button, Tabs, Tooltip } from "@heroui/react";
-import { Braces, ChevronDown, CircleDot, LayoutPanelTop, Plus, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { Braces, CircleDot, LayoutPanelTop, Plus, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import type { ComponentControl } from "../../../shared/contracts";
@@ -7,10 +7,13 @@ import type { DesignValue } from "../../../shared/design-document";
 import type { SlotState } from "../../types";
 import { TailwindClassField } from "../../inspector/TailwindClassField";
 import { TailwindMappedControls } from "../../inspector/TailwindMappedControls";
-import { EditorSelectField } from "../EditorSelectField/EditorSelectField";
 import { PropertyControlField } from "../PropertyControlField/PropertyControlField";
+import { ToolPanel } from "./ToolPanel";
+import { ToolHeading } from "./ToolHeading";
+import { TailwindTargetPicker } from "./TailwindTargetPicker";
+import { PropertyGroup } from "./PropertyGroup";
 
-type ToolId = "design" | "properties" | "slots" | "classes";
+export type ToolId = "design" | "properties" | "slots" | "classes";
 type Tool = { id: ToolId; label: string; icon: React.ReactNode };
 
 export function ItemEditorTools(props: {
@@ -176,74 +179,6 @@ export function ItemEditorTools(props: {
         </ToolPanel>
       )}
     </Tabs>
-  );
-}
-
-function ToolPanel(props: { desktop: boolean; id: ToolId; children: React.ReactNode }) {
-  return (
-    <Tabs.Panel
-      id={props.id}
-      className={`${props.desktop ? "!ml-12 !mt-0 !mr-0 !mb-0" : "!m-0"} h-full min-h-0 overflow-y-auto overscroll-contain bg-[#141518] !p-0 outline-none`}
-    >
-      {props.children}
-    </Tabs.Panel>
-  );
-}
-
-function ToolHeading(props: { title: string; description: string; strictUi?: boolean }) {
-  return (
-    <div className="sticky top-0 z-10 flex min-h-16 items-center gap-3 border-b border-white/10 bg-[#141518] px-4 py-3">
-      <span className="min-w-0 flex-1">
-        <span className="block text-xs font-semibold text-zinc-200">{props.title}</span>
-        <span className="mt-0.5 block truncate text-[9px] text-zinc-600">{props.description}</span>
-      </span>
-      {props.strictUi && (
-        <Tooltip delay={350}>
-          <span className="flex shrink-0 items-center gap-1 text-[9px] text-emerald-400/80">
-            <ShieldCheck size={12} /> Strict UI
-          </span>
-          <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[9px] text-zinc-200 shadow-xl">Only controls that map deterministically to Tailwind CSS</Tooltip.Content>
-        </Tooltip>
-      )}
-    </div>
-  );
-}
-
-function TailwindTargetPicker(props: {
-  controls: readonly ComponentControl[];
-  selectedProp: string;
-  onChange: (prop: string) => void;
-}) {
-  if (props.controls.length < 2) return null;
-  return (
-    <div className="border-b border-white/10 px-4 py-3">
-      <EditorSelectField
-        ariaLabel="Tailwind property"
-        density="compact"
-        label="Style property"
-        options={props.controls.map((control) => ({ id: control.id, label: control.label, value: control.prop }))}
-        value={props.selectedProp}
-        onChange={props.onChange}
-      />
-    </div>
-  );
-}
-
-function PropertyGroup(props: { title: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(true);
-  return (
-    <section className="border-b border-white/10">
-      <Button
-        aria-expanded={open}
-        className="flex min-h-11 w-full items-center justify-start gap-2 rounded-none px-4 text-left text-[10px] font-medium text-zinc-400 hover:bg-white/[0.02]"
-        variant="ghost"
-        onPress={() => setOpen((value) => !value)}
-      >
-        <span className="flex-1">{props.title}</span>
-        <ChevronDown size={13} className={`text-zinc-600 transition-transform ${open ? "rotate-180" : ""}`} />
-      </Button>
-      {open && <div className="space-y-4 px-4 pb-4">{props.children}</div>}
-    </section>
   );
 }
 

@@ -3,6 +3,7 @@ import { Button, Input, Label, TextField } from "@heroui/react";
 import { Boxes, ChevronRight, Library, Plus, Search, Smartphone } from "lucide-react";
 
 import type { TargetDocumentEntry } from "../../shared/target-module";
+import { ModeButton } from "./ModeButton";
 
 export type ProductMode = "app" | "library";
 
@@ -61,8 +62,4 @@ export function DocumentNavigator(props: {
       </div>
     </aside>
   );
-}
-
-function ModeButton(props: { active: boolean; icon: React.ReactNode; label: string; onPress: () => void }) {
-  return <Button className="min-h-9" size="sm" variant={props.active ? "secondary" : "ghost"} onPress={props.onPress}>{props.icon}{props.label}</Button>;
 }

@@ -47,6 +47,13 @@ project + source file + export name
 Each JSX use of that definition is a component instance in the composed app tree. The definition remains
 owned by its source file regardless of how many instances exist.
 
+Every production component definition MUST live in its own source file. A source file MUST NOT define a
+second component, and a component MUST NOT declare an inline or nested component in its function body.
+Small rendering helpers that return JSX are components when they use a component-style PascalCase name;
+move them to their own file instead of hiding a second component inside an implementation. This boundary
+keeps source identity, design colocation, review, and signing unambiguous. The repository ESLint rule
+`design-space/one-component-per-file` enforces it for production and example TSX source.
+
 Component props MUST be read from the compiler-resolved TypeScript props type. Ordinary values such as
 `string`, `number`, `boolean`, enums, and structured data are properties, not source-tree nodes.
 

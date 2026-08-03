@@ -2,10 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { WandSparkles } from "lucide-react";
 import { Button } from "@heroui/react";
 
-import type {
-  RuntimeSourceWorkspaceEntry,
-  SourceWorkspaceLayer,
-} from "../../shared/source-workspace";
+import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
 import { SourceCanvasFeedbackDock } from "./SourceCanvasFeedbackDock";
@@ -21,10 +18,11 @@ import { measureSourcePreviewContent, type SourcePreviewContentSize } from "./so
 import { externalSourceLayerOwner, sourceEntryOwner, sourceLayerOwner } from "./source-layer-ownership";
 import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement, sourceLayerElements } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
-import { renderStaticSourceDesignMarkup, renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
+import { renderStaticSourceDesignMarkup, renderStaticSourcePreviewMarkup } from "./source-static-preview";
 import type { SourcePreviewFrameProps } from "./source-preview-frame-props";
 import { SourceComponentReviewCheckpoint } from "./SourceComponentReviewCheckpoint";
 import { sourceReviewGraphProperties, sourceReviewGraphSlots } from "./source-review-graph";
+import { PlayablePreview } from "./PlayablePreview";
 
 export function sourceStaticProjectionLayerId(options: {
   entry?: RuntimeSourceWorkspaceEntry;
@@ -584,34 +582,6 @@ function invalidDesignMessage(definition: ComponentDesignDefinition | undefined)
 }
 
 type LoadedDesign = { designId: string; definition: ComponentDesignDefinition };
-function PlayablePreview(props: {
-  caseName: string;
-  centered?: boolean;
-  classCss?: string;
-  className?: string;
-  definition: ComponentDesignDefinition;
-  entry: RuntimeSourceWorkspaceEntry;
-  layer?: SourceWorkspaceLayer;
-  matrix: boolean;
-  styles: readonly string[];
-  text?: string;
-}) {
-  const output = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const root = output.current;
-    if (!root || !props.layer) return;
-    if (props.className !== undefined) applySourceLayerClassNameById(root, props.layer.id, props.className);
-    if (props.text !== undefined) applySourceLayerTextById(root, props.layer.id, props.text);
-  }, [props.className, props.layer, props.text]);
-  return (
-    <section aria-label={`${props.entry.label} interactive preview`} className="h-full w-full overflow-auto bg-[#0d0e10] text-zinc-100">
-      <style>{[props.styles.join("\n"), props.classCss ?? ""].join("\n")}</style>
-      <div ref={output} className="min-h-full">
-        <SourcePreviewContent caseName={props.caseName} centered={props.centered} definition={props.definition} entry={props.entry} matrix={props.matrix} />
-      </div>
-    </section>
-  );
-}
 
 export function projectSourceLayer(staging: HTMLElement, output: HTMLElement, layerId: string): boolean {
   const target = [...staging.querySelectorAll<HTMLElement>("[data-design-space-source-layer-id]")]

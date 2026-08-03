@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { LibraryDevelopmentProjectStatus } from "../../shared/source-workspace";
 import { runLocalOperation } from "../api";
+import { OperationError } from "./OperationError";
 
 interface LibraryDevelopmentSourceControlProps {
   onModeChange: (mode: "development" | "release") => void;
@@ -186,8 +187,4 @@ function chooseWorktree(
 function repositoryLabel(repository?: string): string {
   if (!repository) return "Development repository";
   return repository.replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
-}
-
-function OperationError(props: { message: string }) {
-  return <p className="mt-1.5 text-[9px] leading-4 text-rose-300">{props.message}</p>;
 }

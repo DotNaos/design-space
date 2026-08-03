@@ -8,20 +8,16 @@ import { SourceDeviceTabs } from "./SourceDeviceTabs";
 import { SourceDeviceFrame } from "./SourceDeviceFrame";
 import { SourceViewportPicker } from "./SourceViewportPicker";
 import { SourcePreviewModeToggle } from "./SourcePreviewModeToggle";
-import {
-  SourceReviewGraphModeControl,
-  SourceReviewGraphStage,
-  type SourceReviewGraph,
-  type SourceReviewGraphLayout,
-} from "./SourceReviewGraphStage";
+import { SourceReviewGraphModeControl, SourceReviewGraphStage, type SourceReviewGraph, type SourceReviewGraphLayout } from "./SourceReviewGraphStage";
 import type { SourcePreviewMode } from "./source-layer-design";
 import type { SourcePreviewContentSize } from "./source-preview-content-size";
 import type { SourceTreeNode } from "./source-workspace-tree";
 import { sourceDeviceFrameKind, sourceDeviceFrameLayout } from "./source-device-frame";
 import { defaultSourceViewport, sourceViewportPresets } from "./source-viewports";
 import type { SourceCanvasAncestryItem, SourceCanvasSlotTab } from "./source-canvas-ancestry";
+import { PreviewScreen } from "./PreviewScreen";
 
-const sourcePreviewId = "source-preview";
+export const sourcePreviewId = "source-preview";
 
 export function SourceCanvasViewport(props: {
   children: (frame: { width: number; height: number }) => React.ReactNode;
@@ -188,28 +184,4 @@ function sourceReviewGraphInsets(layout: SourceReviewGraphLayout) {
   if (layout === "focus") return { bottom: 0, left: 0, right: 0, top: 52 };
   if (layout === "horizontal") return { bottom: 44, left: 220, right: 220, top: 52 };
   return { bottom: 88, left: 0, right: 0, top: 116 };
-}
-
-function PreviewScreen(props: {
-  attachedHeader: boolean;
-  children: React.ReactNode;
-  clipToScreen: boolean;
-  frame: { height: number; width: number };
-}) {
-  return (
-    <div
-      data-design-space-instance-id={sourcePreviewId}
-      data-preview-frame-mode={props.clipToScreen ? "screen" : "content"}
-      className={`${props.clipToScreen ? "overflow-hidden" : "overflow-visible"} size-full ${props.attachedHeader ? "rounded-b-md" : "rounded-md shadow-2xl"} border border-white/15 bg-[#111216]`}
-      style={{
-        backgroundImage: "linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px)",
-        backgroundPosition: "-1px -1px",
-        backgroundSize: "32px 32px",
-        height: props.frame.height,
-        width: props.frame.width,
-      }}
-    >
-      {props.children}
-    </div>
-  );
 }

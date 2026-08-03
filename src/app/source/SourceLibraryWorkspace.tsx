@@ -1,28 +1,17 @@
-import { Button, Input, Label, ListBox, Select, TextField } from "@heroui/react";
-import { Diamond, Library, LockKeyhole, PackageCheck, Radio, Search } from "lucide-react";
+import { Input, Label, TextField } from "@heroui/react";
+import { Library, PackageCheck, Radio, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import type {
-  DesignSpaceDevice,
-  RuntimeSourceLibraryCatalog,
-  RuntimeSourceWorkspace,
-  RuntimeSourceWorkspaceEntry,
-  SourceWorkspaceLibrary,
-} from "../../shared/source-workspace";
-import { suggestedSourceDesignPath } from "../../shared/source-design";
-import { SourceDesignStatus } from "./SourceDesignStatus";
-import { SourcePreviewFrame } from "./SourcePreviewFrame";
-import {
-  filterSourceCatalog,
-  selectedSourceCatalogComponent,
-  sourceCatalogComponents,
-  type SourceCatalogComponent,
-  type SourceCatalogKind,
-  type SourceLibraryCategory,
-} from "./source-library-catalog";
+import type { DesignSpaceDevice, RuntimeSourceLibraryCatalog, RuntimeSourceWorkspace, RuntimeSourceWorkspaceEntry, SourceWorkspaceLibrary } from "../../shared/source-workspace";
+import { filterSourceCatalog, selectedSourceCatalogComponent, sourceCatalogComponents, type SourceCatalogComponent, type SourceCatalogKind, type SourceLibraryCategory } from "./source-library-catalog";
 import type { SourceLibraryMode } from "./useSourceLibraryRuntime";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 import { LibraryDevelopmentSourceControl } from "./LibraryDevelopmentSourceControl";
+import { CatalogComponentRow } from "./CatalogComponentRow";
+import { CategoryFilter } from "./CategoryFilter";
+import { SourceOption } from "./SourceOption";
+import { SourceLibraryCanvas } from "./SourceLibraryCanvas";
+import { SourceLibraryInspector } from "./SourceLibraryInspector";
 
 export interface SourceLibraryProps {
   appWorkspace?: RuntimeSourceWorkspace;
@@ -175,176 +164,12 @@ export function SourceLibrarySidebar(
   );
 }
 
-function CatalogComponentRow(props: {
-  component: SourceCatalogComponent;
-  selected: boolean;
-  source?: { entries: readonly RuntimeSourceWorkspaceEntry[] };
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="relative mx-2 flex min-h-10 items-center" role="listitem">
-      <Button
-        aria-pressed={props.selected}
-        className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-2 pr-9 text-left text-xs ${
-          props.selected
-            ? "bg-purple-500 text-white hover:bg-purple-400"
-            : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
-        }`}
-        fullWidth
-        variant="ghost"
-        onPress={() => props.onSelect(props.component.id)}
-      >
-        <Diamond className={`shrink-0 ${props.selected ? "text-white/80" : "text-violet-400/70"}`} size={12} />
-        <span className="min-w-0 flex-1 truncate">{props.component.label}</span>
-      </Button>
-      {!props.component.entry?.design ? (
-        <span className="absolute right-2">
-          <SourceDesignStatus
-            designPath={props.component.entry
-              ? suggestedSourceDesignPath(props.component.entry, props.source?.entries ?? [])
-              : "No registered source file"}
-            label={props.component.label}
-          />
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 function catalogSections(components: readonly SourceCatalogComponent[], kind: SourceCatalogKind) {
   if (kind === "app") return [{ id: "app", label: undefined, components }];
   return [
     { id: "composed", label: "Components", components: components.filter((component) => component.category === "composed") },
     { id: "primitive", label: "Primitives", components: components.filter((component) => component.category === "primitive") },
   ].filter((section) => section.components.length > 0);
-}
-
-function CategoryFilter(props: {
-  value: SourceLibraryCategory;
-  onChange: (value: SourceLibraryCategory) => void;
-}) {
-  const options = [
-    { id: "all", label: "All components" },
-    { id: "primitive", label: "Primitives" },
-    { id: "composed", label: "Composed" },
-  ] satisfies readonly { id: SourceLibraryCategory; label: string }[];
-  return (
-    <Select
-      aria-label="Component category"
-      className="mt-2 w-full"
-      selectedKey={props.value}
-      onSelectionChange={(key) => props.onChange(String(key) as SourceLibraryCategory)}
-    >
-      <Select.Trigger className="flex h-8 w-full items-center gap-1.5 rounded-full bg-white/[0.045] px-3 text-[10px] text-zinc-300 outline-none transition-colors data-[focus-visible]:bg-white/[0.08]">
-        <Select.Value className="min-w-0 flex-1 truncate text-left !text-[10px] !leading-none" />
-        <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
-      </Select.Trigger>
-      <Select.Popover placement="bottom" className="min-w-44 rounded-lg bg-[#1b1c20] p-1 shadow-2xl">
-        <ListBox items={options}>
-          {(item) => (
-            <ListBox.Item
-              className="flex min-h-8 cursor-default items-center rounded-md px-2 text-xs text-zinc-300 outline-none data-[focused]:bg-white/10 data-[selected]:text-sky-300"
-              id={item.id}
-              textValue={item.label}
-            >
-              {item.label}
-              <ListBox.ItemIndicator className="ml-auto size-3" />
-            </ListBox.Item>
-          )}
-        </ListBox>
-      </Select.Popover>
-    </Select>
-  );
-}
-
-function SourceOption(props: {
-  active: boolean;
-  description: string;
-  disabled?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Button
-      aria-pressed={props.active}
-      className={`h-9 w-full min-w-0 justify-start gap-1.5 rounded-full px-2.5 text-left transition-colors ${
-        props.active ? "bg-white/[0.08] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.04]"
-      }`}
-      fullWidth
-      isDisabled={props.disabled}
-      variant="ghost"
-      onPress={props.onPress}
-    >
-      <span className={props.active ? "text-sky-300" : "text-zinc-600"}>{props.icon}</span>
-      <span className="min-w-0">
-        <span className="block truncate text-[10px] font-medium leading-3.5">{props.label}</span>
-        <span className="block truncate text-[8px] leading-3 text-zinc-600">{props.description}</span>
-      </span>
-    </Button>
-  );
-}
-
-export function SourceLibraryCanvas(props: SourceLibraryProps) {
-  const component = selectedSourceLibraryComponent(props);
-  const source = selectedCatalogWorkspace(props);
-  if (!component) return <LibraryState title="No component selected" message="Choose a component from the native design catalog." />;
-  if (!component.entry) {
-    return <LibraryState title="Design missing" message={`${component.label} is exported by the package, but this package does not include a colocated native design.`} />;
-  }
-  return (
-    <SourcePreviewFrame
-      centerContent
-      device={props.device}
-      entry={component.entry}
-      entries={source?.entries}
-      generateDesignError={props.generatingDesignEntryId === component.entry.id ? props.generateDesignError : undefined}
-      generatingDesign={props.generatingDesignEntryId === component.entry.id}
-      runtime="react"
-      selectedClassCss={props.selectedClassCss}
-      selectedClassName={props.selectedClassName}
-      selectedDesignCase={props.selectedDesignCase}
-      selectedLayer={props.selectedLayer}
-      selectedText={props.selectedText}
-      isolateSelectedLayer={false}
-      mode={props.previewMode}
-      selectionMode={props.selectionMode}
-      styles={source?.styles ?? []}
-      workspaceNavigation={props.workspaceNavigation}
-      onGenerateDesign={(props.catalogKind === "app" || props.mode === "development") && props.onGenerateDesign
-        ? () => props.onGenerateDesign?.(component.entry!)
-        : undefined}
-      onDeviceChange={props.onDeviceChange}
-      onDesignCaseChange={props.onDesignCaseChange}
-      onModeChange={props.onPreviewModeChange}
-      onSelectLayer={props.onSelectLayer}
-      onSelectedLayerMetrics={props.onSelectedLayerMetrics}
-    />
-  );
-}
-
-function LibraryState(props: { message: string; title: string }) {
-  return (
-    <div className="grid h-full min-h-0 place-items-center bg-[#0d0e10] p-8 text-center">
-      <div className="max-w-sm"><PackageCheck className="mx-auto text-zinc-700" size={22} /><h2 className="mt-3 text-sm font-semibold text-zinc-300">{props.title}</h2><p className="mt-2 text-xs leading-5 text-zinc-600">{props.message}</p></div>
-    </div>
-  );
-}
-
-export function SourceLibraryInspector(props: SourceLibraryProps) {
-  const component = selectedSourceLibraryComponent(props);
-  const app = props.catalogKind === "app";
-  return (
-    <aside aria-label="Component library evidence" className="h-full w-full bg-[#141518] p-5">
-      <div className="flex items-center gap-2 text-zinc-500"><PackageCheck size={14} /><span className="text-[10px] font-medium">{app ? "App component" : "Library evidence"}</span></div>
-      <dl className="mt-5 space-y-4 text-xs">
-        <div><dt className="text-zinc-600">{app ? "Source root" : "Package"}</dt><dd className="mt-1 font-mono text-zinc-300">{app ? props.appWorkspace?.sourceRoot ?? "src" : props.catalog?.packageName ?? props.library?.packageName ?? "Not configured"}</dd></div>
-        <div><dt className="text-zinc-600">Selected source</dt><dd className="mt-1 text-zinc-300">{app ? component?.entry?.relativePath ?? "App source" : props.mode === "development" ? "Attached development source" : `Installed ${props.catalog?.release?.version ?? "package"}`}</dd></div>
-        <div><dt className="text-zinc-600">Access</dt><dd className="mt-1 flex items-center gap-1.5 text-zinc-300"><LockKeyhole size={12} />{app ? "Edit from the App workspace" : props.mode === "development" ? "Editable source" : "Read-only release"}</dd></div>
-        {component ? <div><dt className="text-zinc-600">Selected export</dt><dd className="mt-1 font-mono text-zinc-300">{component.label}</dd><dd className={`mt-1 text-[10px] ${component.entry?.design ? "text-emerald-400" : "text-amber-300"}`}>{component.entry?.design ? "Native design ready" : "Native design missing"}</dd></div> : null}
-      </dl>
-    </aside>
-  );
 }
 
 type SourceLibrarySelectionProps = Pick<
@@ -393,3 +218,6 @@ function catalogComponents(
 export function selectedSourceLibraryComponent(props: SourceLibrarySelectionProps): SourceCatalogComponent | undefined {
   return selectedSourceCatalogComponent(catalogComponents(props, props.catalogKind), props.selected);
 }
+
+export { SourceLibraryCanvas } from "./SourceLibraryCanvas";
+export { SourceLibraryInspector } from "./SourceLibraryInspector";

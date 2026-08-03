@@ -1,33 +1,13 @@
-import {
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
-} from "lucide-react";
-import { Button, Tooltip } from "@heroui/react";
 
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type PointerEvent,
-  type ReactNode,
-} from "react";
+
+import { useCallback, useEffect, useId, useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 import { useWorkspacePanelWidths } from "./use-workspace-panel-widths";
 import { useWorkspacePanelVisibility } from "./use-workspace-panel-visibility";
 import { useWorkspacePanelControl } from "./use-workspace-panel-control";
-import {
-  clampPanelWidth,
-  fitWorkspacePanelWidths,
-  normalizePanelBounds,
-  type PanelWidthBounds,
-  type WorkspacePanelNamespace,
-  type WorkspacePanelWidths,
-} from "./workspace-panel-state";
+import { clampPanelWidth, fitWorkspacePanelWidths, normalizePanelBounds, type PanelWidthBounds, type WorkspacePanelNamespace, type WorkspacePanelWidths } from "./workspace-panel-state";
+import { WorkspacePanel } from "./WorkspacePanel";
+import { WorkspacePanelSeparator } from "./WorkspacePanelSeparator";
 
 export const DESKTOP_WORKSPACE_MEDIA_QUERY = "(min-width: 1024px)";
 
@@ -39,7 +19,7 @@ const COLLAPSED_PANEL_WIDTH = 36;
 const SNAP_RESISTANCE_DISTANCE = 56;
 
 type PanelSide = keyof WorkspacePanelWidths;
-type PanelSnapFeedback = "resist-collapse" | "collapse" | "resist-expand" | "expand" | "resist-restore" | "restore";
+export type PanelSnapFeedback = "resist-collapse" | "collapse" | "resist-expand" | "expand" | "resist-restore" | "restore";
 
 export type WorkspacePanelDefinition = Partial<PanelWidthBounds> & {
   label: string;
@@ -341,181 +321,6 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
       />
     </div>
   );
-}
-
-function WorkspacePanel(props: {
-  content: ReactNode;
-  contentClassName?: string;
-  controls: string;
-  label: string;
-  header?: ReactNode;
-  hideToggle?: boolean;
-  managedHeader?: boolean;
-  side: keyof WorkspacePanelWidths;
-  suppressed: boolean;
-  visible: boolean;
-  workspaceExpanded: boolean;
-  onToggle: () => void;
-}) {
-  if (props.managedHeader) {
-    return (
-      <section
-        className="flex min-h-0 min-w-0 flex-col overflow-hidden"
-        data-workspace-panel={props.side}
-        data-workspace-panel-collapsed={!props.visible || undefined}
-        data-workspace-panel-expanded={props.workspaceExpanded || undefined}
-        data-workspace-panel-suppressed={props.suppressed || undefined}
-      >
-        {props.header}
-        <div
-          id={props.controls}
-          aria-label={props.label}
-          aria-hidden={!props.visible || props.suppressed}
-          className={`min-h-0 min-w-0 flex-1 overflow-hidden ${
-            props.visible && !props.suppressed ? props.contentClassName ?? "" : "hidden"
-          }`}
-          role="region"
-        >
-          {props.content}
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section
-      className={`grid min-h-0 min-w-0 overflow-hidden ${
-        props.hideToggle
-          ? "grid-cols-[minmax(0,1fr)]"
-          : props.visible
-          ? props.side === "left"
-            ? "grid-cols-[minmax(0,1fr)_36px]"
-            : "grid-cols-[36px_minmax(0,1fr)]"
-          : "grid-cols-[36px]"
-      }`}
-      data-workspace-panel={props.side}
-      data-workspace-panel-collapsed={!props.visible || undefined}
-      data-workspace-panel-expanded={props.workspaceExpanded || undefined}
-      data-workspace-panel-suppressed={props.suppressed || undefined}
-    >
-      <div
-        id={props.controls}
-        aria-label={props.label}
-        aria-hidden={!props.visible || props.suppressed}
-        className={`h-full min-h-0 min-w-0 overflow-hidden ${
-          props.visible && !props.suppressed ? props.side === "right" ? "order-2" : "order-1" : "hidden"
-        } ${props.contentClassName ?? ""}`}
-        role="region"
-      >
-        {props.content}
-      </div>
-      {props.hideToggle ? null : (
-        <div className={`${props.visible && props.side === "left" ? "order-2" : "order-1"} flex min-w-0 justify-center`}>
-          <WorkspacePanelToggle
-            controls={props.controls}
-            label={props.label}
-            side={props.side}
-            visible={props.visible}
-            onToggle={props.onToggle}
-          />
-        </div>
-      )}
-    </section>
-  );
-}
-
-function WorkspacePanelSeparator(props: {
-  bounds: PanelWidthBounds;
-  controls: string;
-  label: string;
-  side: keyof WorkspacePanelWidths;
-  snapFeedback?: PanelSnapFeedback;
-  value: number;
-  visible: boolean;
-  workspaceExpanded: boolean;
-  onPointerDown: (event: PointerEvent<HTMLElement>) => void;
-  onReset: () => void;
-  onResize: (width: number) => void;
-}) {
-  const resizeFromKeyboard = (event: KeyboardEvent<HTMLElement>) => {
-    const step = event.shiftKey ? 48 : 16;
-    let next: number | undefined;
-    if (event.key === "Home") next = props.bounds.minWidth;
-    if (event.key === "End") next = props.bounds.maxWidth;
-    if (event.key === "ArrowLeft") next = props.value + (props.side === "left" ? -step : step);
-    if (event.key === "ArrowRight") next = props.value + (props.side === "left" ? step : -step);
-    if (next === undefined) return;
-    event.preventDefault();
-    props.onResize(next);
-  };
-
-  return (
-    <div className="relative z-30 w-px">
-      <div
-        aria-label={`Resize ${props.label}`}
-        aria-controls={props.controls}
-        aria-orientation="vertical"
-        aria-valuemax={props.visible ? props.workspaceExpanded ? Math.round(props.value) : props.bounds.maxWidth : undefined}
-        aria-valuemin={props.visible ? props.bounds.minWidth : undefined}
-        aria-valuenow={props.visible ? Math.round(props.value) : undefined}
-        aria-valuetext={props.visible ? props.workspaceExpanded ? "Full width" : `${Math.round(props.value)} pixels` : "Collapsed"}
-        className={`group absolute inset-y-0 left-0 w-px touch-none outline-none before:absolute before:inset-y-0 before:-inset-x-2 before:content-[''] ${
-          props.visible ? "" : "pointer-events-none"
-        } ${
-          props.snapFeedback === "collapse" || props.snapFeedback === "expand" || props.snapFeedback === "restore"
-            ? "cursor-col-resize bg-violet-300 shadow-[0_0_12px_rgba(196,181,253,0.85)]"
-            : props.snapFeedback
-              ? "cursor-col-resize bg-white/70"
-              : props.visible
-                ? "cursor-col-resize bg-white/10 hover:bg-cyan-400/70 focus-visible:bg-cyan-300"
-                : "bg-white/[0.06]"
-        }`}
-        data-workspace-panel-snap={props.snapFeedback}
-        onDoubleClick={props.visible ? props.onReset : undefined}
-        onKeyDown={props.visible ? resizeFromKeyboard : undefined}
-        onPointerDown={props.visible ? props.onPointerDown : undefined}
-        role="separator"
-        tabIndex={props.visible ? 0 : -1}
-        title={props.visible ? "Drag or use arrow keys to resize. Double-click to reset." : undefined}
-      />
-    </div>
-  );
-}
-
-function WorkspacePanelToggle(props: {
-  controls: string;
-  label: string;
-  side: keyof WorkspacePanelWidths;
-  visible: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <Tooltip delay={350} closeDelay={80}>
-      <Button
-        isIconOnly
-        aria-controls={props.controls}
-        aria-expanded={props.visible}
-        aria-label={`${props.visible ? "Hide" : "Show"} ${props.label}`}
-        className="mt-2 size-7 min-w-7 rounded-lg border-0 bg-[#17181b]/95 text-zinc-500 shadow-lg shadow-black/20 backdrop-blur hover:bg-[#202126] hover:text-zinc-200"
-        data-workspace-panel-toggle={props.side}
-        size="sm"
-        variant="ghost"
-        onPress={props.onToggle}
-      >
-        <PanelToggleIcon side={props.side} visible={props.visible} />
-      </Button>
-      <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl">
-        {props.visible ? "Hide" : "Show"} {props.label}
-      </Tooltip.Content>
-    </Tooltip>
-  );
-}
-
-function PanelToggleIcon(props: { side: keyof WorkspacePanelWidths; visible: boolean }) {
-  const Icon = props.side === "left"
-    ? props.visible ? PanelLeftClose : PanelLeftOpen
-    : props.visible ? PanelRightClose : PanelRightOpen;
-  return <Icon aria-hidden="true" size={14} />;
 }
 
 function useDesktopWorkspace() {

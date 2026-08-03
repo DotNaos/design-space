@@ -1,9 +1,10 @@
 import { Button } from "@heroui/react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, FileDiff, GitCompareArrows, LoaderCircle, Redo2, RotateCcw, Save, Shield, Undo2 } from "lucide-react";
+import { ArrowLeft, FileDiff, GitCompareArrows, LoaderCircle, Redo2, RotateCcw, Save, Undo2 } from "lucide-react";
 
 import type { StrictUiEvidence } from "../../shared/strict-ui";
 import { DesignSpaceThemeToggle } from "./DesignSpaceThemeToggle";
 import { RunningTargetSwitcher, type WorkspaceSurfaceNavigation } from "./RunningTargetSwitcher";
+import { StrictStatusButton } from "./StrictStatusButton";
 export function WorkspaceTopBar(props: {
   targetLabel: string;
   documentLabel: string;
@@ -78,17 +79,4 @@ export function WorkspaceTopBar(props: {
       </div>
     </header>
   );
-}
-
-function StrictStatusButton(props: { disabled: boolean; evidence?: StrictUiEvidence; checking: boolean; onPress: () => void }) {
-  const label = props.checking ? "Strict UI checking" : props.evidence ? `Strict UI ${props.evidence.status}` : "Strict UI not checked";
-  const icon = props.checking
-    ? <LoaderCircle className="animate-spin" size={14} />
-    : props.evidence?.status === "passed"
-      ? <CheckCircle2 size={14} />
-      : props.evidence?.status === "blocked" || props.evidence?.status === "warnings"
-        ? <AlertTriangle size={14} />
-        : <Shield size={14} />;
-  const tone = props.evidence?.status === "passed" ? "text-emerald-400" : props.evidence?.status === "blocked" ? "text-rose-400" : props.evidence?.status === "warnings" ? "text-amber-400" : "text-zinc-600";
-  return <Button aria-label={label} className={`size-9 shrink-0 ${tone}`} isDisabled={props.disabled} isIconOnly size="sm" variant="ghost" onPress={props.onPress}>{icon}</Button>;
 }

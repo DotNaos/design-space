@@ -1,24 +1,14 @@
-import { Button, Disclosure, Input, Label, TextField } from "@heroui/react";
+import { Button, Input, Label, TextField } from "@heroui/react";
 import { Braces, Component, Plus } from "lucide-react";
-import { useState } from "react";
 
 import type { ComponentPropertyDraft, DesignDocument } from "../../shared/design-document";
 import type { ComponentCreationRecipe } from "../../shared/target-module";
-import {
-  addComponentProperty,
-  addComponentSlot,
-  removeComponentProperty,
-  updateComponentDefinition,
-  updateComponentProperty,
-  updateComponentSlot,
-} from "../document/document-commands";
-import {
-  authoredSlotDependencyMessage,
-  removeAuthoredSlotDefinition,
-} from "../document/workspace-selection-actions";
+import { addComponentProperty, addComponentSlot, removeComponentProperty, updateComponentDefinition, updateComponentProperty, updateComponentSlot } from "../document/document-commands";
+import { authoredSlotDependencyMessage, removeAuthoredSlotDefinition } from "../document/workspace-selection-actions";
 import { ComponentPropertyEditor } from "./ComponentPropertyEditor";
 import { ComponentPropertyBindings, type BindingComponentOption } from "./ComponentPropertyBindings";
 import { ComponentSlotEditor } from "./ComponentSlotEditor";
+import { WorkshopSection } from "./WorkshopSection";
 
 const propertyKinds: ComponentPropertyDraft["kind"][] = ["text", "tailwind", "boolean", "number", "select"];
 
@@ -122,24 +112,6 @@ export function ComponentWorkshop(props: {
         <p className="mt-2 flex items-start gap-2 text-[10px] leading-4 text-zinc-600"><Braces size={13} className="mt-0.5 shrink-0" />{props.document.root ? "The body executes registered React adapters directly. Slot outlets stay explicit in the document." : "Add a root component to start the component body."}</p>
       </WorkshopSection>
     </aside>
-  );
-}
-
-function WorkshopSection(props: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
-  const [expanded, setExpanded] = useState(true);
-  return (
-    <Disclosure className="border-b border-white/10 px-4 py-4" isExpanded={expanded} onExpandedChange={setExpanded}>
-      <Disclosure.Heading className={`${expanded ? "mb-3" : ""} flex min-h-9 items-center gap-2`}>
-        <Disclosure.Trigger className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left lg:min-h-8">
-          <Disclosure.Indicator className="shrink-0 text-zinc-600" />
-          <span className="truncate text-xs font-semibold text-zinc-300">{props.title}</span>
-        </Disclosure.Trigger>
-        {props.action}
-      </Disclosure.Heading>
-      <Disclosure.Content>
-        <Disclosure.Body className="space-y-3 p-0">{props.children}</Disclosure.Body>
-      </Disclosure.Content>
-    </Disclosure>
   );
 }
 

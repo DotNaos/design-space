@@ -1,11 +1,11 @@
-import { Button, ToggleButton, Tooltip } from "@heroui/react";
-import { Fingerprint, Hand, Maximize2, Minus, MonitorSmartphone, MousePointer2, Plus, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { ToggleButton, Tooltip } from "@heroui/react";
+import { Fingerprint, Hand, MonitorSmartphone, MousePointer2, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
-
-import { CanvasGridControls } from "../CanvasGrid/CanvasGridControls";
 import type { CanvasGridMode, CanvasLayoutGridSettings } from "../CanvasGrid/canvas-grid-types";
+import { NarrowToolbarTab } from "./NarrowToolbarTab";
+import { CanvasActions } from "./CanvasActions";
 
-type CanvasViewportControlsProps = {
+export type CanvasViewportControlsProps = {
   compact?: boolean;
   headerContent?: React.ReactNode;
   headerHeight?: number;
@@ -127,47 +127,5 @@ export function CanvasViewportControls(props: CanvasViewportControlsProps) {
         </div>
       )}
     </>
-  );
-}
-
-function NarrowToolbarTab(props: {
-  active: boolean;
-  children: React.ReactNode;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Button
-      aria-current={props.active ? "page" : undefined}
-      className={`h-7 min-w-20 flex-1 justify-center gap-1 rounded-full px-3 text-[9px] transition-colors ${props.active ? "bg-[#303239] text-white" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200"}`}
-      size="sm"
-      variant="ghost"
-      onPress={props.onPress}
-    >
-      {props.children}
-      {props.label}
-    </Button>
-  );
-}
-
-function CanvasActions(props: CanvasViewportControlsProps & { compact?: boolean }) {
-  return (
-    <div className="flex shrink-0 items-center">
-      <div className={props.compact ? "block" : "hidden shrink-0 sm:block"}>
-        <CanvasGridControls
-          gridVisible={props.gridVisible}
-          layoutGrid={props.layoutGrid}
-          mode={props.gridMode}
-          onGridVisibleChange={props.onGridVisibleChange}
-          onLayoutGridChange={props.onLayoutGridChange}
-          onModeChange={props.onGridModeChange}
-        />
-      </div>
-      <Button isIconOnly aria-label="Zoom out" className={`${props.compact ? "inline-flex" : "hidden sm:inline-flex"} size-8 min-w-8 text-zinc-500 lg:size-7 lg:min-w-7`} size="sm" variant="ghost" onPress={props.onZoomOut}><Minus size={13} /></Button>
-      <span className={`${props.compact ? "block" : "hidden sm:block"} min-w-10 text-center text-[10px] tabular-nums text-zinc-300`}>{Math.round(props.scale * 100)}%</span>
-      <Button isIconOnly aria-label="Zoom in" className={`${props.compact ? "inline-flex" : "hidden sm:inline-flex"} size-8 min-w-8 text-zinc-500 lg:size-7 lg:min-w-7`} size="sm" variant="ghost" onPress={props.onZoomIn}><Plus size={13} /></Button>
-      <Button aria-label="Fit canvas" className="h-8 min-w-10 border-l border-white/[0.07] px-2 text-[10px] text-zinc-300 lg:h-7" size="sm" variant="ghost" onPress={props.onFit}><Maximize2 size={12} /> Fit</Button>
-      <Button isIconOnly aria-label="Reset zoom to 100%" className="size-8 min-w-8 border-l border-white/[0.07] text-zinc-500 lg:size-7 lg:min-w-7" size="sm" variant="ghost" onPress={props.onReset}><RotateCcw size={13} /></Button>
-    </div>
   );
 }

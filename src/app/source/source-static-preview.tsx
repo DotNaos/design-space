@@ -2,18 +2,16 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { createElement, type CSSProperties } from "react";
 
-import type {
-  ComponentDesignDefinition,
-  ComponentDesignPreview,
-  ComponentDesignPreviewLength,
-} from "../../shared/component-design";
+import type { ComponentDesignDefinition, ComponentDesignPreview, ComponentDesignPreviewLength } from "../../shared/component-design";
 import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { PreviewBoundary } from "../PreviewBoundary";
 import { SourcePreviewRuntimeContext } from "./SourcePreviewRuntime";
 import type { SourceSlotScope } from "./source-slot-navigation";
+import { SourceCanvasSlotMarker } from "./SourceCanvasSlotMarker";
+import { SourceStructureDesign } from "./SourceStructureDesign";
 
-const sourceCanvasSlotPattern = "url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgdmlld0JveD0iMCAwIDI4IDI4Ij48cGF0aCBkPSJNMTQgOXYxME05IDE0aDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiNkOGI0ZmUiIHN0cm9rZS1vcGFjaXR5PSIuMTIiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==)";
-const sourceCanvasSharedPattern = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M14 9v10M9 14h10' fill='none' stroke='%237dd3fc' stroke-opacity='.12' stroke-width='1'/%3E%3C/svg%3E\")";
+export const sourceCanvasSlotPattern = "url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgdmlld0JveD0iMCAwIDI4IDI4Ij48cGF0aCBkPSJNMTQgOXYxME05IDE0aDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiNkOGI0ZmUiIHN0cm9rZS1vcGFjaXR5PSIuMTIiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==)";
+export const sourceCanvasSharedPattern = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M14 9v10M9 14h10' fill='none' stroke='%237dd3fc' stroke-opacity='.12' stroke-width='1'/%3E%3C/svg%3E\")";
 
 export type SourcePreviewContentProps = {
   caseName: string;
@@ -182,69 +180,7 @@ function previewProps(
   return { ...values, slots };
 }
 
-function SourceCanvasSlotMarker(props: { fill?: boolean; label: string; layerId: string; scope?: SourceSlotScope }) {
-  const shared = props.scope === "shared";
-  return (
-    <span
-      aria-label={`${props.label} slot`}
-      data-design-space-source-layer-id={props.layerId}
-      data-design-space-source-slot-name={props.label}
-      role="region"
-      style={{
-        alignItems: "center",
-        backgroundColor: shared ? "rgba(14, 116, 144, .12)" : "rgba(88, 28, 135, .16)",
-        backgroundImage: shared ? sourceCanvasSharedPattern : sourceCanvasSlotPattern,
-        backgroundPosition: "0 0",
-        backgroundSize: "28px 28px",
-        border: shared ? "1px solid rgba(125, 211, 252, .38)" : "1px solid rgba(192, 132, 252, .38)",
-        borderRadius: 10,
-        boxSizing: "border-box",
-        color: shared ? "#7dd3fc" : "#c4b5fd",
-        display: "flex",
-        flexDirection: "column",
-        gap: 4,
-        height: props.fill ? "100%" : undefined,
-        justifyContent: "center",
-        minHeight: props.fill ? "100%" : "clamp(64px, 18vh, 144px)",
-        minWidth: 96,
-        padding: 12,
-        width: "100%",
-      }}
-    >
-      <strong style={{ font: "600 12px/1.4 ui-monospace, SFMono-Regular, monospace" }}>{props.label}</strong>
-      <span style={{ color: "#71717a", font: "10px/1.4 ui-sans-serif, system-ui, sans-serif" }}>Empty slot</span>
-    </span>
-  );
-}
-
-function SourceStructureDesign(props: {
-  entry: RuntimeSourceWorkspaceEntry;
-  slotLayers: readonly SourceWorkspaceLayer[];
-  slotScopes?: Readonly<Record<string, SourceSlotScope>>;
-}) {
-  const slotsById = new Map(props.slotLayers.map((slot) => [slot.id, slot]));
-  const slotsByComponent = new Map(props.slotLayers.flatMap((slot) => (
-    slot.children.filter((child) => child.kind === "component").map((child) => [child.id, slot] as const)
-  )));
-  const attached = new Set<string>();
-  const layers = (props.entry.layers ?? []).map((layer) => structureLayer(
-    layer,
-    slotsById,
-    slotsByComponent,
-    attached,
-    props.slotScopes,
-    true,
-  ));
-  const remaining = props.slotLayers.filter((slot) => !attached.has(slot.id));
-  return (
-    <div data-design-space-preview-entry-root style={{ height: "100%", minHeight: "100%", width: "100%" }}>
-      {layers}
-      {remaining.map((slot) => <SourceCanvasSlotMarker key={slot.id} label={slot.label} layerId={slot.id} scope={props.slotScopes?.[slot.id]} />)}
-    </div>
-  );
-}
-
-function structureLayer(
+export function structureLayer(
   layer: SourceWorkspaceLayer,
   slotsById: ReadonlyMap<string, SourceWorkspaceLayer>,
   slotsByComponent: ReadonlyMap<string, SourceWorkspaceLayer>,

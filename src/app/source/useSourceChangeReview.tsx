@@ -1,21 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ComponentDesignDefinition } from "../../shared/component-design";
-import type {
-  RuntimeSourceWorkspace,
-  SourceWorkspaceLayer,
-} from "../../shared/source-workspace";
+import type { RuntimeSourceWorkspace, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { runLocalOperation } from "../api";
 import { SourcePreviewFrame } from "./SourcePreviewFrame";
 import { preparedSourceDraftModuleUrl } from "./source-draft-local";
 import { applySourceDraftChanges, SourceChangeApplyError } from "./source-change-apply";
 import type { SourceChangeReviewItem, SourceChangeReviewState } from "./source-change-review";
-import type {
-  SourceDraftEntry,
-  SourceDraftWorkspaceStore,
-} from "./source-draft-workspace";
+import type { SourceDraftEntry, SourceDraftWorkspaceStore } from "./source-draft-workspace";
 import { sourceDraftGroupId } from "./source-draft-workspace";
 import { findSourceTreeLayer } from "./source-workspace-tree";
+import { ReviewSourcePreview } from "./ReviewSourcePreview";
+import { ReviewPreviewUnavailable } from "./ReviewPreviewUnavailable";
 
 type VisualReviewContext = {
   currentFileId?: string;
@@ -324,43 +320,4 @@ function PreparedReviewPreview(props: {
     design: { ...props.entry.design!, load: async () => loaded.definition },
   };
   return <ReviewSourcePreview {...props} entry={preparedEntry} />;
-}
-
-function ReviewSourcePreview(props: {
-  change: SourceDraftEntry;
-  entries: RuntimeSourceWorkspace["entries"];
-  entry: RuntimeSourceWorkspace["entries"][number];
-  layer?: SourceWorkspaceLayer;
-  runtime: RuntimeSourceWorkspace["runtime"];
-  styles: readonly string[];
-}) {
-  return (
-    <div className="h-52 w-full min-w-0 overflow-hidden">
-      <SourcePreviewFrame
-        centerContent
-        compact
-        device={props.entry.device}
-        entry={props.entry}
-        entries={props.entries}
-        runtime={props.runtime}
-        isolateSelectedLayer={false}
-        selectedLayer={props.layer}
-        selectedClassName={props.change.visualReview?.className}
-        selectedText={props.change.visualReview?.text}
-        styles={[
-          ...props.styles,
-          ...(props.change.visualReview?.css ? [props.change.visualReview.css] : []),
-        ]}
-        onDeviceChange={() => undefined}
-      />
-    </div>
-  );
-}
-
-function ReviewPreviewUnavailable(props: { message: string }) {
-  return (
-    <div className="grid min-h-32 w-full place-items-center px-5 text-center text-[10px] leading-5 text-zinc-600">
-      {props.message}
-    </div>
-  );
 }

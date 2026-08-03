@@ -1,9 +1,11 @@
-import { Button } from "@heroui/react";
+
 
 import type { ComponentSlot, ComponentSlotList, StrictUiProps } from "../../../shared/strict-ui";
 import type { DocumentWorkspace } from "../../DocumentWorkspace";
 import type { LegacyWorkspace } from "../../App";
 import type { SourceWorkspace } from "../../SourceWorkspace";
+import { WorkspaceStatus } from "./WorkspaceStatus";
+import { WorkspaceAction } from "./WorkspaceAction";
 
 export interface WorkspaceShellProps extends StrictUiProps {
   slots: {
@@ -23,10 +25,5 @@ export function WorkspaceShell({ slots }: WorkspaceShellProps) {
   );
 }
 
-export function WorkspaceStatus() {
-  return <div className="sr-only">Design Space workspace status</div>;
-}
-
-export function WorkspaceAction() {
-  return <Button variant="ghost">Workspace action</Button>;
-}
+export { WorkspaceStatus } from "./WorkspaceStatus";
+export { WorkspaceAction } from "./WorkspaceAction";
