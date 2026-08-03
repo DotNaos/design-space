@@ -117,9 +117,9 @@ export function SourceLibrarySidebar(
         </div>
         <TextField className="mt-2.5" value={query} onChange={setQuery}>
           <Label className="sr-only">Search components</Label>
-          <div className="flex h-9 items-center gap-2 rounded-lg bg-white/[0.045] px-2.5 transition-colors focus-within:bg-white/[0.07]">
+          <div className="flex h-9 items-center gap-2 rounded-full bg-white/[0.045] px-3 transition-colors focus-within:bg-white/[0.07]">
             <Search aria-hidden="true" className="shrink-0 text-zinc-600" size={13} />
-            <Input className="min-w-0 flex-1 bg-transparent text-[11px] text-zinc-300 outline-none placeholder:text-zinc-600" placeholder="Search components" />
+            <Input className="min-w-0 flex-1 rounded-full bg-transparent text-[11px] text-zinc-300 outline-none placeholder:text-zinc-600" placeholder="Search components" />
           </div>
         </TextField>
         {props.catalogKind === "library" ? (

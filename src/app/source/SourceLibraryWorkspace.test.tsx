@@ -80,7 +80,7 @@ it("shows native development and release sources with a design coverage audit", 
   expect(screen.getByRole("group", { name: "Primitives" })).toBeVisible();
   expect(screen.getByLabelText("Card design missing")).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Button", pressed: true })).toHaveClass("bg-purple-500", "text-white");
+  expect(screen.getByRole("button", { name: "Button", pressed: true })).toHaveClass("rounded-full", "bg-violet-500/[0.14]", "text-violet-200");
   expect(screen.getByRole("button", { name: "Card" })).toBeVisible();
   expect(screen.queryByText("Component")).not.toBeInTheDocument();
   expect(screen.queryByText("Primitive")).not.toBeInTheDocument();

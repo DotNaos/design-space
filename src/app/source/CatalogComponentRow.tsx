@@ -12,19 +12,19 @@ export function CatalogComponentRow(props: {
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="relative mx-2 flex min-h-10 items-center" role="listitem">
+    <div className="relative mx-2.5 flex min-h-10 items-center" role="listitem">
       <Button
         aria-pressed={props.selected}
-        className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-2 pr-9 text-left text-xs ${
+        className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-full px-3.5 pr-10 text-left text-xs transition-colors ${
           props.selected
-            ? "bg-purple-500 text-white hover:bg-purple-400"
+            ? "bg-violet-500/[0.14] text-violet-200 hover:bg-violet-500/[0.2] hover:text-violet-100"
             : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
         }`}
         fullWidth
         variant="ghost"
         onPress={() => props.onSelect(props.component.id)}
       >
-        <Diamond className={`shrink-0 ${props.selected ? "text-white/80" : "text-violet-400/70"}`} size={12} />
+        <Diamond className={`shrink-0 ${props.selected ? "text-violet-300" : "text-violet-400/70"}`} size={12} />
         <span className="min-w-0 flex-1 truncate">{props.component.label}</span>
       </Button>
       {!props.component.entry?.design ? (
