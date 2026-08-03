@@ -82,8 +82,8 @@ export function SourceLibrarySidebar(
   }, [props.onSelect, props.selected, visible]);
   const ready = components.filter((component) => component.entry?.design).length;
   return (
-    <aside aria-label="Component catalog" className="flex h-full min-h-0 w-full flex-col bg-[#141518]">
-      <header className="shrink-0 border-b border-white/10 px-4 py-4">
+    <aside aria-label="Component catalog" className="flex h-full min-h-0 w-full flex-col bg-[#0f1012]">
+      <header className="shrink-0 bg-white/[0.018] px-4 py-4">
         <div className="flex items-center gap-2"><Library className="text-violet-300" size={15} /><h2 className="text-sm font-semibold text-zinc-100">Library</h2></div>
         <p className="mt-1 truncate font-mono text-[10px] text-zinc-500">
           {props.catalogKind === "app"
@@ -92,10 +92,10 @@ export function SourceLibrarySidebar(
         </p>
       </header>
 
-      <div className="shrink-0 border-b border-white/10 px-3 py-2.5">
+      <div className="shrink-0 bg-white/[0.012] px-3 py-2.5">
         {props.catalogKind === "library" ? (
           <>
-            <div className="grid grid-cols-2 rounded-xl bg-black/20 p-1">
+            <div className="grid grid-cols-2 rounded-xl bg-white/[0.035] p-1">
               <SourceOption
                 active={props.mode === "development"}
                 description={props.catalog?.development ? "Editable" : "Not attached"}
@@ -124,7 +124,7 @@ export function SourceLibrarySidebar(
         </div>
         <TextField className="mt-2.5" value={query} onChange={setQuery}>
           <Label className="sr-only">Search components</Label>
-          <div className="flex h-9 items-center gap-2 rounded-lg bg-black/25 px-2.5 ring-1 ring-inset ring-white/[0.07] focus-within:ring-sky-400/30">
+          <div className="flex h-9 items-center gap-2 rounded-lg bg-white/[0.045] px-2.5 transition-colors focus-within:bg-white/[0.07]">
             <Search aria-hidden="true" className="shrink-0 text-zinc-600" size={13} />
             <Input className="min-w-0 flex-1 bg-transparent text-[11px] text-zinc-300 outline-none placeholder:text-zinc-600" placeholder="Search components" />
           </div>
@@ -155,7 +155,7 @@ export function SourceLibrarySidebar(
           ) : null}
         </div>
         {props.details ? (
-          <div className="min-h-0 border-t border-white/10">
+          <div className="min-h-0 bg-white/[0.012]">
             {props.details}
           </div>
         ) : null}
@@ -219,11 +219,11 @@ function CategoryFilter(props: {
       selectedKey={props.value}
       onSelectionChange={(key) => props.onChange(String(key) as SourceLibraryCategory)}
     >
-      <Select.Trigger className="flex h-8 w-full items-center gap-1.5 rounded-lg bg-black/25 px-2.5 text-[10px] text-zinc-300 outline-none ring-1 ring-inset ring-white/[0.07] data-[focus-visible]:ring-sky-400/30">
+      <Select.Trigger className="flex h-8 w-full items-center gap-1.5 rounded-lg bg-white/[0.045] px-2.5 text-[10px] text-zinc-300 outline-none transition-colors data-[focus-visible]:bg-white/[0.08]">
         <Select.Value className="min-w-0 flex-1 truncate text-left !text-[10px] !leading-none" />
         <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
       </Select.Trigger>
-      <Select.Popover placement="bottom" className="min-w-44 rounded-lg bg-[#18191c] p-1 shadow-2xl">
+      <Select.Popover placement="bottom" className="min-w-44 rounded-lg bg-[#1b1c20] p-1 shadow-2xl">
         <ListBox items={options}>
           {(item) => (
             <ListBox.Item

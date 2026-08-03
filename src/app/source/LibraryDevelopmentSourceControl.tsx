@@ -76,7 +76,7 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
   if (!status?.configured && !error) return null;
   if (!status?.cloned) {
     return (
-      <div className="mt-2 rounded-lg border border-white/10 bg-black/15 p-2">
+      <div className="mt-2 rounded-lg bg-white/[0.035] p-2">
         <p className="truncate text-[9px] text-zinc-600" title={status?.repository}>
           {repositoryLabel(status?.repository)}
         </p>
@@ -110,13 +110,13 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
           setWorktreeQuery("");
         }}
       >
-        <Select.Trigger className="flex h-9 min-w-0 items-center gap-2 rounded-lg bg-black/25 px-2.5 text-[10px] text-zinc-300 outline-none ring-1 ring-inset ring-white/[0.07] data-[focus-visible]:ring-sky-400/30">
+        <Select.Trigger className="flex h-9 min-w-0 items-center gap-2 rounded-lg bg-white/[0.055] px-2.5 text-[10px] text-zinc-300 outline-none transition-colors data-[focus-visible]:bg-white/[0.09]">
           <GitBranch className="size-3 shrink-0 text-zinc-500" />
           <span className="min-w-0 flex-1 truncate text-left font-medium">{selected?.branch ?? "Choose branch"}</span>
           <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
         </Select.Trigger>
-        <Select.Popover className="min-w-64 rounded-lg bg-[#18191c] p-1 shadow-2xl" placement="bottom">
-          <div className="mb-1 flex h-8 items-center gap-2 rounded-md bg-black/25 px-2 ring-1 ring-inset ring-white/[0.07] focus-within:ring-sky-400/30">
+        <Select.Popover className="min-w-64 rounded-lg bg-[#1b1c20] p-1 shadow-2xl" placement="bottom">
+          <div className="mb-1 flex h-8 items-center gap-2 rounded-md bg-white/[0.055] px-2 transition-colors focus-within:bg-white/[0.09]">
             <Search aria-hidden="true" className="size-3 shrink-0 text-zinc-600" />
             <Input
               aria-label="Search branches"
