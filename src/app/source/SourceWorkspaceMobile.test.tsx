@@ -95,10 +95,19 @@ describe("SourceWorkspaceMobile", () => {
   it("returns from Files to the current workspace surface", async () => {
     const { props } = renderMobile({ activity: "files", mobilePane: "documents", returnActivity: "library" });
 
-    await userEvent.click(screen.getByRole("button", { name: "Files" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back to Library" }));
 
     expect(props.onActivityChange).toHaveBeenCalledWith("library");
     expect(props.onPaneChange).toHaveBeenCalledWith("documents");
+  });
+
+  it("returns from Files to the app structure", async () => {
+    const { props } = renderMobile({ activity: "files", mobilePane: "documents", returnActivity: "app" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Back to App" }));
+
+    expect(props.onActivityChange).toHaveBeenCalledWith("app");
+    expect(props.onPaneChange).toHaveBeenCalledWith("tree");
   });
 
   it("keeps the Files control reachable in both tab directions", async () => {

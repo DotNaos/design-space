@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
@@ -29,6 +29,58 @@ it("allows trusted TypeScript source files to use the code editor", async () => 
     directory: { displayName: "src/app/components" },
     fileName: "desktop.tsx",
   });
+});
+
+it("registers configured monorepo source files as editable", async () => {
+  const root = await mkdtemp(resolve(tmpdir(), "design-space-monorepo-registration-"));
+  try {
+    await symlink(resolve(process.cwd(), "node_modules"), resolve(root, "node_modules"), "dir");
+    await mkdir(resolve(root, "apps", "production", "src", "components"), { recursive: true });
+    await writeFile(resolve(root, ".designspace.ts"), "export default {};\n");
+    await writeFile(resolve(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
+    await writeFile(resolve(root, "apps", "production", "src", "App.tsx"), "export function App() { return <main />; }\n");
+    await writeFile(resolve(root, "apps", "production", "src", "components", "Toolbar.tsx"), "export function Toolbar() { return <nav />; }\n");
+
+    const target = await registerSourceProject(root, {
+      project: { id: "monorepo-registration", label: "Monorepo registration" },
+      devices: { mode: "responsive" },
+      source: { layout: "apps/production/src/App.tsx" },
+    });
+    const toolbar = [...target.files.values()].find((file) => file.displayName === "apps/production/src/components/Toolbar.tsx");
+
+    expect(toolbar).toBeDefined();
+    expect(target.editableFileIds?.has(toolbar!.id)).toBe(true);
+    expect(target.sourceComponentStore).toMatchObject({
+      directory: { displayName: "apps/production/src/components" },
+      fileName: "index.tsx",
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+it("keeps colocated component creation for a configured src app layout", async () => {
+  const root = await mkdtemp(resolve(tmpdir(), "design-space-src-app-registration-"));
+  try {
+    await symlink(resolve(process.cwd(), "node_modules"), resolve(root, "node_modules"), "dir");
+    await mkdir(resolve(root, "src", "app", "components"), { recursive: true });
+    await writeFile(resolve(root, ".designspace.ts"), "export default {};\n");
+    await writeFile(resolve(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
+    await writeFile(resolve(root, "src", "app", "App.tsx"), "export function App() { return <main />; }\n");
+
+    const target = await registerSourceProject(root, {
+      project: { id: "src-app-registration", label: "Src app registration" },
+      devices: { mode: "responsive" },
+      source: { layout: "src/app/App.tsx" },
+    });
+
+    expect(target.sourceComponentStore).toMatchObject({
+      directory: { displayName: "src/app/components" },
+      fileName: "index.tsx",
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 it("indexes a selected library checkout without requiring its own Design Space config", async () => {

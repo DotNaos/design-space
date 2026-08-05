@@ -1,4 +1,4 @@
-import { FileCode2 } from "lucide-react";
+import { ArrowLeft, FileCode2 } from "lucide-react";
 
 import { MobileAreaButton } from "./MobileAreaButton";
 
@@ -10,17 +10,19 @@ export function SourceWorkspaceAreaTabs(props: {
   returnActivity: Exclude<SourceWorkspaceActivity, "files">;
   onActivityChange: (activity: SourceWorkspaceActivity) => void;
 }) {
+  const filesActive = props.activity === "files";
+  const label = filesActive ? `Back to ${props.returnActivity === "library" ? "Library" : "App"}` : "Files";
   return (
     <nav
       aria-label={props.label ?? "Workspace areas"}
       className="flex shrink-0 items-center rounded-full bg-black/20 p-0.5"
     >
       <MobileAreaButton
-        active={props.activity === "files"}
-        label="Files"
-        onPress={() => props.onActivityChange(props.activity === "files" ? props.returnActivity : "files")}
+        active={filesActive}
+        label={label}
+        onPress={() => props.onActivityChange(filesActive ? props.returnActivity : "files")}
       >
-        <FileCode2 size={14} />
+        {filesActive ? <ArrowLeft size={14} /> : <FileCode2 size={14} />}
       </MobileAreaButton>
     </nav>
   );

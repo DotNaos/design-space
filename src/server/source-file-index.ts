@@ -70,13 +70,18 @@ export async function indexSourceWorkspace(
   config: DesignSpaceProjectConfig,
 ): Promise<IndexedSourceWorkspace> {
   const root = await canonicalRoot(unsafeRoot);
-  const relativePaths = await discoverBrowsableFiles(root);
+  const sourceRoot = inferredSourceRoot(config);
+  const relativePaths = await discoverBrowsableFiles(root, sourceRoot);
   const files = await registerDiscoveredFiles(root, relativePaths);
   const fileByPath = new Map(files.map((file) => [file.relativePath, file]));
   const conventionCandidates = files.filter((file) => sourceLocation(file.relativePath));
   const inferredCatalog = Boolean(config.source?.layout) || conventionCandidates.length === 0;
   const componentCandidates = inferredCatalog
-    ? files.filter((file) => !isDesignModule(file.relativePath) && inferredSourceLocation(file.relativePath, config))
+    ? files.filter((file) => (
+        isWithinSourceRoot(file.relativePath, sourceRoot)
+        && !isDesignModule(file.relativePath)
+        && inferredSourceLocation(file.relativePath, config)
+      ))
     : conventionCandidates;
   const indexedComponents = await indexTypeScriptComponents({
     projectRoot: root,
@@ -120,7 +125,7 @@ export async function indexSourceWorkspace(
 
   const manifest: SourceWorkspaceManifest = {
     runtime: config.runtime ?? "react",
-    sourceRoot: inferredCatalog ? inferredSourceRoot(config) : SOURCE_ROOT,
+    sourceRoot: inferredCatalog ? sourceRoot : SOURCE_ROOT,
     entries: Object.freeze(entries),
     devices: Object.freeze(deviceStates(entries, config)),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
@@ -255,19 +260,31 @@ async function importedLibraryComponents(
   })));
 }
 
-async function discoverBrowsableFiles(root: string): Promise<string[]> {
+async function discoverBrowsableFiles(root: string, sourceRoot: string): Promise<string[]> {
   const result = new Set<string>();
   for (const file of safeRootFiles) {
     if (await isSafeFile(resolve(root, file))) result.add(file);
   }
-  for (const directory of ["app", "public", "src"] as const) {
+  for (const directory of new Set(["app", "public", "src", sourceRoot])) {
     await walkDirectory(root, directory, 0, result);
   }
   return [...result].sort((left, right) => left.localeCompare(right, "en"));
 }
 
 function inferredSourceRoot(config: DesignSpaceProjectConfig): string {
-  return config.source?.layout.startsWith("app/") ? "app" : "src";
+  const layout = normalizedConfiguredLayout(config);
+  if (!layout) return "src";
+  const segments = layout.split("/");
+  const rootIndex = segments.findIndex((segment) => segment === "src" || segment === "app");
+  return rootIndex === -1 ? "src" : segments.slice(0, rootIndex + 1).join("/");
+}
+
+function normalizedConfiguredLayout(config: DesignSpaceProjectConfig): string | undefined {
+  return config.source?.layout.replace(/^\.\//, "");
+}
+
+function isWithinSourceRoot(relativePath: string, sourceRoot: string): boolean {
+  return relativePath === sourceRoot || relativePath.startsWith(`${sourceRoot}/`);
 }
 
 async function walkDirectory(root: string, relativeDirectory: string, depth: number, result: Set<string>): Promise<void> {
@@ -331,7 +348,7 @@ function inferredSourceLocation(
   if (!relativePath.endsWith(".tsx") || /(?:^|\/)[^/]+\.(?:test|spec|stories|design)\.tsx$/.test(relativePath)) return undefined;
   const device = inferredDevice(relativePath);
   const fileName = relativePath.split("/").at(-1) ?? relativePath;
-  const configuredLayout = config.source?.layout;
+  const configuredLayout = normalizedConfiguredLayout(config);
   const area: DesignSpaceArea = configuredLayout ? relativePath === configuredLayout
     ? "layout"
     : /(?:^|\/)components(?:\/|$)/i.test(relativePath)

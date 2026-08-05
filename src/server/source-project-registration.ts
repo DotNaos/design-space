@@ -21,14 +21,16 @@ export async function registerSourceProject(
   const registrationPath = await canonicalRegisteredFile(root, ".designspace.ts");
   const sourceWorkspace = await indexRegisteredSourceWorkspace(root, config);
   const sourceLibrary = await registerSourceLibrary(root, config, sourceWorkspace.manifest.library);
+  const sourceRoot = sourceWorkspace.manifest.sourceRoot;
+  const editableSourceRoot = sourceRoot === "src/app" ? "src" : sourceRoot;
   const sourceComponentStore = await registerSourceComponentStore(
     root,
-    config.source?.layout.startsWith("app/") ? "app/components" : "src/app/components",
+    componentStoreDirectory(config, sourceRoot),
     config.devices?.mode === "responsive" ? "index.tsx" : "desktop.tsx",
   );
   const editableFileIds = new Set(
     sourceWorkspace.files
-      .filter((file) => isEditableTypeScriptSource(file.relativePath))
+      .filter((file) => isEditableTypeScriptSource(file.relativePath, editableSourceRoot))
       .map((file) => file.id),
   );
   return {
@@ -145,6 +147,13 @@ async function resolveLibraryDesignModule(root: string, packageName: string): Pr
   return canonicalRegisteredFile(packageRoot, relativePath.replace(/^\.\//, "")).catch(() => undefined);
 }
 
-function isEditableTypeScriptSource(relativePath: string): boolean {
-  return /^(?:app|src)\//.test(relativePath) && /\.(?:ts|tsx)$/.test(relativePath);
+function isEditableTypeScriptSource(relativePath: string, sourceRoot: string): boolean {
+  return relativePath.startsWith(`${sourceRoot}/`) && /\.(?:ts|tsx)$/.test(relativePath);
+}
+
+function componentStoreDirectory(config: DesignSpaceProjectConfig, sourceRoot: string): string {
+  const layout = config.source?.layout.replace(/^\.\//, "");
+  if (!layout) return `${sourceRoot}/components`;
+  const layoutDirectory = layout.slice(0, Math.max(0, layout.lastIndexOf("/")));
+  return `${layoutDirectory}/components`;
 }
