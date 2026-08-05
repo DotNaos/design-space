@@ -46,6 +46,7 @@ function siblingUiLibraryRoot(): string | undefined {
     const commonDirectory = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
       cwd: root,
       encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
     }).trim();
     const repository = resolve(commonDirectory, "..", "..", "ui");
     const candidate = resolve(repository, "packages", "react-ui");

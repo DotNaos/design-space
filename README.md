@@ -43,7 +43,15 @@ Raw Vite startup is blocked. `DESIGN_SPACE_ALLOW_DIRECT=1` is a noisy debugging 
 
 ## Start from a target repository
 
-Install Design Space as a development dependency and add a script such as `"design-space": "design-space"`. Run that script from the frontend project root, for example `clients/web`. That root owns a minimal `.designspace.ts`:
+Install Design Space from the frontend project root and let the initializer create the package script and a minimal `.designspace.ts`:
+
+```bash
+pnpm add -D github:DotNaos/design-space#main
+pnpm exec design-space init
+pnpm design-space
+```
+
+The initializer derives the project identity from `package.json`, detects a conventional app entry when present, and never overwrites an existing `.designspace.ts`. The generated configuration is equivalent to:
 
 ```ts
 import { defineDesignSpace } from "@dotnaos/design-space/source-workspace";
@@ -84,7 +92,7 @@ The same contract can be placed at a React Native project root with `runtime: "r
 
 The component-library connection is derived from the frontend project's package dependencies. A normal package version is shown as a read-only release. `workspace:`, `file:`, or `link:` dependencies prove that a development source is connected; Design Space does not claim it is editable until that second project root has its own trusted write registration.
 
-The CLI accepts no root, path, command, or module arguments. The local developer chooses the target by the directory where the CLI starts, while the browser receives only the server-indexed files and exports.
+The CLI accepts `init` but no root, path, or module arguments. The local developer chooses the target by the directory where the CLI starts, while the browser receives only the server-indexed files and exports.
 
 ## Legacy document targets
 
