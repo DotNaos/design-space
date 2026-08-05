@@ -66,3 +66,15 @@ it("recognizes memo, forwardRef, default lambdas, and class components", () => {
   expect(defaultLambda).toHaveLength(1);
   expect(classComponent).toHaveLength(1);
 });
+
+it("recognizes components behind nested wrappers", () => {
+  const messages = verify(`
+    const Button = memo(forwardRef(function Button(props, ref) {
+      return <button ref={ref} {...props} />;
+    }));
+    const Icon = () => <svg />;
+  `);
+
+  expect(messages).toHaveLength(1);
+  expect(messages[0]).toMatchObject({ messageId: "multiple", line: 5 });
+});

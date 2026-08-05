@@ -40,7 +40,11 @@ function containsOwnJsx(node) {
 function wrappedFunction(node) {
   if (isFunctionNode(node)) return node;
   if (node?.type !== "CallExpression") return undefined;
-  return node.arguments.find((argument) => isFunctionNode(argument));
+  for (const argument of node.arguments) {
+    const functionNode = wrappedFunction(argument);
+    if (functionNode) return functionNode;
+  }
+  return undefined;
 }
 
 function classRendersJsx(node) {

@@ -203,6 +203,11 @@ export function FocusTreeRow(props: {
         size="sm"
         variant="ghost"
         onDoubleClick={row.kind === "component" ? openComponent : undefined}
+        onKeyDown={row.kind === "component" ? (event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          openComponent();
+        } : undefined}
         onPress={select}
       >
         {componentEntry && props.approvalReview ? (

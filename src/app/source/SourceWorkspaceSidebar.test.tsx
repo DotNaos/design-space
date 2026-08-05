@@ -405,7 +405,7 @@ it("keeps the tree fully visible until component hover previews its ownership", 
   expect(dashboard.className).not.toMatch(/opacity-/);
 });
 
-it("opens a nested component only on double-click", async () => {
+it("selects a nested component on click and opens it on double-click or Enter", async () => {
   const onFocus = vi.fn();
   const onOpenComponent = vi.fn();
   const onSelect = vi.fn();
@@ -429,6 +429,13 @@ it("opens a nested component only on double-click", async () => {
     kind: "component",
   }));
   expect(onOpenComponent).not.toHaveBeenCalled();
+
+  onFocus.mockClear();
+  dashboard.focus();
+  await userEvent.keyboard("{Enter}");
+  expect(onFocus).toHaveBeenCalledWith(expect.stringContaining("Dashboard"), expect.objectContaining({
+    kind: "component",
+  }));
 });
 
 it("opens a same-file component definition without requiring design evidence", async () => {
