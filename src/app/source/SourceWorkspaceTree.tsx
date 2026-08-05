@@ -27,7 +27,7 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
     : graph.occurrences.has(props.focusId ?? "") ? props.focusId! : requestedRootFocus ?? graph.roots[0];
   const atAppRoot = Boolean(focusId && graph.roots.includes(focusId));
   const [rootSelection, setRootSelection] = useState<SourceWorkspaceTreeProps["selected"]>();
-  const displayedSelection = atAppRoot ? rootSelection : props.selected;
+  const displayedSelection = atAppRoot ? props.selected ?? rootSelection : props.selected;
   const rows = useMemo(
     () => {
       if (!focusId) return [];

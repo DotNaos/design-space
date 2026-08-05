@@ -676,6 +676,27 @@ it("reveals and highlights a layer selected from the canvas", async () => {
   expect(screen.getByRole("button", { name: "Collapse Dashboard" })).toHaveAttribute("aria-expanded", "true");
 });
 
+it("keeps a canvas selection highlighted in the full app tree", async () => {
+  const graph = sourceFocusGraph(sourceTreeNodes(workspace), "desktop");
+  const occurrence = [...graph.occurrences.values()].find(({ node }) => node.label === "Dashboard")!;
+  render(
+    <SourceWorkspaceSidebar
+      {...callbacks}
+      selected={{
+        device: "desktop",
+        kind: "component",
+        nodeId: occurrence.node.id,
+        occurrenceId: occurrence.id,
+        sourceNodeId: occurrence.node.id,
+      }}
+      workspace={workspace}
+    />,
+  );
+
+  expect(await screen.findByRole("treeitem", { name: "Dashboard" }))
+    .toHaveAttribute("aria-selected", "true");
+});
+
 it("does not cover a visible selection with a locate control", () => {
   const graph = sourceFocusGraph(sourceTreeNodes(workspace), "desktop");
   const occurrenceId = initialFocusOccurrence(graph)!;

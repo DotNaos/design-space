@@ -2,6 +2,8 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
+const defaultResizeObserver = globalThis.ResizeObserver;
+
 vi.mock("../components/PreviewCanvas/PreviewCanvas", () => ({
   PreviewCanvas: (props: {
     canvasHeader?: React.ReactNode;
@@ -28,7 +30,13 @@ vi.mock("../components/PreviewCanvas/PreviewCanvas", () => ({
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
 import type { SourceTreeNode } from "./source-workspace-tree";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    configurable: true,
+    value: defaultResizeObserver,
+  });
+});
 
 const node: SourceTreeNode = {
   id: "app",
@@ -175,6 +183,49 @@ it("attaches an interactive ancestry path to the canvas", async () => {
   expect(screen.getByRole("button", { name: "slot:toolbar" })).toHaveAttribute("data-slot-scope", "shared");
   await userEvent.click(screen.getByRole("button", { name: "slot:status" }));
   expect(onSelectSlot).toHaveBeenCalledWith({ active: false, id: "status", label: "status", scope: "tree" });
+});
+
+it("keeps the current breadcrumb visible after revealing a collapsed path", async () => {
+  class NarrowResizeObserver {
+    constructor(private readonly callback: ResizeObserverCallback) {}
+    observe(target: Element) {
+      if (target instanceof HTMLDivElement) {
+        this.callback([{ contentRect: { width: 320 } } as ResizeObserverEntry], this as unknown as ResizeObserver);
+      }
+    }
+    unobserve() {}
+    disconnect() {}
+  }
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    configurable: true,
+    value: NarrowResizeObserver,
+  });
+
+  render(
+    <SourceCanvasViewport
+      ancestry={[
+        { id: "app", kind: "component", label: "App" },
+        { id: "shell", kind: "component", label: "WorkspaceShell" },
+        { id: "content", kind: "slot", label: "slot:content" },
+        { id: "workspace", kind: "component", label: "SourceWorkspace" },
+        { id: "sidebar", kind: "component", label: "SourceWorkspaceSidebar" },
+      ]}
+      device="desktop"
+      onDeviceChange={vi.fn()}
+    >
+      {() => <div>Preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  const ancestry = screen.getByRole("navigation", { name: "Canvas ancestry" });
+  const list = ancestry.querySelector("ol")!;
+  Object.defineProperty(list, "scrollWidth", { configurable: true, value: 640 });
+  list.scrollLeft = 0;
+
+  await userEvent.click(screen.getByRole("button", { name: "Show 3 hidden path items" }));
+
+  expect(within(ancestry).getByText("App")).toBeVisible();
+  expect(list.scrollLeft).toBe(640);
 });
 
 it("reveals the real component subtree from a breadcrumb hover and navigates from it", async () => {

@@ -58,7 +58,7 @@ export function SourceCanvasAncestryHeader(props: {
       cancelAnimationFrame(frame);
       observer?.disconnect();
     };
-  }, [pathCapacity, pathKey]);
+  }, [expandedPathKey, pathCapacity, pathKey]);
 
   useLayoutEffect(() => {
     const header = headerRef.current;
