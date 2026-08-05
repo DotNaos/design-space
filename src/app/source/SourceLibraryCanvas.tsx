@@ -13,6 +13,9 @@ export function SourceLibraryCanvas(props: SourceLibraryProps) {
   return (
     <SourcePreviewFrame
       centerContent
+      boxModelPreviewStore={props.boxModelPreviewStore}
+      codeAnnotations={props.codeAnnotations}
+      codeContexts={props.codeContexts}
       device={props.device}
       entry={component.entry}
       entries={source?.entries}
@@ -32,9 +35,12 @@ export function SourceLibraryCanvas(props: SourceLibraryProps) {
       onGenerateDesign={(props.catalogKind === "app" || props.mode === "development") && props.onGenerateDesign
         ? () => props.onGenerateDesign?.(component.entry!)
         : undefined}
+      onClearCodeFeedback={props.onClearCodeFeedback}
       onDeviceChange={props.onDeviceChange}
       onDesignCaseChange={props.onDesignCaseChange}
       onModeChange={props.onPreviewModeChange}
+      onRemoveCodeAnnotation={props.onRemoveCodeAnnotation}
+      onRemoveCodeContext={props.onRemoveCodeContext}
       onSelectLayer={props.onSelectLayer}
       onSelectedLayerMetrics={props.onSelectedLayerMetrics}
     />

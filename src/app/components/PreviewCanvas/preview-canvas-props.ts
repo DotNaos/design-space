@@ -25,6 +25,7 @@ export interface PreviewCanvasProps {
   revealTarget?: { key: string; rect: CanvasWorldRect };
   strictUiViolations?: readonly StrictUiViolation[];
   compact?: boolean;
+  showControls?: boolean;
   staticPreview?: boolean;
   forcedInteractionMode?: "select" | "interact";
   worldWidth?: number;

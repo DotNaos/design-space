@@ -127,7 +127,7 @@ it("defaults to the main checkout directly below the projects directory", async 
   }));
 });
 
-it("stops development and returns to the installed release", async () => {
+it("stops development without switching to an installed source", async () => {
   const running: LibraryDevelopmentProjectStatus = {
     configured: true,
     repository: "https://github.com/DotNaos/ui.git",
@@ -154,6 +154,6 @@ it("stops development and returns to the installed release", async () => {
   await waitFor(() => expect(runLocalOperation).toHaveBeenLastCalledWith({
     type: "stop-library-development",
   }));
-  expect(onModeChange).toHaveBeenCalledWith("release");
-  expect(localStorage.getItem("design-space.library-source")).toBe("release");
+  expect(onModeChange).not.toHaveBeenCalled();
+  expect(localStorage.getItem("design-space.library-source")).toBeNull();
 });

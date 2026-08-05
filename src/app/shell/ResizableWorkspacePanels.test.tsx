@@ -97,6 +97,34 @@ describe("ResizableWorkspacePanels", () => {
     expect(document.getElementById(collapsedToggle.getAttribute("aria-controls")!)).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("can place the right panel toggle in a full-height panel header without a separate rail", () => {
+    render(
+      <ResizableWorkspacePanels
+        namespace={{ projectId: "demo", documentId: "right-header" }}
+        left={{ label: "Project panel", content: <div>Project</div> }}
+        right={{ label: "Inspector panel", content: <div>Inspector</div> }}
+        rightHeader={({ controls, visible, onToggle }) => (
+          visible ? <button aria-controls={controls} aria-expanded={visible} onClick={onToggle}>Inline inspector header</button> : null
+        )}
+      >
+        {({ right }) => (
+          <div>
+            {!right.visible ? <button aria-controls={right.controls} aria-expanded={right.visible} onClick={right.onToggle}>Collapsed inspector header</button> : null}
+            Canvas
+          </div>
+        )}
+      </ResizableWorkspacePanels>,
+    );
+
+    const headerToggle = screen.getByRole("button", { name: "Inline inspector header" });
+    expect(headerToggle.closest("[data-workspace-panel='right']")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Hide Inspector panel" })).not.toBeInTheDocument();
+    fireEvent.click(headerToggle);
+    const collapsedToggle = screen.getByRole("button", { name: "Collapsed inspector header" });
+    expect(collapsedToggle).toHaveAttribute("aria-expanded", "false");
+    expect(document.getElementById(collapsedToggle.getAttribute("aria-controls")!)).toHaveAttribute("aria-hidden", "true");
+  });
+
   it("exposes external controls without reserving collapsed panel rails", () => {
     render(
       <ResizableWorkspacePanels
@@ -175,6 +203,45 @@ describe("ResizableWorkspacePanels", () => {
     expect(layout).not.toHaveAttribute("data-workspace-panel-expanded");
     expect(left).toHaveAttribute("aria-valuenow", "400");
     dispatchPointer(window, "pointerup", 3, 1320);
+  });
+
+  it("can clamp panel resizing without allowing a full-width takeover", async () => {
+    const namespace = { projectId: "demo", documentId: "bounded-panels" };
+    const visibilityKey = workspacePanelVisibilityStorageKey(namespace);
+    window.localStorage.setItem(visibilityKey, JSON.stringify({
+      version: 1,
+      left: true,
+      right: true,
+      expanded: "left",
+    }));
+
+    render(
+      <ResizableWorkspacePanels
+        allowPanelExpansion={false}
+        namespace={namespace}
+        left={{ label: "Project panel", content: <div>Project</div>, defaultWidth: 260, minWidth: 200, maxWidth: 400 }}
+        right={{ label: "Inspector panel", content: <div>Inspector</div>, defaultWidth: 300, minWidth: 240, maxWidth: 460 }}
+      >
+        <div>Canvas</div>
+      </ResizableWorkspacePanels>,
+    );
+
+    const layout = screen.getByText("Canvas").closest("[data-workspace-panel-layout]")!;
+    const left = screen.getByRole("separator", { name: "Resize Project panel" });
+    expect(layout).not.toHaveAttribute("data-workspace-panel-expanded");
+    expect(screen.getByText("Canvas").parentElement).toHaveAttribute("aria-hidden", "false");
+
+    dispatchPointer(left, "pointerdown", 1, 260);
+    dispatchPointer(window, "pointermove", 1, 1000);
+    expect(left).toHaveAttribute("aria-valuenow", "400");
+    expect(left).not.toHaveAttribute("data-workspace-panel-snap");
+    expect(layout).not.toHaveAttribute("data-workspace-panel-expanded");
+    expect(screen.getByText("Canvas").parentElement).toHaveAttribute("aria-hidden", "false");
+    dispatchPointer(window, "pointerup", 1, 1000);
+
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem(visibilityKey) ?? "{}")).toMatchObject({
+      expanded: null,
+    }));
   });
 
   it("resizes both panels by pointer and clamps them to their limits", () => {

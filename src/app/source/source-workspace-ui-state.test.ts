@@ -53,6 +53,7 @@ it("round-trips project-scoped editor state", () => {
       sourceNodeId: "components:Button",
     },
     workspaceMode: "design",
+    workspaceSurface: "app",
   };
 
   saveSourceWorkspaceUiState(storage, "project alpha", state);

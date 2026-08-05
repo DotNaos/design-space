@@ -2,7 +2,13 @@ import { z } from "zod";
 
 import { opaqueIdSchema, sourceVersionSchema } from "./ids";
 import type { SourceDesignScope } from "./source-design";
-import type { SourceComponentProp, SourceComponentSlot, SourceStrictUiFinding, SourceWorkspaceLayer } from "./source-workspace";
+import type {
+  SourceComponentProp,
+  SourceComponentSlot,
+  SourceStrictUiFinding,
+  SourceWorkspaceFileEntry,
+  SourceWorkspaceLayer,
+} from "./source-workspace";
 
 export { opaqueIdSchema, sourceVersionSchema } from "./ids";
 
@@ -163,6 +169,10 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
   }).strict(),
   z.object({ type: z.literal("analyze-tailwind"), value: z.string().max(10_000), cursor: z.number().int().min(0).max(10_000) }).strict(),
   z.object({
+    type: z.literal("list-project-files"),
+    scope: z.enum(["app", "library-development"]),
+  }).strict(),
+  z.object({
     type: z.literal("read-project-file"),
     fileId: opaqueIdSchema,
     scope: z.enum(["app", "library-development"]).optional(),
@@ -178,6 +188,7 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
     fileId: opaqueIdSchema,
     baseVersion: sourceVersionSchema,
     source: z.string().max(512 * 1024),
+    scope: z.enum(["app", "library-development"]).optional(),
   }).strict(),
   z.object({ type: z.literal("save-project-file-edit"), challengeId: z.string().uuid() }).strict(),
   z.object({
@@ -232,6 +243,14 @@ export const libraryDevelopmentOperationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("get-library-development") }).strict(),
   z.object({ type: z.literal("clone-library-development") }).strict(),
   z.object({
+    type: z.literal("clone-library-development-worktree"),
+    branch: z.string()
+      .trim()
+      .min(1)
+      .max(200)
+      .regex(/^[^\s~^:?*\\[\]]+$/),
+  }).strict(),
+  z.object({
     type: z.literal("start-library-development"),
     worktreeId: opaqueIdSchema,
   }).strict(),
@@ -267,6 +286,10 @@ export interface ProjectFileSnapshot {
   label: string;
   source: string;
   version: string;
+}
+
+export interface ProjectFileCatalog {
+  files: readonly SourceWorkspaceFileEntry[];
 }
 
 export interface SourceDraftComponent {

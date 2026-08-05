@@ -12,6 +12,7 @@ import type { SourceLayerMetrics } from "./source-layer-design";
 import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
 import { ComponentInspectorHeader } from "./ComponentInspectorHeader";
 import { ContractSection } from "./ContractSection";
+import type { BoxModelPreview } from "../inspector/tailwind-box-model-values";
 
 export interface SourceComponentInspectorProps {
   className?: string;
@@ -21,6 +22,10 @@ export interface SourceComponentInspectorProps {
   slotLayers?: readonly SourceWorkspaceLayer[];
   slotEditorReady?: boolean;
   styleEditor?: SourceLayerClassEditor;
+  openLayerComponent?: {
+    label: string;
+    onOpen: () => void;
+  };
   candidatesForSlot?: (slot: SourceWorkspaceLayer) => readonly SourceComponentCandidate[];
   outsideCurrentFile?: {
     currentRelativePath?: string;
@@ -30,6 +35,7 @@ export interface SourceComponentInspectorProps {
   onApplySlot?: (slot: SourceWorkspaceLayer, candidate: SourceComponentCandidate, action: "add" | "replace") => void;
   onPrepareSlotEdit?: () => void;
   onDesignCaseChange?: (caseName: string) => void;
+  onBoxModelPreviewChange?: (preview?: BoxModelPreview) => void;
 }
 
 export function SourceComponentInspector(props: SourceComponentInspectorProps) {
@@ -119,12 +125,14 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
             </ul>
           </section>
         )}
-        {props.layer?.kind === "html" && (
+        {(props.layer?.className || (props.layer && props.openLayerComponent)) && (
           <SourceLayerDesignInspector
             layer={props.layer}
             metrics={props.layerMetrics}
+            openComponent={props.openLayerComponent}
             previewClassName={previewClassName}
             styleEditor={props.styleEditor}
+            onBoxModelPreviewChange={props.onBoxModelPreviewChange}
             onClassNamePreviewChange={setPreviewClassName}
           />
         )}

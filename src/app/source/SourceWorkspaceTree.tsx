@@ -1,7 +1,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { centerSourceTreeRow, SourceTreeAnchorControls } from "./SourceTreeAnchorControls";
-import { initialFocusOccurrence, sourceCompositionRows, sourceFocusGraph, sourceOccurrenceSubtree, sourceIsolatedDesignRows, visibleSourceCompositionRows } from "./source-focus-tree";
+import { sourceCompositionRows, sourceFocusGraph, sourceOccurrenceSubtree, sourceIsolatedDesignRows, visibleSourceCompositionRows } from "./source-focus-tree";
 import { sourceTreeNodes } from "./source-workspace-tree";
 import { collapseSourceBranchesOutsideFocus } from "./source-tree-collapse";
 import { ancestorBranchKeys, ancestorRowKeys, sourceRowOutsideActiveFile } from "./source-tree-row-state";
@@ -12,15 +12,37 @@ import { FocusTreeRow } from "./FocusTreeRow";
 
 export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
   const device = props.selected?.device ?? "desktop";
-  const nodes = useMemo(() => sourceTreeNodes(props.workspace), [props.workspace]);
-  const graph = useMemo(() => sourceFocusGraph(nodes, device, props.rootNodeIds), [device, nodes, props.rootNodeIds]);
+  const nodes = useMemo(
+    () => props.treeNodes ?? sourceTreeNodes(props.workspace),
+    [props.treeNodes, props.workspace],
+  );
+  const graph = useMemo(
+    () => props.focusGraph ?? sourceFocusGraph(nodes, device, props.rootNodeIds),
+    [device, nodes, props.focusGraph, props.rootNodeIds],
+  );
   const definitionSelected = props.selected?.kind === "component" && !props.selected.occurrenceId;
   const requestedRootFocus = graph.roots.find((rootId) => graph.occurrences.get(rootId)?.node.id === props.focusNodeId);
   const focusId = definitionSelected
     ? undefined
-    : graph.occurrences.has(props.focusId ?? "") ? props.focusId! : requestedRootFocus ?? initialFocusOccurrence(graph);
-  const rows = useMemo(() => props.designNavigation && focusId ? sourceIsolatedDesignRows(graph, focusId) : sourceCompositionRows(graph, focusId), [focusId, graph, props.designNavigation]);
+    : graph.occurrences.has(props.focusId ?? "") ? props.focusId! : requestedRootFocus ?? graph.roots[0];
+  const atAppRoot = Boolean(focusId && graph.roots.includes(focusId));
+  const [rootSelection, setRootSelection] = useState<SourceWorkspaceTreeProps["selected"]>();
+  const displayedSelection = atAppRoot ? rootSelection : props.selected;
+  const rows = useMemo(
+    () => {
+      if (!focusId) return [];
+      return atAppRoot
+        ? sourceCompositionRows(graph, focusId)
+        : sourceIsolatedDesignRows(graph, focusId);
+    },
+    [atAppRoot, focusId, graph],
+  );
   const activeCanvasIds = useMemo(() => sourceOccurrenceSubtree(graph, focusId), [focusId, graph]);
+  const [previewOccurrenceId, setPreviewOccurrenceId] = useState<string>();
+  const previewCanvasIds = useMemo(
+    () => sourceOccurrenceSubtree(graph, previewOccurrenceId),
+    [graph, previewOccurrenceId],
+  );
   const activePathKeys = useMemo(() => {
     const focusIndex = rows.findIndex((row) => (
       row.kind === "component"
@@ -38,16 +60,16 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
   const [revealSelectedRevision, setRevealSelectedRevision] = useState(0);
   const visibleRows = useMemo(() => visibleSourceCompositionRows(rows, collapsed), [collapsed, rows]);
   const selectedVisibleIndex = useMemo(
-    () => sourceRowIndexForSelection(visibleRows, props.selected, focusId),
-    [focusId, props.selected, visibleRows],
+    () => sourceRowIndexForSelection(visibleRows, displayedSelection, atAppRoot ? undefined : focusId),
+    [atAppRoot, displayedSelection, focusId, visibleRows],
   );
   const activeVisibleIndex = useMemo(
-    () => visibleRows.findIndex((row) => row.kind === "component" && !row.layer && row.occurrence?.id === focusId),
-    [focusId, visibleRows],
+    () => atAppRoot ? -1 : visibleRows.findIndex((row) => row.kind === "component" && !row.layer && row.occurrence?.id === focusId),
+    [atAppRoot, focusId, visibleRows],
   );
   const virtual = useVirtualSourceTree(visibleRows.length, selectedVisibleIndex, activeVisibleIndex);
   const revealSelected = useCallback(() => {
-    const selectedIndex = sourceRowIndexForSelection(rows, props.selected, focusId);
+    const selectedIndex = sourceRowIndexForSelection(rows, displayedSelection, atAppRoot ? undefined : focusId);
     if (selectedIndex < 0) return;
     const open = ancestorBranchKeys(rows, selectedIndex);
     setCollapsed((current) => {
@@ -57,11 +79,11 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
       return next;
     });
     setRevealSelectedRevision((current) => current + 1);
-  }, [focusId, props.selected, rows, setCollapsed]);
+  }, [atAppRoot, displayedSelection, focusId, rows, setCollapsed]);
   useEffect(() => {
     const focusChanged = previousFocusId.current !== focusId;
     previousFocusId.current = focusId;
-    const selectedIndex = sourceRowIndexForSelection(rows, props.selected, focusId);
+    const selectedIndex = sourceRowIndexForSelection(rows, displayedSelection, atAppRoot ? undefined : focusId);
     if (selectedIndex < 0) return;
     const open = new Set(ancestorBranchKeys(rows, selectedIndex));
     const selectedRow = rows[selectedIndex];
@@ -73,13 +95,14 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
       return next;
     });
   }, [
+    atAppRoot,
+    displayedSelection?.kind,
+    displayedSelection?.layerId,
+    displayedSelection?.nodeId,
+    displayedSelection?.occurrenceId,
+    displayedSelection?.renderedLayerOccurrence,
+    displayedSelection?.sourceNodeId,
     focusId,
-    props.selected?.kind,
-    props.selected?.layerId,
-    props.selected?.nodeId,
-    props.selected?.occurrenceId,
-    props.selected?.renderedLayerOccurrence,
-    props.selected?.sourceNodeId,
     rows,
   ]);
   useEffect(() => {
@@ -164,10 +187,13 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
                 nodes={nodes}
                 row={displayRow}
                 activeCanvasIds={activeCanvasIds}
-                activeCanvasId={focusId}
-                activePath={activePathKeys.has(row.key)}
+                activeCanvasId={atAppRoot ? undefined : focusId}
+                previewCanvasIds={previewCanvasIds}
+                previewOccurrenceId={previewOccurrenceId}
+                rootMode={atAppRoot}
+                activePath={!atAppRoot && activePathKeys.has(row.key)}
                 approvalReview={props.approvalReview}
-                selected={props.selected}
+                selected={displayedSelection}
                 workspace={props.workspace}
                 onApplySlot={props.onApplySlot}
                 editingSourceOwnerId={props.editingSourceOwnerId}
@@ -176,8 +202,12 @@ export function SourceWorkspaceTree(props: SourceWorkspaceTreeProps) {
                 onFocus={props.onFocus}
                 onOpenComponent={props.onOpenComponent}
                 onHover={props.onHover}
+                onPreviewOccurrence={setPreviewOccurrenceId}
                 onDeviceChange={props.onDeviceChange}
-                onSelect={props.onSelect}
+                onSelect={(next) => {
+                  if (atAppRoot) setRootSelection(next);
+                  props.onSelect(next);
+                }}
                 onToggleBranch={toggleBranch}
               />
             );

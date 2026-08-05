@@ -1,5 +1,5 @@
-import { Label, TextArea, TextField } from "@heroui/react";
-import { BoxSelect, Code2, Move, PaintBucket, SquareDashed, Type } from "lucide-react";
+import { Button, Label, TextArea, TextField } from "@heroui/react";
+import { ArrowUpRight, BoxSelect, Code2, Move, PaintBucket, SquareDashed, Type } from "lucide-react";
 
 import type { SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { TailwindClassField } from "../inspector/TailwindClassField";
@@ -10,12 +10,18 @@ import { InspectorSection } from "./InspectorSection";
 import { Metric } from "./Metric";
 import { DimensionField } from "./DimensionField";
 import { PaintField } from "./PaintField";
+import type { BoxModelPreview } from "../inspector/tailwind-box-model-values";
 
 export function SourceLayerDesignInspector(props: {
   layer: SourceWorkspaceLayer;
   metrics?: SourceLayerMetrics;
+  openComponent?: {
+    label: string;
+    onOpen: () => void;
+  };
   previewClassName?: string;
   styleEditor?: SourceLayerClassEditor;
+  onBoxModelPreviewChange?: (preview?: BoxModelPreview) => void;
   onClassNamePreviewChange?: (value?: string) => void;
 }) {
   const editor = props.styleEditor;
@@ -29,6 +35,18 @@ export function SourceLayerDesignInspector(props: {
         <BoxSelect aria-hidden="true" className="text-sky-400" size={14} />
         <h3 aria-label="Selected layer" id="source-layer-design" className="min-w-0 flex-1 truncate text-[10px] font-medium">Layer</h3>
         <code className="max-w-28 truncate font-mono text-[9px] text-zinc-500">{layerLabel(props.layer)}</code>
+        {props.openComponent ? (
+          <Button
+            aria-label={`Open ${props.openComponent.label} component`}
+            className="h-6 min-w-0 gap-1 rounded-full bg-white/[0.07] px-2 text-[9px] text-zinc-200 hover:bg-white/[0.11]"
+            size="sm"
+            variant="ghost"
+            onPress={props.openComponent.onOpen}
+          >
+            Open
+            <ArrowUpRight aria-hidden="true" size={11} />
+          </Button>
+        ) : null}
       </header>
 
       <div className="divide-y divide-white/[0.06]">
@@ -56,6 +74,7 @@ export function SourceLayerDesignInspector(props: {
             <TailwindMappedControls
               value={className}
               onChange={(value) => editor?.change(value)}
+              onBoxModelPreviewChange={props.onBoxModelPreviewChange}
               onPreviewChange={props.onClassNamePreviewChange}
             />
           </div>

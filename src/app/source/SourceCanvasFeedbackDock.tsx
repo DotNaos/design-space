@@ -5,9 +5,12 @@ import { useEffect, useState } from "react";
 import { SourceCodexChatModal } from "./SourceCodexChatModal";
 import { SourceCodexConnectionIndicator } from "./SourceCodexConnectionIndicator";
 import { SourceCodexConnectionModal } from "./SourceCodexConnectionModal";
+import { codeSelectionLabel, SourceCodeContextChip } from "./SourceCodeContextChip";
 import {
   addSourceFeedbackAnnotation,
   formatSourceFeedback,
+  type SourceCodeAnnotation,
+  type SourceCodeSelectionContext,
   type SourceCanvasAnnotation,
   type SourceFeedbackContext,
   useSourceFeedbackAnnotations,
@@ -23,9 +26,14 @@ import {
 export function SourceCanvasFeedbackDock(props: {
   annotationMode?: boolean;
   annotations?: readonly SourceCanvasAnnotation[];
+  codeAnnotations?: readonly SourceCodeAnnotation[];
+  codeContexts?: readonly SourceCodeSelectionContext[];
   context?: SourceFeedbackContext;
   onAnnotationModeChange?: (active: boolean) => void;
   onAnnotationsSent?: () => void;
+  onCodeFeedbackSent?: () => void;
+  onRemoveCodeAnnotation?: (id: string) => void;
+  onRemoveCodeContext?: (id: string) => void;
 }) {
   const [draft, setDraft] = useState("");
   const [origin, setOrigin] = useState<SourceCodexOrigin>();
@@ -38,6 +46,9 @@ export function SourceCanvasFeedbackDock(props: {
   const [sending, setSending] = useState(false);
   const comments = useSourceFeedbackAnnotations(props.context?.id);
   const annotations = props.annotations ?? [];
+  const codeAnnotations = props.codeAnnotations ?? [];
+  const codeContexts = props.codeContexts ?? [];
+  const pendingCodeCount = codeContexts.length + codeAnnotations.length;
 
   useEffect(() => {
     let active = true;
@@ -62,17 +73,36 @@ export function SourceCanvasFeedbackDock(props: {
   }, []);
 
   async function send() {
-    if (!origin || (!draft.trim() && !annotations.length) || sending) return;
+    if (!origin || (!draft.trim() && !annotations.length && !pendingCodeCount) || sending) return;
     setSending(true);
     setError(undefined);
     try {
-      await sendSourceCodexFeedback(origin, formatSourceFeedback(draft, props.context, annotations));
+      await sendSourceCodexFeedback(origin, formatSourceFeedback(
+        draft,
+        props.context,
+        annotations,
+        codeContexts,
+        codeAnnotations,
+      ));
       if (props.context && draft.trim()) addSourceFeedbackAnnotation(draft, props.context);
       for (const annotation of annotations) {
         addSourceFeedbackAnnotation(annotation.comment, annotation.context);
       }
+      for (const annotation of codeAnnotations) {
+        addSourceFeedbackAnnotation(annotation.comment, {
+          id: annotation.context.id,
+          kind: "code",
+          label: codeSelectionLabel(annotation.context),
+          source: {
+            end: annotation.context.endLine,
+            relativePath: annotation.context.relativePath,
+            start: annotation.context.startLine,
+          },
+        });
+      }
       setDraft("");
       props.onAnnotationsSent?.();
+      props.onCodeFeedbackSent?.();
     } catch (cause: unknown) {
       if (cause instanceof SourceCodexTaskUnavailableError) {
         setOrigin(undefined);
@@ -94,8 +124,8 @@ export function SourceCanvasFeedbackDock(props: {
     ? "Connecting to Codex…"
       : writable
       ? props.context
-        ? annotations.length
-          ? `Add a message or send ${annotations.length} annotation${annotations.length === 1 ? "" : "s"}…`
+          ? annotations.length || pendingCodeCount
+          ? `Add a message or send ${annotations.length + pendingCodeCount} item${annotations.length + pendingCodeCount === 1 ? "" : "s"}…`
           : `Comment on ${props.context.label}…`
         : "Message the working Codex task…"
       : connected
@@ -134,6 +164,29 @@ export function SourceCanvasFeedbackDock(props: {
             </Tooltip.Content>
           </Tooltip>
         </div>
+        {pendingCodeCount ? (
+          <div
+            aria-label="Attached code context"
+            className="flex min-h-7 min-w-0 items-center gap-1 overflow-x-auto bg-black/10 px-2 py-1 [scrollbar-width:none]"
+            data-testid="source-code-context-rail"
+          >
+            {codeContexts.map((selection) => (
+              <SourceCodeContextChip
+                key={selection.id}
+                label={codeSelectionLabel(selection)}
+                onRemove={props.onRemoveCodeContext ? () => props.onRemoveCodeContext?.(selection.id) : undefined}
+              />
+            ))}
+            {codeAnnotations.map((annotation) => (
+              <SourceCodeContextChip
+                annotation
+                key={annotation.id}
+                label={codeSelectionLabel(annotation.context)}
+                onRemove={props.onRemoveCodeAnnotation ? () => props.onRemoveCodeAnnotation?.(annotation.id) : undefined}
+              />
+            ))}
+          </div>
+        ) : null}
         <div className="flex h-11 min-w-0 items-center px-1">
           <div
             aria-label="Codex composer"
@@ -203,7 +256,7 @@ export function SourceCanvasFeedbackDock(props: {
                 isIconOnly
                 aria-label="Send to Codex"
                 className="ml-auto size-7 min-w-7 rounded-full bg-zinc-100 text-zinc-950 hover:bg-white"
-                isDisabled={!writable || (!draft.trim() && !annotations.length)}
+                isDisabled={!writable || (!draft.trim() && !annotations.length && !pendingCodeCount)}
                 isPending={sending}
                 size="sm"
                 variant="ghost"

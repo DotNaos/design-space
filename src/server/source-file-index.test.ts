@@ -193,6 +193,8 @@ describe("TypeScript-first source index", () => {
     await writeFile(join(packageRoot, "index.d.ts"), [
       "export declare function Button(): unknown;",
       "export declare const Scrollable: () => unknown;",
+      "declare function StrictUiDevTools(): unknown;",
+      "export { StrictUiDevTools, StrictUiDevTools as UiDevTools };",
       "export interface ButtonProps { disabled?: boolean }",
       "export declare function getCatalog(): unknown;",
     ].join("\n"));
@@ -201,6 +203,7 @@ describe("TypeScript-first source index", () => {
     expect(result.manifest.library?.components).toEqual([
       { name: "Button", evidence: "package-export" },
       { name: "Scrollable", evidence: "package-export" },
+      { name: "StrictUiDevTools", evidence: "package-export" },
     ]);
   });
 });

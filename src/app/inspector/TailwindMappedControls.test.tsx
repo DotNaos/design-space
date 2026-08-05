@@ -363,11 +363,13 @@ describe("Tailwind box model", () => {
 
   it("keeps slider motion local and commits only the final value", () => {
     const onChange = vi.fn();
+    const onBoxModelPreviewChange = vi.fn();
     const onPreviewChange = vi.fn();
     render(
       <TailwindBoxModelControl
         value="p-4"
         onChange={onChange}
+        onBoxModelPreviewChange={onBoxModelPreviewChange}
         onPreviewChange={onPreviewChange}
       />,
     );
@@ -379,6 +381,10 @@ describe("Tailwind box model", () => {
 
     expect(onChange).not.toHaveBeenCalled();
     expect(onPreviewChange).toHaveBeenLastCalledWith("p-10");
+    expect(onBoxModelPreviewChange).toHaveBeenLastCalledWith({
+      className: "p-10",
+      kind: "padding",
+    });
 
     fireEvent.blur(slider);
     expect(onChange).toHaveBeenCalledTimes(1);

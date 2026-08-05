@@ -57,6 +57,9 @@ export function useSourceWorkspaceUiState(options: {
     validSelection(restored.previewSelection) ?? restoredSelection,
   );
   const [workspaceMode, setWorkspaceMode] = useState<SourceWorkspaceMode>(restored.workspaceMode ?? "design");
+  const [workspaceSurface, setWorkspaceSurface] = useState<"app" | "library">(
+    restored.workspaceSurface ?? (restored.activity === "library" ? "library" : "app"),
+  );
   const [previewRuntime, setPreviewRuntime] = useState<"static" | "play">("static");
   const [rightMode, setRightMode] = useState<"code" | "design">(restored.rightMode ?? "design");
   const [codeDocument, setCodeDocument] = useState<"source" | "design">(restored.codeDocument ?? "source");
@@ -100,6 +103,7 @@ export function useSourceWorkspaceUiState(options: {
     setDesignSelection(validSelection(restored.designSelection));
     setPreviewSelection(validSelection(restored.previewSelection) ?? restoredSelection);
     setWorkspaceMode(restored.workspaceMode ?? "design");
+    setWorkspaceSurface(restored.workspaceSurface ?? (restored.activity === "library" ? "library" : "app"));
     setPreviewRuntime("static");
     setRightMode(restored.rightMode ?? "design");
     setCodeDocument(restored.codeDocument ?? "source");
@@ -137,6 +141,7 @@ export function useSourceWorkspaceUiState(options: {
       selectedProjectFileId,
       selection,
       workspaceMode,
+      workspaceSurface,
     });
   }, [
     activity,
@@ -157,6 +162,7 @@ export function useSourceWorkspaceUiState(options: {
     selectedProjectFileId,
     selection,
     workspaceMode,
+    workspaceSurface,
   ]);
 
   useEffect(() => {
@@ -182,6 +188,7 @@ export function useSourceWorkspaceUiState(options: {
     selectedProjectFileId,
     selection,
     workspaceMode,
+    workspaceSurface,
     setActivity,
     setAppCodeHeight,
     setAppCodeOpen,
@@ -200,5 +207,6 @@ export function useSourceWorkspaceUiState(options: {
     setSelectedProjectFileId,
     setSelection,
     setWorkspaceMode,
+    setWorkspaceSurface,
   };
 }

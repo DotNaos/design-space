@@ -57,6 +57,15 @@ it("shows exact TypeScript prop and slot contracts without editable or invented 
   expect(screen.queryByRole("button", { name: "Code" })).not.toBeInTheDocument();
 });
 
+it("keeps each prop name, type, and requirement together in one compact row", () => {
+  render(<SourceComponentInspector entry={entry} />);
+
+  const titleRow = within(screen.getByRole("region", { name: "Props" })).getByText("title").closest("div");
+  expect(titleRow).not.toBeNull();
+  expect(within(titleRow!).getByText("string")).toBeVisible();
+  expect(within(titleRow!).getByText("Required")).toBeVisible();
+});
+
 it("renders an honest empty selection state", () => {
   render(<SourceComponentInspector />);
   expect(screen.getByText("Select an exported component to inspect its TypeScript contract.")).toBeVisible();
@@ -171,4 +180,84 @@ it("edits a selected HTML layer through its source-derived Tailwind binding", ()
   expect(text).toHaveValue("Panel");
   fireEvent.change(text, { target: { value: "Project panel" } });
   expect(changeText).toHaveBeenCalledWith("Project panel");
+});
+
+it("edits a selected component when its contract exposes className", () => {
+  const change = vi.fn();
+  const binding = { value: "", start: 40, end: 40, insert: true as const };
+  const styleEditor = {
+    binding,
+    change,
+    changeText: vi.fn(),
+    css: "",
+    editable: true,
+    error: undefined,
+    previewCss: "",
+    previewTextValue: undefined,
+    previewValue: undefined,
+    reset: vi.fn(),
+    textBinding: undefined,
+    textEditable: false,
+    textValue: "",
+    value: "",
+  } satisfies SourceLayerClassEditor;
+
+  render(
+    <SourceComponentInspector
+      entry={entry}
+      layer={{
+        id: "base-checkbox",
+        label: "BaseCheckbox",
+        kind: "component",
+        source: { start: 20, end: 80 },
+        children: [],
+        className: binding,
+      }}
+      styleEditor={styleEditor}
+    />,
+  );
+
+  expect(screen.getByRole("region", { name: "Design" })).toBeVisible();
+  const classes = screen.getByRole("combobox", { name: "className" });
+  fireEvent.change(classes, { target: { value: "rounded-md p-2" } });
+  expect(change).toHaveBeenCalledWith("rounded-md p-2");
+});
+
+it("does not invent a visual editor for a component without className", () => {
+  render(
+    <SourceComponentInspector
+      entry={entry}
+      layer={{
+        id: "plain-component",
+        label: "PlainComponent",
+        kind: "component",
+        source: { start: 20, end: 80 },
+        children: [],
+      }}
+    />,
+  );
+
+  expect(screen.queryByRole("region", { name: "Design" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("combobox", { name: "className" })).not.toBeInTheDocument();
+});
+
+it("opens the source component behind an imported selected layer", async () => {
+  const onOpen = vi.fn();
+  render(
+    <SourceComponentInspector
+      entry={entry}
+      layer={{
+        id: "base-checkbox",
+        label: "BaseCheckbox",
+        kind: "component",
+        source: { start: 20, end: 80 },
+        children: [],
+        className: { value: "", start: 40, end: 40, insert: true },
+      }}
+      openLayerComponent={{ label: "BaseCheckbox", onOpen }}
+    />,
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: "Open BaseCheckbox component" }));
+  expect(onOpen).toHaveBeenCalledOnce();
 });

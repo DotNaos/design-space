@@ -179,6 +179,7 @@ function sourceTargetModule(target: RegisteredTarget): string {
     `    library: ${JSON.stringify(workspace.manifest.library)},`,
     `    approvals: ${JSON.stringify(workspace.manifest.approvals)},`,
     `    capabilities: ${JSON.stringify({ createComponents: Boolean(target.sourceComponentStore) })},`,
+    `    files: ${JSON.stringify(registeredFileCatalog(target))},`,
     `    entries: [${sourceRuntime.entries.join(",\n")}],`,
     `    styles: [${sourceRuntime.styles.join(", ")}],`,
     "  },",

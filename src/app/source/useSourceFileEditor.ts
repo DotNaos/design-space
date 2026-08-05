@@ -7,7 +7,10 @@ import type {
 } from "../../shared/contracts";
 import { LocalOperationError, runLocalOperation } from "../api";
 
-export function useSourceFileEditor(fileId: string | undefined) {
+export function useSourceFileEditor(
+  fileId: string | undefined,
+  scope: "app" | "library-development" = "app",
+) {
   const request = useRef(0);
   const [snapshot, setSnapshot] = useState<ProjectFileSnapshot>();
   const [draft, setDraftState] = useState("");
@@ -31,7 +34,11 @@ export function useSourceFileEditor(fileId: string | undefined) {
     setLoading(true);
     setError(undefined);
     try {
-      const next = await runLocalOperation<ProjectFileSnapshot>({ type: "read-project-file", fileId });
+      const next = await runLocalOperation<ProjectFileSnapshot>({
+        type: "read-project-file",
+        fileId,
+        ...(scope === "library-development" ? { scope } : {}),
+      });
       if (request.current !== current) return;
       setSnapshot(next);
       setDraftState(next.source);
@@ -44,7 +51,7 @@ export function useSourceFileEditor(fileId: string | undefined) {
     } finally {
       if (request.current === current) setLoading(false);
     }
-  }, [fileId]);
+  }, [fileId, scope]);
 
   useEffect(() => {
     void load();
@@ -77,6 +84,7 @@ export function useSourceFileEditor(fileId: string | undefined) {
         fileId: snapshot.fileId,
         baseVersion: snapshot.version,
         source: draft,
+        ...(scope === "library-development" ? { scope } : {}),
       });
       setPrepared(next);
       return next;
@@ -85,7 +93,7 @@ export function useSourceFileEditor(fileId: string | undefined) {
       setError(messageFor(reason));
       return undefined;
     }
-  }, [draft, load, snapshot]);
+  }, [draft, load, scope, snapshot]);
   const save = useCallback(async () => {
     if (!prepared) return undefined;
     setSaving(true);

@@ -75,6 +75,7 @@ export function useSourceChangeReview(options: SourceChangeReviewOptions) {
               entries={workspace.entries}
               runtime={workspace.runtime}
               isolateSelectedLayer={false}
+              showChrome={false}
               selectedLayer={visualLayer}
               styles={workspace.styles}
               onDeviceChange={() => undefined}

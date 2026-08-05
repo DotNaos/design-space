@@ -34,7 +34,7 @@ export function WorkspaceTopBar(props: {
 }) {
   return (
     <header className="relative flex h-12 shrink-0 items-center gap-1 border-b border-white/[0.08] bg-[#101113] px-2 lg:gap-0 lg:px-0">
-      <div className="flex min-w-0 items-center gap-1.5 lg:px-2">
+      <div className="flex min-w-0 items-center gap-1.5 lg:px-[5px]">
         {props.leadingAction}
         {props.focusLabel && props.onExitFocus && (
           <Button aria-label={`Back to ${props.documentLabel}`} className="size-9 shrink-0 lg:size-8" isIconOnly size="sm" variant="ghost" onPress={props.onExitFocus}>
@@ -50,7 +50,7 @@ export function WorkspaceTopBar(props: {
         </div>
       )}
 
-      <div className="ml-auto flex shrink-0 items-center gap-0.5 lg:px-3">
+      <div className="ml-auto flex shrink-0 items-center gap-0.5 lg:px-[5px]">
         <DesignSpaceThemeToggle />
         <Button aria-label="Undo" isIconOnly className="hidden size-8 text-zinc-500 hover:text-zinc-200 min-[1120px]:inline-flex" size="sm" variant="ghost" isDisabled={!props.canUndo} onPress={props.onUndo}><Undo2 size={14} /></Button>
         <Button aria-label="Redo" isIconOnly className="hidden size-8 text-zinc-500 hover:text-zinc-200 min-[1120px]:inline-flex" size="sm" variant="ghost" isDisabled={!props.canRedo} onPress={props.onRedo}><Redo2 size={14} /></Button>

@@ -23,6 +23,7 @@ import type { SourcePreviewFrameProps } from "./source-preview-frame-props";
 import { SourceComponentReviewCheckpoint } from "./SourceComponentReviewCheckpoint";
 import { sourceReviewGraphProperties, sourceReviewGraphSlots } from "./source-review-graph";
 import { PlayablePreview } from "./PlayablePreview";
+import { useSourceBoxModelPreview } from "./useSourceBoxModelPreview";
 
 export function sourceStaticProjectionLayerId(options: {
   entry?: RuntimeSourceWorkspaceEntry;
@@ -379,6 +380,17 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
     }
   }, [mounts, projectionKey, props.selectedClassName, props.selectedLayer, selectedOccurrence, staticRevision]);
 
+  useSourceBoxModelPreview({
+    compiledClassCss: props.selectedClassCss,
+    output: mounts?.output,
+    previewMode,
+    projected: Boolean(projectionKey),
+    selectedLayerId: props.selectedLayer?.id,
+    selectedOccurrence,
+    staticRevision,
+    store: props.boxModelPreviewStore,
+  });
+
   useEffect(() => {
     if (!mounts || props.selectedText === undefined) return;
     if (projectionKey) {
@@ -405,6 +417,7 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
       device={props.device}
       mode={previewMode === "static" ? undefined : previewMode}
       node={props.node}
+      showChrome={props.showChrome}
       selectedLayer={Boolean(props.selectedLayer)}
       showDeviceSwitcher={!props.workspaceMode}
       showModeToggle={!props.workspaceMode || props.workspaceMode === "preview"}
@@ -435,9 +448,14 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
           <SourceCanvasFeedbackDock
             annotationMode={canvasAnnotations.active}
             annotations={canvasAnnotations.annotations}
+            codeAnnotations={props.codeAnnotations}
+            codeContexts={props.codeContexts}
             context={feedbackContext}
             onAnnotationModeChange={previewMode === "design" && !previewState ? canvasAnnotations.setActive : undefined}
             onAnnotationsSent={canvasAnnotations.clear}
+            onCodeFeedbackSent={props.onClearCodeFeedback}
+            onRemoveCodeAnnotation={props.onRemoveCodeAnnotation}
+            onRemoveCodeContext={props.onRemoveCodeContext}
           />
           {selectedOwner ? (
             <SourceHoverIdentityHud

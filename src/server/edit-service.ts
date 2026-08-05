@@ -13,6 +13,7 @@ import {
   type PreparedProjectFileEdit,
   type PreparedSourceChangeSet,
   type PreparedSourceComponentCreate,
+  type ProjectFileCatalog,
   type ProjectFileSnapshot,
   type SavedEdit,
   type SavedProjectFileEdit,
@@ -25,6 +26,7 @@ import {
 import type { SourceDesignScope } from "../shared/source-design";
 import { createUnifiedDiff } from "./diff";
 import { ChallengeStore } from "./challenge-store";
+import { registeredFileCatalog, sourceWorkspaceFileCatalog } from "./document-catalog-files";
 import { DesignSpaceError } from "./errors";
 import { assertStillRegistered } from "./path-security";
 import { readRegisteredFile } from "./registered-file-reader";
@@ -60,6 +62,7 @@ interface StoredChallenge {
 
 interface StoredProjectFileChallenge {
   id: string;
+  root: string;
   file: RegisteredFile;
   baseVersion: string;
   nextVersion: string;
@@ -161,7 +164,7 @@ export class EditService {
     });
   }
 
-  async execute(input: unknown): Promise<SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceChangeSet | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | AppliedSourceChangeSet | SavedSourceComponentCreate | GeneratedSourceDesign | TailwindPreview | TailwindIntelligence> {
+  async execute(input: unknown): Promise<SourceSnapshot | ProjectFileCatalog | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceChangeSet | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | AppliedSourceChangeSet | SavedSourceComponentCreate | GeneratedSourceDesign | TailwindPreview | TailwindIntelligence> {
     const parsed = browserOperationSchema.safeParse(input);
     if (!parsed.success) {
       throw new DesignSpaceError("INVALID_REQUEST", "The browser operation is invalid");
@@ -169,7 +172,7 @@ export class EditService {
     return this.#executeParsed(parsed.data);
   }
 
-  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceChangeSet | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | AppliedSourceChangeSet | SavedSourceComponentCreate | GeneratedSourceDesign | TailwindPreview | TailwindIntelligence> {
+  async #executeParsed(operation: BrowserOperation): Promise<SourceSnapshot | ProjectFileCatalog | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceChangeSet | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | AppliedSourceChangeSet | SavedSourceComponentCreate | GeneratedSourceDesign | TailwindPreview | TailwindIntelligence> {
     switch (operation.type) {
       case "analyze-tailwind":
         return this.#tailwindIntelligence.analyze(operation.value, operation.cursor);
@@ -180,12 +183,14 @@ export class EditService {
           return compileWorkspaceTailwindPreview(operation.value, workspace.root, workspace.stylePaths);
         }
         return (await this.#tailwind.compile(operation.value)).preview;
+      case "list-project-files":
+        return this.listProjectFiles(operation.scope);
       case "read-project-file":
         return this.readProjectFile(operation.fileId, operation.scope);
       case "analyze-source-file-draft":
         return this.analyzeSourceFileDraft(operation.fileId, operation.source, operation.scope);
       case "prepare-project-file-edit":
-        return this.prepareProjectFileEdit(operation.fileId, operation.source, operation.baseVersion);
+        return this.prepareProjectFileEdit(operation.fileId, operation.source, operation.baseVersion, operation.scope);
       case "save-project-file-edit":
         return this.saveProjectFileEdit(operation.challengeId);
       case "prepare-source-change-set":
@@ -213,6 +218,13 @@ export class EditService {
 
   dispose(): void {
     this.#tailwindIntelligence.dispose();
+  }
+
+  listProjectFiles(scope: SourceDesignScope): ProjectFileCatalog {
+    if (scope === "app") return { files: registeredFileCatalog(this.#target) };
+    const workspace = this.#target.sourceLibrary?.development;
+    if (!workspace) throw new DesignSpaceError("ACCESS_DENIED", "The development library source is not attached");
+    return { files: sourceWorkspaceFileCatalog(workspace) };
   }
 
   async readProjectFile(fileId: string, scope?: SourceDesignScope): Promise<ProjectFileSnapshot> {
@@ -259,9 +271,10 @@ export class EditService {
     fileId: string,
     nextSource: string,
     baseVersion: string,
+    scope: SourceDesignScope = "app",
   ): Promise<PreparedProjectFileEdit> {
-    const file = this.#editableProjectFile(fileId);
-    const source = await readRegisteredFile(this.#target.root, file.path, {
+    const { file, root, workspace } = this.#editableScopedFile(fileId, scope);
+    const source = await readRegisteredFile(root, file.path, {
       maximumBytes: maximumBrowsableFileBytes,
       unavailableMessage: "The registered project source is unavailable for editing",
     });
@@ -274,14 +287,14 @@ export class EditService {
     try {
       const loader = file.displayName.endsWith(".tsx") ? "tsx" : "ts";
       await transformWithEsbuild(nextSource, file.displayName, { loader, jsx: "automatic" });
-      if (this.#target.sourceWorkspace) assertEditedTypeScriptCompiles(this.#target.root, file.path, nextSource);
+      if (workspace) assertEditedTypeScriptCompiles(workspace.root, file.path, nextSource);
     } catch {
       throw new DesignSpaceError("COMPILE_ERROR", "The edited TypeScript source did not compile");
     }
-    if (this.#target.sourceWorkspace && /\.tsx?$/.test(file.path)) {
+    if (workspace && /\.[cm]?tsx?$/.test(file.path)) {
       await assertStrictUiSourceChangesDoNotRegress({
-        projectRoot: this.#target.sourceWorkspace.root,
-        filePaths: this.#target.sourceWorkspace.files
+        projectRoot: workspace.root,
+        filePaths: workspace.files
           .filter((candidate) => /\.[cm]?tsx?$/.test(candidate.absolutePath))
           .map((candidate) => candidate.absolutePath),
         changes: [{ filePath: file.path, source: nextSource }],
@@ -292,6 +305,7 @@ export class EditService {
     const nextVersion = sourceVersion(nextSource);
     this.#projectFileChallenges.set(id, {
       id,
+      root,
       file,
       baseVersion,
       nextVersion,
@@ -320,12 +334,12 @@ export class EditService {
     if (challenge.expiresAt <= this.#now()) {
       throw new DesignSpaceError("CHALLENGE_EXPIRED", "The prepared source edit expired before it was saved");
     }
-    const currentSource = await readRegisteredFile(this.#target.root, challenge.file.path);
+    const currentSource = await readRegisteredFile(challenge.root, challenge.file.path);
     if (sourceVersion(currentSource) !== challenge.baseVersion) {
       throw new DesignSpaceError("STALE_SOURCE", "The source changed before the edit could be saved");
     }
-    await atomicWrite(this.#target.root, challenge.file.path, challenge.baseVersion, challenge.nextSource);
-    await assertStillRegistered(this.#target.root, challenge.file.path);
+    await atomicWrite(challenge.root, challenge.file.path, challenge.baseVersion, challenge.nextSource);
+    await assertStillRegistered(challenge.root, challenge.file.path);
     return {
       fileId: challenge.file.id,
       label: challenge.file.displayName,
@@ -342,6 +356,30 @@ export class EditService {
     const file = this.#target.files.get(fileId);
     if (!file) throw new DesignSpaceError("NOT_FOUND", "The project file is not registered");
     return file;
+  }
+
+  #editableScopedFile(
+    fileId: string,
+    scope: SourceDesignScope,
+  ): { root: string; file: RegisteredFile; workspace: RegisteredTarget["sourceWorkspace"] } {
+    if (scope === "app") {
+      return {
+        root: this.#target.root,
+        file: this.#editableProjectFile(fileId),
+        workspace: this.#target.sourceWorkspace,
+      };
+    }
+    const workspace = this.#target.sourceLibrary?.development;
+    if (!workspace) throw new DesignSpaceError("ACCESS_DENIED", "The development library source is not attached");
+    const indexed = workspace.files.find((candidate) => candidate.id === fileId);
+    if (!indexed || !/\.[cm]?tsx?$/.test(indexed.relativePath)) {
+      throw new DesignSpaceError("ACCESS_DENIED", "The library file is not registered for editing");
+    }
+    return {
+      root: workspace.root,
+      file: { id: indexed.id, path: indexed.absolutePath, displayName: indexed.relativePath },
+      workspace,
+    };
   }
 
   #scopedFile(

@@ -64,3 +64,26 @@ it("formats multiple spatial annotations with source and canvas position", () =>
   expect(message).toContain("Canvas point: 42% × 67%");
   expect(message).toContain("Rendered instance: 2");
 });
+
+it("formats attached code and inline code annotations with exact ranges", () => {
+  const selection = {
+    endColumn: 4,
+    endLine: 12,
+    id: "src/components/Button.tsx:24-56",
+    relativePath: "src/components/Button.tsx",
+    selectedText: "return <button>Save</button>;",
+    startColumn: 3,
+    startLine: 10,
+  };
+  const message = formatSourceFeedback("Please update this.", undefined, [], [selection], [{
+    comment: "Use the primary action style.",
+    context: selection,
+    id: "annotation-1",
+  }]);
+
+  expect(message).toContain("Design Space code context");
+  expect(message).toContain("Source: src/components/Button.tsx:10-12");
+  expect(message).toContain("Design Space code annotations");
+  expect(message).toContain("Use the primary action style.");
+  expect(message).toContain("return <button>Save</button>;");
+});

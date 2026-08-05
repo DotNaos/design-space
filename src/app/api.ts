@@ -8,6 +8,7 @@ import type {
   PreparedProjectFileEdit,
   PreparedSourceChangeSet,
   PreparedSourceComponentCreate,
+  ProjectFileCatalog,
   ProjectFileSnapshot,
   SavedEdit,
   SavedProjectFileEdit,
@@ -23,7 +24,7 @@ import type { DocumentOperation, DocumentOperationResult } from "../shared/docum
 import type { LibraryDevelopmentProjectStatus, LibraryReleaseStatus } from "../shared/source-workspace";
 
 type LocalOperation = BrowserOperation | DocumentOperation | LibraryDevelopmentOperation | LibraryReleaseOperation | SourceApprovalOperation;
-type OperationResult = SourceSnapshot | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceChangeSet | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | AppliedSourceChangeSet | SavedSourceComponentCreate | GeneratedSourceDesign | SignedSourceComponent | TailwindPreview | TailwindIntelligence | DocumentOperationResult | LibraryDevelopmentProjectStatus | LibraryReleaseStatus;
+type OperationResult = SourceSnapshot | ProjectFileCatalog | ProjectFileSnapshot | SourceDraftAnalysis | PreparedEdit | PreparedProjectFileEdit | PreparedSourceChangeSet | PreparedSourceComponentCreate | SavedEdit | SavedProjectFileEdit | AppliedSourceChangeSet | SavedSourceComponentCreate | GeneratedSourceDesign | SignedSourceComponent | TailwindPreview | TailwindIntelligence | DocumentOperationResult | LibraryDevelopmentProjectStatus | LibraryReleaseStatus;
 
 export class LocalOperationError extends Error {
   constructor(

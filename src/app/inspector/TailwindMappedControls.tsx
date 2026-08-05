@@ -4,6 +4,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Columns3, EyeOff, LayoutGrid
 import { type EditorSelectOption } from "../components/EditorSelectField/EditorSelectField";
 import { TailwindAlignmentControl } from "./TailwindAlignmentControl";
 import { TailwindBoxModelControl } from "./TailwindBoxModelControl";
+import type { BoxModelPreview } from "./tailwind-box-model-values";
 import { TailwindSizeControl } from "./TailwindSizeControl";
 import { parseTailwindToken, replaceTailwindUtilityGroup } from "./tailwind-utility";
 import { SegmentedUtilityControl } from "./SegmentedUtilityControl";
@@ -118,6 +119,7 @@ const appearanceGroups: readonly UtilityGroup[] = [
 export function TailwindMappedControls(props: {
   value: string;
   onChange: (value: string) => void;
+  onBoxModelPreviewChange?: (preview?: BoxModelPreview) => void;
   onPreviewChange?: (value?: string) => void;
 }) {
   const layout = baseLayoutDisplay(props.value);
@@ -153,6 +155,7 @@ export function TailwindMappedControls(props: {
             <TailwindBoxModelControl
               value={props.value}
               onChange={props.onChange}
+              onBoxModelPreviewChange={props.onBoxModelPreviewChange}
               onPreviewChange={props.onPreviewChange}
             />
           </div>

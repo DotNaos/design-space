@@ -36,6 +36,7 @@ vi.mock("./SourcePreviewFrame", () => ({
     entry?: RuntimeSourceWorkspaceEntry;
     selectedClassName?: string;
     selectedText?: string;
+    showChrome?: boolean;
     styles?: readonly string[];
   }) => {
     const [evidence, setEvidence] = useState("Loading review preview");
@@ -50,12 +51,39 @@ vi.mock("./SourcePreviewFrame", () => ({
       <div>
         {evidence}
         <output aria-label="Preview class">{props.selectedClassName}</output>
+        <output aria-label="Preview chrome">{props.showChrome === false ? "hidden" : "visible"}</output>
         <output aria-label="Preview text">{props.selectedText}</output>
         <output aria-label="Preview styles">{props.styles?.join("\n")}</output>
       </div>
     );
   },
 }));
+
+it("hides editor chrome from both review previews", async () => {
+  const workspace = sourceWorkspace();
+  const { result } = renderHook(() => useSourceChangeReview({
+    appLabel: "Design Space",
+    appVisual: { css: ".p-6{}", textValue: "Renamed", value: "p-6" },
+    appWorkspace: workspace,
+    changes: [draftEntry()],
+    draftWorkspace: createSourceDraftWorkspace(),
+    libraryLabel: "UI",
+    libraryVisual: { css: "", textValue: "", value: "" },
+    libraryWorkspace: workspace,
+  }));
+
+  render(
+    <>
+      {result.current.items[0]!.before.preview}
+      {result.current.items[0]!.after.preview}
+    </>,
+  );
+
+  await waitFor(() => expect(screen.getAllByLabelText("Preview chrome")).toHaveLength(2));
+  const chromeStates = screen.getAllByLabelText("Preview chrome");
+  expect(chromeStates).toHaveLength(2);
+  expect(chromeStates.every((state) => state.textContent === "hidden")).toBe(true);
+});
 
 it("renders the complete prepared graph after a visual edit plus another Monaco edit", async () => {
   const workspace = sourceWorkspace();

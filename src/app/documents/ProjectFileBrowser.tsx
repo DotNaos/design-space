@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 
-import type { TargetFileEntry } from "../../shared/target-module";
+import type { SourceWorkspaceFileEntry } from "../../shared/source-workspace";
 import { FileTreeLevel } from "./FileTreeLevel";
 
 export interface ProjectFileBrowserProps {
   className?: string;
-  files: readonly TargetFileEntry[];
+  files: readonly SourceWorkspaceFileEntry[];
+  title?: string;
   selectedFileId?: string;
+  header?: ReactNode;
   onSelect: (fileId: string) => void;
 }
 
@@ -16,15 +18,19 @@ export function ProjectFileBrowser(props: ProjectFileBrowserProps) {
     () => props.files.filter((entry) => entry.kind === "directory").map((entry) => entry.id),
     [props.files],
   );
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(directoryIds));
+  const rootDirectoryIds = useMemo(
+    () => props.files.filter((entry) => entry.kind === "directory" && !entry.parentId).map((entry) => entry.id),
+    [props.files],
+  );
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(rootDirectoryIds));
 
   useEffect(() => {
     setExpanded((current) => {
       const next = new Set([...current].filter((id) => directoryIds.includes(id)));
-      for (const id of directoryIds) next.add(id);
+      for (const id of rootDirectoryIds) next.add(id);
       return next;
     });
-  }, [directoryIds.join("\u0000")]);
+  }, [directoryIds.join("\u0000"), rootDirectoryIds.join("\u0000")]);
 
   useEffect(() => {
     if (!props.selectedFileId) return;
@@ -47,17 +53,21 @@ export function ProjectFileBrowser(props: ProjectFileBrowserProps) {
 
   return (
     <aside
-      aria-label="Project file browser"
+      aria-label={`${props.title ?? "Project files"} browser`}
       className={`${props.className ?? "flex w-64"} min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}
     >
       <header className="flex min-h-11 items-center gap-2 border-b border-white/10 px-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-xs font-medium text-zinc-300">Project files</h2>
-          <p className="mt-0.5 text-[9px] text-zinc-600">{fileCount} allowlisted {fileCount === 1 ? "file" : "files"}</p>
-        </div>
-        <span className="inline-flex items-center gap-1 text-[9px] font-medium text-emerald-400">
-          <ShieldCheck aria-hidden="true" size={12} /> Trusted root
-        </span>
+        {props.header ?? (
+          <>
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-xs font-medium text-zinc-300">{props.title ?? "Project files"}</h2>
+              <p className="mt-0.5 text-[9px] text-zinc-600">{fileCount} allowlisted {fileCount === 1 ? "file" : "files"}</p>
+            </div>
+            <span className="inline-flex items-center gap-1 text-[9px] font-medium text-emerald-400">
+              <ShieldCheck aria-hidden="true" size={12} /> Trusted root
+            </span>
+          </>
+        )}
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
@@ -87,9 +97,9 @@ export function ProjectFileBrowser(props: ProjectFileBrowserProps) {
   );
 }
 
-function indexChildren(files: readonly TargetFileEntry[]): ReadonlyMap<string | undefined, readonly TargetFileEntry[]> {
+function indexChildren(files: readonly SourceWorkspaceFileEntry[]): ReadonlyMap<string | undefined, readonly SourceWorkspaceFileEntry[]> {
   const ids = new Set(files.map((entry) => entry.id));
-  const result = new Map<string | undefined, TargetFileEntry[]>();
+  const result = new Map<string | undefined, SourceWorkspaceFileEntry[]>();
   for (const entry of files) {
     const parentId = entry.parentId && ids.has(entry.parentId) ? entry.parentId : undefined;
     result.set(parentId, [...(result.get(parentId) ?? []), entry]);
@@ -97,7 +107,7 @@ function indexChildren(files: readonly TargetFileEntry[]): ReadonlyMap<string | 
   return result;
 }
 
-function ancestorDirectoryIds(files: readonly TargetFileEntry[], entryId: string): string[] {
+function ancestorDirectoryIds(files: readonly SourceWorkspaceFileEntry[], entryId: string): string[] {
   const byId = new Map(files.map((entry) => [entry.id, entry]));
   const ancestors: string[] = [];
   const visited = new Set<string>();

@@ -48,8 +48,10 @@ export type ResizableWorkspacePanelsProps = {
   mobile?: ReactNode;
   className?: string;
   contentClassName?: string;
-  leftHeader?: (controls: WorkspacePanelControls) => ReactNode;
+  leftHeader?: (controls: WorkspacePanelControls, panels: WorkspacePanelsControls) => ReactNode;
+  rightHeader?: (controls: WorkspacePanelControls) => ReactNode;
   externalPanelControls?: boolean;
+  allowPanelExpansion?: boolean;
 };
 
 export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
@@ -62,6 +64,7 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
   const bounds = { left: leftBounds, right: rightBounds };
   const { widths, setWidths } = useWorkspacePanelWidths(props.namespace, bounds);
   const { visibility, setVisible, setExpanded, toggle } = useWorkspacePanelVisibility(props.namespace);
+  const expandedPanel = props.allowPanelExpansion === false ? null : visibility.expanded;
   useWorkspacePanelControl({ setVisible, toggle });
   const [layoutWidth, setLayoutWidth] = useState(viewportWidth);
   const [snapFeedback, setSnapFeedback] = useState<{ side: PanelSide; state: PanelSnapFeedback }>();
@@ -117,6 +120,9 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
 
   useEffect(() => () => dragCleanup.current?.(), []);
   useEffect(() => {
+    if (props.allowPanelExpansion === false && visibility.expanded) setExpanded(null);
+  }, [props.allowPanelExpansion, setExpanded, visibility.expanded]);
+  useEffect(() => {
     if (!isDesktop) dragCleanup.current?.();
   }, [isDesktop]);
   useEffect(() => {
@@ -160,7 +166,7 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
 
     const pointerId = event.pointerId;
     const startX = event.clientX;
-    const expandedAtStart = visibility.expanded === side;
+    const expandedAtStart = expandedPanel === side;
     const startWidth = expandedAtStart ? layoutWidth : displayWidths[side];
     const direction = side === "left" ? 1 : -1;
     const target = event.currentTarget;
@@ -189,9 +195,11 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
         const maximumWidth = maximumPanelWidth(side);
         if (requestedWidth > maximumWidth) {
           resizePanel(side, maximumWidth);
-          feedback = requestedWidth - maximumWidth >= SNAP_RESISTANCE_DISTANCE
-            ? "expand"
-            : "resist-expand";
+          if (props.allowPanelExpansion !== false) {
+            feedback = requestedWidth - maximumWidth >= SNAP_RESISTANCE_DISTANCE
+              ? "expand"
+              : "resist-expand";
+          }
         } else {
           resizePanel(side, requestedWidth);
         }
@@ -235,7 +243,7 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
     window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", finish);
     dragCleanup.current = cleanup;
-  }, [bounds, displayWidths, layoutWidth, maximumPanelWidth, resizePanel, setExpanded, setVisible, visibility.expanded]);
+  }, [bounds, displayWidths, expandedPanel, layoutWidth, maximumPanelWidth, props.allowPanelExpansion, resizePanel, setExpanded, setVisible]);
 
   if (!isDesktop) {
     return <>{props.mobile ?? centerContent}</>;
@@ -246,11 +254,11 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
       ref={layoutRef}
       className={`grid min-h-0 min-w-0 flex-1 overflow-hidden ${props.className ?? ""}`}
       data-workspace-panel-layout="desktop"
-      data-workspace-panel-expanded={visibility.expanded ?? undefined}
+      data-workspace-panel-expanded={expandedPanel ?? undefined}
       style={{
-        gridTemplateColumns: visibility.expanded === "left"
+        gridTemplateColumns: expandedPanel === "left"
           ? "minmax(0,1fr) 1px 0 0 0"
-          : visibility.expanded === "right"
+          : expandedPanel === "right"
             ? "0 0 0 1px minmax(0,1fr)"
             : `${columnWidths.left}px 1px minmax(${MINIMUM_CANVAS_WIDTH}px, 1fr) 1px ${columnWidths.right}px`,
       }}
@@ -260,12 +268,12 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
         contentClassName={props.left.className}
         controls={leftPanelId}
         label={props.left.label}
-        header={props.leftHeader?.(leftControls)}
+        header={props.leftHeader?.(leftControls, { left: leftControls, right: rightControls })}
         managedHeader={Boolean(props.leftHeader)}
         side="left"
-        suppressed={visibility.expanded === "right"}
+        suppressed={expandedPanel === "right"}
         visible={visibility.left}
-        workspaceExpanded={visibility.expanded === "left"}
+        workspaceExpanded={expandedPanel === "left"}
         hideToggle={props.externalPanelControls}
         onToggle={() => toggle("left")}
       />
@@ -275,9 +283,9 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
         label={props.left.label}
         side="left"
         snapFeedback={snapFeedback?.side === "left" ? snapFeedback.state : undefined}
-        value={visibility.expanded === "left" ? layoutWidth : displayWidths.left}
-        visible={visibility.left && visibility.expanded !== "right"}
-        workspaceExpanded={visibility.expanded === "left"}
+        value={expandedPanel === "left" ? layoutWidth : displayWidths.left}
+        visible={visibility.left && expandedPanel !== "right"}
+        workspaceExpanded={expandedPanel === "left"}
         onPointerDown={(event) => startResize("left", event)}
         onReset={() => {
           setExpanded(null);
@@ -286,8 +294,8 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
         onResize={(width) => resizePanel("left", width)}
       />
       <div
-        aria-hidden={visibility.expanded !== null}
-        className={`min-h-0 min-w-0 overflow-hidden ${visibility.expanded ? "invisible" : ""} ${props.contentClassName ?? ""}`}
+        aria-hidden={expandedPanel !== null}
+        className={`min-h-0 min-w-0 overflow-hidden ${expandedPanel ? "invisible" : ""} ${props.contentClassName ?? ""}`}
       >
         {centerContent}
       </div>
@@ -297,9 +305,9 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
         label={props.right.label}
         side="right"
         snapFeedback={snapFeedback?.side === "right" ? snapFeedback.state : undefined}
-        value={visibility.expanded === "right" ? layoutWidth : displayWidths.right}
-        visible={visibility.right && visibility.expanded !== "left"}
-        workspaceExpanded={visibility.expanded === "right"}
+        value={expandedPanel === "right" ? layoutWidth : displayWidths.right}
+        visible={visibility.right && expandedPanel !== "left"}
+        workspaceExpanded={expandedPanel === "right"}
         onPointerDown={(event) => startResize("right", event)}
         onReset={() => {
           setExpanded(null);
@@ -312,10 +320,12 @@ export function ResizableWorkspacePanels(props: ResizableWorkspacePanelsProps) {
         contentClassName={props.right.className}
         controls={rightPanelId}
         label={props.right.label}
+        header={props.rightHeader?.(rightControls)}
+        managedHeader={Boolean(props.rightHeader)}
         side="right"
-        suppressed={visibility.expanded === "left"}
+        suppressed={expandedPanel === "left"}
         visible={visibility.right}
-        workspaceExpanded={visibility.expanded === "right"}
+        workspaceExpanded={expandedPanel === "right"}
         hideToggle={props.externalPanelControls}
         onToggle={() => toggle("right")}
       />

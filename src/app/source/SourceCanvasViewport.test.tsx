@@ -5,15 +5,22 @@ import { afterEach, expect, it, vi } from "vitest";
 vi.mock("../components/PreviewCanvas/PreviewCanvas", () => ({
   PreviewCanvas: (props: {
     canvasHeader?: React.ReactNode;
+    hud?: React.ReactNode;
     preview: React.ReactNode;
+    selection?: unknown;
+    showControls?: boolean;
     toolbar?: React.ReactNode;
+    toolbarSigning?: React.ReactNode;
     worldFooter?: React.ReactNode;
   }) => (
-    <div>
+    <div data-testid="preview-canvas" data-show-controls={String(props.showControls !== false)}>
       <div data-testid="fixed-canvas-header">{props.canvasHeader}</div>
-      {props.toolbar}
+      <div data-testid="preview-toolbar">{props.toolbar}</div>
+      <div data-testid="preview-signing">{props.toolbarSigning}</div>
       {props.preview}
-      {props.worldFooter}
+      <div data-testid="preview-hud">{props.hud}</div>
+      <output data-testid="preview-selection">{props.selection ? "selected" : "none"}</output>
+      <div data-testid="preview-footer">{props.worldFooter}</div>
     </div>
   ),
 }));
@@ -35,6 +42,32 @@ const node: SourceTreeNode = {
     mobile: { requestedDevice: "mobile", state: "missing" },
   },
 };
+
+it("renders a chrome-free review preview without hiding the component", () => {
+  render(
+    <SourceCanvasViewport
+      ancestry={[{ id: "app", kind: "component", label: "App" }]}
+      device="desktop"
+      footer={<div>Selected file</div>}
+      hud={<div>Comment composer</div>}
+      node={node}
+      showChrome={false}
+      toolbarSigning={<div>Signing</div>}
+      onDeviceChange={vi.fn()}
+    >
+      {() => <div>Component preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  expect(screen.getByText("Component preview")).toBeVisible();
+  expect(screen.getByTestId("preview-canvas")).toHaveAttribute("data-show-controls", "false");
+  expect(screen.getByTestId("fixed-canvas-header")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("preview-toolbar")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("preview-signing")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("preview-hud")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("preview-footer")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("preview-selection")).toHaveTextContent("none");
+});
 
 it("can leave device switching to the workspace sidebar", () => {
   render(

@@ -20,13 +20,12 @@ describe("ProjectFileBrowser", () => {
     render(<ProjectFileBrowser files={files} onSelect={onSelect} />);
 
     expect(screen.getByRole("treeitem", { name: /demo-target/ })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: /Card.tsx/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Card.tsx/ })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /src/ }));
-    expect(screen.queryByRole("button", { name: /Card.tsx/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Card.tsx/ })).toBeInTheDocument();
     expect(onSelect).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole("button", { name: /src/ }));
     await userEvent.click(screen.getByRole("button", { name: /Card.tsx/ }));
     expect(onSelect).toHaveBeenCalledWith("card");
   });
@@ -39,5 +38,12 @@ describe("ProjectFileBrowser", () => {
     rerender(<ProjectFileBrowser files={files} selectedFileId="card" onSelect={() => undefined} />);
     expect(await screen.findByRole("button", { name: /Card.tsx/ })).toBeInTheDocument();
     expect(screen.getByRole("treeitem", { name: "Card.tsx" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("labels the browser for the selected workspace", () => {
+    render(<ProjectFileBrowser files={files} title="Library files" onSelect={() => undefined} />);
+
+    expect(screen.getByRole("complementary", { name: "Library files browser" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Library files" })).toBeInTheDocument();
   });
 });

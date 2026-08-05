@@ -12,13 +12,13 @@ export function MobileAreaButton(props: {
       <Button
         aria-current={props.active ? "page" : undefined}
         aria-label={props.label}
-        className={`h-8 min-w-0 flex-1 gap-1 rounded-lg px-1.5 text-[9px] font-medium transition-colors ${props.active ? "bg-[#292b31] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200"}`}
+        className={`h-8 min-w-0 shrink-0 gap-1 rounded-full px-2.5 text-[10px] font-medium transition-colors ${props.active ? "bg-[#292b31] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200"}`}
         size="sm"
         variant="ghost"
         onPress={props.onPress}
       >
         {props.children}
-        <span className="hidden min-[330px]:inline">{props.label}</span>
+        <span>{props.label}</span>
       </Button>
       <Tooltip.Content className="rounded-lg bg-[#202126] px-2 py-1 text-[10px] text-zinc-200 shadow-xl" placement="bottom">
         {props.label}

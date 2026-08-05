@@ -74,6 +74,8 @@ export interface LibraryDevelopmentProjectStatus {
   cloned: boolean;
   state: "stopped" | "running";
   activeWorktreeId?: string;
+  /** Local branches, including branches that have not been materialized as worktrees yet. */
+  branches?: readonly string[];
   worktrees: readonly LibraryDevelopmentWorktree[];
 }
 
@@ -272,8 +274,18 @@ export interface RuntimeSourceWorkspaceEntry extends SourceWorkspaceEntry {
 
 export interface RuntimeSourceWorkspace extends Omit<SourceWorkspaceManifest, "entries"> {
   entries: readonly RuntimeSourceWorkspaceEntry[];
+  /** Server-registered files that are safe to expose in the source browser. */
+  files?: readonly SourceWorkspaceFileEntry[];
   /** Target-owned CSS, injected only into the isolated preview document. */
   styles: readonly string[];
+}
+
+export interface SourceWorkspaceFileEntry {
+  id: string;
+  label: string;
+  kind: "file" | "directory";
+  parentId?: string;
+  editable?: boolean;
 }
 
 export interface RuntimeSourceLibraryCatalog {

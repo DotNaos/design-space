@@ -201,7 +201,7 @@ function resolvedLibraryComponents(
   const checker = program.getTypeChecker();
   const moduleSymbol = source && checker.getSymbolAtLocation(source);
   if (!moduleSymbol) return [];
-  const components = checker.getExportsOfModule(moduleSymbol).flatMap((symbol) => {
+  const candidates = checker.getExportsOfModule(moduleSymbol).flatMap((symbol) => {
     const name = symbol.getName();
     if (!/^[A-Z][A-Za-z0-9]*$/.test(name) || name === name.toUpperCase()) return [];
     const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
@@ -210,11 +210,20 @@ function resolvedLibraryComponents(
       /[/\\]primitives[/\\]/.test(declaration.getSourceFile().fileName)
     ));
     return [{
+      target,
       name,
       evidence: "package-export" as const,
       ...(primitive ? { category: "primitive" as const } : {}),
     }];
   });
+  const componentsByTarget = new Map<ts.Symbol, (typeof candidates)[number]>();
+  for (const candidate of candidates) {
+    const current = componentsByTarget.get(candidate.target);
+    if (!current || (candidate.name === candidate.target.getName() && current.name !== candidate.target.getName())) {
+      componentsByTarget.set(candidate.target, candidate);
+    }
+  }
+  const components = [...componentsByTarget.values()].map(({ target: _target, ...component }) => component);
   return Object.freeze(
     [...new Map(components.map((component) => [component.name, component])).values()]
       .sort((left, right) => left.name.localeCompare(right.name, "en")),

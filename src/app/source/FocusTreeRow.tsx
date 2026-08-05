@@ -2,11 +2,8 @@ import { Button } from "@heroui/react";
 import { ChevronDown, ChevronRight, Component, Diamond, PanelTop } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
 import { type DesignSpaceDevice, type RuntimeSourceWorkspace } from "../../shared/source-workspace";
-import { suggestedSourceDesignPath } from "../../shared/source-design";
 import { SourceComponentPicker } from "./SourceComponentPicker";
 import { SourceApprovalStatus, sourceApprovalRowClassName } from "./SourceApprovalStatus";
-import { SourceDesignStatus } from "./SourceDesignStatus";
-import { SourceDeviceTabs } from "./SourceDeviceTabs";
 import { type SourceFocusGraph, type SourceFocusRow } from "./source-focus-tree";
 import { sourceSlotCandidates } from "./source-slot-composition";
 import { sourceTreeNodes } from "./source-workspace-tree";
@@ -23,6 +20,9 @@ export function FocusTreeRow(props: {
   row: SourceFocusRow;
   activeCanvasIds: ReadonlySet<string>;
   activeCanvasId?: string;
+  previewCanvasIds: ReadonlySet<string>;
+  previewOccurrenceId?: string;
+  rootMode: boolean;
   activePath: boolean;
   approvalReview?: boolean;
   selected?: SourceWorkspaceSelection;
@@ -34,6 +34,7 @@ export function FocusTreeRow(props: {
   onFocus: SourceWorkspaceSidebarProps["onFocus"];
   onOpenComponent: SourceWorkspaceSidebarProps["onOpenComponent"];
   onHover: SourceWorkspaceSidebarProps["onHover"];
+  onPreviewOccurrence: (occurrenceId: string | undefined) => void;
   onDeviceChange?: SourceWorkspaceSidebarProps["onDeviceChange"];
   onSelect: SourceWorkspaceSidebarProps["onSelect"];
   onToggleBranch: (key: string) => void;
@@ -55,7 +56,7 @@ export function FocusTreeRow(props: {
     if (active) rowButton.current?.scrollIntoView?.({ block: "nearest" });
   }, [active]);
   const withinCanvas = Boolean(row.occurrence && props.activeCanvasIds.has(row.occurrence.id));
-  const openedCanvas = occurrenceRow && row.occurrence?.id === props.activeCanvasId;
+  const openedCanvas = !props.rootMode && occurrenceRow && row.occurrence?.id === props.activeCanvasId;
   const Icon = row.kind === "component"
     ? openedCanvas ? Component : Diamond
     : row.kind === "html" ? htmlLayerIcon(row.label) : PanelTop;
@@ -79,8 +80,9 @@ export function FocusTreeRow(props: {
     props.device,
     props.activeCanvasId,
   );
-  const mutedOpacity = outsideActiveFile
-    ? props.activePath ? "opacity-70" : "opacity-40"
+  const previewed = Boolean(row.occurrence && props.previewCanvasIds.has(row.occurrence.id));
+  const previewOpacity = props.previewOccurrenceId && !previewed
+    ? props.activePath ? "opacity-65" : "opacity-35"
     : "";
   const candidates = slot ? sourceSlotCandidates(props.workspace, props.nodes, slot, props.device, ownerPath) : [];
   const componentEntry = occurrenceRow ? row.occurrence?.entry : undefined;
@@ -146,12 +148,13 @@ export function FocusTreeRow(props: {
   const openComponent = () => {
     const request = componentOpenRequest();
     if (!request) return;
+    if (occurrenceRow && focusTarget) {
+      props.onFocus(focusTarget.id, request.selection);
+      return;
+    }
     if (props.onOpenComponent) {
       props.onOpenComponent(request);
       return;
-    }
-    if (occurrenceRow && focusTarget) {
-      props.onFocus(focusTarget.id, request.selection);
     }
   };
   const approvalRowClassName = componentEntry && props.approvalReview
@@ -162,7 +165,7 @@ export function FocusTreeRow(props: {
       aria-label={row.label}
       aria-level={row.depth + 1}
       aria-selected={active}
-      className={`relative flex min-h-10 w-full min-w-max items-center pr-2 transition-[padding,opacity,transform,background-color] duration-150 ease-out motion-reduce:transition-none ${mutedOpacity} ${approvalRowClassName || (props.activePath ? "bg-violet-500/[0.025]" : "")}`}
+      className={`relative flex min-h-10 w-full min-w-max items-center pr-2 transition-[padding,opacity,transform,background-color] duration-150 ease-out motion-reduce:transition-none ${previewOpacity} ${approvalRowClassName || (props.activePath ? "bg-violet-500/[0.025]" : "")}`}
       data-source-active-path={props.activePath || undefined}
       data-source-file-scope={outsideActiveFile ? "external" : "current"}
       data-source-occurrence={row.occurrence?.id}
@@ -170,8 +173,14 @@ export function FocusTreeRow(props: {
       data-source-runtime-occurrence={row.renderedLayerOccurrence}
       role="treeitem"
       style={{ paddingLeft: 8 + row.depth * 18 }}
-      onMouseEnter={() => props.onHover?.(selection())}
-      onMouseLeave={() => props.onHover?.(undefined)}
+      onMouseEnter={() => {
+        props.onHover?.(selection());
+        if (occurrenceRow) props.onPreviewOccurrence(row.occurrence?.id);
+      }}
+      onMouseLeave={() => {
+        props.onHover?.(undefined);
+        if (occurrenceRow) props.onPreviewOccurrence(undefined);
+      }}
     >
       {row.collapsible ? (
         <Button
@@ -188,19 +197,12 @@ export function FocusTreeRow(props: {
       ) : <span aria-hidden="true" className="size-6 shrink-0" />}
       <Button
         ref={rowButton}
-        aria-label={`${row.label}${row.role === "focus" ? ", focused" : ""}`}
-        className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 text-left ${active ? "bg-sky-500/15 text-sky-100" : props.activePath ? "text-zinc-400 hover:bg-violet-500/[0.055] hover:text-zinc-200" : withinCanvas && !outsideActiveFile ? "text-zinc-300 hover:bg-white/[0.04] hover:text-zinc-100" : "text-zinc-600 hover:bg-white/[0.04] hover:text-zinc-400"}`}
-        fullWidth={!(openedCanvas && props.onDeviceChange)}
+        aria-label={`${row.label}${!props.rootMode && row.role === "focus" ? ", focused" : ""}`}
+        className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 text-left ${active ? props.rootMode ? "bg-white/[0.06] text-zinc-100" : "bg-sky-500/15 text-sky-100" : props.activePath ? "text-zinc-400 hover:bg-violet-500/[0.055] hover:text-zinc-200" : withinCanvas && !outsideActiveFile ? "text-zinc-300 hover:bg-white/[0.04] hover:text-zinc-100" : "text-zinc-600 hover:bg-white/[0.04] hover:text-zinc-400"}`}
+        fullWidth
         size="sm"
         variant="ghost"
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && row.kind === "component") {
-            event.preventDefault();
-            openComponent();
-            return;
-          }
-        }}
-        onDoubleClick={openComponent}
+        onDoubleClick={row.kind === "component" ? openComponent : undefined}
         onPress={select}
       >
         {componentEntry && props.approvalReview ? (
@@ -211,20 +213,6 @@ export function FocusTreeRow(props: {
         {row.kind === "component" && row.occurrence && <MissingDeviceCluster implementations={row.occurrence.node.implementations} />}
         {status && <SlotStatus layer={slot!} />}
       </Button>
-      {componentEntry && !componentEntry.design ? (
-        <SourceDesignStatus
-          designPath={suggestedSourceDesignPath(componentEntry, props.workspace.entries)}
-          label={componentEntry.label}
-        />
-      ) : null}
-      {openedCanvas && props.onDeviceChange ? (
-        <SourceDeviceTabs
-          compact
-          device={props.device}
-          node={row.occurrence?.node}
-          onChange={props.onDeviceChange}
-        />
-      ) : null}
       {slot && row.occurrence && props.onApplySlot && (
         <SourceComponentPicker
           candidates={candidates}

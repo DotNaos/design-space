@@ -12,13 +12,29 @@ let cachedAnnotations: readonly SourceFeedbackAnnotation[] = [];
 
 export interface SourceFeedbackContext {
   id: string;
-  kind: "component" | "layer" | "slot";
+  kind: "code" | "component" | "layer" | "slot";
   label: string;
   source: {
     end: number;
     relativePath: string;
     start: number;
   };
+}
+
+export interface SourceCodeSelectionContext {
+  endColumn: number;
+  endLine: number;
+  id: string;
+  relativePath: string;
+  selectedText: string;
+  startColumn: number;
+  startLine: number;
+}
+
+export interface SourceCodeAnnotation {
+  comment: string;
+  context: SourceCodeSelectionContext;
+  id: string;
 }
 
 export interface SourceFeedbackAnnotation {
@@ -78,14 +94,17 @@ export function formatSourceFeedback(
   message: string,
   context?: SourceFeedbackContext,
   annotations: readonly SourceCanvasAnnotation[] = [],
+  codeContexts: readonly SourceCodeSelectionContext[] = [],
+  codeAnnotations: readonly SourceCodeAnnotation[] = [],
 ) {
   const trimmed = message.trim();
-  if (annotations.length) {
+  if (annotations.length || codeContexts.length || codeAnnotations.length) {
     const lines = [
       ...(trimmed ? [trimmed, ""] : []),
-      "---",
-      "Design Space annotations",
-      ...annotations.flatMap((annotation, index) => {
+      ...(annotations.length ? [
+        "---",
+        "Design Space annotations",
+        ...annotations.flatMap((annotation, index) => {
         const range = sourceRange(annotation.context);
         return [
           `${index + 1}. ${annotation.element} — ${annotation.comment}`,
@@ -93,7 +112,21 @@ export function formatSourceFeedback(
           `   Canvas point: ${Math.round(annotation.point.x * 100)}% × ${Math.round(annotation.point.y * 100)}%`,
           ...(annotation.occurrence > 0 ? [`   Rendered instance: ${annotation.occurrence + 1}`] : []),
         ];
-      }),
+        }),
+      ] : []),
+      ...(codeContexts.length ? [
+        "---",
+        "Design Space code context",
+        ...codeContexts.flatMap((selection, index) => formatCodeSelection(selection, `${index + 1}.`)),
+      ] : []),
+      ...(codeAnnotations.length ? [
+        "---",
+        "Design Space code annotations",
+        ...codeAnnotations.flatMap((annotation, index) => [
+          `${index + 1}. ${annotation.comment}`,
+          ...formatCodeSelection(annotation.context, "  "),
+        ]),
+      ] : []),
     ];
     return lines.join("\n");
   }
@@ -106,6 +139,18 @@ export function formatSourceFeedback(
     `- ${context.kind}: ${context.label}`,
     `- Source: ${context.source.relativePath}:${sourceRange(context)}`,
   ].join("\n");
+}
+
+function formatCodeSelection(selection: SourceCodeSelectionContext, prefix: string) {
+  const location = selection.startLine === selection.endLine
+    ? `${selection.relativePath}:${selection.startLine}`
+    : `${selection.relativePath}:${selection.startLine}-${selection.endLine}`;
+  return [
+    `${prefix} Source: ${location}`,
+    "```tsx",
+    selection.selectedText,
+    "```",
+  ];
 }
 
 function sourceRange(context: SourceFeedbackContext) {

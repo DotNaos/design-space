@@ -1,13 +1,14 @@
 import { Button } from "@heroui/react";
-import { ArrowUpToLine, FilePlus2, Frame, House, Image, ListCollapse, Square, Type, ShieldCheck } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { ArrowLeft, FilePlus2, Frame, Image, Square, Type, ShieldCheck } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { type DesignSpaceDevice, type RuntimeSourceWorkspace, type SourceLayerBinding, type SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { SourceApprovalReviewSummary, sourceApprovalModeLabel } from "./SourceApprovalStatus";
+import { SourceDeviceTabs } from "./SourceDeviceTabs";
 import { SourceTreeHeaderAction } from "./SourceTreeHeaderAction";
-import { type SourceFocusRow, type SourceOccurrence } from "./source-focus-tree";
+import { sourceFocusGraph, type SourceFocusGraph, type SourceFocusRow, type SourceOccurrence } from "./source-focus-tree";
 import { type SourceComponentCandidate } from "./source-slot-composition";
-import { type SourceImplementation, type SourceTreeSelection } from "./source-workspace-tree";
+import { sourceTreeNodes, type SourceImplementation, type SourceTreeNode, type SourceTreeSelection } from "./source-workspace-tree";
 import { renderedOccurrenceMatches } from "./source-tree-row-state";
 import { SourceWorkspaceTree } from "./SourceWorkspaceTree";
 
@@ -48,6 +49,8 @@ export interface SourceWorkspaceSidebarProps {
   onCreateComponent?: () => void;
   onApprovalReviewChange?: (active: boolean) => void;
   treeStateKey?: string;
+  focusGraph?: SourceFocusGraph;
+  treeNodes?: readonly SourceTreeNode[];
   designNavigation?: {
     parentLabel?: string;
     onExit: () => void;
@@ -57,9 +60,21 @@ export interface SourceWorkspaceSidebarProps {
 }
 
 export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
-  const [collapseOutsideRequest, setCollapseOutsideRequest] = useState(0);
   const [internalApprovalReview, setInternalApprovalReview] = useState(false);
   const approvalReview = props.approvalReview ?? internalApprovalReview;
+  const device = props.selected?.device ?? "desktop";
+  const nodes = useMemo(
+    () => props.treeNodes ?? sourceTreeNodes(props.workspace),
+    [props.treeNodes, props.workspace],
+  );
+  const graph = useMemo(
+    () => props.focusGraph ?? sourceFocusGraph(nodes, device),
+    [device, nodes, props.focusGraph],
+  );
+  const focusedOccurrence = props.focusId ? graph.occurrences.get(props.focusId) : undefined;
+  const drilldownOccurrence = focusedOccurrence && !graph.roots.includes(focusedOccurrence.id)
+    ? focusedOccurrence
+    : undefined;
   const toggleApprovalReview = () => {
     const next = !approvalReview;
     if (props.approvalReview === undefined) setInternalApprovalReview(next);
@@ -68,43 +83,44 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
   return (
     <aside aria-label="Source workspace" className={`${props.className ?? "flex w-80"} min-h-0 min-w-0 shrink-0 flex-col border-r border-white/10 bg-[#141518]`}>
       <header className="flex min-h-12 shrink-0 items-center gap-1 border-b border-white/10 px-1.5">
-        {props.headerLeading}
         <h2 className="sr-only">Source tree</h2>
-        {props.workspace.entries.length > 0 && (
-          <SourceTreeHeaderAction
-            label="Collapse outside active component"
-            onPress={() => setCollapseOutsideRequest((current) => current + 1)}
-          >
-            <ListCollapse aria-hidden="true" size={14} />
-          </SourceTreeHeaderAction>
-        )}
-        {props.workspace.entries.length > 0 && (
-          <SourceTreeHeaderAction
-            active={approvalReview}
-            label={sourceApprovalModeLabel(props.workspace.approvals, props.workspace.entries)}
-            onPress={toggleApprovalReview}
-          >
-            <ShieldCheck aria-hidden="true" size={14} />
-          </SourceTreeHeaderAction>
-        )}
         {props.designNavigation?.onOpenParent && (
-          <SourceTreeHeaderAction
-            label={`Open parent${props.designNavigation.parentLabel ? ` ${props.designNavigation.parentLabel}` : ""}`}
-            onPress={props.designNavigation.onOpenParent}
+          <Button
+            aria-label="Return to full app tree"
+            className="h-8 min-w-0 gap-1.5 rounded-full bg-white/[0.07] px-3 text-xs font-medium text-zinc-200 hover:bg-white/[0.11]"
+            size="sm"
+            variant="ghost"
+            onPress={props.designNavigation.onExit}
           >
-            <ArrowUpToLine aria-hidden="true" size={14} />
-          </SourceTreeHeaderAction>
-        )}
-        {props.designNavigation && (
-          <SourceTreeHeaderAction label="Open app design" onPress={props.designNavigation.onExit}>
-            <House aria-hidden="true" size={14} />
-          </SourceTreeHeaderAction>
-        )}
-        {props.workspace.capabilities?.createComponents && props.onCreateComponent && (
-          <Button aria-label="Create component" className="grid size-7 min-w-7 place-items-center rounded-lg text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>
-            <FilePlus2 aria-hidden="true" size={14} />
+            <ArrowLeft aria-hidden="true" size={13} />
+            App tree
           </Button>
         )}
+        {drilldownOccurrence && props.onDeviceChange ? (
+          <SourceDeviceTabs
+            compact
+            device={device}
+            node={drilldownOccurrence.node}
+            onChange={props.onDeviceChange}
+          />
+        ) : null}
+        {props.headerLeading}
+        <div className="ml-auto flex items-center gap-1">
+          {props.workspace.capabilities?.createComponents && props.onCreateComponent && (
+            <Button aria-label="Create component" className="grid size-7 min-w-7 place-items-center rounded-lg text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>
+              <FilePlus2 aria-hidden="true" size={14} />
+            </Button>
+          )}
+          {props.workspace.entries.length > 0 && (
+            <SourceTreeHeaderAction
+              active={approvalReview}
+              label={sourceApprovalModeLabel(props.workspace.approvals, props.workspace.entries)}
+              onPress={toggleApprovalReview}
+            >
+              <ShieldCheck aria-hidden="true" size={14} />
+            </SourceTreeHeaderAction>
+          )}
+        </div>
       </header>
       {approvalReview && (
         <SourceApprovalReviewSummary
@@ -115,7 +131,6 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
       <SourceWorkspaceTree
         {...props}
         approvalReview={approvalReview}
-        collapseOutsideRequest={collapseOutsideRequest}
       />
     </aside>
   );

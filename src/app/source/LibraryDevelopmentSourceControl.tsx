@@ -61,8 +61,6 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
           worktreeId: selected.id,
         }));
       } else if (action === "stop") {
-        try { localStorage.setItem("design-space.library-source", "release"); } catch { /* optional preference */ }
-        props.onModeChange("release");
         setStatus(await runLocalOperation<LibraryDevelopmentProjectStatus>({
           type: "stop-library-development",
         }));

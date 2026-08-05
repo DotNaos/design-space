@@ -1,4 +1,5 @@
 import { ListBox, Select } from "@heroui/react";
+import { ListFilter } from "lucide-react";
 import { type SourceLibraryCategory } from "./source-library-catalog";
 
 export function CategoryFilter(props: {
@@ -13,13 +14,15 @@ export function CategoryFilter(props: {
   return (
     <Select
       aria-label="Component category"
-      className="mt-2 w-full"
+      className="w-9 shrink-0"
       selectedKey={props.value}
       onSelectionChange={(key) => props.onChange(String(key) as SourceLibraryCategory)}
     >
-      <Select.Trigger className="flex h-8 w-full items-center gap-1.5 rounded-full bg-white/[0.045] px-3 text-[10px] text-zinc-300 outline-none transition-colors data-[focus-visible]:bg-white/[0.08]">
-        <Select.Value className="min-w-0 flex-1 truncate text-left !text-[10px] !leading-none" />
-        <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
+      <Select.Trigger
+        className="flex size-9 items-center justify-center rounded-full bg-white/[0.045] text-zinc-500 outline-none transition-colors hover:bg-white/[0.075] hover:text-zinc-300 data-[focus-visible]:bg-white/[0.08] data-[pressed]:bg-violet-500/[0.14] data-[pressed]:text-violet-200"
+      >
+        <ListFilter aria-hidden="true" size={14} />
+        <Select.Value className="sr-only" />
       </Select.Trigger>
       <Select.Popover placement="bottom" className="min-w-44 rounded-lg bg-[#1b1c20] p-1 shadow-2xl">
         <ListBox items={options}>

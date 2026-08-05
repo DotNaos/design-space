@@ -89,9 +89,10 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
   const [showGestureHint, setShowGestureHint] = useState(true);
   const [interactionMode, setInteractionMode] = useState<"select" | "interact">("select");
   const activeInteractionMode = props.forcedInteractionMode ?? interactionMode;
+  const showControls = props.showControls !== false;
   const narrowViewport = viewportSize.width > 0 && viewportSize.width < 1024;
   const nestedToolbar = narrowViewport || Boolean(props.toolbarSigning);
-  const toolbarInset = props.compact ? 42 : nestedToolbar ? 88 : 52;
+  const toolbarInset = showControls ? (props.compact ? 42 : nestedToolbar ? 88 : 52) : 0;
   const strictUiTargets = useMemo(
     () => buildStrictUiCanvasTargets(props.strictUiViolations ?? [], props.rootInstanceId),
     [props.rootInstanceId, props.strictUiViolations],
@@ -529,34 +530,36 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
         visible={gridVisible}
       />
 
-      <CanvasViewportControls
-        headerContent={props.canvasHeader}
-        headerHeight={canvasHeaderHeight}
-        compact={props.compact}
-        leadingContent={props.toolbar}
-        narrow={narrowViewport}
-        signingContent={props.toolbarSigning}
-        showInteractionToggle={!props.staticPreview}
-        gridMode={gridMode}
-        gridVisible={gridVisible}
-        interactionMode={activeInteractionMode}
-        layoutGrid={layoutGrid}
-        scale={camera.scale}
-        onFit={() => {
-          suppressClick.current = false;
-          autoFit.current = true;
-          fit();
-        }}
-        onReset={reset}
-        onGridModeChange={setGridMode}
-        onGridVisibleChange={setGridVisible}
-        onLayoutGridChange={setLayoutGrid}
-        onZoomIn={() => zoomBy(1.2)}
-        onZoomOut={() => zoomBy(1 / 1.2)}
-        onToggleInteractionMode={() => {
-          if (!props.staticPreview) setInteractionMode((current) => current === "select" ? "interact" : "select");
-        }}
-      />
+      {showControls ? (
+        <CanvasViewportControls
+          headerContent={props.canvasHeader}
+          headerHeight={canvasHeaderHeight}
+          compact={props.compact}
+          leadingContent={props.toolbar}
+          narrow={narrowViewport}
+          signingContent={props.toolbarSigning}
+          showInteractionToggle={!props.staticPreview}
+          gridMode={gridMode}
+          gridVisible={gridVisible}
+          interactionMode={activeInteractionMode}
+          layoutGrid={layoutGrid}
+          scale={camera.scale}
+          onFit={() => {
+            suppressClick.current = false;
+            autoFit.current = true;
+            fit();
+          }}
+          onReset={reset}
+          onGridModeChange={setGridMode}
+          onGridVisibleChange={setGridVisible}
+          onLayoutGridChange={setLayoutGrid}
+          onZoomIn={() => zoomBy(1.2)}
+          onZoomOut={() => zoomBy(1 / 1.2)}
+          onToggleInteractionMode={() => {
+            if (!props.staticPreview) setInteractionMode((current) => current === "select" ? "interact" : "select");
+          }}
+        />
+      ) : null}
 
       <div
         ref={worldRef}

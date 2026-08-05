@@ -4,6 +4,7 @@ import type { DesignSpaceDevice, SourceApprovalEvidence, SourceWorkspaceLayer } 
 import type { SignedSourceComponent } from "../shared/contracts";
 import { runLocalOperation } from "./api";
 import { ProjectFileBrowser } from "./documents/ProjectFileBrowser";
+import { LibraryFilesHeader } from "./documents/LibraryFilesHeader";
 import { ResizableWorkspacePanels } from "./shell/ResizableWorkspacePanels";
 import { WorkspaceTopBar } from "./shell/WorkspaceTopBar";
 import { WorkspaceSidebarToggle } from "./shell/WorkspaceSidebarHeader";
@@ -37,6 +38,7 @@ import { CodeDocumentSwitch, FileEvidencePanel, findSourceSlotLayer } from "./so
 import { sourceCanvasSelection, sourceCanvasSelectionOccurrence, sourceCanvasVisualLayer } from "./source/source-canvas-selection";
 import type { SourceLayerMetrics } from "./source/source-layer-design";
 import { useSourceWorkspaceUiState } from "./source/useSourceWorkspaceUiState";
+import { useSourceWorkspaceFiles } from "./source/useSourceWorkspaceFiles";
 import { sourceEntrySlotLayers } from "./source/source-entry-layers";
 import { sourceSlotNavigationTarget, sourceSlotScope, sourceSlotSelection } from "./source/source-slot-navigation";
 import { SourceWorkspaceCodeOverlay } from "./source/SourceWorkspaceCodeOverlay";
@@ -54,6 +56,10 @@ import { sourceCanvasAncestry } from "./source/source-canvas-ancestry";
 import { sourceCanvasApprovalStatus } from "./source/SourceApprovalStatus";
 import { SourceWorkspacePageNavigation } from "./source/SourceWorkspacePageNavigation";
 import { approvedSourceComponentCount, sourceComponentReviewSequence } from "./source/source-component-review";
+import type { SourceCodeAnnotation, SourceCodeSelectionContext } from "./source/source-feedback";
+import { SourceWorkspaceAreaTabs } from "./source/SourceWorkspaceAreaTabs";
+import { sourceImportedComponentTarget } from "./source/source-import-component-target";
+import { createSourceBoxModelPreviewStore } from "./source/source-box-model-preview";
 
 export function SourceWorkspace({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
   const registeredWorkspace = target.sourceWorkspace;
@@ -63,6 +69,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const initialGraph = useMemo(() => sourceFocusGraph(registeredNodes, initial?.device ?? "desktop"), [initial?.device, registeredNodes]);
   const initialFocusId = initialFocusOccurrence(initialGraph);
   const initialFocus = initialFocusId ? initialGraph.occurrences.get(initialFocusId) : undefined;
+  const boxModelPreviewStore = useMemo(createSourceBoxModelPreviewStore, []);
   const defaultSelection: SourceWorkspaceSelection | undefined = initial && initialFocusId ? {
     ...initial,
     nodeId: initialFocus?.node.id ?? initial.nodeId,
@@ -73,20 +80,25 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     activity, appCodeHeight, appCodeOpen, canvasMode, codeDocument, designCases, designRootId, designSelection,
     focusId, mobilePane, previewRuntime, previewSelection,
     selectedLibraryComponent, selectedLibraryLayerId, selectedProjectFileId,
-    selection, workspaceMode, setActivity, setAppCodeHeight, setAppCodeOpen, setCanvasMode, setCodeDocument,
+    selection, workspaceMode, workspaceSurface, setActivity, setAppCodeHeight, setAppCodeOpen, setCanvasMode, setCodeDocument,
     setDesignCases, setDesignRootId, setDesignSelection, setFocusId, setMobilePane, setPreviewRuntime,
     setPreviewSelection, setSelectedLibraryComponent, setSelectedLibraryLayerId,
-    setSelectedProjectFileId, setSelection, setWorkspaceMode,
+    setSelectedProjectFileId, setSelection, setWorkspaceMode, setWorkspaceSurface,
   } = useSourceWorkspaceUiState({
     defaultFocusId: initialFocusId,
     defaultLibraryComponent: registeredWorkspace.library?.components[0]?.name,
     defaultSelection,
-    fileIds: new Set(target.files.map((file) => file.id)),
+    fileIds: new Set([
+      ...target.files.map((file) => file.id),
+      ...(target.sourceLibrary?.development?.files ?? []).map((file) => file.id),
+    ]),
     focusIds: new Set(initialGraph.occurrences.keys()),
     nodeIds: new Set(registeredNodes.map((node) => node.id)),
     projectId: target.project.id,
   });
   const [draftSelection, setDraftSelection] = useState<{ start: number; end: number }>();
+  const [codeContexts, setCodeContexts] = useState<readonly SourceCodeSelectionContext[]>([]);
+  const [codeAnnotations, setCodeAnnotations] = useState<readonly SourceCodeAnnotation[]>([]);
   const [hoveredTreeSelection, setHoveredTreeSelection] = useState<SourceWorkspaceSelection>();
   const [selectedLayerMetrics, setSelectedLayerMetrics] = useState<SourceLayerMetrics>();
   const [canvasRevealRequest, setCanvasRevealRequest] = useState<number>();
@@ -309,6 +321,18 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const librarySelectedLayer = findSourceTreeLayer(libraryEntry?.layers, selectedLibraryLayerId) ?? baseLibrarySelectedLayer;
   const libraryVisualLayer = sourceCanvasVisualLayer(libraryEntry, librarySelectedLayer);
   const libraryReviewLayer = sourceCanvasVisualLayer(baseLibraryEditEntry, baseLibrarySelectedLayer);
+  const libraryImportedComponentTarget = useMemo(() => sourceImportedComponentTarget({
+    currentEntry: libraryEntry,
+    entries: effectiveLibraryCatalog?.development?.entries ?? [],
+    layer: libraryVisualLayer,
+    source: libraryEditor.draft || libraryEditor.snapshot?.source || "",
+  }), [
+    effectiveLibraryCatalog?.development?.entries,
+    libraryEditor.draft,
+    libraryEditor.snapshot?.source,
+    libraryEntry,
+    libraryVisualLayer,
+  ]);
   const libraryStyleEditor = useSourceLayerClassEditor({
     connected: libraryDraftAnalysis.workspace.runtime === "react",
     editor: libraryEditor,
@@ -316,8 +340,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     ready: libraryDraftAnalysis.ready,
     scope: "library-development",
   });
-  const fileEditor = useSourceFileEditor(selectedProjectFileId);
-  const selectedProjectFile = target.files.find((file) => file.id === selectedProjectFileId && file.kind === "file");
+  const fileScope = workspaceSurface === "library" ? "library-development" : "app";
+  const workspaceFiles = useSourceWorkspaceFiles(fileScope, target.files, target.sourceLibrary?.development);
+  const selectedProjectFile = workspaceFiles.find((file) => file.id === selectedProjectFileId && file.kind === "file");
+  const fileEditor = useSourceFileEditor(selectedProjectFile?.id, fileScope);
   const activeEditor = activity === "files"
     ? fileEditor
     : activity === "library"
@@ -412,6 +438,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     setCanvasRevealRequest(undefined);
     setDraftSelection(undefined);
     setApprovalSigningError(undefined);
+    setWorkspaceSurface("app");
     setActivity("app");
     setMobilePane("canvas");
   }, [selection, workspaceMode]);
@@ -430,6 +457,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       setPreviewRuntime("static");
       setSelection(request.selection);
       setDesignSelection(request.selection);
+      setWorkspaceSurface("app");
       setActivity("app");
       setMobilePane("canvas");
     }
@@ -443,6 +471,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     setPreviewRuntime("static");
     setCanvasRevealRequest(undefined);
     setSelection(previewSelection ?? defaultSelection);
+    setWorkspaceSurface("app");
     setActivity("app");
     setMobilePane("canvas");
   };
@@ -460,7 +489,17 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     if (workspaceMode === "preview") setPreviewSelection(selection);
     setWorkspaceMode("design");
     setPreviewRuntime("static");
+    if (next === "library") setWorkspaceSurface("library");
     setActivity(next);
+    setMobilePane("documents");
+  };
+  const revealSourceFile = (fileId: string, surface: "app" | "library") => {
+    if (workspaceMode === "preview") setPreviewSelection(selection);
+    setWorkspaceMode("design");
+    setPreviewRuntime("static");
+    setWorkspaceSurface(surface);
+    setSelectedProjectFileId(fileId);
+    setActivity("files");
     setMobilePane("documents");
   };
   const openWorkspaceArea = (next: "app" | "library") => {
@@ -520,8 +559,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         } : {}),
       } : undefined}
       focusId={resolvedFocusId}
+      focusGraph={graph}
       headerLeading={headerLeading}
       selected={selection}
+      treeNodes={nodes}
       treeStateKey={`${target.project.id}:app:${requestedDevice}`}
       workspace={workspaceWithApprovals}
       onApprovalReviewChange={setApprovalReview}
@@ -546,12 +587,27 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         setDesignSelection(next);
         if (next.kind === "component") setCanvasRevealRequest((current) => (current ?? 0) + 1);
         setDraftSelection(undefined);
+        setWorkspaceSurface("app");
         setActivity("app");
-        setMobilePane(next.kind === "slot" ? "tree" : "canvas");
+        // Keep component rows mounted long enough for the second click of a
+        // double-click to open the isolated drill-down on narrow layouts.
+        setMobilePane(next.kind === "html" ? "canvas" : "tree");
       }}
     />
   );
   const appSidebar = renderAppSidebar();
+  const attachCodeSelection = useCallback((codeSelection: SourceCodeSelectionContext) => {
+    setCodeContexts((current) => current.some(({ id }) => id === codeSelection.id)
+      ? current
+      : [...current, codeSelection]);
+  }, []);
+  const annotateCodeSelection = useCallback((codeSelection: SourceCodeSelectionContext, comment: string) => {
+    setCodeAnnotations((current) => [...current, {
+      comment,
+      context: codeSelection,
+      id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
+    }]);
+  }, []);
   const renderAppCodePanel = (showHeader = true) => (
     <SourceCodeCanvas
       editable={activeCodeDocument === "design" ? Boolean(entry?.design) : Boolean(entry)}
@@ -578,6 +634,12 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         else setDesignSelection(next);
         setDraftSelection(undefined);
       } : undefined}
+      onAttachSelection={attachCodeSelection}
+      onAnnotateSelection={annotateCodeSelection}
+      onRevealInFiles={entry && (() => revealSourceFile(
+        activeCodeDocument === "design" && entry.design ? entry.design.fileId : entry.fileId,
+        "app",
+      ))}
     />
   );
   const appCodePanel = renderAppCodePanel();
@@ -590,6 +652,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       toolbar={entry?.design ? (
         <CodeDocumentSwitch value={activeCodeDocument} onChange={setCodeDocument} />
       ) : undefined}
+      onRevealInFiles={entry && (() => revealSourceFile(
+        activeCodeDocument === "design" && entry.design ? entry.design.fileId : entry.fileId,
+        "app",
+      ))}
     />
   );
   const libraryCodePanel = (
@@ -608,13 +674,25 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       toolbar={libraryEntry?.design ? (
         <CodeDocumentSwitch value={activeLibraryCodeDocument} onChange={setCodeDocument} />
       ) : undefined}
+      onAttachSelection={attachCodeSelection}
+      onAnnotateSelection={annotateCodeSelection}
+      onRevealInFiles={libraryEntry && libraryRuntime.mode === "development" ? () => revealSourceFile(
+        activeLibraryCodeDocument === "design" && libraryEntry.design
+          ? libraryEntry.design.fileId
+          : libraryEntry.fileId,
+        libraryRuntime.catalogKind === "app" ? "app" : "library",
+      ) : undefined}
     />
   );
   const fileSidebar = (
     <ProjectFileBrowser
       className="flex h-full w-full border-r-0"
-      files={target.files}
+      files={workspaceFiles}
+      header={workspaceSurface === "library" ? (
+        <LibraryFilesHeader fileCount={workspaceFiles.filter((file) => file.kind === "file").length} />
+      ) : undefined}
       selectedFileId={selectedProjectFileId}
+      title={workspaceSurface === "library" ? "Library files" : "Project files"}
       onSelect={(fileId) => {
         setSelectedProjectFileId(fileId);
         setActivity("files");
@@ -653,11 +731,13 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       onModeChange={libraryRuntime.setMode}
       onSelectLayer={(layerId) => {
         setSelectedLibraryLayerId(layerId);
+        setWorkspaceSurface("library");
         setActivity("library");
       }}
       onSelect={(componentId) => {
         setSelectedLibraryComponent(componentId);
         setSelectedLibraryLayerId(undefined);
+        setWorkspaceSurface("library");
         setActivity("library");
       }}
     />
@@ -700,8 +780,11 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
   const canvas = activity === "library" ? (
     <SourceLibraryCanvas
       appWorkspace={workspace}
+      boxModelPreviewStore={boxModelPreviewStore}
       catalog={effectiveLibraryCatalog}
       catalogKind={libraryRuntime.catalogKind}
+      codeAnnotations={codeAnnotations}
+      codeContexts={codeContexts}
       device={requestedDevice}
       library={workspace.library}
       mode={libraryRuntime.mode}
@@ -716,6 +799,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       generateDesignError={designGeneration.error}
       generatingDesignEntryId={designGeneration.entryId}
       workspaceNavigation={workspacePageNavigation}
+      onClearCodeFeedback={() => {
+        setCodeContexts([]);
+        setCodeAnnotations([]);
+      }}
       onDeviceChange={(device) => setSelection((current) => current ? { ...current, device } : current)}
       onDesignCaseChange={(caseName) => libraryPreviewEntry?.design && setDesignCases((current) => ({
         ...current,
@@ -732,6 +819,8 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       }}
       onModeChange={libraryRuntime.setMode}
       onPreviewModeChange={setCanvasMode}
+      onRemoveCodeAnnotation={(id) => setCodeAnnotations((current) => current.filter((item) => item.id !== id))}
+      onRemoveCodeContext={(id) => setCodeContexts((current) => current.filter((item) => item.id !== id))}
       onSelectLayer={(layerId) => {
         setSelectedLibraryLayerId(layerId);
         setMobilePane("inspect");
@@ -742,12 +831,15 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
     <SourceCodeCanvas
       editable={Boolean(selectedProjectFile?.editable)}
       editor={fileEditor}
-      label={selectedProjectFile?.label ?? "Select a project file"}
+      label={selectedProjectFile?.label ?? (workspaceSurface === "library" ? "Select a library file" : "Select a project file")}
     />
   ) : (
     <SourceAppCanvas
       ancestry={canvasAncestry}
+      boxModelPreviewStore={boxModelPreviewStore}
       centerContent={workspaceMode === "design"}
+      codeAnnotations={codeAnnotations}
+      codeContexts={codeContexts}
       device={requestedDevice}
       draftSelection={draftSelection}
       editor={editor}
@@ -791,6 +883,10 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       workspaceMode={workspaceMode}
       workspaceNavigation={workspacePageNavigation}
       onModeChange={(mode) => setPreviewRuntime(mode === "play" ? "play" : "static")}
+      onClearCodeFeedback={() => {
+        setCodeContexts([]);
+        setCodeAnnotations([]);
+      }}
       onDesignCaseChange={(caseName) => previewEntry?.design && setDesignCases((current) => ({
         ...current,
         [previewEntry.design!.fileId]: caseName,
@@ -823,6 +919,8 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       onOpenSlotTarget={selectedSlotTarget ? () => {
         openDesign(selectedSlotTarget.id, sourceComponentSelection(selectedSlotTarget, requestedDevice));
       } : undefined}
+      onRemoveCodeAnnotation={(id) => setCodeAnnotations((current) => current.filter((item) => item.id !== id))}
+      onRemoveCodeContext={(id) => setCodeContexts((current) => current.filter((item) => item.id !== id))}
       onSelectAncestry={(item) => {
         if (item.kind !== "component") return;
         const occurrence = graph.occurrences.get(item.id);
@@ -840,9 +938,21 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         entry={libraryEntry}
         layer={libraryVisualLayer}
         layerMetrics={selectedLayerMetrics}
+        openLayerComponent={libraryImportedComponentTarget && libraryVisualLayer ? {
+          label: libraryVisualLayer.label,
+          onOpen: () => {
+            setSelectedLibraryLayerId(libraryImportedComponentTarget.layerId);
+            setWorkspaceSurface("library");
+            setActivity("library");
+            setCodeDocument("source");
+            setAppCodeOpen(true);
+            setMobilePane("inspect");
+          },
+        } : undefined}
         selectedDesignCase={selectedLibraryDesignCase}
         slotLayers={sourceEntrySlotLayers(libraryEntry)}
         styleEditor={libraryStyleEditor}
+        onBoxModelPreviewChange={boxModelPreviewStore.set}
         onDesignCaseChange={(caseName) => libraryPreviewEntry?.design && setDesignCases((current) => ({
           ...current,
           [libraryPreviewEntry.design!.fileId]: caseName,
@@ -850,7 +960,13 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       />
     )
     : activity === "files"
-      ? <FileEvidencePanel editable={Boolean(selectedProjectFile?.editable)} label={selectedProjectFile?.label} />
+      ? (
+        <FileEvidencePanel
+          editable={Boolean(selectedProjectFile?.editable)}
+          label={selectedProjectFile?.label}
+          scope={fileScope}
+        />
+      )
       : (
         <SourceComponentInspector
           className="flex h-full w-full border-l-0"
@@ -875,6 +991,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           slotLayers={sourceEntrySlotLayers(inspectorEntry)}
           slotEditorReady={selection?.sourceNodeId === focusedOccurrence?.usageOwnerId && slotEditorReady}
           styleEditor={styleEditor}
+          onBoxModelPreviewChange={boxModelPreviewStore.set}
           candidatesForSlot={(slot) => sourceSlotCandidates(workspace, nodes, slot, requestedDevice, inspectorSourceOwnerEntry?.relativePath ?? entry?.relativePath ?? "")}
           onApplySlot={(slot, candidate, action) => focusedOccurrence && applySlot(slot, focusedOccurrence, candidate, action)}
           onDesignCaseChange={(caseName) => inspectorEntry?.design && setDesignCases((current) => ({
@@ -885,7 +1002,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         />
       );
   const surfaceNavigation = {
-    value: activity === "library" ? "library" as const : "app" as const,
+    value: workspaceSurface,
     libraryLabel: target.sourceLibrary?.packageName ?? workspace.library?.packageName ?? "Component library",
     onChange: openWorkspaceArea,
   };
@@ -894,7 +1011,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       targetLabel={target.project.label}
       surfaceNavigation={surfaceNavigation}
       documentLabel={activity === "files"
-        ? selectedProjectFile?.label ?? "Project files"
+        ? selectedProjectFile?.label ?? (workspaceSurface === "library" ? "Library files" : "Project files")
         : activity === "library"
           ? libraryEntry?.label ?? "Component library"
           : selectedLabel ?? "No source entry"}
@@ -935,6 +1052,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
       canvas={canvas}
       left={left}
       mobilePane={mobilePane}
+      returnActivity={workspaceSurface}
       right={right}
       onActivityChange={(next) => next === "app" ? openAppDesign() : openDesignArea(next)}
       onPaneChange={setMobilePane}
@@ -952,7 +1070,34 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           }}
           left={{ label: "TypeScript app structure", content: desktopLeft, defaultWidth: 300, minWidth: 260, maxWidth: 880 }}
           right={{ label: "Component properties", content: right, defaultWidth: 480, minWidth: 360, maxWidth: 760 }}
+          allowPanelExpansion={false}
           externalPanelControls
+          leftHeader={({ controls, visible, onToggle }) => visible ? (
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-white/[0.08] bg-[#101113] px-1.5">
+              <WorkspaceSidebarToggle
+                controls={controls}
+                label="project sidebar"
+                visible
+                onToggle={onToggle}
+              />
+              <SourceWorkspaceAreaTabs
+                activity={activity}
+                returnActivity={workspaceSurface}
+                onActivityChange={(next) => next === "app" ? openAppDesign() : openDesignArea(next)}
+              />
+            </div>
+          ) : null}
+          rightHeader={({ controls, visible, onToggle }) => visible ? (
+            <div className="flex h-12 shrink-0 items-center justify-end border-b border-white/[0.08] bg-[#101113] px-1.5">
+              <WorkspaceSidebarToggle
+                controls={controls}
+                label="properties panel"
+                side="right"
+                visible
+                onToggle={onToggle}
+              />
+            </div>
+          ) : null}
           mobile={(
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               {workspaceTopBar({
@@ -980,7 +1125,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
           {({ left: leftPanel, right: rightPanel }) => (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               {workspaceTopBar({
-                leadingAction: (
+                leadingAction: leftPanel.visible ? undefined : (
                   <WorkspaceSidebarToggle
                     controls={leftPanel.controls}
                     label="project sidebar"
@@ -988,7 +1133,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
                     onToggle={leftPanel.onToggle}
                   />
                 ),
-                trailingAction: (
+                trailingAction: rightPanel.visible ? undefined : (
                   <WorkspaceSidebarToggle
                     controls={rightPanel.controls}
                     label="properties panel"

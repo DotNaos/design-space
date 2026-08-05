@@ -8,10 +8,14 @@ import type { SourceComponentReviewCheckpointProps } from "./SourceComponentRevi
 import type { SourceSlotScope } from "./source-slot-navigation";
 import { SourceCodeCanvas } from "./SourceCodeCanvas";
 import { SourcePreviewFrame } from "./SourcePreviewFrame";
+import type { SourceCodeAnnotation, SourceCodeSelectionContext } from "./source-feedback";
 
 export function SourceAppCanvas(props: {
   ancestry: readonly SourceCanvasAncestryItem[];
+  boxModelPreviewStore?: ComponentProps<typeof SourcePreviewFrame>["boxModelPreviewStore"];
   centerContent: boolean;
+  codeAnnotations?: readonly SourceCodeAnnotation[];
+  codeContexts?: readonly SourceCodeSelectionContext[];
   device: DesignSpaceDevice;
   draftSelection?: { start: number; end: number };
   editor: ComponentProps<typeof SourceCodeCanvas>["editor"];
@@ -42,11 +46,14 @@ export function SourceAppCanvas(props: {
   workspaceMode: SourceWorkspaceMode;
   workspaceNavigation?: ReactNode;
   onDeviceChange: (device: DesignSpaceDevice) => void;
+  onClearCodeFeedback?: () => void;
   onGenerateDesign?: () => void;
   onDesignCaseChange?: (caseName: string) => void;
   onModeChange: (mode: SourcePreviewMode) => void;
   onOpenLayerOwner: (entryId: string, layerId: string, occurrence: number) => void;
   onOpenSlotTarget?: () => void;
+  onRemoveCodeAnnotation?: (id: string) => void;
+  onRemoveCodeContext?: (id: string) => void;
   onSelectAncestry: (item: SourceCanvasAncestryItem) => void;
   onReturnToPreview: () => void;
   onSelectLayer: (layerId: string, occurrence: number) => void;
@@ -66,7 +73,10 @@ export function SourceAppCanvas(props: {
         ) : (
           <SourcePreviewFrame
             ancestry={props.ancestry}
+            boxModelPreviewStore={props.boxModelPreviewStore}
             centerContent={props.centerContent}
+            codeAnnotations={props.codeAnnotations}
+            codeContexts={props.codeContexts}
             device={props.device}
             entry={props.previewEntry}
             entries={props.entries}
@@ -94,11 +104,14 @@ export function SourceAppCanvas(props: {
             workspaceMode={props.workspaceMode}
             workspaceNavigation={props.workspaceNavigation}
             onDeviceChange={props.onDeviceChange}
+            onClearCodeFeedback={props.onClearCodeFeedback}
             onDesignCaseChange={props.onDesignCaseChange}
             onGenerateDesign={props.onGenerateDesign}
             onModeChange={props.onModeChange}
             onOpenLayerOwner={props.onOpenLayerOwner}
             onOpenSlotTarget={props.onOpenSlotTarget}
+            onRemoveCodeAnnotation={props.onRemoveCodeAnnotation}
+            onRemoveCodeContext={props.onRemoveCodeContext}
             onSelectAncestry={props.onSelectAncestry}
             onReturnToPreview={props.onReturnToPreview}
             onSelectLayer={props.onSelectLayer}

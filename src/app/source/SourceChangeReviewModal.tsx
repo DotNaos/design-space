@@ -9,6 +9,11 @@ export const MonacoSourceDiff = lazy(async () => {
   return { default: module.MonacoSourceDiff };
 });
 
+export const MonacoReviewSource = lazy(async () => {
+  const module = await import("./MonacoReviewSource");
+  return { default: module.MonacoReviewSource };
+});
+
 export type SourceChangeReviewModalProps = {
   applying?: boolean;
   changes: readonly SourceChangeReviewItem[];

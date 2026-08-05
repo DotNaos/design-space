@@ -5,11 +5,17 @@ import type { SourceTreeNode } from "./source-workspace-tree";
 import type { SourceSlotScope } from "./source-slot-navigation";
 import type { SourceComponentReviewCheckpointProps } from "./SourceComponentReviewCheckpoint";
 import type { ReactNode } from "react";
+import type { SourceCodeAnnotation, SourceCodeSelectionContext } from "./source-feedback";
+import type { SourceBoxModelPreviewStore } from "./source-box-model-preview";
 
 export interface SourcePreviewFrameProps {
   ancestry?: readonly SourceCanvasAncestryItem[];
   centerContent?: boolean;
+  boxModelPreviewStore?: SourceBoxModelPreviewStore;
+  codeAnnotations?: readonly SourceCodeAnnotation[];
+  codeContexts?: readonly SourceCodeSelectionContext[];
   compact?: boolean;
+  showChrome?: boolean;
   device: DesignSpaceDevice;
   entries?: readonly RuntimeSourceWorkspaceEntry[];
   entry?: RuntimeSourceWorkspaceEntry;
@@ -38,11 +44,14 @@ export interface SourcePreviewFrameProps {
   workspaceMode?: SourceWorkspaceMode;
   workspaceNavigation?: ReactNode;
   onDesignCaseChange?: (caseName: string) => void;
+  onClearCodeFeedback?: () => void;
   onDeviceChange?: (device: DesignSpaceDevice) => void;
   onGenerateDesign?: () => void;
   onModeChange?: (mode: SourcePreviewMode) => void;
   onOpenLayerOwner?: (entryId: string, layerId: string, occurrence: number) => void;
   onOpenSlotTarget?: () => void;
+  onRemoveCodeAnnotation?: (id: string) => void;
+  onRemoveCodeContext?: (id: string) => void;
   onReturnToPreview?: () => void;
   onSelectAncestry?: (item: SourceCanvasAncestryItem) => void;
   onSelectedLayerMetrics?: (metrics: SourceLayerMetrics | undefined) => void;

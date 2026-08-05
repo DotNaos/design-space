@@ -1,10 +1,10 @@
 
 import { Button } from "@heroui/react";
 import { ChevronRight, FileCode2, Folder, FolderOpen } from "lucide-react";
-import type { TargetFileEntry } from "../../shared/target-module";
+import type { SourceWorkspaceFileEntry } from "../../shared/source-workspace";
 
 export function FileTreeLevel(props: {
-  childrenByParent: ReadonlyMap<string | undefined, readonly TargetFileEntry[]>;
+  childrenByParent: ReadonlyMap<string | undefined, readonly SourceWorkspaceFileEntry[]>;
   parentId: string | undefined;
   depth: number;
   expanded: ReadonlySet<string>;

@@ -21,6 +21,7 @@ export function ReviewSourcePreview(props: {
         entries={props.entries}
         runtime={props.runtime}
         isolateSelectedLayer={false}
+        showChrome={false}
         selectedLayer={props.layer}
         selectedClassName={props.change.visualReview?.className}
         selectedText={props.change.visualReview?.text}

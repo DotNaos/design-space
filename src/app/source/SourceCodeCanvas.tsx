@@ -5,6 +5,7 @@ import { lazy, Suspense } from "react";
 import type { ProjectFileSnapshot } from "../../shared/contracts";
 import type { SourceLayerBinding } from "../../shared/source-workspace";
 import { SourceCodeHeaderContent } from "./SourceCodeHeaderContent";
+import type { SourceCodeSelectionContext } from "./source-feedback";
 
 const MonacoSourceEditor = lazy(async () => {
   const module = await import("./MonacoSourceEditor");
@@ -19,7 +20,10 @@ export function SourceCodeCanvas(props: {
   selection?: SourceLayerBinding;
   toolbar?: React.ReactNode;
   onCursorOffsetChange?: (offset: number) => void;
+  onAnnotateSelection?: (selection: SourceCodeSelectionContext, comment: string) => void;
+  onAttachSelection?: (selection: SourceCodeSelectionContext) => void;
   onPreview?: () => void;
+  onRevealInFiles?: () => void;
   showHeader?: boolean;
 }) {
   const editor = props.editor;
@@ -45,6 +49,8 @@ export function SourceCodeCanvas(props: {
                 selection={props.selection}
                 value={editor.draft}
                 onChange={editor.setDraft}
+                onAnnotateSelection={props.onAnnotateSelection}
+                onAttachSelection={props.onAttachSelection}
                 onCursorOffsetChange={props.onCursorOffsetChange}
               />
             </Suspense>

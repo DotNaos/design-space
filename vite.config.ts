@@ -21,7 +21,7 @@ import {
   workspaceControlPlugin,
 } from "./src/server";
 import { createViteFileSystemPolicy } from "./src/server/vite-file-system-policy";
-import { targetTypeScriptAliases } from "./src/server/typescript-path-aliases";
+import { targetTypeScriptAliasRoots, targetTypeScriptAliases } from "./src/server/typescript-path-aliases";
 import { runningTargetPlugin } from "./src/server/running-target-plugin";
 
 const root = import.meta.dirname;
@@ -45,6 +45,10 @@ export default defineConfig(async () => {
   );
   const sourceDraftPreviews = new SourceDraftPreviewRegistry();
   const sourceCodex = new SourceCodexService(undefined, root);
+  const targetAliases = targetTypeScriptAliases(registeredTarget.root);
+  const libraryAliases = registeredTarget.sourceLibrary?.development
+    ? targetTypeScriptAliases(registeredTarget.sourceLibrary.development.root)
+    : [];
   const api = new LocalOperationService(
     new EditService(registeredTarget, { sourceDraftPreviews }),
     new DocumentService(registeredTarget),
@@ -56,8 +60,14 @@ export default defineConfig(async () => {
   return {
     cacheDir: resolve(root, "node_modules/.vite-design-space", `port-${serverPort}`),
     resolve: {
-      alias: targetTypeScriptAliases(registeredTarget.root),
+      alias: [...targetAliases, ...libraryAliases],
       dedupe: ["react", "react-dom"],
+    },
+    optimizeDeps: {
+      // Monaco's pre-bundled shared chunk is large enough to overflow Vite's
+      // transform-filter RegExp stack when the file explorer first opens it.
+      // Keep Monaco as native ESM so Vite transforms its smaller modules.
+      exclude: ["monaco-editor"],
     },
     plugins: [
       enforcedPortless(),
@@ -83,6 +93,7 @@ export default defineConfig(async () => {
       fs: createViteFileSystemPolicy(root, registeredTarget.targetModulePath, registeredTarget.root, [
         registeredTarget.sourceLibrary?.development?.root ?? "",
         registeredTarget.sourceLibrary?.release?.modulePath ?? "",
+        ...targetTypeScriptAliasRoots(libraryAliases),
       ]),
     },
     build: { sourcemap: true },

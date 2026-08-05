@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { statSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 import ts from "typescript";
 import type { Alias } from "vite";
@@ -23,10 +24,22 @@ export function targetTypeScriptAliases(projectRoot: string): Alias[] {
       continue;
     }
     if (!pattern.includes("*") && !replacement.includes("*")) {
-      aliases.push({ find: pattern, replacement: resolve(baseUrl, replacement) });
+      aliases.push({ find: new RegExp(`^${escapeRegExp(pattern)}$`), replacement: resolve(baseUrl, replacement) });
     }
   }
   return aliases;
+}
+
+/** Returns the trusted source roots reached by the aliases above. */
+export function targetTypeScriptAliasRoots(aliases: readonly Alias[]): string[] {
+  return [...new Set(aliases.flatMap((alias) => {
+    if (typeof alias.replacement !== "string") return [];
+    const replacement = alias.replacement.endsWith("/")
+      ? alias.replacement.slice(0, -1)
+      : alias.replacement;
+    if (!existsSync(replacement)) return [dirname(replacement)];
+    return [statSync(replacement).isDirectory() ? replacement : dirname(replacement)];
+  }))];
 }
 
 function escapeRegExp(value: string): string {

@@ -399,6 +399,14 @@ describe("source change-set browser contract", () => {
     const base = await fixture();
     const service = new EditService(base.target);
     await expect(service.execute({
+      type: "list-project-files",
+      scope: "library-development",
+    })).resolves.toMatchObject({
+      files: expect.arrayContaining([
+        expect.objectContaining({ id: base.libraryFiles.a.id, kind: "file", editable: true }),
+      ]),
+    });
+    await expect(service.execute({
       type: "read-project-file",
       scope: "library-development",
       fileId: base.libraryFiles.a.id,
@@ -409,6 +417,20 @@ describe("source change-set browser contract", () => {
       fileId: base.libraryFiles.a.id,
       source: "export const value: number = 2;\n",
     })).resolves.toEqual({ fileId: "library.a", components: [] });
+    const snapshot = await service.readProjectFile(base.libraryFiles.a.id, "library-development");
+    const prepared = await service.execute({
+      type: "prepare-project-file-edit",
+      scope: "library-development",
+      fileId: base.libraryFiles.a.id,
+      baseVersion: snapshot.version,
+      source: "export const value: number = 3;\n",
+    });
+    expect(prepared).toMatchObject({ fileId: "library.a" });
+    if (!("challengeId" in prepared)) throw new Error("Expected a prepared library file edit");
+    await expect(service.execute({
+      type: "save-project-file-edit",
+      challengeId: prepared.challengeId,
+    })).resolves.toMatchObject({ fileId: "library.a", source: expect.stringContaining("number = 3") });
     await expect(service.execute({
       type: "read-project-file",
       scope: "release",

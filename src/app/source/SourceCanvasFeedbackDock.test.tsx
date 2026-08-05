@@ -109,3 +109,40 @@ it("disables composer actions while no Codex task is connected", async () => {
   expect(screen.getByRole("button", { name: "Send to Codex" })).toBeDisabled();
   expect(screen.getByLabelText("Codex composer")).toHaveAttribute("aria-disabled", "true");
 });
+
+it("shows attached code in the composer and sends it with inline annotations", async () => {
+  const onCodeFeedbackSent = vi.fn();
+  const codeContext = {
+    endColumn: 20,
+    endLine: 22,
+    id: "src/app/App.tsx:120-180",
+    relativePath: "src/app/App.tsx",
+    selectedText: "return <WorkspaceShell />;",
+    startColumn: 3,
+    startLine: 21,
+  };
+  render(
+    <SourceCanvasFeedbackDock
+      codeAnnotations={[{
+        comment: "This branch should use the empty state.",
+        context: codeContext,
+        id: "code-note-1",
+      }]}
+      codeContexts={[codeContext]}
+      context={context}
+      onCodeFeedbackSent={onCodeFeedbackSent}
+      onRemoveCodeAnnotation={vi.fn()}
+      onRemoveCodeContext={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByLabelText("Attached code context")).toHaveTextContent("App.tsx:21–22");
+  const send = screen.getByRole("button", { name: "Send to Codex" });
+  await waitFor(() => expect(send).toBeEnabled());
+  await userEvent.click(send);
+
+  await waitFor(() => expect(sendSourceCodexFeedback).toHaveBeenCalledOnce());
+  expect(sendSourceCodexFeedback.mock.calls[0]?.[1]).toContain("Design Space code context");
+  expect(sendSourceCodexFeedback.mock.calls[0]?.[1]).toContain("This branch should use the empty state.");
+  expect(onCodeFeedbackSent).toHaveBeenCalledOnce();
+});
