@@ -69,7 +69,10 @@ it("starts the selected worktree as the editable development source", async () =
 
   render(<LibraryDevelopmentSourceControl onModeChange={onModeChange} />);
 
+  expect(await screen.findByRole("button", { name: "Development library worktree" })).toHaveTextContent(readyWorktree.branch);
+  expect(screen.queryByText(readyWorktree.path)).not.toBeInTheDocument();
   const start = await screen.findByRole("button", { name: "Start development source" });
+  expect(start).toHaveTextContent("Start");
   await userEvent.click(start);
 
   await waitFor(() => expect(runLocalOperation).toHaveBeenLastCalledWith({
@@ -108,6 +111,14 @@ it("defaults to the main checkout directly below the projects directory", async 
 
   render(<LibraryDevelopmentSourceControl onModeChange={vi.fn()} />);
 
+  const worktrees = await screen.findByRole("button", { name: "Development library worktree" });
+  await userEvent.click(worktrees);
+  const search = screen.getByRole("textbox", { name: "Search branches" });
+  await userEvent.type(search, "main");
+  expect(screen.getByRole("option", { name: "main" })).toBeVisible();
+  expect(screen.queryByRole("option", { name: "feature/designs" })).not.toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+
   await userEvent.click(await screen.findByRole("button", { name: "Start development source" }));
 
   await waitFor(() => expect(runLocalOperation).toHaveBeenLastCalledWith({
@@ -116,7 +127,7 @@ it("defaults to the main checkout directly below the projects directory", async 
   }));
 });
 
-it("stops development and returns to the installed release", async () => {
+it("stops development without switching to an installed source", async () => {
   const running: LibraryDevelopmentProjectStatus = {
     configured: true,
     repository: "https://github.com/DotNaos/ui.git",
@@ -137,11 +148,12 @@ it("stops development and returns to the installed release", async () => {
   render(<LibraryDevelopmentSourceControl onModeChange={onModeChange} />);
 
   const stop = await screen.findByRole("button", { name: "Stop development source" });
+  expect(stop).toHaveTextContent("Stop");
   await userEvent.click(stop);
 
   await waitFor(() => expect(runLocalOperation).toHaveBeenLastCalledWith({
     type: "stop-library-development",
   }));
-  expect(onModeChange).toHaveBeenCalledWith("release");
-  expect(localStorage.getItem("design-space.library-source")).toBe("release");
+  expect(onModeChange).not.toHaveBeenCalled();
+  expect(localStorage.getItem("design-space.library-source")).toBeNull();
 });

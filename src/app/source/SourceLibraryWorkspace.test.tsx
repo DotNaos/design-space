@@ -59,29 +59,31 @@ const catalog: RuntimeSourceLibraryCatalog = {
   release: { version: "0.0.5", entries: [entry], styles: [] },
 };
 
-it("shows native development and release sources with a design coverage audit", async () => {
-  const change = vi.fn();
+it("shows only the development source with a design coverage audit", () => {
   render(
     <SourceLibrarySidebar
       catalog={catalog}
       catalogKind="library"
       device="desktop"
       library={library}
-      mode="release"
+      mode="development"
       onDeviceChange={vi.fn()}
       onCatalogKindChange={vi.fn()}
-      onModeChange={change}
+      onModeChange={vi.fn()}
       onSelect={vi.fn()}
     />,
   );
 
   expect(screen.getByText("1/2")).toBeVisible();
-  expect(screen.getByLabelText("Card design missing")).toBeVisible();
+  expect(screen.getByRole("group", { name: "Primitives" })).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /Button/, pressed: true })).toBeVisible();
-  expect(screen.getByRole("button", { name: /Card/ })).toBeVisible();
-  await userEvent.click(screen.getByRole("button", { name: /Development/ }));
-  expect(change).toHaveBeenCalledWith("development");
+  expect(screen.getByRole("button", { name: "Button", pressed: true })).toHaveClass("rounded-full", "bg-violet-500/[0.14]", "text-violet-200");
+  expect(screen.getByRole("button", { name: "Card" })).toBeVisible();
+  expect(screen.getByLabelText("Card design missing")).toBeVisible();
+  expect(screen.queryByText("Component")).not.toBeInTheDocument();
+  expect(screen.queryByText("Primitive")).not.toBeInTheDocument();
+  expect(screen.queryByText("Installed")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Installed library version" })).not.toBeInTheDocument();
 });
 
 it("searches the flat library catalog", async () => {
@@ -131,7 +133,7 @@ it("searches the flat library catalog", async () => {
   expect(screen.queryByRole("button", { name: /^Button/ })).not.toBeInTheDocument();
 });
 
-it("keeps the flat catalog, selected component layers, and code in one explorer", () => {
+it("drills from the component catalog into its layers and back", async () => {
   const layeredEntry: RuntimeSourceWorkspaceEntry = {
     ...entry,
     layers: [{
@@ -160,10 +162,19 @@ it("keeps the flat catalog, selected component layers, and code in one explorer"
     />,
   );
 
-  expect(screen.getByRole("button", { name: /Button/, pressed: true })).toBeVisible();
-  expect(screen.getByRole("region", { name: "Selected component layers" })).toBeVisible();
+  const componentButton = screen.getByRole("button", { name: /Button/, pressed: true });
+  expect(componentButton).toBeVisible();
+  expect(screen.queryByRole("region", { name: "Selected component layers" })).not.toBeInTheDocument();
   expect(screen.getByText("Editable component code")).toBeVisible();
+
+  await userEvent.click(componentButton);
+  expect(screen.getByRole("region", { name: "Selected component layers" })).toBeVisible();
   expect(screen.getByText("<button>")).toBeVisible();
+  expect(screen.queryByRole("textbox", { name: "Search components" })).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: "Back to component catalog" }));
+  expect(screen.getByRole("textbox", { name: "Search components" })).toBeVisible();
+  expect(screen.queryByRole("region", { name: "Selected component layers" })).not.toBeInTheDocument();
 });
 
 it("can render app-built components without adding another source switch", () => {
@@ -184,11 +195,11 @@ it("can render app-built components without adding another source switch", () =>
 
   expect(screen.getByRole("button", { name: /Button/ })).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
-  expect(screen.getByText("src")).toBeVisible();
+  expect(screen.queryByText("src")).not.toBeInTheDocument();
   expect(screen.queryByRole("group", { name: "Component source" })).not.toBeInTheDocument();
 });
 
-it("labels the library locally without duplicating the global workspace switch", () => {
+it("does not duplicate the library identity from the global workspace switch", () => {
   render(
     <SourceLibrarySidebar
       catalog={catalog}
@@ -203,9 +214,73 @@ it("labels the library locally without duplicating the global workspace switch",
     />,
   );
 
-  expect(screen.getByRole("heading", { name: "Library" })).toBeVisible();
+  expect(screen.queryByRole("heading", { name: "Library" })).not.toBeInTheDocument();
+  expect(screen.queryByText("@dotnaos/react-ui")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Workspace source/ })).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /Development/ })).toBeVisible();
+  expect(screen.queryByText("Installed")).not.toBeInTheDocument();
+});
+
+it("keeps the compact category filter beside component search", () => {
+  render(
+    <SourceLibrarySidebar
+      catalog={catalog}
+      catalogKind="library"
+      device="desktop"
+      library={library}
+      mode="development"
+      onCatalogKindChange={vi.fn()}
+      onDeviceChange={vi.fn()}
+      onModeChange={vi.fn()}
+      onSelect={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole("textbox", { name: "Search components" })).toBeVisible();
+  expect(screen.getByRole("button", { name: /Component category/ })).toHaveClass("size-9", "rounded-full");
+});
+
+it("fills the available canvas with its empty state", () => {
+  render(
+    <SourceLibraryCanvas
+      catalog={{ ...catalog, development: { ...catalog.development!, entries: [] } }}
+      catalogKind="library"
+      device="desktop"
+      mode="development"
+      onCatalogKindChange={vi.fn()}
+      onDeviceChange={vi.fn()}
+      onModeChange={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole("heading", { name: "No component selected" }).parentElement?.parentElement)
+    .toHaveClass("w-full", "flex-1");
+});
+
+it("shows selected library code in the shared Codex composer", async () => {
+  render(
+    <SourceLibraryCanvas
+      catalog={catalog}
+      catalogKind="library"
+      codeContexts={[{
+        endColumn: 20,
+        endLine: 16,
+        id: "src/shared/button/render.tsx:4-16",
+        relativePath: "src/shared/button/render.tsx",
+        selectedText: "export function Button() {}",
+        startColumn: 1,
+        startLine: 4,
+      }]}
+      device="desktop"
+      library={library}
+      mode="development"
+      selected="library.development.Button"
+      onCatalogKindChange={vi.fn()}
+      onDeviceChange={vi.fn()}
+      onModeChange={vi.fn()}
+    />,
+  );
+
+  expect(await screen.findByLabelText("Attached code context")).toHaveTextContent("render.tsx:4–16");
 });
 
 it("generates a missing design only for the attached development source", async () => {

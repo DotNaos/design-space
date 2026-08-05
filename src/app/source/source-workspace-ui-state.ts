@@ -22,6 +22,7 @@ export interface SourceWorkspaceUiState {
   selectedProjectFileId?: string;
   selection?: SourceWorkspaceSelection;
   workspaceMode: SourceWorkspaceMode;
+  workspaceSurface: "app" | "library";
 }
 
 type PersistedSourceWorkspaceUiState = Partial<SourceWorkspaceUiState> & {
@@ -38,6 +39,7 @@ const TREE_STORAGE_PREFIX = "design-space:source-tree:v1";
 const activities: readonly WorkspaceActivity[] = ["app", "library", "files"];
 const canvasModes: readonly SourcePreviewMode[] = ["design", "play"];
 const workspaceModes: readonly SourceWorkspaceMode[] = ["preview", "design"];
+const workspaceSurfaces = ["app", "library"] as const;
 const codeDocuments = ["source", "design"] as const;
 const devices: readonly DesignSpaceDevice[] = ["desktop", "tablet", "mobile"];
 const mobilePanes: readonly MobilePane[] = ["documents", "files", "tree", "canvas", "catalog", "inspect"];
@@ -91,6 +93,7 @@ export function loadSourceWorkspaceUiState(
       ? { selection: sourceWorkspaceSelection(parsed.selection) }
       : {}),
     ...(isOneOf(parsed.workspaceMode, workspaceModes) ? { workspaceMode: parsed.workspaceMode } : {}),
+    ...(isOneOf(parsed.workspaceSurface, workspaceSurfaces) ? { workspaceSurface: parsed.workspaceSurface } : {}),
   };
 }
 

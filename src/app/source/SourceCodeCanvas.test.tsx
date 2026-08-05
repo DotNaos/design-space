@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { SourceCodeCanvas } from "./SourceCodeCanvas";
@@ -63,6 +64,22 @@ it("reports the Monaco cursor offset so tree and canvas can follow source select
   fireEvent.select(source);
 
   expect(onCursorOffsetChange).toHaveBeenCalledWith(7);
+});
+
+it("opens the current source file in the Files workspace", async () => {
+  const onRevealInFiles = vi.fn();
+  render(
+    <SourceCodeCanvas
+      editable
+      editor={sourceEditor()}
+      label="Checkbox.tsx"
+      onRevealInFiles={onRevealInFiles}
+    />,
+  );
+
+  await userEvent.click(screen.getByRole("button", { name: "Show current source in Files" }));
+
+  expect(onRevealInFiles).toHaveBeenCalledOnce();
 });
 
 function sourceEditor(overrides: Partial<SourceFileEditor> = {}): SourceFileEditor {

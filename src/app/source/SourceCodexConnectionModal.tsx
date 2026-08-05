@@ -1,22 +1,9 @@
 import { Button, Input, Modal } from "@heroui/react";
-import {
-  Check,
-  CircleDot,
-  Folder,
-  LoaderCircle,
-  Plus,
-  RefreshCw,
-  Search,
-  X,
-} from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Check, CircleDot, Folder, LoaderCircle, Plus, RefreshCw, Search, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-import {
-  connectSourceCodexTask,
-  createSourceCodexTask,
-  listSourceCodexTasks,
-  type SourceCodexTask,
-} from "./source-codex-feedback-client";
+import { connectSourceCodexTask, createSourceCodexTask, listSourceCodexTasks, type SourceCodexTask } from "./source-codex-feedback-client";
+import { EmptyState } from "./EmptyState";
 
 type ConnectionMode = "existing" | "new";
 
@@ -315,17 +302,6 @@ function relativeTaskFolder(task: SourceCodexTask): string {
   if (!task.repositoryPath || !task.cwd.startsWith(task.repositoryPath)) return task.cwd;
   const relative = task.cwd.slice(task.repositoryPath.length).replace(/^\/+/, "");
   return relative || "main checkout";
-}
-
-function EmptyState(props: { icon: ReactNode; label: string }) {
-  return (
-    <div className="grid min-h-48 place-items-center text-center text-zinc-600">
-      <div>
-        <span className="mx-auto grid size-8 place-items-center">{props.icon}</span>
-        <p className="mt-1 text-xs">{props.label}</p>
-      </div>
-    </div>
-  );
 }
 
 function statusColor(status: SourceCodexTask["status"]): string {

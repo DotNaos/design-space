@@ -24,15 +24,22 @@ it("uses a compact canvas switcher and allows selecting missing implementations"
   const onChange = vi.fn();
   render(<SourceDeviceTabs device="desktop" node={node} onChange={onChange} />);
 
-  expect(screen.getByRole("group", { name: "Source implementation" })).toHaveClass("h-7");
+  expect(screen.getByRole("group", { name: "Source implementation" })).toHaveClass("h-8");
   expect(screen.getByRole("button", { name: "Desktop implementation" }))
     .toHaveAttribute("aria-current", "page");
   expect(screen.getByRole("button", { name: "Desktop implementation" }))
-    .toHaveClass("items-center", "justify-center", "p-0");
+    .toHaveClass("size-7", "items-center", "justify-center", "p-0");
   expect(screen.queryByText("Desktop")).not.toBeInTheDocument();
   expect(screen.queryByText("Tablet")).not.toBeInTheDocument();
   expect(screen.queryByText("Mobile")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Tablet implementation, Uses Desktop" })).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "Mobile implementation, Missing" }));
   expect(onChange).toHaveBeenCalledWith("mobile");
+});
+
+it("fits the implementation switcher into a component row", () => {
+  render(<SourceDeviceTabs compact device="desktop" node={node} onChange={vi.fn()} />);
+
+  expect(screen.getByRole("group", { name: "Source implementation" })).toHaveClass("h-7");
+  expect(screen.getByRole("button", { name: "Desktop implementation" })).toHaveClass("size-6", "min-w-6");
 });

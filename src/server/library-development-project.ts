@@ -64,6 +64,9 @@ export class LibraryDevelopmentProjectService implements OperationExecutor {
       case "clone-library-development":
         await cloneLibraryProject(config, projectsRoot);
         return libraryDevelopmentStatus(this.#target, config, projectsRoot);
+      case "clone-library-development-worktree":
+        await cloneLibraryWorktree(config, projectsRoot, operation.data.branch);
+        return libraryDevelopmentStatus(this.#target, config, projectsRoot);
       case "start-library-development": {
         const worktreeId = operation.data.worktreeId;
         const status = await libraryDevelopmentStatus(this.#target, config, projectsRoot);
@@ -136,6 +139,7 @@ export async function libraryDevelopmentStatus(
       checkoutPath: paths.checkoutPath,
       cloned: false,
       state: "stopped",
+      branches: [],
       worktrees: [],
     };
   }
@@ -144,6 +148,7 @@ export async function libraryDevelopmentStatus(
     ? await realpath(target.sourceLibrary.development.root).catch(() => undefined)
     : undefined;
   const listed = await listLibraryWorktrees(paths.checkoutPath, config.packageRoot);
+  const branches = await listLibraryBranches(paths.checkoutPath);
   const worktrees = await Promise.all(listed.map(async (worktree) => {
     const packagePath = await realpath(resolve(worktree.path, config.packageRoot)).catch(() => undefined);
     return { ...worktree, active: Boolean(packagePath && packagePath === activePackageRoot) };
@@ -161,8 +166,14 @@ export async function libraryDevelopmentStatus(
     cloned: true,
     state: activeWorktree ? "running" : "stopped",
     activeWorktreeId: activeWorktree?.id,
+    branches,
     worktrees,
   };
+}
+
+export function parseGitBranchList(source: string): string[] {
+  return [...new Set(source.split("\n").map((branch) => branch.trim()).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, "en"));
 }
 
 export function parseGitWorktreeList(source: string, packageRoot: string): Promise<LibraryDevelopmentWorktree[]> {
@@ -203,6 +214,19 @@ async function listLibraryWorktrees(
   }
 }
 
+async function listLibraryBranches(checkoutPath: string): Promise<string[]> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["-C", checkoutPath, "for-each-ref", "--format=%(refname:short)", "refs/heads"],
+      { encoding: "utf8", maxBuffer: 2_000_000 },
+    );
+    return parseGitBranchList(stdout);
+  } catch {
+    throw new DesignSpaceError("VALIDATION_ERROR", "The configured library branches could not be read");
+  }
+}
+
 async function cloneLibraryProject(config: DesignSpaceLibraryProjectConfig, projectsRoot: string): Promise<void> {
   const { checkoutPath } = projectPaths(config, projectsRoot);
   if (await pathExists(checkoutPath)) return;
@@ -214,6 +238,40 @@ async function cloneLibraryProject(config: DesignSpaceLibraryProjectConfig, proj
     });
   } catch {
     throw new DesignSpaceError("VALIDATION_ERROR", "The component library could not be cloned");
+  }
+}
+
+async function cloneLibraryWorktree(
+  config: DesignSpaceLibraryProjectConfig,
+  projectsRoot: string,
+  branch: string,
+): Promise<void> {
+  const { checkoutPath } = projectPaths(config, projectsRoot);
+  if (!await pathExists(checkoutPath)) {
+    throw new DesignSpaceError("NOT_FOUND", "Clone the component library before creating a worktree");
+  }
+  const branches = await listLibraryBranches(checkoutPath);
+  if (!branches.includes(branch)) {
+    throw new DesignSpaceError("NOT_FOUND", "The selected component-library branch does not exist");
+  }
+  const worktrees = await listLibraryWorktrees(checkoutPath, config.packageRoot);
+  if (worktrees.some((worktree) => worktree.branch === branch)) return;
+
+  const worktreesRoot = resolve(projectsRoot, ".worktrees", config.checkoutName);
+  const branchSlug = branch.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "branch";
+  const suffix = createHash("sha256").update(branch).digest("hex").slice(0, 8);
+  const destination = resolve(worktreesRoot, `${branchSlug}-${suffix}`);
+  if (await pathExists(destination)) {
+    throw new DesignSpaceError("VALIDATION_ERROR", "The worktree destination already exists");
+  }
+  await mkdir(worktreesRoot, { recursive: true, mode: 0o700 });
+  try {
+    await execFileAsync("git", ["-C", checkoutPath, "worktree", "add", destination, branch], {
+      encoding: "utf8",
+      maxBuffer: 10_000_000,
+    });
+  } catch {
+    throw new DesignSpaceError("VALIDATION_ERROR", "The component-library worktree could not be created");
   }
 }
 

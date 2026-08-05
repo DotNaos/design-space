@@ -3,10 +3,26 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
 import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
-import { SourceReviewGraphStage } from "./SourceReviewGraphStage";
+import { SourceReviewGraphModeControl, SourceReviewGraphStage } from "./SourceReviewGraphStage";
 import { sourceReviewGraphProperties, sourceReviewGraphSlots } from "./source-review-graph";
 
 afterEach(cleanup);
+
+it("uses purpose-built icons for every review graph layout", async () => {
+  const onChange = vi.fn();
+  render(<SourceReviewGraphModeControl layout="vertical" onChange={onChange} />);
+
+  const vertical = screen.getByRole("button", { name: "Inputs above, outputs below" });
+  const horizontal = screen.getByRole("button", { name: "Inputs left, outputs right" });
+  const focus = screen.getByRole("button", { name: "Focus on the current design" });
+
+  expect(vertical.querySelector('[data-graph-layout-icon="vertical"]')).toBeTruthy();
+  expect(horizontal.querySelector('[data-graph-layout-icon="horizontal"]')).toBeTruthy();
+  expect(focus.querySelector('[data-graph-layout-icon="focus"]')).toBeTruthy();
+
+  await userEvent.click(horizontal);
+  expect(onChange).toHaveBeenCalledWith("horizontal");
+});
 
 it("cycles through arbitrary declared design cases instead of assuming named statuses", async () => {
   const onCaseChange = vi.fn();

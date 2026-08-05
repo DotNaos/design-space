@@ -73,21 +73,27 @@ it("sends pending canvas annotations without requiring a separate message", asyn
   expect(onAnnotationsSent).toHaveBeenCalledOnce();
 });
 
-it("keeps context, the connected task, and the composer in one compact dock", async () => {
-  render(<SourceCanvasFeedbackDock context={context} meta={<span>Design · Button</span>} onAnnotationModeChange={vi.fn()} />);
+it("keeps the connected task above the compact annotation composer", async () => {
+  render(<SourceCanvasFeedbackDock context={context} onAnnotationModeChange={vi.fn()} />);
 
   const indicator = await screen.findByRole("button", {
     name: "Connected to Design Space. Change Codex task",
   });
   expect(indicator).toHaveTextContent("Design Space");
-  expect(indicator).toHaveClass("text-emerald-200");
+  expect(indicator).toHaveClass("text-zinc-300");
+  expect(screen.getByTestId("source-codex-connection-dot")).toHaveClass("bg-emerald-400");
   const composer = screen.getByLabelText("Codex composer");
-  const sessionRow = screen.getByTestId("source-codex-session-stack");
-  expect(sessionRow).toContainElement(indicator);
-  expect(sessionRow).toHaveTextContent("Design · Button");
+  const actionRow = screen.getByTestId("source-codex-dock-actions");
+  const expand = screen.getByRole("button", { name: "Open full Codex conversation" });
   expect(screen.getByTestId("source-canvas-feedback-dock")).toContainElement(composer);
+  expect(actionRow).toContainElement(indicator);
   expect(composer).not.toContainElement(indicator);
+  expect(composer).toContainElement(screen.getByRole("button", { name: "Add a canvas annotation" }));
+  expect(actionRow).toContainElement(expand);
+  expect(composer).not.toContainElement(expand);
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeEnabled();
+  expect(expand).toContainElement(screen.getByTestId("source-codex-expand-icon"));
+  expect(screen.getByRole("button", { name: "Send to Codex" })).toHaveClass("ml-auto", "rounded-full");
 });
 
 it("disables composer actions while no Codex task is connected", async () => {
@@ -96,10 +102,47 @@ it("disables composer actions while no Codex task is connected", async () => {
 
   const connect = await screen.findByRole("button", { name: "Connect Codex task" });
   expect(connect).toHaveTextContent("Connect Codex");
-  expect(connect).toHaveClass("text-rose-200");
+  expect(connect).toHaveClass("text-zinc-400");
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Add a canvas annotation" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Open full Codex conversation" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Send to Codex" })).toBeDisabled();
   expect(screen.getByLabelText("Codex composer")).toHaveAttribute("aria-disabled", "true");
+});
+
+it("shows attached code in the composer and sends it with inline annotations", async () => {
+  const onCodeFeedbackSent = vi.fn();
+  const codeContext = {
+    endColumn: 20,
+    endLine: 22,
+    id: "src/app/App.tsx:120-180",
+    relativePath: "src/app/App.tsx",
+    selectedText: "return <WorkspaceShell />;",
+    startColumn: 3,
+    startLine: 21,
+  };
+  render(
+    <SourceCanvasFeedbackDock
+      codeAnnotations={[{
+        comment: "This branch should use the empty state.",
+        context: codeContext,
+        id: "code-note-1",
+      }]}
+      codeContexts={[codeContext]}
+      context={context}
+      onCodeFeedbackSent={onCodeFeedbackSent}
+      onRemoveCodeAnnotation={vi.fn()}
+      onRemoveCodeContext={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByLabelText("Attached code context")).toHaveTextContent("App.tsx:21–22");
+  const send = screen.getByRole("button", { name: "Send to Codex" });
+  await waitFor(() => expect(send).toBeEnabled());
+  await userEvent.click(send);
+
+  await waitFor(() => expect(sendSourceCodexFeedback).toHaveBeenCalledOnce());
+  expect(sendSourceCodexFeedback.mock.calls[0]?.[1]).toContain("Design Space code context");
+  expect(sendSourceCodexFeedback.mock.calls[0]?.[1]).toContain("This branch should use the empty state.");
+  expect(onCodeFeedbackSent).toHaveBeenCalledOnce();
 });

@@ -1,25 +1,27 @@
-import { Input, Label, NumberField, TextArea, TextField } from "@heroui/react";
-import { BoxSelect, Code2, Move, PaintBucket, SquareDashed, Type } from "lucide-react";
+import { Button, Label, TextArea, TextField } from "@heroui/react";
+import { ArrowUpRight, BoxSelect, Code2, Move, PaintBucket, SquareDashed, Type } from "lucide-react";
 
 import type { SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { TailwindClassField } from "../inspector/TailwindClassField";
 import { TailwindMappedControls } from "../inspector/TailwindMappedControls";
-import {
-  setSourceLayerDimension,
-  setSourceLayerFill,
-  setSourceLayerStroke,
-  setSourceLayerStrokeWidth,
-  setSourceLayerTextColor,
-  sourceLayerPaint,
-  type SourceLayerMetrics,
-} from "./source-layer-design";
+import { setSourceLayerDimension, setSourceLayerFill, setSourceLayerStroke, setSourceLayerStrokeWidth, setSourceLayerTextColor, sourceLayerPaint, type SourceLayerMetrics } from "./source-layer-design";
 import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
+import { InspectorSection } from "./InspectorSection";
+import { Metric } from "./Metric";
+import { DimensionField } from "./DimensionField";
+import { PaintField } from "./PaintField";
+import type { BoxModelPreview } from "../inspector/tailwind-box-model-values";
 
 export function SourceLayerDesignInspector(props: {
   layer: SourceWorkspaceLayer;
   metrics?: SourceLayerMetrics;
+  openComponent?: {
+    label: string;
+    onOpen: () => void;
+  };
   previewClassName?: string;
   styleEditor?: SourceLayerClassEditor;
+  onBoxModelPreviewChange?: (preview?: BoxModelPreview) => void;
   onClassNamePreviewChange?: (value?: string) => void;
 }) {
   const editor = props.styleEditor;
@@ -33,6 +35,18 @@ export function SourceLayerDesignInspector(props: {
         <BoxSelect aria-hidden="true" className="text-sky-400" size={14} />
         <h3 aria-label="Selected layer" id="source-layer-design" className="min-w-0 flex-1 truncate text-[10px] font-medium">Layer</h3>
         <code className="max-w-28 truncate font-mono text-[9px] text-zinc-500">{layerLabel(props.layer)}</code>
+        {props.openComponent ? (
+          <Button
+            aria-label={`Open ${props.openComponent.label} component`}
+            className="h-6 min-w-0 gap-1 rounded-full bg-white/[0.07] px-2 text-[9px] text-zinc-200 hover:bg-white/[0.11]"
+            size="sm"
+            variant="ghost"
+            onPress={props.openComponent.onOpen}
+          >
+            Open
+            <ArrowUpRight aria-hidden="true" size={11} />
+          </Button>
+        ) : null}
       </header>
 
       <div className="divide-y divide-white/[0.06]">
@@ -60,6 +74,7 @@ export function SourceLayerDesignInspector(props: {
             <TailwindMappedControls
               value={className}
               onChange={(value) => editor?.change(value)}
+              onBoxModelPreviewChange={props.onBoxModelPreviewChange}
               onPreviewChange={props.onClassNamePreviewChange}
             />
           </div>
@@ -134,78 +149,7 @@ export function SourceLayerDesignInspector(props: {
   );
 }
 
-function InspectorSection(props: { children: React.ReactNode; icon: typeof Move; title: string }) {
-  const Icon = props.icon;
-  return (
-    <section className="px-4 py-3">
-      <h4 className="mb-2 flex items-center gap-2 text-[10px] font-medium text-zinc-300">
-        <span className="grid size-4 shrink-0 place-items-center text-zinc-600">
-          <Icon aria-hidden="true" size={12} />
-        </span>
-        {props.title}
-      </h4>
-      {props.children}
-    </section>
-  );
-}
-
-function Metric(props: { label: string; value?: number }) {
-  return (
-    <div className="flex h-8 items-center gap-1 rounded-lg bg-black/20 px-2">
-      <span className="text-[9px] text-zinc-600">{props.label}</span>
-      <span className="min-w-0 flex-1 truncate text-right font-mono text-[10px] text-zinc-400">{formatMetric(props.value)}</span>
-    </div>
-  );
-}
-
-function DimensionField(props: { disabled: boolean; label: string; value?: number; onChange: (value: number) => void }) {
-  return (
-    <NumberField isDisabled={props.disabled} minValue={0} value={Number.isFinite(props.value) ? Math.round(props.value!) : Number.NaN}>
-      <Label className="sr-only">{props.label}</Label>
-      <NumberField.Group className="flex h-8 items-center rounded-lg bg-black/20 px-2 focus-within:ring-1 focus-within:ring-sky-400/50">
-        <span aria-hidden="true" className="text-[9px] text-zinc-600">{props.label}</span>
-        <NumberField.Input
-          aria-label={props.label}
-          className="min-w-0 flex-1 bg-transparent text-right font-mono text-[10px] text-zinc-300 outline-none disabled:text-zinc-600"
-          onChange={(event) => {
-            const value = Number(event.currentTarget.value);
-            if (Number.isFinite(value)) props.onChange(value);
-          }}
-        />
-      </NumberField.Group>
-    </NumberField>
-  );
-}
-
-function PaintField(props: {
-  disabled: boolean;
-  label: string;
-  placeholder: string;
-  value: string;
-  onChange: (value: string) => void;
-  trailing?: React.ReactNode;
-}) {
-  return (
-    <div className={`grid min-h-10 items-center gap-2 py-1.5 ${props.trailing ? "grid-cols-[3.5rem_minmax(0,1fr)_4.5rem]" : "grid-cols-[3.5rem_minmax(0,1fr)]"}`}>
-      <span className="text-[9px] text-zinc-500">{props.label}</span>
-      <TextField isDisabled={props.disabled} value={props.value} onChange={props.onChange}>
-        <Label className="sr-only">{props.label}</Label>
-        <div className="flex h-8 items-center gap-2 rounded-lg bg-black/20 px-2 focus-within:ring-1 focus-within:ring-sky-400/50">
-          <span
-            aria-label={`${props.label} swatch`}
-            className="size-3.5 shrink-0 rounded-sm border border-white/15 bg-[linear-gradient(135deg,transparent_45%,rgba(244,63,94,.8)_46%,rgba(244,63,94,.8)_54%,transparent_55%)]"
-            role="img"
-            style={tailwindColorStyle(props.value)}
-          />
-          <Input aria-label={props.label} className="h-full min-w-0 flex-1 bg-transparent px-0 font-mono text-[10px] text-zinc-300 outline-none" placeholder={props.placeholder} />
-        </div>
-      </TextField>
-      <div className="min-w-0">{props.trailing}</div>
-    </div>
-  );
-}
-
-function tailwindColorStyle(value: string): React.CSSProperties | undefined {
+export function tailwindColorStyle(value: string): React.CSSProperties | undefined {
   const normalized = value.trim();
   if (!normalized) return undefined;
   if (validCssColor(normalized)) return { background: normalized };
@@ -227,7 +171,7 @@ function validCssColor(value: string): boolean {
   return /^(?:#|(?:rgb|hsl|oklch|color|var)\()/.test(value);
 }
 
-function formatMetric(value: number | undefined): string {
+export function formatMetric(value: number | undefined): string {
   return Number.isFinite(value) ? String(Math.round(value!)) : "—";
 }
 

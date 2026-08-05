@@ -23,11 +23,16 @@ export function SourceCodexConnectionIndicator(props: {
       : "Connect Codex task";
   const tone = props.connection === "checking"
     ? "text-zinc-500"
+    : connected
+      ? "text-zinc-300 hover:bg-white/[0.06]"
+      : "text-zinc-400 hover:bg-white/[0.06]";
+  const dotTone = props.connection === "checking"
+    ? "bg-zinc-600"
     : writable
-      ? "text-emerald-200 hover:bg-emerald-300/[0.08]"
+      ? "bg-emerald-400"
       : connected
-        ? "text-amber-200 hover:bg-amber-300/[0.08]"
-        : "text-rose-200 hover:bg-rose-300/[0.08]";
+        ? "bg-amber-400"
+        : "bg-rose-400";
   const detail = props.connection === "checking"
     ? "Checking the current Codex task"
     : connected
@@ -44,7 +49,7 @@ export function SourceCodexConnectionIndicator(props: {
         variant="ghost"
         onPress={props.onPress}
       >
-        <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />
+        <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${dotTone}`} data-testid="source-codex-connection-dot" />
         <span className="truncate">{label}</span>
       </Button>
       <Tooltip.Content className="max-w-72 rounded-lg bg-[#202126] px-2 py-1 text-[10px] leading-4 text-zinc-200 shadow-xl">

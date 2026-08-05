@@ -1,11 +1,16 @@
 import "./monaco-environment";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import * as monaco from "monaco-editor";
 import type { SourceLayerBinding } from "../../shared/source-workspace";
 import { configureMonacoTypeScript, sourceLanguageFor } from "./monaco-source-language";
 import { monacoModelPath } from "./monaco-model-path";
 import { currentDesignSpaceTheme, subscribeDesignSpaceTheme } from "../shell/design-space-theme";
+import {
+  SourceCodeSelectionPopover,
+  type SourceCodePopoverSelection,
+} from "./SourceCodeSelectionPopover";
+import type { SourceCodeSelectionContext } from "./source-feedback";
 
 configureMonacoTypeScript();
 
@@ -15,6 +20,8 @@ type MonacoSourceEditorProps = {
   value: string;
   selection?: SourceLayerBinding;
   onChange: (value: string) => void;
+  onAnnotateSelection?: (selection: SourceCodeSelectionContext, comment: string) => void;
+  onAttachSelection?: (selection: SourceCodeSelectionContext) => void;
   onCursorOffsetChange?: (offset: number) => void;
 };
 
@@ -27,6 +34,11 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
   const onCursorOffsetChangeRef = useRef(props.onCursorOffsetChange);
   const synchronizing = useRef(false);
   const decorationsRef = useRef<string[]>([]);
+  const pointerSelectingRef = useRef(false);
+  const pendingCodeSelectionRef = useRef<SourceCodePopoverSelection | undefined>(undefined);
+  const keyboardSelectionTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const mouseUpTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [codeSelection, setCodeSelection] = useState<SourceCodePopoverSelection>();
 
   useEffect(() => {
     onChangeRef.current = props.onChange;
@@ -65,12 +77,75 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
     const cursorSubscription = editor.onDidChangeCursorPosition((event) => {
       onCursorOffsetChangeRef.current?.(model.getOffsetAt(event.position));
     });
+    function resolveCodeSelection(selection: monaco.Selection) {
+      if ((!props.onAnnotateSelection && !props.onAttachSelection) || selection.isEmpty()) return undefined;
+      const start = selection.getStartPosition();
+      const end = selection.getEndPosition();
+      const selectedText = model.getValueInRange(selection);
+      if (!selectedText.trim()) return undefined;
+      const visible = editor.getScrolledVisiblePosition(end) ?? editor.getScrolledVisiblePosition(start);
+      if (!visible) return undefined;
+      const startOffset = model.getOffsetAt(start);
+      const endOffset = model.getOffsetAt(end);
+      const editorLayout = editor.getLayoutInfo();
+      return {
+        anchor: {
+          left: Math.max(12, Math.min(visible.left, editorLayout.width - 312)),
+          top: visible.top + visible.height > editorLayout.height - 150
+            ? Math.max(12, visible.top - 152)
+            : visible.top + visible.height,
+        },
+        endColumn: end.column,
+        endLine: end.lineNumber,
+        id: `${props.path}:${startOffset}-${endOffset}`,
+        relativePath: props.path,
+        selectedText,
+        startColumn: start.column,
+        startLine: start.lineNumber,
+      } satisfies SourceCodePopoverSelection;
+    }
+    const selectionSubscription = editor.onDidChangeCursorSelection((event) => {
+      pendingCodeSelectionRef.current = resolveCodeSelection(event.selection);
+      if (keyboardSelectionTimerRef.current) clearTimeout(keyboardSelectionTimerRef.current);
+      if ((!props.onAnnotateSelection && !props.onAttachSelection) || event.selection.isEmpty()) {
+        setCodeSelection(undefined);
+        return;
+      }
+      if (pointerSelectingRef.current) {
+        setCodeSelection(undefined);
+        return;
+      }
+      keyboardSelectionTimerRef.current = setTimeout(() => {
+        setCodeSelection(pendingCodeSelectionRef.current);
+      }, 180);
+    });
+    const mouseDownSubscription = editor.onMouseDown(() => {
+      pointerSelectingRef.current = true;
+      setCodeSelection(undefined);
+      if (keyboardSelectionTimerRef.current) clearTimeout(keyboardSelectionTimerRef.current);
+    });
+    const mouseUpSubscription = editor.onMouseUp(() => {
+      pointerSelectingRef.current = false;
+      if (keyboardSelectionTimerRef.current) clearTimeout(keyboardSelectionTimerRef.current);
+      if (mouseUpTimerRef.current) clearTimeout(mouseUpTimerRef.current);
+      mouseUpTimerRef.current = setTimeout(() => {
+        const finalSelection = editor.getSelection();
+        setCodeSelection(finalSelection ? resolveCodeSelection(finalSelection) : undefined);
+      }, 0);
+    });
+    const scrollSubscription = editor.onDidScrollChange(() => setCodeSelection(undefined));
 
     modelRef.current = model;
     editorRef.current = editor;
     return () => {
       subscription.dispose();
       cursorSubscription.dispose();
+      selectionSubscription.dispose();
+      mouseDownSubscription.dispose();
+      mouseUpSubscription.dispose();
+      scrollSubscription.dispose();
+      if (keyboardSelectionTimerRef.current) clearTimeout(keyboardSelectionTimerRef.current);
+      if (mouseUpTimerRef.current) clearTimeout(mouseUpTimerRef.current);
       editor.dispose();
       model.dispose();
       editorRef.current = undefined;
@@ -118,5 +193,23 @@ export function MonacoSourceEditor(props: MonacoSourceEditorProps) {
     ));
   }, [props.selection, props.value]);
 
-  return <div ref={containerRef} className="h-full min-h-0 w-full" />;
+  return (
+    <div className="relative h-full min-h-0 w-full overflow-hidden">
+      <div ref={containerRef} className="h-full min-h-0 w-full" />
+      {codeSelection && props.onAnnotateSelection && props.onAttachSelection ? (
+        <SourceCodeSelectionPopover
+          selection={codeSelection}
+          onAnnotate={(comment) => {
+            props.onAnnotateSelection?.(codeSelection, comment);
+            setCodeSelection(undefined);
+          }}
+          onAttach={() => {
+            props.onAttachSelection?.(codeSelection);
+            setCodeSelection(undefined);
+          }}
+          onDismiss={() => setCodeSelection(undefined)}
+        />
+      ) : null}
+    </div>
+  );
 }

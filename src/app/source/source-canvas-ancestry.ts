@@ -5,10 +5,18 @@ import type { SourceSlotScope } from "./source-slot-navigation";
 
 export type SourceCanvasAncestryItem = {
   approval?: SourceCanvasApprovalStatus;
+  children?: readonly SourceCanvasNavigationNode[];
   id: string;
   kind: "component" | "element" | "slot";
   label: string;
   scope?: SourceSlotScope;
+};
+
+export type SourceCanvasNavigationNode = {
+  children: readonly SourceCanvasNavigationNode[];
+  id: string;
+  label: string;
+  slotLabel?: string;
 };
 
 export type SourceCanvasApprovalStatus = {
@@ -48,7 +56,13 @@ export function sourceCanvasAncestry(
       label: `slot:${edgeSlot.label}`,
       scope: "tree",
     });
-    items.push({ id: item.id, kind: "component", label: item.node.label });
+    const children = occurrenceNavigationChildren(graph, item);
+    items.push({
+      ...(children.length ? { children } : {}),
+      id: item.id,
+      kind: "component",
+      label: item.node.label,
+    });
   });
   if (selectedLayer?.kind === "slot") {
     items.push({ id: selectedLayer.id, kind: "slot", label: `slot:${selectedLayer.label}`, scope: "tree" });
@@ -56,6 +70,25 @@ export function sourceCanvasAncestry(
     items.push({ id: selectedLayer.id, kind: "element", label: `<${selectedLayer.label}>` });
   }
   return items;
+}
+
+function occurrenceNavigationChildren(
+  graph: SourceFocusGraph,
+  occurrence: SourceOccurrence,
+  visited: ReadonlySet<string> = new Set([occurrence.id]),
+): readonly SourceCanvasNavigationNode[] {
+  return occurrence.children.flatMap((childId) => {
+    if (visited.has(childId)) return [];
+    const child = graph.occurrences.get(childId);
+    if (!child) return [];
+    const nextVisited = new Set(visited).add(child.id);
+    return [{
+      children: occurrenceNavigationChildren(graph, child, nextVisited),
+      id: child.id,
+      label: child.node.label,
+      slotLabel: occurrenceSlot(occurrence, child)?.label,
+    }];
+  });
 }
 
 function occurrenceSlot(

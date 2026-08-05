@@ -26,22 +26,22 @@ export function SourceComponentReviewCheckpoint(props: SourceComponentReviewChec
   return (
     <section
       aria-label={`Review checkpoint for ${props.entry.label}`}
-      className="pointer-events-auto min-w-0 max-w-56 overflow-hidden"
+      className="pointer-events-auto min-w-0 max-w-64 overflow-hidden rounded-full bg-white/[0.035] px-1"
       data-testid="source-component-review-checkpoint"
+      title={state.detail}
     >
-      <div className="flex h-6 min-w-0 items-center gap-0.5">
+      <div className="flex h-6 min-w-0 items-center gap-1">
         <span
           aria-hidden="true"
-          className={`mx-1 size-1.5 shrink-0 rounded-full ${state.tone === "approved" ? "bg-emerald-300" : "bg-amber-300/80"}`}
+          className={`ml-1 size-1.5 shrink-0 rounded-full ${state.tone === "approved" ? "bg-emerald-300" : "bg-amber-300"}`}
           title={state.detail}
         />
-        <p className="max-w-20 truncate px-0.5 text-[9px] font-semibold text-zinc-300">{props.entry.label}</p>
-        <span className="shrink-0 px-0.5 font-mono text-[9px] tabular-nums text-zinc-600">{props.index + 1}/{props.total}</span>
-        <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-white/[0.07]" />
+        <p className="max-w-24 truncate text-[9px] font-medium text-zinc-300">{props.entry.label}</p>
+        <span className="shrink-0 rounded-full bg-black/20 px-1.5 py-0.5 text-[8px] tabular-nums text-zinc-500">{props.index + 1}/{props.total}</span>
         <span className="sr-only">{state.detail}</span>
         <Button
           aria-label={`Request changes for ${props.entry.label}`}
-          className="size-5 min-w-5 shrink-0 rounded text-zinc-600 hover:bg-white/[0.05] hover:text-zinc-100"
+          className="ml-auto size-5 min-w-5 shrink-0 rounded-full text-zinc-600 hover:bg-white/[0.07] hover:text-zinc-100"
           isIconOnly
           size="sm"
           variant="ghost"
@@ -52,7 +52,7 @@ export function SourceComponentReviewCheckpoint(props: SourceComponentReviewChec
         {state.tone === "approved" ? (
           <Button
             aria-label={props.onNext ? "Open next component" : "All reachable components reviewed"}
-            className="size-5 min-w-5 shrink-0 rounded bg-emerald-300/90 text-emerald-950 hover:bg-emerald-200"
+            className="size-5 min-w-5 shrink-0 rounded-full bg-emerald-300 text-emerald-950 hover:bg-emerald-200"
             isDisabled={!props.onNext}
             isIconOnly
             size="sm"
@@ -63,7 +63,7 @@ export function SourceComponentReviewCheckpoint(props: SourceComponentReviewChec
         ) : (
           <Button
             aria-label={`Sign ${props.entry.label} with Touch ID`}
-            className={`size-5 min-w-5 shrink-0 rounded ${state.canSign || props.signing ? "bg-fuchsia-300/90 text-fuchsia-950 hover:bg-fuchsia-200" : "text-zinc-700"}`}
+            className={`size-5 min-w-5 shrink-0 rounded-full ${state.canSign || props.signing ? "bg-fuchsia-300 text-fuchsia-950 hover:bg-fuchsia-200" : "text-zinc-700"}`}
             isDisabled={!state.canSign}
             isIconOnly
             isPending={props.signing}

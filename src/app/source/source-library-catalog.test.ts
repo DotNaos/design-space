@@ -82,3 +82,48 @@ it("categorizes and filters external library components", () => {
   expect(filterSourceCatalog(components, "", "primitive").map((component) => component.label)).toEqual(["Button"]);
   expect(filterSourceCatalog(components, "chat", "all").map((component) => component.label)).toEqual(["AiChat"]);
 });
+
+it("keeps Development scoped to the public package catalog while resolving live source entries", () => {
+  const button = entry({
+    id: "button",
+    label: "Button",
+    relativePath: "src/primitives/Button/index.tsx",
+  });
+  const internalButton = entry({
+    id: "button-internal",
+    label: "ButtonInternal",
+    relativePath: "src/primitives/Button/ButtonInternal.tsx",
+  });
+  const catalog: RuntimeSourceLibraryCatalog = {
+    packageName: "@dotnaos/react-ui",
+    development: {
+      devices: [],
+      entries: [button, internalButton],
+      runtime: "react",
+      sourceRoot: "src",
+      styles: [],
+    },
+  };
+  const library: SourceWorkspaceLibrary = {
+    components: [
+      { category: "primitive", evidence: "package-export", name: "Button" },
+      { category: "component", evidence: "package-export", name: "InstalledOnly" },
+    ],
+    editable: false,
+    mode: "release",
+    packageName: "@dotnaos/react-ui",
+    version: "0.0.6",
+  };
+
+  const components = sourceCatalogComponents({
+    catalog,
+    device: "desktop",
+    kind: "library",
+    library,
+    mode: "development",
+  });
+
+  expect(components.map((component) => component.label)).toEqual(["Button", "InstalledOnly"]);
+  expect(components[0].entry).toBe(button);
+  expect(components[1].entry).toBeUndefined();
+});

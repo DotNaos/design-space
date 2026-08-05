@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { targetTypeScriptAliases } from "./typescript-path-aliases";
+import { targetTypeScriptAliasRoots, targetTypeScriptAliases } from "./typescript-path-aliases";
 
 describe("target TypeScript aliases", () => {
   const roots: string[] = [];
@@ -15,12 +15,15 @@ describe("target TypeScript aliases", () => {
     roots.push(root);
     await mkdir(join(root, "src"), { recursive: true });
     await writeFile(join(root, "tsconfig.app.json"), JSON.stringify({
-      compilerOptions: { baseUrl: ".", paths: { "@/*": ["src/*"] } },
+      compilerOptions: { baseUrl: ".", paths: { "@/*": ["src/*"], "@design": ["src/index.ts"] } },
     }));
 
     const aliases = targetTypeScriptAliases(root);
-    expect(aliases).toHaveLength(1);
+    expect(aliases).toHaveLength(2);
     expect((aliases[0].find as RegExp).test("@/app/app")).toBe(true);
     expect(aliases[0].replacement).toBe(`${join(root, "src")}/`);
+    expect((aliases[1].find as RegExp).test("@design")).toBe(true);
+    expect((aliases[1].find as RegExp).test("@design/styles.css")).toBe(false);
+    expect(targetTypeScriptAliasRoots(aliases)).toEqual([join(root, "src")]);
   });
 });

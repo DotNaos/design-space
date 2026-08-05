@@ -2,13 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { WandSparkles } from "lucide-react";
 import { Button } from "@heroui/react";
 
-import type {
-  RuntimeSourceWorkspaceEntry,
-  SourceWorkspaceLayer,
-} from "../../shared/source-workspace";
+import type { RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import type { ComponentDesignDefinition } from "../../shared/component-design";
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
-import { SourceCanvasContextHud } from "./SourceCanvasContextHud";
 import { SourceCanvasFeedbackDock } from "./SourceCanvasFeedbackDock";
 import { sourceCanvasAnnotationTargetAtPoint, SourceCanvasAnnotationOverlay, useSourceCanvasAnnotations } from "./SourceCanvasAnnotations";
 import { SourceDesignControls } from "./SourceDesignControls";
@@ -22,10 +18,12 @@ import { measureSourcePreviewContent, type SourcePreviewContentSize } from "./so
 import { externalSourceLayerOwner, sourceEntryOwner, sourceLayerOwner } from "./source-layer-ownership";
 import { mountSourceLayerHover, mountSourceLayerSelection, sourceLayerElement, sourceLayerElements } from "./source-preview-selection-overlay";
 import { sourceCanvasVisualLayer } from "./source-canvas-selection";
-import { renderStaticSourceDesignMarkup, renderStaticSourcePreviewMarkup, SourcePreviewContent } from "./source-static-preview";
+import { renderStaticSourceDesignMarkup, renderStaticSourcePreviewMarkup } from "./source-static-preview";
 import type { SourcePreviewFrameProps } from "./source-preview-frame-props";
 import { SourceComponentReviewCheckpoint } from "./SourceComponentReviewCheckpoint";
 import { sourceReviewGraphProperties, sourceReviewGraphSlots } from "./source-review-graph";
+import { PlayablePreview } from "./PlayablePreview";
+import { useSourceBoxModelPreview } from "./useSourceBoxModelPreview";
 
 export function sourceStaticProjectionLayerId(options: {
   entry?: RuntimeSourceWorkspaceEntry;
@@ -382,6 +380,17 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
     }
   }, [mounts, projectionKey, props.selectedClassName, props.selectedLayer, selectedOccurrence, staticRevision]);
 
+  useSourceBoxModelPreview({
+    compiledClassCss: props.selectedClassCss,
+    output: mounts?.output,
+    previewMode,
+    projected: Boolean(projectionKey),
+    selectedLayerId: props.selectedLayer?.id,
+    selectedOccurrence,
+    staticRevision,
+    store: props.boxModelPreviewStore,
+  });
+
   useEffect(() => {
     if (!mounts || props.selectedText === undefined) return;
     if (projectionKey) {
@@ -408,26 +417,25 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
       device={props.device}
       mode={previewMode === "static" ? undefined : previewMode}
       node={props.node}
+      showChrome={props.showChrome}
       selectedLayer={Boolean(props.selectedLayer)}
-      showModeToggle={!props.workspaceMode}
+      showDeviceSwitcher={!props.workspaceMode}
+      showModeToggle={!props.workspaceMode || props.workspaceMode === "preview"}
       revealTarget={revealTarget?.key === revealKey ? revealTarget : undefined}
       reviewGraph={previewMode === "play" ? undefined : reviewGraph}
       selectionKey={props.entry?.id}
       selectionLabel={props.selectedLayerLabel ?? sourceCanvasLayerLabel(props.selectedLayer) ?? props.node?.label}
       slotOwnerLabel={props.node?.label ?? props.entry?.label}
       slotTabs={canvasSlotTabs}
-      footer={selectedOwner ? (
-        <SourceHoverIdentityHud
-          action={props.onOpenSlotTarget && props.slotTargetLabel ? {
-            label: props.slotTargetLabel,
-            onPress: props.onOpenSlotTarget,
-          } : undefined}
-          external={Boolean(props.onOpenLayerOwner && selectedOwner.fileId !== props.entry?.fileId)}
-          owner={selectedOwner}
+      toolbarSigning={props.reviewCheckpoint ? (
+        <SourceComponentReviewCheckpoint
+          {...props.reviewCheckpoint}
+          stateCount={caseNames.length || (props.entry?.design ? 1 : 0)}
+          onRequestChanges={() => canvasAnnotations.setActive(true)}
         />
       ) : undefined}
       hud={(
-        <div className="flex w-[min(600px,calc(100vw-2rem))] max-w-full flex-col gap-1.5">
+        <div className="flex w-[min(820px,calc(100vw-2rem))] max-w-full flex-col gap-1.5">
           {!props.workspaceMode && props.selectedLayer && selectedLayerOccurrenceCount > 1 ? (
             <div className="min-w-0">
               <SourceInstanceNavigator
@@ -440,30 +448,25 @@ export function SourcePreviewFrame(props: SourcePreviewFrameProps) {
           <SourceCanvasFeedbackDock
             annotationMode={canvasAnnotations.active}
             annotations={canvasAnnotations.annotations}
+            codeAnnotations={props.codeAnnotations}
+            codeContexts={props.codeContexts}
             context={feedbackContext}
-            meta={props.workspaceMode || props.reviewCheckpoint ? (
-              <>
-                {props.workspaceMode ? (
-                  <SourceCanvasContextHud
-                    contextLabel={props.node?.label ?? props.entry?.label ?? "Component"}
-                    mode={props.workspaceMode}
-                    playing={previewMode === "play"}
-                    onPlayChange={(playing) => props.onModeChange?.(playing ? "play" : "design")}
-                    onReturnToPreview={props.onReturnToPreview}
-                  />
-                ) : null}
-                {props.reviewCheckpoint ? (
-                  <SourceComponentReviewCheckpoint
-                    {...props.reviewCheckpoint}
-                    stateCount={caseNames.length || (props.entry?.design ? 1 : 0)}
-                    onRequestChanges={() => canvasAnnotations.setActive(true)}
-                  />
-                ) : null}
-              </>
-            ) : undefined}
             onAnnotationModeChange={previewMode === "design" && !previewState ? canvasAnnotations.setActive : undefined}
             onAnnotationsSent={canvasAnnotations.clear}
+            onCodeFeedbackSent={props.onClearCodeFeedback}
+            onRemoveCodeAnnotation={props.onRemoveCodeAnnotation}
+            onRemoveCodeContext={props.onRemoveCodeContext}
           />
+          {selectedOwner ? (
+            <SourceHoverIdentityHud
+              action={props.onOpenSlotTarget && props.slotTargetLabel ? {
+                label: props.slotTargetLabel,
+                onPress: props.onOpenSlotTarget,
+              } : undefined}
+              external={Boolean(props.onOpenLayerOwner && selectedOwner.fileId !== props.entry?.fileId)}
+              owner={selectedOwner}
+            />
+          ) : null}
         </div>
       )}
       onDeviceChange={props.onDeviceChange ?? (() => undefined)}
@@ -597,34 +600,6 @@ function invalidDesignMessage(definition: ComponentDesignDefinition | undefined)
 }
 
 type LoadedDesign = { designId: string; definition: ComponentDesignDefinition };
-function PlayablePreview(props: {
-  caseName: string;
-  centered?: boolean;
-  classCss?: string;
-  className?: string;
-  definition: ComponentDesignDefinition;
-  entry: RuntimeSourceWorkspaceEntry;
-  layer?: SourceWorkspaceLayer;
-  matrix: boolean;
-  styles: readonly string[];
-  text?: string;
-}) {
-  const output = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const root = output.current;
-    if (!root || !props.layer) return;
-    if (props.className !== undefined) applySourceLayerClassNameById(root, props.layer.id, props.className);
-    if (props.text !== undefined) applySourceLayerTextById(root, props.layer.id, props.text);
-  }, [props.className, props.layer, props.text]);
-  return (
-    <section aria-label={`${props.entry.label} interactive preview`} className="h-full w-full overflow-auto bg-[#0d0e10] text-zinc-100">
-      <style>{[props.styles.join("\n"), props.classCss ?? ""].join("\n")}</style>
-      <div ref={output} className="min-h-full">
-        <SourcePreviewContent caseName={props.caseName} centered={props.centered} definition={props.definition} entry={props.entry} matrix={props.matrix} />
-      </div>
-    </section>
-  );
-}
 
 export function projectSourceLayer(staging: HTMLElement, output: HTMLElement, layerId: string): boolean {
   const target = [...staging.querySelectorAll<HTMLElement>("[data-design-space-source-layer-id]")]

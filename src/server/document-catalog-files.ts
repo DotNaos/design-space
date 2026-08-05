@@ -2,13 +2,34 @@ import { posix } from "node:path";
 
 import type { DocumentCatalogFileEntry } from "../shared/document-transactions";
 import { sourceVersion } from "./source-editor";
+import type { IndexedSourceWorkspace } from "./source-file-index";
 import type { RegisteredTarget } from "./target-registration";
 
 export function registeredFileCatalog(target: RegisteredTarget): readonly DocumentCatalogFileEntry[] {
+  return fileCatalog([...target.files.values()].map((file) => ({
+    id: file.id,
+    displayName: file.displayName,
+    editable: target.editableFileIds?.has(file.id) ?? false,
+  })));
+}
+
+export function sourceWorkspaceFileCatalog(
+  workspace: IndexedSourceWorkspace,
+): readonly DocumentCatalogFileEntry[] {
+  return fileCatalog(workspace.files.map((file) => ({
+    id: file.id,
+    displayName: file.relativePath,
+    editable: /\.[cm]?tsx?$/.test(file.relativePath),
+  })));
+}
+
+function fileCatalog(
+  registeredFiles: readonly { id: string; displayName: string; editable: boolean }[],
+): readonly DocumentCatalogFileEntry[] {
   const entries: DocumentCatalogFileEntry[] = [];
   const directoryIds = new Map<string, string>();
-  const usedIds = new Set(target.files.keys());
-  const files = [...target.files.values()].sort((left, right) => (
+  const usedIds = new Set(registeredFiles.map((file) => file.id));
+  const files = [...registeredFiles].sort((left, right) => (
     left.displayName.localeCompare(right.displayName, "en") || left.id.localeCompare(right.id, "en")
   ));
 
@@ -31,7 +52,7 @@ export function registeredFileCatalog(target: RegisteredTarget): readonly Docume
       label: segments.at(-1) ?? file.displayName,
       kind: "file",
       parentId,
-      editable: target.editableFileIds?.has(file.id) ?? false,
+      editable: file.editable,
     });
   }
   return entries;

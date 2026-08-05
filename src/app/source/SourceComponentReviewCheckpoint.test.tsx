@@ -36,6 +36,8 @@ it("keeps the one-component signature disabled with a visible reason when approv
 
   expect(screen.getByRole("button", { name: "Sign Workspace shell with Touch ID" })).toBeDisabled();
   expect(screen.getByText("Configure the project approval policy.")).toBeInTheDocument();
+  expect(screen.getByTestId("source-component-review-checkpoint")).toHaveClass("rounded-full", "bg-white/[0.035]");
+  expect(screen.getByText("1/3")).toHaveClass("rounded-full");
   expect(screen.queryByText("Component · WorkspaceShell")).not.toBeInTheDocument();
   expect(screen.queryByText("Properties")).not.toBeInTheDocument();
   expect(screen.queryByText("States")).not.toBeInTheDocument();

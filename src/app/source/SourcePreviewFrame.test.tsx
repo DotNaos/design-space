@@ -87,7 +87,7 @@ it("does not load design JavaScript or execute the component on the Design page"
   );
 
   expect(await screen.findByTitle("StaticPanel desktop preview")).toBeVisible();
-  await waitFor(() => expect(screen.getByLabelText("Canvas context")).toHaveTextContent("Design · StaticPanel"));
+  expect(screen.queryByLabelText("Canvas context")).not.toBeInTheDocument();
   expect(load).not.toHaveBeenCalled();
   expect(component).not.toHaveBeenCalled();
 });
@@ -106,9 +106,14 @@ it("keeps the Codex composer available in a library canvas", () => {
   expect(screen.getByLabelText("Codex composer")).toBeVisible();
   expect(screen.getByRole("textbox", { name: "Codex feedback" })).toBeVisible();
   expect(screen.getByTestId("source-canvas-feedback-dock")).toHaveClass("flex-col", "rounded-2xl");
-  expect(screen.getByTestId("source-codex-session-stack")).toBeVisible();
-  expect(screen.getByTestId("canvas-selection-identity-footer")).toHaveTextContent("LibraryButton");
-  expect(screen.getByTestId("canvas-world-footer")).not.toContainElement(screen.getByTestId("canvas-hud"));
+  expect(screen.getByTestId("source-codex-dock-actions")).toBeVisible();
+  const identity = screen.getByTestId("canvas-selection-identity-footer");
+  const hud = screen.getByTestId("canvas-hud");
+  const dock = screen.getByTestId("source-canvas-feedback-dock");
+  expect(identity).toHaveTextContent("LibraryButton");
+  expect(hud).toContainElement(identity);
+  expect(dock.compareDocumentPosition(identity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByTestId("canvas-world-footer")).not.toBeInTheDocument();
 });
 
 it("places, edits, and removes spatial canvas annotations", async () => {
@@ -478,7 +483,7 @@ it("separates design selection from playable component interactions", async () =
   expect(onAction).toHaveBeenCalledOnce();
 });
 
-it("uses the bottom HUD for safe Preview, temporary Play, and isolated Design", async () => {
+it("keeps temporary Play in the toolbar without duplicating the page mode in the bottom HUD", async () => {
   const onModeChange = vi.fn();
   const onReturnToPreview = vi.fn();
   const entry = previewEntry("context", async () => previewDefinition("Context"));
@@ -495,9 +500,9 @@ it("uses the bottom HUD for safe Preview, temporary Play, and isolated Design", 
     />,
   );
 
-  expect(screen.getByLabelText("Canvas context")).toHaveTextContent("Preview");
-  expect(screen.queryByRole("button", { name: "Design mode" })).not.toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "Play interactive preview" }));
+  expect(screen.queryByLabelText("Canvas context")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Design mode" })).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Play mode" }));
   expect(onModeChange).toHaveBeenCalledWith("play");
 
   view.rerender(
@@ -512,9 +517,10 @@ it("uses the bottom HUD for safe Preview, temporary Play, and isolated Design", 
       onReturnToPreview={onReturnToPreview}
     />,
   );
-  expect(screen.getByLabelText("Canvas context")).toHaveTextContent("Design · context");
-  await userEvent.click(screen.getByRole("button", { name: "Open Preview page" }));
-  expect(onReturnToPreview).toHaveBeenCalledOnce();
+  expect(screen.queryByLabelText("Canvas context")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Open Preview page" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Design mode" })).not.toBeInTheDocument();
+  expect(onReturnToPreview).not.toHaveBeenCalled();
 });
 
 it("serializes design content without keeping component handlers attached", async () => {

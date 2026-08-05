@@ -1,6 +1,7 @@
 import { Button, Input, Label, ListBox, TextField } from "@heroui/react";
-import { ChevronDown, CircleDot, Plus } from "lucide-react";
+import { CircleDot, Plus } from "lucide-react";
 import type { Selection, SlotState } from "../../types";
+import { InspectorSection } from "./InspectorSection";
 
 type InspectorProps = {
   className?: string;
@@ -68,17 +69,5 @@ export function Inspector(props: InspectorProps) {
         <p className="mt-2 text-[9px] leading-4 text-zinc-600">{props.editable ? "Live preview only. Source changes after Diff and Save." : "Connect a registered editable target to change source."}</p>
       </InspectorSection>
     </aside>
-  );
-}
-
-function InspectorSection(props: { title: string; open?: boolean; children?: React.ReactNode }) {
-  return (
-    <section className="border-b border-white/10 px-4 py-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-medium text-zinc-300">{props.title}</h3>
-        <ChevronDown size={13} className={props.open ? "text-zinc-500" : "-rotate-90 text-zinc-700"} />
-      </div>
-      {props.open && <div className="mt-3">{props.children}</div>}
-    </section>
   );
 }

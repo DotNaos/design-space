@@ -1,16 +1,17 @@
-import { Button, ToggleButton, Tooltip } from "@heroui/react";
-import { Hand, Maximize2, Minus, MonitorSmartphone, MousePointer2, Plus, RotateCcw, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
-
-import { CanvasGridControls } from "../CanvasGrid/CanvasGridControls";
+import { ToggleButton, Tooltip } from "@heroui/react";
+import { Fingerprint, Hand, MonitorSmartphone, MousePointer2, SlidersHorizontal } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { CanvasGridMode, CanvasLayoutGridSettings } from "../CanvasGrid/canvas-grid-types";
+import { NarrowToolbarTab } from "./NarrowToolbarTab";
+import { CanvasActions } from "./CanvasActions";
 
-type CanvasViewportControlsProps = {
+export type CanvasViewportControlsProps = {
   compact?: boolean;
   headerContent?: React.ReactNode;
   headerHeight?: number;
   leadingContent?: React.ReactNode;
   narrow?: boolean;
+  signingContent?: React.ReactNode;
   showInteractionToggle?: boolean;
   gridMode: CanvasGridMode;
   gridVisible: boolean;
@@ -28,9 +29,16 @@ type CanvasViewportControlsProps = {
 };
 
 export function CanvasViewportControls(props: CanvasViewportControlsProps) {
-  const [narrowTab, setNarrowTab] = useState<"viewport" | "canvas">(() => props.leadingContent ? "viewport" : "canvas");
+  const [toolbarTab, setToolbarTab] = useState<"viewport" | "canvas" | "signing">(() => props.leadingContent ? "viewport" : "canvas");
   const headerHeight = props.headerContent ? props.headerHeight ?? 36 : 0;
   const toolbarTop = headerHeight + (props.narrow ? 8 : 12);
+  const nested = props.narrow || Boolean(props.signingContent);
+
+  useEffect(() => {
+    if (toolbarTab === "signing" && !props.signingContent) {
+      setToolbarTab(props.leadingContent ? "viewport" : "canvas");
+    }
+  }, [props.leadingContent, props.signingContent, toolbarTab]);
   return (
     <>
       {props.headerContent ? (
@@ -65,30 +73,40 @@ export function CanvasViewportControls(props: CanvasViewportControlsProps) {
         </Tooltip.Content>
         </Tooltip>
       )}
-      {props.narrow ? (
+      {nested ? (
         <div
           data-testid="canvas-viewport-toolbar"
           data-layout="nested"
-          className="group/canvas-controls absolute left-12 right-2 z-20 overflow-hidden rounded-xl bg-[#17181b]/96 shadow-[0_8px_24px_rgba(0,0,0,0.22)] backdrop-blur-sm"
-          data-narrow
+          className={`group/canvas-controls absolute left-12 right-2 z-20 ${props.narrow ? "" : "mx-auto max-w-[760px]"}`}
+          data-narrow={props.narrow || undefined}
           style={{ top: toolbarTop }}
           onPointerDown={(event) => event.stopPropagation()}
           onPointerMove={(event) => event.stopPropagation()}
           onPointerUp={(event) => event.stopPropagation()}
         >
-          <nav aria-label="Canvas toolbar sections" className="flex h-7 items-end gap-1 border-b border-white/[0.06] px-1">
+          <nav aria-label="Canvas toolbar sections" className="mx-auto flex h-8 w-fit min-w-56 items-center justify-center rounded-full bg-[#17181b] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.22)]">
             {props.leadingContent ? (
-              <NarrowToolbarTab active={narrowTab === "viewport"} label="Viewport" onPress={() => setNarrowTab("viewport")}>
+              <NarrowToolbarTab active={toolbarTab === "viewport"} label="Viewport" onPress={() => setToolbarTab("viewport")}>
                 <MonitorSmartphone size={12} />
               </NarrowToolbarTab>
             ) : null}
-            <NarrowToolbarTab active={narrowTab === "canvas"} label="Canvas" onPress={() => setNarrowTab("canvas")}>
+            <NarrowToolbarTab active={toolbarTab === "canvas"} label="Canvas" onPress={() => setToolbarTab("canvas")}>
               <SlidersHorizontal size={12} />
             </NarrowToolbarTab>
+            {props.signingContent ? (
+              <NarrowToolbarTab active={toolbarTab === "signing"} label="Signing" onPress={() => setToolbarTab("signing")}>
+                <Fingerprint size={12} />
+              </NarrowToolbarTab>
+            ) : null}
           </nav>
-          <div className="flex h-9 min-w-0 items-center overflow-x-auto px-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {narrowTab === "viewport" ? (
-              <div className="min-w-0 shrink-0">{props.leadingContent}</div>
+          <div
+            data-testid="canvas-toolbar-actions"
+            className="mx-auto mt-2 flex h-9 w-fit max-w-full min-w-0 items-center justify-center overflow-x-auto rounded-full bg-[#17181b] px-2 shadow-[0_8px_24px_rgba(0,0,0,0.22)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {toolbarTab === "viewport" ? (
+              <div className="flex min-w-0 shrink-0 items-center justify-center">{props.leadingContent}</div>
+            ) : toolbarTab === "signing" ? (
+              <div className="flex min-w-0 items-center justify-center px-1">{props.signingContent}</div>
             ) : (
               <CanvasActions {...props} compact />
             )}
@@ -109,48 +127,5 @@ export function CanvasViewportControls(props: CanvasViewportControlsProps) {
         </div>
       )}
     </>
-  );
-}
-
-function NarrowToolbarTab(props: {
-  active: boolean;
-  children: React.ReactNode;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Button
-      aria-current={props.active ? "page" : undefined}
-      className={`relative h-6 gap-1 rounded-none px-2 text-[9px] ${props.active ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-200"}`}
-      size="sm"
-      variant="ghost"
-      onPress={props.onPress}
-    >
-      {props.children}
-      {props.label}
-      {props.active ? <span aria-hidden="true" className="absolute inset-x-1 bottom-0 h-0.5 rounded-t-full bg-sky-300" /> : null}
-    </Button>
-  );
-}
-
-function CanvasActions(props: CanvasViewportControlsProps & { compact?: boolean }) {
-  return (
-    <div className="flex shrink-0 items-center">
-      <div className={props.compact ? "block" : "hidden shrink-0 sm:block"}>
-        <CanvasGridControls
-          gridVisible={props.gridVisible}
-          layoutGrid={props.layoutGrid}
-          mode={props.gridMode}
-          onGridVisibleChange={props.onGridVisibleChange}
-          onLayoutGridChange={props.onLayoutGridChange}
-          onModeChange={props.onGridModeChange}
-        />
-      </div>
-      <Button isIconOnly aria-label="Zoom out" className={`${props.compact ? "inline-flex" : "hidden sm:inline-flex"} size-8 min-w-8 text-zinc-500 lg:size-7 lg:min-w-7`} size="sm" variant="ghost" onPress={props.onZoomOut}><Minus size={13} /></Button>
-      <span className={`${props.compact ? "block" : "hidden sm:block"} min-w-10 text-center text-[10px] tabular-nums text-zinc-300`}>{Math.round(props.scale * 100)}%</span>
-      <Button isIconOnly aria-label="Zoom in" className={`${props.compact ? "inline-flex" : "hidden sm:inline-flex"} size-8 min-w-8 text-zinc-500 lg:size-7 lg:min-w-7`} size="sm" variant="ghost" onPress={props.onZoomIn}><Plus size={13} /></Button>
-      <Button aria-label="Fit canvas" className="h-8 min-w-10 border-l border-white/[0.07] px-2 text-[10px] text-zinc-300 lg:h-7" size="sm" variant="ghost" onPress={props.onFit}><Maximize2 size={12} /> Fit</Button>
-      <Button isIconOnly aria-label="Reset zoom to 100%" className="size-8 min-w-8 border-l border-white/[0.07] text-zinc-500 lg:size-7 lg:min-w-7" size="sm" variant="ghost" onPress={props.onReset}><RotateCcw size={13} /></Button>
-    </div>
   );
 }

@@ -8,9 +8,13 @@ const appRoot = join(dirname(fileURLToPath(import.meta.url)), "../app");
 
 const allowedNativeButtons: Readonly<Record<string, number>> = {
   // Roving tree-item focus and branch disclosure are one composite ARIA tree.
-  "components/ComponentTree/ComponentTree.tsx": 4,
+  "components/ComponentTree/BranchChevron.tsx": 1,
+  "components/ComponentTree/ComponentRow.tsx": 1,
+  "components/ComponentTree/TreeRow.tsx": 2,
   // These exact-position hit targets are part of the transformed canvas geometry.
   "components/PreviewCanvas/PreviewCanvas.tsx": 2,
+  // The breadcrumb flyout is a compact composite ARIA tree with explorer disclosure.
+  "source/SourceCanvasNavigationBranch.tsx": 1,
 };
 
 describe("HeroUI primitive boundary", () => {

@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { expect, it } from "vitest";
 
 import { registerSourceProject } from "./source-project-registration";
+import { DESIGN_SPACE_TARGET_MODULE_ID, designSpaceTargetPlugin } from "./virtual-target-plugin";
 
 it("allows trusted TypeScript source files to use the code editor", async () => {
   const root = resolve(import.meta.dirname, "../../examples/source-target");
@@ -76,6 +77,11 @@ it("indexes a selected library checkout without requiring its own Design Space c
         ],
       },
     });
+    const runtimeSource = await (designSpaceTargetPlugin(target).load as Function)(
+      `\0${DESIGN_SPACE_TARGET_MODULE_ID}`,
+    ) as string;
+    expect(runtimeSource).not.toContain('"label":"Button.tsx"');
+    expect(runtimeSource).not.toContain('"files":[{"id":"library.source.');
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

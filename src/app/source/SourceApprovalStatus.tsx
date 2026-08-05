@@ -1,12 +1,9 @@
 import { Tooltip } from "@heroui/react";
 import { ShieldAlert, ShieldCheck, ShieldQuestion, ShieldX } from "lucide-react";
 
-import type {
-  SourceApprovalEvidence,
-  SourceComponentApproval,
-  SourceWorkspaceEntry,
-} from "../../shared/source-workspace";
+import type { SourceApprovalEvidence, SourceComponentApproval, SourceWorkspaceEntry } from "../../shared/source-workspace";
 import type { SourceCanvasApprovalStatus } from "./source-canvas-ancestry";
+import { SourceApprovalReviewSummary } from "./SourceApprovalReviewSummary";
 
 type ApprovalTone = "approved" | "invalid" | "stale" | "unreviewed" | "unavailable";
 
@@ -31,27 +28,6 @@ export function sourceApprovalModeLabel(
   }
   const approved = entries.filter((entry) => approvals.components[entry.id]?.state === "approved").length;
   return `Show approval checklist · ${approved} of ${entries.length} approved`;
-}
-
-export function SourceApprovalReviewSummary(props: {
-  approvals: SourceApprovalEvidence | undefined;
-  entries: readonly SourceWorkspaceEntry[];
-}) {
-  const counts = approvalCounts(props.approvals, props.entries);
-  const toReview = counts.total - counts.approved;
-  return (
-    <section
-      aria-label="Approval review"
-      className="flex min-h-9 shrink-0 items-center gap-2 border-b border-white/[0.06] bg-white/[0.015] px-4"
-    >
-      <ShieldCheck aria-hidden="true" className="text-zinc-500" size={13} />
-      <p className="text-[10px] font-medium text-zinc-400">Approval</p>
-      <p className="ml-auto font-mono text-[9px] tabular-nums text-zinc-500">
-        <span className="text-emerald-400">{counts.approved} / {counts.total} approved</span>
-        {toReview > 0 && <span className="text-amber-300/80"> · {toReview} to review</span>}
-      </p>
-    </section>
-  );
 }
 
 export function SourceApprovalStatus(props: {
@@ -177,7 +153,7 @@ function approvalAppearance(
   };
 }
 
-function approvalCounts(
+export function approvalCounts(
   evidence: SourceApprovalEvidence | undefined,
   entries: readonly SourceWorkspaceEntry[],
 ) {
@@ -195,3 +171,5 @@ function approvalCounts(
   }
   return counts;
 }
+
+export { SourceApprovalReviewSummary } from "./SourceApprovalReviewSummary";

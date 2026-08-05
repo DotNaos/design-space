@@ -4,15 +4,17 @@ import { startTransition, useEffect, useRef, useState } from "react";
 import { BoxModelUnitTabs } from "./BoxModelUnitTabs";
 import { BoxModelValueRows } from "./TailwindBoxModelValueRows";
 import { BoxModelDiagram, type BoxFocus } from "./TailwindBoxModelDiagram";
-import type { BoxUnit } from "./tailwind-box-model-values";
+import { changedBoxModelKind, type BoxModelPreview, type BoxUnit } from "./tailwind-box-model-values";
 
 export { readBoxSource, readBoxValue, setBoxUniformValue, setBoxValue, snapBoxPixels } from "./tailwind-box-model-values";
 
 const detentFlashMs = 130;
+const compiledPreviewFallbackMs = 1_500;
 
 export function TailwindBoxModelControl(props: {
   value: string;
   onChange: (value: string) => void;
+  onBoxModelPreviewChange?: (preview?: BoxModelPreview) => void;
   onPreviewChange?: (value?: string) => void;
 }) {
   const [hovered, setHovered] = useState<BoxFocus>();
@@ -22,20 +24,28 @@ export function TailwindBoxModelControl(props: {
   const [unit, setUnit] = useState<BoxUnit>("tailwind");
   const [interactionValue, setInteractionValue] = useState<string>();
   const detentTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const previewClearTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const interactionValueRef = useRef<string | undefined>(undefined);
   const onPreviewChangeRef = useRef(props.onPreviewChange);
   onPreviewChangeRef.current = props.onPreviewChange;
+  const onBoxModelPreviewChangeRef = useRef(props.onBoxModelPreviewChange);
+  onBoxModelPreviewChangeRef.current = props.onBoxModelPreviewChange;
   const focus = edited ?? dragged ?? hovered;
   const value = interactionValue ?? props.value;
 
   useEffect(() => () => {
     clearTimeout(detentTimer.current);
+    clearTimeout(previewClearTimer.current);
     onPreviewChangeRef.current?.();
+    onBoxModelPreviewChangeRef.current?.();
   }, []);
 
   const previewInteraction = (next: string) => {
     interactionValueRef.current = next;
     setInteractionValue(next);
+    clearTimeout(previewClearTimer.current);
+    const kind = changedBoxModelKind(props.value, next);
+    props.onBoxModelPreviewChange?.(kind ? { className: next, kind } : undefined);
     startTransition(() => props.onPreviewChange?.(next));
   };
 
@@ -43,8 +53,18 @@ export function TailwindBoxModelControl(props: {
     const finalValue = next ?? interactionValueRef.current;
     interactionValueRef.current = undefined;
     setInteractionValue(undefined);
-    if (finalValue !== undefined && finalValue !== props.value) props.onChange(finalValue);
+    const changed = finalValue !== undefined && finalValue !== props.value;
+    if (changed) props.onChange(finalValue);
     startTransition(() => props.onPreviewChange?.());
+    clearTimeout(previewClearTimer.current);
+    if (changed) {
+      previewClearTimer.current = setTimeout(
+        () => onBoxModelPreviewChangeRef.current?.(),
+        compiledPreviewFallbackMs,
+      );
+    } else {
+      props.onBoxModelPreviewChange?.();
+    }
   };
 
   /** Every rung the drag clicks past flashes the band, so the snap is felt as well as seen. */

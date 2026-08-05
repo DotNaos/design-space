@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseGitWorktreeList } from "./library-development-project";
+import { parseGitBranchList, parseGitWorktreeList } from "./library-development-project";
 
 const temporaryDirectories: string[] = [];
 
@@ -13,6 +13,14 @@ afterEach(async () => {
 });
 
 describe("library development worktrees", () => {
+  it("lists local branches once in a stable order", () => {
+    expect(parseGitBranchList("feature/zeta\nmain\nfeature/alpha\nmain\n")).toEqual([
+      "feature/alpha",
+      "feature/zeta",
+      "main",
+    ]);
+  });
+
   it("lists every checkout that contains the configured UI package", async () => {
     const root = await mkdtemp(join(tmpdir(), "design-space-library-"));
     temporaryDirectories.push(root);

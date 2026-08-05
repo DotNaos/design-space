@@ -1,26 +1,98 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+
+const defaultResizeObserver = globalThis.ResizeObserver;
 
 vi.mock("../components/PreviewCanvas/PreviewCanvas", () => ({
   PreviewCanvas: (props: {
     canvasHeader?: React.ReactNode;
+    hud?: React.ReactNode;
     preview: React.ReactNode;
+    selection?: unknown;
+    showControls?: boolean;
     toolbar?: React.ReactNode;
+    toolbarSigning?: React.ReactNode;
     worldFooter?: React.ReactNode;
   }) => (
-    <div>
+    <div data-testid="preview-canvas" data-show-controls={String(props.showControls !== false)}>
       <div data-testid="fixed-canvas-header">{props.canvasHeader}</div>
-      {props.toolbar}
+      <div data-testid="preview-toolbar">{props.toolbar}</div>
+      <div data-testid="preview-signing">{props.toolbarSigning}</div>
       {props.preview}
-      {props.worldFooter}
+      <div data-testid="preview-hud">{props.hud}</div>
+      <output data-testid="preview-selection">{props.selection ? "selected" : "none"}</output>
+      <div data-testid="preview-footer">{props.worldFooter}</div>
     </div>
   ),
 }));
 
 import { SourceCanvasViewport } from "./SourceCanvasViewport";
+import type { SourceTreeNode } from "./source-workspace-tree";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    configurable: true,
+    value: defaultResizeObserver,
+  });
+});
+
+const node: SourceTreeNode = {
+  id: "app",
+  area: "components",
+  label: "App",
+  entries: [],
+  uses: [],
+  implementations: {
+    desktop: { requestedDevice: "desktop", sourceDevice: "desktop", state: "direct" },
+    tablet: { requestedDevice: "tablet", sourceDevice: "desktop", state: "fallback" },
+    mobile: { requestedDevice: "mobile", state: "missing" },
+  },
+};
+
+it("renders a chrome-free review preview without hiding the component", () => {
+  render(
+    <SourceCanvasViewport
+      ancestry={[{ id: "app", kind: "component", label: "App" }]}
+      device="desktop"
+      footer={<div>Selected file</div>}
+      hud={<div>Comment composer</div>}
+      node={node}
+      showChrome={false}
+      toolbarSigning={<div>Signing</div>}
+      onDeviceChange={vi.fn()}
+    >
+      {() => <div>Component preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  expect(screen.getByText("Component preview")).toBeVisible();
+  expect(screen.getByTestId("preview-canvas")).toHaveAttribute("data-show-controls", "false");
+  expect(screen.getByTestId("fixed-canvas-header")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("preview-toolbar")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("preview-signing")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("preview-hud")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("preview-footer")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("preview-selection")).toHaveTextContent("none");
+});
+
+it("can leave device switching to the workspace sidebar", () => {
+  render(
+    <SourceCanvasViewport
+      ancestry={[{ id: "app", kind: "component", label: "App" }]}
+      device="desktop"
+      node={node}
+      showDeviceSwitcher={false}
+      onDeviceChange={vi.fn()}
+    >
+      {() => <div>Preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  expect(screen.queryByRole("group", { name: "Source implementation" })).not.toBeInTheDocument();
+  expect(screen.getByRole("navigation", { name: "Canvas ancestry" })).toBeVisible();
+});
 
 it("switches between the selected screen and measured content bounds", async () => {
   render(
@@ -90,21 +162,144 @@ it("attaches an interactive ancestry path to the canvas", async () => {
 
   const ancestry = screen.getByRole("navigation", { name: "Canvas ancestry" });
   expect(screen.getByTestId("fixed-canvas-header")).toContainElement(ancestry);
-  expect(ancestry).toHaveTextContent("From root");
+  expect(ancestry).not.toHaveTextContent("From root");
   expect(ancestry).toHaveTextContent("App");
   expect(ancestry).toHaveTextContent("WorkspaceShell");
   expect(ancestry).toHaveTextContent("slot:content");
+  const appCrumb = within(ancestry).getByRole("button", { name: "App" });
+  expect(appCrumb).toHaveClass("rounded-full");
+  expect(appCrumb.querySelector("[aria-hidden='true']")).toHaveClass("rounded-full");
   expect(screen.getByText("slot:content").closest("[aria-current]"))
     .toHaveAttribute("aria-current", "location");
+  expect(screen.getByText("slot:content").closest("[aria-current]")).toHaveClass("rounded-full");
+  expect(screen.getByText("slot:content").previousElementSibling).not.toHaveClass("ring-1");
   expect(document.querySelector("[data-preview-frame-mode]")).not.toHaveClass("shadow-2xl");
 
   await userEvent.click(screen.getByRole("button", { name: /App/ }));
   expect(onSelectAncestry).toHaveBeenCalledWith({ id: "app", kind: "component", label: "App" });
 
   expect(screen.getByRole("button", { name: "slot:content" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "slot:content" })).toHaveClass("rounded-full");
   expect(screen.getByRole("button", { name: "slot:toolbar" })).toHaveAttribute("data-slot-scope", "shared");
   await userEvent.click(screen.getByRole("button", { name: "slot:status" }));
   expect(onSelectSlot).toHaveBeenCalledWith({ active: false, id: "status", label: "status", scope: "tree" });
+});
+
+it("keeps the current breadcrumb visible after revealing a collapsed path", async () => {
+  class NarrowResizeObserver {
+    constructor(private readonly callback: ResizeObserverCallback) {}
+    observe(target: Element) {
+      if (target instanceof HTMLDivElement) {
+        this.callback([{ contentRect: { width: 320 } } as ResizeObserverEntry], this as unknown as ResizeObserver);
+      }
+    }
+    unobserve() {}
+    disconnect() {}
+  }
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    configurable: true,
+    value: NarrowResizeObserver,
+  });
+
+  render(
+    <SourceCanvasViewport
+      ancestry={[
+        { id: "app", kind: "component", label: "App" },
+        { id: "shell", kind: "component", label: "WorkspaceShell" },
+        { id: "content", kind: "slot", label: "slot:content" },
+        { id: "workspace", kind: "component", label: "SourceWorkspace" },
+        { id: "sidebar", kind: "component", label: "SourceWorkspaceSidebar" },
+      ]}
+      device="desktop"
+      onDeviceChange={vi.fn()}
+    >
+      {() => <div>Preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  const ancestry = screen.getByRole("navigation", { name: "Canvas ancestry" });
+  const list = ancestry.querySelector("ol")!;
+  Object.defineProperty(list, "scrollWidth", { configurable: true, value: 640 });
+  list.scrollLeft = 0;
+
+  await userEvent.click(screen.getByRole("button", { name: "Show 3 hidden path items" }));
+
+  expect(within(ancestry).getByText("App")).toBeVisible();
+  expect(list.scrollLeft).toBe(640);
+});
+
+it("reveals the real component subtree from a breadcrumb hover and navigates from it", async () => {
+  const onSelectAncestry = vi.fn();
+  const toolbar = { children: [], id: "toolbar", label: "Toolbar", slotLabel: "toolbar" };
+  const status = { children: [], id: "status", label: "WorkspaceStatus", slotLabel: "status" };
+  const shell = { children: [status, toolbar], id: "shell", label: "WorkspaceShell", slotLabel: "content" };
+  render(
+    <SourceCanvasViewport
+      ancestry={[
+        { children: [shell], id: "app", kind: "component", label: "App" },
+        { children: [status, toolbar], id: "shell", kind: "component", label: "WorkspaceShell" },
+        { id: "status", kind: "component", label: "WorkspaceStatus" },
+      ]}
+      device="desktop"
+      onDeviceChange={vi.fn()}
+      onSelectAncestry={onSelectAncestry}
+    >
+      {() => <div>Preview</div>}
+    </SourceCanvasViewport>,
+  );
+
+  const ancestry = screen.getByRole("navigation", { name: "Canvas ancestry" });
+  const currentCrumb = within(ancestry).getByText("WorkspaceStatus").closest("[aria-current]");
+  expect(currentCrumb).not.toBeNull();
+  expect(currentCrumb).toHaveClass("rounded-full", "bg-purple-500", "!px-2.5", "text-[8px]", "text-white");
+  expect(currentCrumb?.querySelector("[aria-hidden='true']")).toHaveClass("rounded-full", "bg-white/20", "text-white");
+
+  await userEvent.hover(screen.getByRole("button", { name: "App" }));
+  const tree = await screen.findByRole("tree", { name: "App component tree" });
+  expect(tree).toHaveClass("overflow-auto");
+  expect(within(tree).getByRole("treeitem", { name: "App" }).parentElement).toHaveClass("text-fuchsia-300");
+  expect(within(tree).getByRole("treeitem", { name: /WorkspaceShell/ }).parentElement).toHaveClass("text-fuchsia-300");
+  expect(within(tree).getByRole("treeitem", { name: "WorkspaceStatus" })).toHaveAttribute("aria-current", "location");
+  expect(within(tree).getByRole("treeitem", { name: "WorkspaceStatus" })).toHaveAttribute("data-slot-label", "status");
+  expect(within(tree).getByRole("treeitem", { name: "WorkspaceStatus" })).toHaveClass("min-w-max", "whitespace-nowrap");
+  expect(within(tree).getAllByTestId("source-canvas-tree-component-icon")).toHaveLength(4);
+  expect(within(tree).getByRole("treeitem", { name: "Toolbar" })).not.toHaveAttribute("aria-current");
+
+  await userEvent.click(within(tree).getByRole("button", { name: "Collapse WorkspaceShell" }));
+  expect(within(tree).queryByRole("treeitem", { name: "WorkspaceStatus" })).not.toBeInTheDocument();
+  await userEvent.click(within(tree).getByRole("button", { name: "Expand WorkspaceShell" }));
+
+  await userEvent.click(within(tree).getByRole("treeitem", { name: "Toolbar" }));
+  expect(onSelectAncestry).toHaveBeenCalledWith({
+    children: [],
+    id: "toolbar",
+    kind: "component",
+    label: "Toolbar",
+  });
+});
+
+it("dismisses the breadcrumb tree when pressing outside it", async () => {
+  const shell = { children: [], id: "shell", label: "WorkspaceShell", slotLabel: "content" };
+  render(
+    <SourceCanvasViewport
+      ancestry={[
+        { children: [shell], id: "app", kind: "component", label: "App" },
+        { id: "shell", kind: "component", label: "WorkspaceShell" },
+      ]}
+      device="desktop"
+      onDeviceChange={vi.fn()}
+    >
+      {() => <button type="button">Outside the tree</button>}
+    </SourceCanvasViewport>,
+  );
+
+  await userEvent.hover(screen.getByRole("button", { name: "App" }));
+  expect(await screen.findByRole("tree", { name: "App component tree" })).toBeVisible();
+
+  await userEvent.click(screen.getByText("Outside the tree"));
+  await waitFor(() => {
+    expect(screen.queryByRole("tree", { name: "App component tree" })).not.toBeInTheDocument();
+  });
 });
 
 it("collapses dense sibling slots into a compact picker", async () => {

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -9,12 +9,18 @@ import type { SourceChangeReviewItem } from "./source-change-review";
 afterEach(cleanup);
 
 vi.mock("./MonacoSourceDiff", () => ({
-  MonacoSourceDiff: (props: { modified: string; original: string; path: string }) => (
-    <div aria-label="Source diff editor" data-path={props.path}>
+  MonacoSourceDiff: (props: { mode: string; modified: string; original: string; path: string }) => (
+    <div aria-label="Source diff editor" data-mode={props.mode} data-path={props.path}>
       <pre aria-label="Before source">{props.original}</pre>
       <pre aria-label="After source">{props.modified}</pre>
       <span>Highlighted synchronized diff</span>
     </div>
+  ),
+}));
+
+vi.mock("./MonacoReviewSource", () => ({
+  MonacoReviewSource: (props: { ariaLabel: string; path: string; value: string }) => (
+    <pre aria-label={props.ariaLabel} data-path={props.path}>{props.value}</pre>
   ),
 }));
 
@@ -45,9 +51,12 @@ describe("SourceChangeReviewModal", () => {
     expect(screen.getByText("0 of 2 approved · 2 selected")).toBeVisible();
     expect(screen.getByRole("region", { name: "Before preview" })).toHaveTextContent("Button before");
     expect(screen.getByRole("region", { name: "After preview" })).toHaveTextContent("Button after");
-    expect(await screen.findByLabelText("Before source")).toHaveTextContent("<button>Save</button>");
-    expect(screen.getByLabelText("After source")).toHaveTextContent("className=\"rounded\"");
-    expect(screen.getByRole("region", { name: "Source diff" })).toHaveTextContent("Highlighted synchronized diff");
+    const before = screen.getByRole("region", { name: "Before change" });
+    const after = screen.getByRole("region", { name: "After change" });
+    expect(await within(before).findByLabelText("Before source")).toHaveTextContent("<button>Save</button>");
+    expect(within(after).getByLabelText("After source")).toHaveTextContent("className=\"rounded\"");
+    expect(within(before).getByRole("region", { name: "Before preview" })).toHaveTextContent("Button before");
+    expect(within(after).getByRole("region", { name: "After preview" })).toHaveTextContent("Button after");
 
     const apply = screen.getByRole("button", { name: "Apply selected (2)" });
     expect(apply).toBeDisabled();
@@ -184,8 +193,36 @@ describe("SourceChangeReviewModal", () => {
     renderReview({ changes: [buttonChange] });
     expect(await screen.findByTestId("source-change-comparison-grid")).toHaveClass(
       "grid-cols-1",
-      "xl:grid-cols-2",
+      "lg:grid-cols-2",
     );
+  });
+
+  it("keeps each source directly below its matching preview", async () => {
+    renderReview({ changes: [buttonChange] });
+
+    const before = await screen.findByRole("region", { name: "Before change" });
+    const after = screen.getByRole("region", { name: "After change" });
+    expect(within(before).getByRole("region", { name: "Before preview" })).toBeVisible();
+    expect(within(before).getByLabelText("Before source")).toBeVisible();
+    expect(within(after).getByRole("region", { name: "After preview" })).toBeVisible();
+    expect(within(after).getByLabelText("After source")).toBeVisible();
+  });
+
+  it("switches between paired previews, split diff, and unified diff", async () => {
+    renderReview({ changes: [buttonChange] });
+
+    expect(await screen.findByRole("region", { name: "Before change" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Split diff" }));
+    const split = await screen.findByRole("region", { name: "Split source diff" });
+    expect(await within(split).findByLabelText("Source diff editor")).toHaveAttribute("data-mode", "split");
+    expect(screen.queryByRole("region", { name: "Before change" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Unified diff" }));
+    const unified = await screen.findByRole("region", { name: "Unified source diff" });
+    expect(await within(unified).findByLabelText("Source diff editor")).toHaveAttribute("data-mode", "unified");
+
+    await userEvent.click(screen.getByRole("button", { name: "Before / after" }));
+    expect(await screen.findByRole("region", { name: "Before change" })).toBeVisible();
   });
 
   it("locks review and discard controls while changes are being applied", async () => {

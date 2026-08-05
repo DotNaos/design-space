@@ -10,6 +10,7 @@ export interface PreviewCanvasProps {
   canvasHeader?: React.ReactNode;
   canvasHeaderHeight?: number;
   toolbar?: React.ReactNode;
+  toolbarSigning?: React.ReactNode;
   preview: React.ReactNode;
   rootInstanceId: string;
   selectedComponentInstanceId: string;
@@ -24,6 +25,7 @@ export interface PreviewCanvasProps {
   revealTarget?: { key: string; rect: CanvasWorldRect };
   strictUiViolations?: readonly StrictUiViolation[];
   compact?: boolean;
+  showControls?: boolean;
   staticPreview?: boolean;
   forcedInteractionMode?: "select" | "interact";
   worldWidth?: number;

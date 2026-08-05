@@ -45,6 +45,24 @@ it("routes library development operations and attaches the live server", async (
   expect(libraryExecute).toHaveBeenCalledWith({ type: "get-library-development" });
 });
 
+it("routes only typed library release operations", async () => {
+  const releaseExecute = vi.fn(async () => ({ versions: [] }));
+  const service = new LocalOperationService(
+    { execute: vi.fn() } as unknown as EditService,
+    { execute: vi.fn() } as unknown as DocumentService,
+    undefined,
+    undefined,
+    { execute: releaseExecute },
+  );
+
+  await expect(service.execute({ type: "get-library-releases" })).resolves.toEqual({ versions: [] });
+  await expect(service.execute({ type: "install-library-release", version: "0.0.6" })).resolves.toEqual({ versions: [] });
+  await expect(service.execute({ type: "install-library-release", version: "latest" })).rejects.toMatchObject({
+    code: "INVALID_REQUEST",
+  });
+  expect(releaseExecute).toHaveBeenCalledTimes(2);
+});
+
 it("routes only the typed one-component signing operation", async () => {
   const approvalExecute = vi.fn(async () => ({ state: "source-component-signed" }));
   const service = new LocalOperationService(

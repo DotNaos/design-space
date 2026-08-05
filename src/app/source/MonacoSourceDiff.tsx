@@ -9,7 +9,9 @@ import { currentDesignSpaceTheme, subscribeDesignSpaceTheme } from "../shell/des
 
 configureMonacoTypeScript();
 
-export function MonacoSourceDiff(props: { modified: string; original: string; path: string }) {
+export type SourceDiffMode = "split" | "unified";
+
+export function MonacoSourceDiff(props: { mode: SourceDiffMode; modified: string; original: string; path: string }) {
   const modelId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const originalRef = useRef<monaco.editor.ITextModel | undefined>(undefined);
@@ -47,11 +49,11 @@ export function MonacoSourceDiff(props: { modified: string; original: string; pa
       renderIndicators: true,
       renderMarginRevertIcon: false,
       renderOverviewRuler: false,
-      renderSideBySide: true,
+      renderSideBySide: props.mode === "split",
       scrollBeyondLastLine: false,
       smoothScrolling: true,
       theme: currentDesignSpaceTheme() === "light" ? "vs" : "vs-dark",
-      useInlineViewWhenSpaceIsLimited: false,
+      useInlineViewWhenSpaceIsLimited: props.mode === "unified",
     });
     editor.setModel({ original, modified });
     originalRef.current = original;
@@ -63,7 +65,7 @@ export function MonacoSourceDiff(props: { modified: string; original: string; pa
       originalRef.current = undefined;
       modifiedRef.current = undefined;
     };
-  }, [modelId, props.path]);
+  }, [modelId, props.mode, props.path]);
 
   useEffect(() => subscribeDesignSpaceTheme((theme) => {
     monaco.editor.setTheme(theme === "light" ? "vs" : "vs-dark");

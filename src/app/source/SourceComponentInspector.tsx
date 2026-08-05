@@ -1,14 +1,8 @@
-import { ArrowUpRight, Braces, ChevronRight, CircleAlert, Component, FileCode2 } from "lucide-react";
-import { Button, Chip } from "@heroui/react";
+import { ArrowUpRight, Braces, CircleAlert, Component, FileCode2 } from "lucide-react";
+import { Button } from "@heroui/react";
 import { useEffect, useState } from "react";
 
-import type {
-  SourceComponentProp,
-  SourceComponentSlot,
-  SourceWorkspaceEntry,
-  SourceWorkspaceLayer,
-} from "../../shared/source-workspace";
-import { SourceComponentPicker } from "./SourceComponentPicker";
+import type { SourceComponentSlot, SourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import { SourceDesignCaseControl } from "./SourceDesignCaseControl";
 import { SourceLayerDesignInspector } from "./SourceLayerDesignInspector";
 import { SourceFeedbackInspector } from "./SourceFeedbackInspector";
@@ -16,6 +10,9 @@ import { sourceFeedbackContext } from "./source-feedback";
 import type { SourceComponentCandidate } from "./source-slot-composition";
 import type { SourceLayerMetrics } from "./source-layer-design";
 import type { SourceLayerClassEditor } from "./useSourceLayerClassEditor";
+import { ComponentInspectorHeader } from "./ComponentInspectorHeader";
+import { ContractSection } from "./ContractSection";
+import type { BoxModelPreview } from "../inspector/tailwind-box-model-values";
 
 export interface SourceComponentInspectorProps {
   className?: string;
@@ -25,6 +22,10 @@ export interface SourceComponentInspectorProps {
   slotLayers?: readonly SourceWorkspaceLayer[];
   slotEditorReady?: boolean;
   styleEditor?: SourceLayerClassEditor;
+  openLayerComponent?: {
+    label: string;
+    onOpen: () => void;
+  };
   candidatesForSlot?: (slot: SourceWorkspaceLayer) => readonly SourceComponentCandidate[];
   outsideCurrentFile?: {
     currentRelativePath?: string;
@@ -34,6 +35,7 @@ export interface SourceComponentInspectorProps {
   onApplySlot?: (slot: SourceWorkspaceLayer, candidate: SourceComponentCandidate, action: "add" | "replace") => void;
   onPrepareSlotEdit?: () => void;
   onDesignCaseChange?: (caseName: string) => void;
+  onBoxModelPreviewChange?: (preview?: BoxModelPreview) => void;
 }
 
 export function SourceComponentInspector(props: SourceComponentInspectorProps) {
@@ -123,12 +125,14 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
             </ul>
           </section>
         )}
-        {props.layer?.kind === "html" && (
+        {(props.layer?.className || props.layer?.text || (props.layer && props.openLayerComponent)) && (
           <SourceLayerDesignInspector
             layer={props.layer}
             metrics={props.layerMetrics}
+            openComponent={props.openLayerComponent}
             previewClassName={previewClassName}
             styleEditor={props.styleEditor}
+            onBoxModelPreviewChange={props.onBoxModelPreviewChange}
             onClassNamePreviewChange={setPreviewClassName}
           />
         )}
@@ -152,140 +156,7 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
   );
 }
 
-function ComponentInspectorHeader({ entry, selectedRegion = false }: { entry: SourceWorkspaceEntry; selectedRegion?: boolean }) {
-  return (
-    <header
-      aria-label={selectedRegion ? "Selected component" : undefined}
-      className="shrink-0 border-b border-white/10 px-4 py-2.5"
-      role={selectedRegion ? "region" : undefined}
-    >
-      <div className="flex items-center gap-2">
-        <FileCode2 aria-hidden="true" className="shrink-0 text-sky-400" size={15} />
-        <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-100">{entry.label}</h2>
-      </div>
-      <p className="mt-1 truncate pl-[23px] font-mono text-[9px] text-zinc-600" title={`${entry.relativePath} · ${entry.exportName}`}>{entry.relativePath}</p>
-    </header>
-  );
-}
-
-function ContractSection(props: {
-  icon: React.ReactNode;
-  properties: readonly (SourceComponentProp | SourceComponentSlot)[];
-  slotLayers?: readonly SourceWorkspaceLayer[];
-  slotEditorReady?: boolean;
-  candidatesForSlot?: SourceComponentInspectorProps["candidatesForSlot"];
-  onApplySlot?: SourceComponentInspectorProps["onApplySlot"];
-  onPrepareSlotEdit?: SourceComponentInspectorProps["onPrepareSlotEdit"];
-  title: "Props" | "Slots";
-}) {
-  return (
-    <section aria-labelledby={`source-contract-${props.title.toLowerCase()}`} className="border-b border-white/10">
-      <header className="flex h-9 items-center gap-2 px-4 text-zinc-500">
-        {props.icon}
-        <h3 id={`source-contract-${props.title.toLowerCase()}`} className="text-[10px] font-medium">
-          {props.title}
-        </h3>
-        <span className="ml-auto text-[9px] tabular-nums text-zinc-700">{props.properties.length}</span>
-      </header>
-      {props.properties.length ? (
-        <dl>
-          {props.properties.map((property) => (
-            <ContractProperty
-              key={property.name}
-              property={property}
-              slotLayer={"accepts" in property ? props.slotLayers?.find((layer) => layer.label === property.name) : undefined}
-              slotEditorReady={props.slotEditorReady}
-              candidatesForSlot={props.candidatesForSlot}
-              onApplySlot={props.onApplySlot}
-              onPrepareSlotEdit={props.onPrepareSlotEdit}
-            />
-          ))}
-        </dl>
-      ) : null}
-    </section>
-  );
-}
-
-function ContractProperty(props: {
-  property: SourceComponentProp | SourceComponentSlot;
-  slotLayer?: SourceWorkspaceLayer;
-  slotEditorReady?: boolean;
-  candidatesForSlot?: SourceComponentInspectorProps["candidatesForSlot"];
-  onApplySlot?: SourceComponentInspectorProps["onApplySlot"];
-  onPrepareSlotEdit?: SourceComponentInspectorProps["onPrepareSlotEdit"];
-}) {
-  const slot = "accepts" in props.property ? props.property : undefined;
-  if (slot) return <SlotContractProperty {...props} slot={slot} />;
-
-  return (
-    <div className="border-t border-white/[0.06] px-4 py-3">
-      <dt className="flex min-w-0 items-center gap-2">
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-zinc-300">{props.property.name}</span>
-        <span className={`text-[9px] font-medium ${props.property.required ? "text-amber-300" : "text-zinc-600"}`}>
-          {props.property.required ? "Required" : "Optional"}
-        </span>
-      </dt>
-      <dd className="mt-1.5">
-        <code className="block whitespace-pre-wrap break-words font-mono text-[10px] leading-4 text-sky-300/80">
-          {props.property.type}
-        </code>
-      </dd>
-    </div>
-  );
-}
-
-function SlotContractProperty(props: {
-  slot: SourceComponentSlot;
-  slotLayer?: SourceWorkspaceLayer;
-  slotEditorReady?: boolean;
-  candidatesForSlot?: SourceComponentInspectorProps["candidatesForSlot"];
-  onApplySlot?: SourceComponentInspectorProps["onApplySlot"];
-  onPrepareSlotEdit?: SourceComponentInspectorProps["onPrepareSlotEdit"];
-}) {
-  const { slot, slotLayer } = props;
-  return (
-    <div className="border-t border-white/[0.06] px-4 py-3.5">
-      <dt className="flex min-w-0 items-center gap-2">
-        <Component aria-hidden="true" className="shrink-0 text-zinc-600" size={13} />
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] font-medium text-zinc-200">{slot.name}</span>
-        <span className={`shrink-0 text-[9px] font-medium ${slot.required ? "text-amber-300" : "text-zinc-600"}`}>
-          {formatSlotCardinality(slot)}
-        </span>
-      </dt>
-      <dd className="mt-2.5 pl-[21px]">
-        {slotLayer && props.onApplySlot && (
-          <SourceComponentPicker
-            appearance="field"
-            candidates={props.candidatesForSlot?.(slotLayer) ?? []}
-            isBusy={props.slotEditorReady === false}
-            slot={slotLayer}
-            onOpen={props.onPrepareSlotEdit}
-            onApply={(candidate, action) => props.onApplySlot?.(slotLayer, candidate, action)}
-          />
-        )}
-        <p className={`${slotLayer && props.onApplySlot ? "mt-2.5" : ""} mb-1.5 text-[8px] font-medium text-zinc-700`}>Accepts</p>
-        <div className="flex flex-wrap gap-1.5">
-          {slot.accepts.map((accepted) => (
-            <Chip key={accepted} className="h-5 border-white/[0.08] bg-white/[0.035] px-1.5 text-[9px] text-sky-300/80" size="sm" variant="secondary">
-              {accepted}
-            </Chip>
-          ))}
-        </div>
-        <details className="group/type mt-2.5">
-          <summary className="flex cursor-pointer list-none items-center gap-1 text-[9px] text-zinc-600 transition-colors hover:text-zinc-400">
-            <ChevronRight aria-hidden="true" className="transition-transform group-open/type:rotate-90" size={11} />
-            Type definition
-          </summary>
-          <code className="mt-2 block whitespace-pre-wrap break-words border-l border-white/[0.08] pl-3 font-mono text-[9px] leading-4 text-sky-300/70">
-            {slot.type}
-          </code>
-        </details>
-      </dd>
-    </div>
-  );
-}
-
-function formatSlotCardinality(slot: SourceComponentSlot): string {
+export function formatSlotCardinality(slot: SourceComponentSlot): string {
   const cardinality = slot.max === slot.min
     ? String(slot.min)
     : slot.min === 0 && slot.max !== undefined

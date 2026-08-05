@@ -8,20 +8,16 @@ import { SourceDeviceTabs } from "./SourceDeviceTabs";
 import { SourceDeviceFrame } from "./SourceDeviceFrame";
 import { SourceViewportPicker } from "./SourceViewportPicker";
 import { SourcePreviewModeToggle } from "./SourcePreviewModeToggle";
-import {
-  SourceReviewGraphModeControl,
-  SourceReviewGraphStage,
-  type SourceReviewGraph,
-  type SourceReviewGraphLayout,
-} from "./SourceReviewGraphStage";
+import { SourceReviewGraphModeControl, SourceReviewGraphStage, type SourceReviewGraph, type SourceReviewGraphLayout } from "./SourceReviewGraphStage";
 import type { SourcePreviewMode } from "./source-layer-design";
 import type { SourcePreviewContentSize } from "./source-preview-content-size";
 import type { SourceTreeNode } from "./source-workspace-tree";
 import { sourceDeviceFrameKind, sourceDeviceFrameLayout } from "./source-device-frame";
 import { defaultSourceViewport, sourceViewportPresets } from "./source-viewports";
 import type { SourceCanvasAncestryItem, SourceCanvasSlotTab } from "./source-canvas-ancestry";
+import { PreviewScreen } from "./PreviewScreen";
 
-const sourcePreviewId = "source-preview";
+export const sourcePreviewId = "source-preview";
 
 export function SourceCanvasViewport(props: {
   children: (frame: { width: number; height: number }) => React.ReactNode;
@@ -31,7 +27,9 @@ export function SourceCanvasViewport(props: {
   device: DesignSpaceDevice;
   node?: SourceTreeNode;
   mode?: SourcePreviewMode;
+  showChrome?: boolean;
   showModeToggle?: boolean;
+  showDeviceSwitcher?: boolean;
   selectedLayer?: boolean;
   selectionKey?: string;
   selectionLabel?: string;
@@ -42,11 +40,13 @@ export function SourceCanvasViewport(props: {
   revealTarget?: { key: string; rect: CanvasWorldRect };
   reviewGraph?: SourceReviewGraph;
   toolbarEnd?: React.ReactNode;
+  toolbarSigning?: React.ReactNode;
   onSelectAncestry?: (item: SourceCanvasAncestryItem) => void;
   onSelectSlot?: (slot: SourceCanvasSlotTab) => void;
   onDeviceChange: (device: DesignSpaceDevice) => void;
   onModeChange?: (mode: SourcePreviewMode) => void;
 }) {
+  const showChrome = props.showChrome !== false;
   const [presetId, setPresetId] = useState(() => defaultSourceViewport(props.device).id);
   const [responsiveWidth, setResponsiveWidth] = useState(960);
   const [clipToScreen, setClipToScreen] = useState(true);
@@ -61,7 +61,7 @@ export function SourceCanvasViewport(props: {
   const previewFrame = deviceFrame
     ? { width: deviceFrame.outerWidth, height: deviceFrame.outerHeight }
     : frame;
-  const graphInsets = props.reviewGraph && props.mode !== "play"
+  const graphInsets = showChrome && props.reviewGraph && props.mode !== "play"
     ? sourceReviewGraphInsets(reviewGraphLayout)
     : { bottom: 0, left: 0, right: 0, top: 0 };
   const graphFrame = {
@@ -74,8 +74,9 @@ export function SourceCanvasViewport(props: {
     height: previewFrame.height + graphInsets.top + graphInsets.bottom,
     width: previewFrame.width + graphInsets.left + graphInsets.right,
   };
-  const hasCanvasDeviceSwitcher = Boolean(props.ancestry?.length && props.node);
-  const ancestryHeight = props.ancestry?.length ? 36 : 0;
+  const showDeviceSwitcher = props.showDeviceSwitcher !== false;
+  const hasCanvasDeviceSwitcher = showChrome && showDeviceSwitcher && Boolean(props.ancestry?.length && props.node);
+  const ancestryHeight = showChrome && props.ancestry?.length ? 36 : 0;
 
   useEffect(() => {
     if (previousDevice.current === props.device) return;
@@ -99,7 +100,7 @@ export function SourceCanvasViewport(props: {
       <PreviewCanvas
         cameraKey={`${props.device}:${presetId}:${clipToScreen ? "screen" : "content"}:${showDeviceFrame ? "device" : "plain"}:${reviewGraphLayout}:${props.selectionKey ?? props.node?.id ?? "source"}`}
         revealTarget={props.revealTarget}
-        canvasHeader={props.ancestry?.length ? (
+        canvasHeader={showChrome && props.ancestry?.length ? (
           <SourceCanvasAncestryHeader
             deviceSwitcher={hasCanvasDeviceSwitcher ? (
               <SourceDeviceTabs device={props.device} node={props.node} onChange={changeDevice} />
@@ -112,7 +113,7 @@ export function SourceCanvasViewport(props: {
           />
         ) : undefined}
         canvasHeaderHeight={ancestryHeight}
-        toolbar={(
+        toolbar={showChrome ? (
           <SourceViewportPicker
             device={props.device}
             node={props.node}
@@ -123,7 +124,7 @@ export function SourceCanvasViewport(props: {
             onDeviceChange={changeDevice}
             onPresetChange={changePreset}
             onResponsiveWidthChange={(width) => setResponsiveWidth(Math.max(320, Math.min(1440, width)))}
-            showDeviceTabs={!hasCanvasDeviceSwitcher}
+            showDeviceTabs={showDeviceSwitcher && !hasCanvasDeviceSwitcher}
             onClipToScreenChange={setClipToScreen}
             onShowDeviceFrameChange={setShowDeviceFrame}
             after={(
@@ -136,7 +137,8 @@ export function SourceCanvasViewport(props: {
               </>
             )}
           />
-        )}
+        ) : undefined}
+        toolbarSigning={showChrome ? props.toolbarSigning : undefined}
         preview={(
           <div className="relative" style={{ height: canvasWorld.height, width: canvasWorld.width }}>
             <div className="absolute" style={{ left: graphFrame.left, top: graphFrame.top }}>
@@ -152,7 +154,7 @@ export function SourceCanvasViewport(props: {
                 </PreviewScreen>
               )}
             </div>
-            {props.reviewGraph && props.mode !== "play" ? (
+            {showChrome && props.reviewGraph && props.mode !== "play" ? (
               <div className="absolute inset-0" data-testid="source-review-graph-world">
                 <SourceReviewGraphStage frame={graphFrame} graph={props.reviewGraph} layout={reviewGraphLayout} />
               </div>
@@ -161,15 +163,16 @@ export function SourceCanvasViewport(props: {
         )}
         rootInstanceId={sourcePreviewId}
         selectedComponentInstanceId={sourcePreviewId}
-        selection={props.selectedLayer ? undefined : { kind: "component", id: sourcePreviewId }}
+        selection={showChrome && !props.selectedLayer ? { kind: "component", id: sourcePreviewId } : undefined}
         selectionLabel={props.selectionLabel ?? `${preset.label.replace("Responsive", `Responsive · ${responsiveWidth} × ${preset.height}`)}`}
-        hud={props.hud}
+        hud={showChrome ? props.hud : undefined}
         slots={[]}
         staticPreview
         forcedInteractionMode={props.mode === "play" ? "interact" : "select"}
         compact={props.compact}
+        showControls={showChrome}
         verticalAlignment="start"
-        worldFooter={props.footer}
+        worldFooter={showChrome ? props.footer : undefined}
         worldFooterHeight={32}
         pinWorldFooter
         worldHeight={canvasWorld.height}
@@ -184,28 +187,4 @@ function sourceReviewGraphInsets(layout: SourceReviewGraphLayout) {
   if (layout === "focus") return { bottom: 0, left: 0, right: 0, top: 52 };
   if (layout === "horizontal") return { bottom: 44, left: 220, right: 220, top: 52 };
   return { bottom: 88, left: 0, right: 0, top: 116 };
-}
-
-function PreviewScreen(props: {
-  attachedHeader: boolean;
-  children: React.ReactNode;
-  clipToScreen: boolean;
-  frame: { height: number; width: number };
-}) {
-  return (
-    <div
-      data-design-space-instance-id={sourcePreviewId}
-      data-preview-frame-mode={props.clipToScreen ? "screen" : "content"}
-      className={`${props.clipToScreen ? "overflow-hidden" : "overflow-visible"} size-full ${props.attachedHeader ? "rounded-b-md" : "rounded-md shadow-2xl"} border border-white/15 bg-[#111216]`}
-      style={{
-        backgroundImage: "linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px)",
-        backgroundPosition: "-1px -1px",
-        backgroundSize: "32px 32px",
-        height: props.frame.height,
-        width: props.frame.width,
-      }}
-    >
-      {props.children}
-    </div>
-  );
 }

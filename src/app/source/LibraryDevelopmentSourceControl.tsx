@@ -1,9 +1,10 @@
-import { Button, ListBox, Select } from "@heroui/react";
-import { Download, GitBranch, LoaderCircle, Play, Square } from "lucide-react";
+import { Button, Input, ListBox, Select } from "@heroui/react";
+import { Download, GitBranch, LoaderCircle, Play, Search, Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { LibraryDevelopmentProjectStatus } from "../../shared/source-workspace";
 import { runLocalOperation } from "../api";
+import { OperationError } from "./OperationError";
 
 interface LibraryDevelopmentSourceControlProps {
   onModeChange: (mode: "development" | "release") => void;
@@ -12,6 +13,7 @@ interface LibraryDevelopmentSourceControlProps {
 export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceControlProps) {
   const [status, setStatus] = useState<LibraryDevelopmentProjectStatus>();
   const [selection, setSelection] = useState<string>();
+  const [worktreeQuery, setWorktreeQuery] = useState("");
   const [busy, setBusy] = useState<"clone" | "start" | "stop">();
   const [error, setError] = useState<string>();
 
@@ -36,6 +38,10 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
     () => status?.worktrees.find((worktree) => worktree.id === selection),
     [selection, status?.worktrees],
   );
+  const visibleWorktrees = useMemo(() => {
+    const query = worktreeQuery.trim().toLocaleLowerCase();
+    return status?.worktrees.filter((worktree) => !query || worktree.branch.toLocaleLowerCase().includes(query)) ?? [];
+  }, [status?.worktrees, worktreeQuery]);
 
   async function run(action: "clone" | "start" | "stop") {
     setBusy(action);
@@ -55,8 +61,6 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
           worktreeId: selected.id,
         }));
       } else if (action === "stop") {
-        try { localStorage.setItem("design-space.library-source", "release"); } catch { /* optional preference */ }
-        props.onModeChange("release");
         setStatus(await runLocalOperation<LibraryDevelopmentProjectStatus>({
           type: "stop-library-development",
         }));
@@ -71,7 +75,7 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
   if (!status?.configured && !error) return null;
   if (!status?.cloned) {
     return (
-      <div className="mt-2 rounded-lg border border-white/10 bg-black/15 p-2">
+      <div className="mt-2 rounded-lg bg-white/[0.035] p-2">
         <p className="truncate text-[9px] text-zinc-600" title={status?.repository}>
           {repositoryLabel(status?.repository)}
         </p>
@@ -97,50 +101,69 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
         className="min-w-0"
         isDisabled={Boolean(busy) || status.state === "running"}
         selectedKey={selection}
-        onSelectionChange={(key) => setSelection(String(key))}
+        onOpenChange={(open) => {
+          if (!open) setWorktreeQuery("");
+        }}
+        onSelectionChange={(key) => {
+          setSelection(String(key));
+          setWorktreeQuery("");
+        }}
       >
-        <Select.Trigger className="flex h-8 min-w-0 items-center gap-1.5 rounded-md border border-white/10 bg-black/20 px-2 text-[10px] text-zinc-300 outline-none data-[focus-visible]:border-sky-300/40">
+        <Select.Trigger className="flex h-9 min-w-0 items-center gap-2 rounded-full bg-white/[0.055] px-3 text-[10px] text-zinc-300 outline-none transition-colors data-[focus-visible]:bg-white/[0.09]">
           <GitBranch className="size-3 shrink-0 text-zinc-500" />
-          <Select.Value className="min-w-0 flex-1 truncate text-left" />
+          <span className="min-w-0 flex-1 truncate text-left font-medium">{selected?.branch ?? "Choose branch"}</span>
           <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
         </Select.Trigger>
-        <Select.Popover className="min-w-64 rounded-lg bg-[#18191c] p-1 shadow-2xl" placement="bottom">
-          <ListBox items={status.worktrees}>
+        <Select.Popover className="min-w-64 rounded-lg bg-[#1b1c20] p-1 shadow-2xl" placement="bottom">
+          <div className="mb-1 flex h-8 items-center gap-2 rounded-md bg-white/[0.055] px-2 transition-colors focus-within:bg-white/[0.09]">
+            <Search aria-hidden="true" className="size-3 shrink-0 text-zinc-600" />
+            <Input
+              aria-label="Search branches"
+              autoComplete="off"
+              className="min-w-0 flex-1 bg-transparent text-[10px] text-zinc-200 outline-none placeholder:text-zinc-600"
+              placeholder="Search branches"
+              value={worktreeQuery}
+              onChange={(event) => setWorktreeQuery(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape") event.stopPropagation();
+              }}
+            />
+          </div>
+          <ListBox items={visibleWorktrees}>
             {(worktree) => (
               <ListBox.Item
-                className="flex min-h-10 cursor-default items-center rounded-md px-2 text-xs text-zinc-300 outline-none data-[disabled]:opacity-40 data-[focused]:bg-white/10 data-[selected]:text-sky-300"
+                className="flex min-h-8 cursor-default items-center gap-2 rounded-md px-2 text-[10px] text-zinc-300 outline-none data-[disabled]:opacity-40 data-[focused]:bg-white/10 data-[selected]:text-sky-300"
                 id={worktree.id}
                 isDisabled={!worktree.packageReady}
                 textValue={worktree.branch}
               >
-                <span className="min-w-0">
-                  <span className="block truncate">{worktree.branch}</span>
-                  <span className="block truncate font-mono text-[9px] text-zinc-600">
-                    {worktree.packageReady ? worktree.path : "UI package missing"}
-                  </span>
-                </span>
+                <GitBranch className="size-3 shrink-0 text-zinc-600" />
+                <span className="min-w-0 flex-1 truncate">{worktree.branch}</span>
+                {!worktree.packageReady ? <span className="shrink-0 text-[8px] text-amber-300/70">Package missing</span> : null}
                 <ListBox.ItemIndicator className="ml-auto size-3 shrink-0" />
               </ListBox.Item>
             )}
           </ListBox>
+          {!visibleWorktrees.length ? (
+            <p className="px-2 py-3 text-center text-[9px] text-zinc-600">No matching branches</p>
+          ) : null}
         </Select.Popover>
       </Select>
       <Button
         aria-label={status.state === "running" ? "Stop development source" : "Start development source"}
-        className={`size-8 rounded-md ${
+        className={`h-9 gap-1.5 rounded-full px-3 text-[10px] font-semibold text-white transition-colors ${
           status.state === "running"
-            ? "bg-rose-400/10 text-rose-300"
-            : "bg-emerald-400/10 text-emerald-300"
+            ? "bg-rose-500 hover:bg-rose-400"
+            : "bg-sky-500 hover:bg-sky-400"
         }`}
         isDisabled={Boolean(busy) || (status.state !== "running" && !selected?.packageReady)}
-        isIconOnly
         size="sm"
-        variant="ghost"
         onPress={() => void run(status.state === "running" ? "stop" : "start")}
       >
         {busy
           ? <LoaderCircle className="animate-spin" size={12} />
           : status.state === "running" ? <Square size={11} /> : <Play size={12} />}
+        <span>{status.state === "running" ? "Stop" : "Start"}</span>
       </Button>
       {error ? <div className="col-span-2"><OperationError message={error} /></div> : null}
     </div>
@@ -162,8 +185,4 @@ function chooseWorktree(
 function repositoryLabel(repository?: string): string {
   if (!repository) return "Development repository";
   return repository.replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
-}
-
-function OperationError(props: { message: string }) {
-  return <p className="mt-1.5 text-[9px] leading-4 text-rose-300">{props.message}</p>;
 }

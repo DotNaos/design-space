@@ -7,6 +7,11 @@ export type BoxSide = "top" | "right" | "bottom" | "left";
 export type BoxCorner = "topLeft" | "topRight" | "bottomRight" | "bottomLeft";
 export type BoxUnit = "tailwind" | "rem" | "px";
 
+export interface BoxModelPreview {
+  className: string;
+  kind: BoxKind;
+}
+
 export const boxUnits: readonly BoxUnit[] = ["tailwind", "rem", "px"];
 export const rootFontSizePixels = 16;
 export const tailwindSpacingUnitPixels = 4;
@@ -189,6 +194,12 @@ export function snapBoxPixels(kind: BoxKind, value: number): number {
 
 export function readBoxValue(className: string, kind: BoxKind, side: BoxSide): string {
   return readBoxSource(className, kind, side).value;
+}
+
+export function changedBoxModelKind(current: string, next: string): BoxKind | undefined {
+  const kinds: readonly BoxKind[] = ["margin", "border", "padding"];
+  const sides: readonly BoxSide[] = ["top", "right", "bottom", "left"];
+  return kinds.find((kind) => sides.some((side) => readBoxValue(current, kind, side) !== readBoxValue(next, kind, side)));
 }
 
 export function readBoxSource(className: string, kind: BoxKind, side: BoxSide): { token: string; value: string } {
