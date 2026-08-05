@@ -13,9 +13,9 @@ const sourceProjectConfigSchema = z.object({
   tablet: z.object({ fallback: z.enum(["desktop", "mobile"]) }).strict().optional(),
   devices: z.object({ mode: z.literal("responsive") }).strict().optional(),
   source: z.object({
-    layout: z.string().regex(
-      /^(?:src|app)\/(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+\.tsx$/,
-      "Source layout must be a project-relative .tsx file under src/ or app/",
+    layout: z.string().refine(
+      isProjectRelativeSourceLayout,
+      "Source layout must be a project-relative .tsx file inside a src/ or app/ directory",
     ),
   }).strict().optional(),
   library: z.object({
@@ -38,6 +38,19 @@ const sourceProjectConfigSchema = z.object({
       .optional(),
   }).strict().optional(),
 }).strict();
+
+function isProjectRelativeSourceLayout(value: string): boolean {
+  if (value.startsWith("/") || value.includes("\\") || !value.endsWith(".tsx")) return false;
+
+  const relativePath = value.startsWith("./") ? value.slice(2) : value;
+  const segments = relativePath.split("/");
+  if (segments.length < 2 || segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
+    return false;
+  }
+
+  const sourceDirectoryIndex = segments.findIndex((segment) => segment === "src" || segment === "app");
+  return sourceDirectoryIndex >= 0 && sourceDirectoryIndex < segments.length - 1;
+}
 
 export function parseSourceProjectConfig(value: unknown): DesignSpaceProjectConfig {
   const parsed = sourceProjectConfigSchema.safeParse(value);
