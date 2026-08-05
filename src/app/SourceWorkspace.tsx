@@ -941,6 +941,7 @@ export function SourceWorkspace({ nestedPreview = false, target }: { nestedPrevi
         openLayerComponent={libraryImportedComponentTarget && libraryVisualLayer ? {
           label: libraryVisualLayer.label,
           onOpen: () => {
+            setSelectedLibraryComponent(libraryImportedComponentTarget.entry.id);
             setSelectedLibraryLayerId(libraryImportedComponentTarget.layerId);
             setWorkspaceSurface("library");
             setActivity("library");
