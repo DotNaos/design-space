@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 
-import { loadRegisteredProject } from "../src/server/project-loader";
+import { initializeDesignSpaceProject } from "../src/server/project-initializer";
 import { targetRouteName } from "./target-route-name";
 
 const packageRoot = resolve(import.meta.dir, "..");
@@ -11,11 +11,22 @@ const projectRoot = process.cwd();
 const arguments_ = process.argv.slice(2);
 
 if (arguments_.includes("--help")) {
-  console.log("Run Design Space for the current frontend project. Use .designspace.ts; legacy design-space.server.ts targets remain supported.");
+  console.log("Run Design Space for the current frontend project. Use `design-space init` once to create .designspace.ts and the package script.");
+  process.exit(0);
+}
+if (arguments_.length === 1 && arguments_[0] === "init") {
+  const result = await initializeDesignSpaceProject(projectRoot);
+  console.log(result.configCreated
+    ? `Created ${result.configPath}`
+    : `Kept existing ${result.configPath}`);
+  console.log(result.packageScriptUpdated
+    ? "Added the design-space package script."
+    : "The design-space package script is already configured.");
+  console.log("Run `pnpm design-space` to open the project.");
   process.exit(0);
 }
 if (arguments_.length > 0) {
-  throw new Error("Design Space accepts no project paths or commands. Run it from the registered target project.");
+  throw new Error("Unknown command. Run `design-space init` from a frontend project root, or run `design-space` to start.");
 }
 if (
   !existsSync(resolve(projectRoot, ".designspace.ts")) &&
@@ -24,12 +35,15 @@ if (
   throw new Error("The current frontend project has no .designspace.ts config.");
 }
 
+const { loadRegisteredProject } = await import("../src/server/project-loader");
+const registeredProject = await loadRegisteredProject(projectRoot);
+
 const child = spawn("bun", [resolve(packageRoot, "scripts/dev.ts")], {
   cwd: packageRoot,
   env: {
     ...process.env,
     DESIGN_SPACE_PROJECT_ROOT: projectRoot,
-    DESIGN_SPACE_PORTLESS_NAME: targetRouteName((await loadRegisteredProject(projectRoot)).project.id),
+    DESIGN_SPACE_PORTLESS_NAME: targetRouteName(registeredProject.project.id),
   },
   stdio: "inherit",
 });
