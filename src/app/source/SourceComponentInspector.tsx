@@ -125,7 +125,7 @@ export function SourceComponentInspector(props: SourceComponentInspectorProps) {
             </ul>
           </section>
         )}
-        {(props.layer?.className || (props.layer && props.openLayerComponent)) && (
+        {(props.layer?.className || props.layer?.text || (props.layer && props.openLayerComponent)) && (
           <SourceLayerDesignInspector
             layer={props.layer}
             metrics={props.layerMetrics}

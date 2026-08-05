@@ -182,6 +182,48 @@ it("edits a selected HTML layer through its source-derived Tailwind binding", ()
   expect(changeText).toHaveBeenCalledWith("Project panel");
 });
 
+it("keeps static text editable when an HTML layer has no className binding", () => {
+  const changeText = vi.fn();
+  const textBinding = { value: "Panel", start: 56, end: 61, syntax: "text" as const };
+  const styleEditor = {
+    binding: undefined,
+    change: vi.fn(),
+    changeText,
+    css: "",
+    editable: false,
+    error: undefined,
+    previewCss: "",
+    previewTextValue: undefined,
+    previewValue: undefined,
+    reset: vi.fn(),
+    textBinding,
+    textEditable: true,
+    textValue: "Panel",
+    value: "",
+  } satisfies SourceLayerClassEditor;
+
+  render(
+    <SourceComponentInspector
+      entry={entry}
+      layer={{
+        id: "panel-copy",
+        label: "p",
+        kind: "html",
+        source: { start: 20, end: 80 },
+        children: [],
+        text: textBinding,
+      }}
+      styleEditor={styleEditor}
+    />,
+  );
+
+  const text = within(screen.getByRole("region", { name: "Design" })).getByRole("textbox", { name: "Static text" });
+  expect(text).toHaveValue("Panel");
+  fireEvent.change(text, { target: { value: "Project panel" } });
+  expect(changeText).toHaveBeenCalledWith("Project panel");
+  expect(screen.queryByRole("combobox", { name: "className" })).not.toBeInTheDocument();
+});
+
 it("edits a selected component when its contract exposes className", () => {
   const change = vi.fn();
   const binding = { value: "", start: 40, end: 40, insert: true as const };
