@@ -131,6 +131,39 @@ describe("TypeScript-first source index", () => {
     expect(result.manifest.entries.some((entry) => entry.label === "NavigationDesign")).toBe(false);
   });
 
+  it("indexes a configured monorepo app without requiring component design files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "design-space-monorepo-source-"));
+    roots.push(root);
+    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
+    await mkdir(join(root, "apps", "production", "src", "components"), { recursive: true });
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
+    await writeFile(join(root, "apps", "production", "src", "App.tsx"), "export function App() { return <main />; }\n");
+    await writeFile(join(root, "apps", "production", "src", "components", "Toolbar.tsx"), "export function Toolbar() { return <nav />; }\n");
+    await writeFile(join(root, "src", "Unrelated.tsx"), "export function Unrelated() { return <aside />; }\n");
+
+    const result = await indexSourceWorkspace(root, {
+      project: { id: "monorepo-project", label: "Monorepo project" },
+      devices: { mode: "responsive" },
+      source: { layout: "./apps/production/src/App.tsx" },
+    });
+
+    expect(result.manifest.sourceRoot).toBe("apps/production/src");
+    expect(result.manifest.entries.map(({ area, label, relativePath, design }) => ({
+      area,
+      label,
+      relativePath,
+      design,
+    }))).toEqual([
+      { area: "layout", label: "App", relativePath: "apps/production/src/App.tsx", design: undefined },
+      { area: "components", label: "Toolbar", relativePath: "apps/production/src/components/Toolbar.tsx", design: undefined },
+    ]);
+    expect(result.files.map((file) => file.relativePath)).toEqual(expect.arrayContaining([
+      "apps/production/src/App.tsx",
+      "apps/production/src/components/Toolbar.tsx",
+    ]));
+  });
+
   it("binds a colocated design only to the component export passed to defineComponentDesign", async () => {
     const root = await mkdtemp(join(tmpdir(), "design-space-design-binding-"));
     roots.push(root);
