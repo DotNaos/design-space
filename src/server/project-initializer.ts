@@ -55,11 +55,12 @@ async function readProjectPackage(packagePath: string): Promise<Record<string, u
 
 function projectIdFromPackage(value: unknown, projectRoot: string): string {
   const packageName = typeof value === "string" ? value.split("/").at(-1) : basename(projectRoot);
-  return (packageName ?? "app")
+  const normalized = (packageName ?? "app")
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .replace(/-+/g, "-") || "app";
+  return /^[a-z]/.test(normalized) ? normalized : `app-${normalized}`;
 }
 
 function projectLabelFromId(projectId: string): string {
@@ -81,7 +82,7 @@ function renderConfig(options: { projectId: string; projectLabel: string; source
   const source = options.sourceLayout
     ? `\n  source: {\n    layout: ${JSON.stringify(options.sourceLayout)},\n  },`
     : "";
-  return `import { defineDesignSpace } from "@dotnaos/design-space/source-workspace";\n\nexport default defineDesignSpace({\n  project: {\n    id: ${JSON.stringify(options.projectId)},\n    label: ${JSON.stringify(options.projectLabel)},\n  },\n  devices: {\n    mode: "responsive",\n  },${source}\n});\n`;
+  return `export default {\n  project: {\n    id: ${JSON.stringify(options.projectId)},\n    label: ${JSON.stringify(options.projectLabel)},\n  },\n  devices: {\n    mode: "responsive",\n  },${source}\n} as const;\n`;
 }
 
 async function writeJsonAtomically(path: string, value: Record<string, unknown>): Promise<void> {

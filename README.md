@@ -51,16 +51,17 @@ pnpm exec design-space init
 pnpm design-space
 ```
 
-The initializer derives the project identity from `package.json`, detects a conventional app entry when present, and never overwrites an existing `.designspace.ts`. The generated configuration is equivalent to:
+The initializer derives the project identity from `package.json`, detects a conventional app entry when present, and never overwrites an existing `.designspace.ts`. The generated configuration is self-contained and equivalent to:
 
 ```ts
-import { defineDesignSpace } from "@dotnaos/design-space/source-workspace";
-
-export default defineDesignSpace({
-  project: { id: "web", label: "Web app" },
-  tablet: { fallback: "desktop" },
-});
+export default {
+  project: { id: "web", label: "Web App" },
+  devices: { mode: "responsive" },
+  source: { layout: "src/App.tsx" },
+} as const;
 ```
+
+`source.layout` points to the app's normal exported React entry. It must be a project-relative `.tsx` file under either `src/` or the Next.js app-router `app/` directory. Only exported components that render JSX appear in the source tree. If `.designspace.ts` already exists, `init` leaves it untouched; fix the file or remove it before running `init` again.
 
 App implementations are device-first. Each device owns its layout and pages, while reusable components are grouped once by component name:
 

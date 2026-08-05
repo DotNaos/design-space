@@ -13,7 +13,10 @@ const sourceProjectConfigSchema = z.object({
   tablet: z.object({ fallback: z.enum(["desktop", "mobile"]) }).strict().optional(),
   devices: z.object({ mode: z.literal("responsive") }).strict().optional(),
   source: z.object({
-    layout: z.string().regex(/^src\/(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+\.tsx$/),
+    layout: z.string().regex(
+      /^(?:src|app)\/(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+\.tsx$/,
+      "Source layout must be a project-relative .tsx file under src/ or app/",
+    ),
   }).strict().optional(),
   library: z.object({
     package: z.string().regex(/^@?[a-z0-9][a-z0-9._/-]*$/i).max(160),
@@ -41,8 +44,14 @@ export function parseSourceProjectConfig(value: unknown): DesignSpaceProjectConf
   if (!parsed.success) {
     throw new DesignSpaceError(
       "INVALID_REGISTRATION",
-      ".designspace.ts must export a valid Design Space project config",
+      `.designspace.ts exports an invalid Design Space project config: ${formatConfigIssues(parsed.error.issues)}`,
     );
   }
   return parsed.data;
+}
+
+function formatConfigIssues(issues: readonly z.ZodIssue[]): string {
+  return issues
+    .map((issue) => `${issue.path.length > 0 ? issue.path.join(".") : "config"}: ${issue.message}`)
+    .join("; ");
 }

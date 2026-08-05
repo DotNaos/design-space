@@ -26,7 +26,11 @@ describe("source project config", () => {
     expect(() => parseSourceProjectConfig({
       project: { id: "unsafe", label: "Unsafe" },
       source: { layout: "../outside.tsx" },
-    })).toThrow("valid Design Space project config");
+    })).toThrow("source.layout");
+    expect(parseSourceProjectConfig({
+      project: { id: "next-app", label: "Next app" },
+      source: { layout: "app/layout.tsx" },
+    })).toMatchObject({ source: { layout: "app/layout.tsx" } });
   });
 
   it("accepts a fixed trusted development-library root", () => {
@@ -94,10 +98,17 @@ describe("source project config", () => {
     expect(() => parseSourceProjectConfig({
       project: { id: "demo", label: "Demo" },
       files: { invented: "src/Card.tsx" },
-    })).toThrow(".designspace.ts");
+    })).toThrow("Unrecognized key(s) in object: 'files'");
     expect(() => parseSourceProjectConfig({
       project: { id: "demo", label: "Demo" },
       slots: [{ id: "content" }],
     })).toThrow(".designspace.ts");
+  });
+
+  it("points to the exact invalid field", () => {
+    expect(() => parseSourceProjectConfig({
+      project: { id: "demo", label: "Demo" },
+      devices: { mode: "desktop" },
+    })).toThrow("devices.mode: Invalid literal value, expected \"responsive\"");
   });
 });

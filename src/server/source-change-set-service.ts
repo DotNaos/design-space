@@ -217,7 +217,7 @@ export class SourceChangeSetService {
   ): RegisteredFile {
     const indexed = workspace.files.find((candidate) => candidate.id === fileId);
     if (!indexed) throw new DesignSpaceError("NOT_FOUND", "The source file is not registered in this scope");
-    if (!indexed.relativePath.startsWith("src/") || !/\.[cm]?tsx?$/.test(indexed.relativePath)) {
+    if (!/^(?:app|src)\//.test(indexed.relativePath) || !/\.[cm]?tsx?$/.test(indexed.relativePath)) {
       throw new DesignSpaceError("ACCESS_DENIED", "Only registered TypeScript source files can be changed");
     }
     if (scope === "app" && !this.#target.editableFileIds?.has(fileId)) {

@@ -120,7 +120,7 @@ export async function indexSourceWorkspace(
 
   const manifest: SourceWorkspaceManifest = {
     runtime: config.runtime ?? "react",
-    sourceRoot: inferredCatalog ? "src" : SOURCE_ROOT,
+    sourceRoot: inferredCatalog ? inferredSourceRoot(config) : SOURCE_ROOT,
     entries: Object.freeze(entries),
     devices: Object.freeze(deviceStates(entries, config)),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
@@ -260,10 +260,14 @@ async function discoverBrowsableFiles(root: string): Promise<string[]> {
   for (const file of safeRootFiles) {
     if (await isSafeFile(resolve(root, file))) result.add(file);
   }
-  for (const directory of ["public", "src"] as const) {
+  for (const directory of ["app", "public", "src"] as const) {
     await walkDirectory(root, directory, 0, result);
   }
   return [...result].sort((left, right) => left.localeCompare(right, "en"));
+}
+
+function inferredSourceRoot(config: DesignSpaceProjectConfig): string {
+  return config.source?.layout.startsWith("app/") ? "app" : "src";
 }
 
 async function walkDirectory(root: string, relativeDirectory: string, depth: number, result: Set<string>): Promise<void> {

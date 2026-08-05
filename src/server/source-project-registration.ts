@@ -23,7 +23,7 @@ export async function registerSourceProject(
   const sourceLibrary = await registerSourceLibrary(root, config, sourceWorkspace.manifest.library);
   const sourceComponentStore = await registerSourceComponentStore(
     root,
-    "src/app/components",
+    config.source?.layout.startsWith("app/") ? "app/components" : "src/app/components",
     config.devices?.mode === "responsive" ? "index.tsx" : "desktop.tsx",
   );
   const editableFileIds = new Set(
@@ -146,5 +146,5 @@ async function resolveLibraryDesignModule(root: string, packageName: string): Pr
 }
 
 function isEditableTypeScriptSource(relativePath: string): boolean {
-  return relativePath.startsWith("src/") && /\.(?:ts|tsx)$/.test(relativePath);
+  return /^(?:app|src)\//.test(relativePath) && /\.(?:ts|tsx)$/.test(relativePath);
 }
