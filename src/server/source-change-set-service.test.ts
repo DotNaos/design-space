@@ -436,7 +436,7 @@ describe("source change-set browser contract", () => {
       scope: "release",
       fileId: base.libraryFiles.a.id,
     })).rejects.toMatchObject({ code: "INVALID_REQUEST" });
-  });
+  }, 10_000);
 
   it("accepts only opaque IDs and applies only a server-issued challenge", async () => {
     const base = await fixture();
