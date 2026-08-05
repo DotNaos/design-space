@@ -33,6 +33,32 @@ describe("source project config", () => {
     })).toMatchObject({ source: { layout: "app/layout.tsx" } });
   });
 
+  it("accepts project-relative layouts inside monorepo applications", () => {
+    expect(parseSourceProjectConfig({
+      project: { id: "production-app", label: "Production app" },
+      source: { layout: "apps/production/src/App.tsx" },
+    })).toMatchObject({ source: { layout: "apps/production/src/App.tsx" } });
+    expect(parseSourceProjectConfig({
+      project: { id: "production-app", label: "Production app" },
+      source: { layout: "./apps/production/src/App.tsx" },
+    })).toMatchObject({ source: { layout: "./apps/production/src/App.tsx" } });
+  });
+
+  it("rejects unsafe or non-source monorepo layouts", () => {
+    for (const layout of [
+      "/apps/production/src/App.tsx",
+      "apps/../production/src/App.tsx",
+      "apps\\production\\src\\App.tsx",
+      "apps/production/components/App.tsx",
+      "apps/production/src/App.ts",
+    ]) {
+      expect(() => parseSourceProjectConfig({
+        project: { id: "unsafe", label: "Unsafe" },
+        source: { layout },
+      })).toThrow("source.layout");
+    }
+  });
+
   it("accepts a fixed trusted development-library root", () => {
     expect(parseSourceProjectConfig({
       project: { id: "library-host", label: "Library host" },
