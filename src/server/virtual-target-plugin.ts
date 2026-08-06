@@ -178,7 +178,7 @@ function sourceTargetModule(target: RegisteredTarget): string {
     `    runtime: ${JSON.stringify(workspace.manifest.runtime)},`,
     `    sourceRoot: ${JSON.stringify(workspace.manifest.sourceRoot)},`,
     `    devices: ${JSON.stringify(workspace.manifest.devices)},`,
-    `    targets: ${JSON.stringify(workspace.manifest.targets)},`,
+    `    targets: ${sourceRuntime.targets},`,
     `    library: ${JSON.stringify(workspace.manifest.library)},`,
     `    approvals: ${JSON.stringify(workspace.manifest.approvals)},`,
     `    capabilities: ${JSON.stringify({ createComponents: Boolean(target.sourceComponentStore) })},`,
@@ -235,13 +235,29 @@ function runtimeWorkspaceModule(
       : "undefined";
     return `{ ...${JSON.stringify(entry)}, component: NativePreviewUnavailable, design: ${design} }`;
   });
-  const styleImports = workspace.manifest.runtime !== "react-native" ? workspace.stylePaths.map((path, index) => ({
+  const legacyStyleImports = !workspace.manifest.targets && workspace.manifest.runtime !== "react-native"
+    ? workspace.stylePaths.map((path, index) => ({
     statement: `import ${prefix}Style${index} from ${JSON.stringify(`${normalizePath(path)}?inline`)};`,
     variable: `${prefix}Style${index}`,
-  })) : [];
+  }))
+    : [];
+  const targetStyleImports = (workspace.manifest.targets ?? []).map((target, targetIndex) => {
+    const paths = target.runtime === "react-native" ? [] : workspace.targetStylePaths?.get(target.id) ?? [];
+    return paths.map((path, styleIndex) => ({
+      statement: `import ${prefix}Target${targetIndex}Style${styleIndex} from ${JSON.stringify(`${normalizePath(path)}?inline`)};`,
+      variable: `${prefix}Target${targetIndex}Style${styleIndex}`,
+    }));
+  });
+  const styleImports = [...legacyStyleImports, ...targetStyleImports.flat()];
+  const targets = workspace.manifest.targets
+    ? `[${workspace.manifest.targets.map((target, index) => (
+      `{ ...${JSON.stringify(target)}, styles: [${targetStyleImports[index]!.map((style) => style.variable).join(", ")}] }`
+    )).join(",")}]`
+    : "undefined";
   return {
     entries,
     imports: styleImports.map((style) => style.statement),
-    styles: styleImports.map((style) => style.variable),
+    styles: legacyStyleImports.map((style) => style.variable),
+    targets,
   };
 }

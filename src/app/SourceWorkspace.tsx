@@ -35,7 +35,7 @@ export function SourceWorkspace(props: { nestedPreview?: boolean; target: Target
   const controller = useSourceWorkspaceController(props);
   if (!controller) return null;
   const {
-    activeCodeDocument, activeEditable, activeEditor, activeLibraryCodeDocument, activeRuntime,
+    activeCodeDocument, activeEditable, activeEditor, activeLibraryCodeDocument, activeRuntime, activeStyles,
     activity, appCodeHeight, appCodeOpen, appRootId, applySlot, approvalReview, approvalSigningError,
     approvedComponentCount, baseLibraryEditEntry, boxModelPreviewStore, canvasAncestry,
     canvasMode, canvasRevealRequest, changeAppDevice, changeTarget, codeAnnotations,
@@ -409,7 +409,7 @@ export function SourceWorkspace(props: { nestedPreview?: boolean; target: Target
       slotLayers={previewSlotLayers}
       slotScopes={previewSlotScopes}
       slotTargetLabel={selectedSlotTarget?.node.label}
-      styles={workspace.styles}
+      styles={activeStyles}
       workspaceMode={workspaceMode}
       workspaceNavigation={workspacePageNavigation}
       onModeChange={(mode) => setPreviewRuntime(mode === "play" ? "play" : "static")}

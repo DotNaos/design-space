@@ -66,6 +66,8 @@ export interface IndexedSourceWorkspace {
   files: readonly IndexedSourceFile[];
   entryFiles: ReadonlyMap<string, string>;
   stylePaths: readonly string[];
+  /** Manifest-only CSS paths keyed by target. Runtime generation keeps these scopes isolated. */
+  targetStylePaths?: ReadonlyMap<string, readonly string[]>;
 }
 
 export async function indexSourceWorkspace(
@@ -235,19 +237,27 @@ export async function indexAppManifestWorkspace(
   if (!firstTarget) throw new DesignSpaceError("INVALID_REGISTRATION", "app.manifest.json must declare a target");
   const manifest: SourceWorkspaceManifest = {
     adapter: "app-manifest",
-    runtime: firstTarget.runtime,
+    // Compatibility only; manifest previews always resolve runtime from their selected target.
+    runtime: "react",
     sourceRoot: firstTarget.sourceRoot,
     entries: Object.freeze(entries),
     devices: Object.freeze([]),
     targets: Object.freeze(targets),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
   };
+  const targetStylePaths = new Map(targetDefinitions.map(([targetId, target]) => [
+    targetId,
+    Object.freeze(files
+      .filter((file) => extname(file.relativePath) === ".css" && isWithinSourceRoot(file.relativePath, target.sourceRoot))
+      .map((file) => file.absolutePath)),
+  ]));
   return {
     root,
     manifest: Object.freeze(manifest),
     files: Object.freeze(files),
     entryFiles,
     stylePaths: Object.freeze(files.filter((file) => extname(file.relativePath) === ".css").map((file) => file.absolutePath)),
+    targetStylePaths,
   };
 }
 

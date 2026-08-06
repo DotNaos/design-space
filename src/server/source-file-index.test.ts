@@ -104,6 +104,8 @@ describe("TypeScript-first source index", () => {
     await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
     await writeFile(join(root, "clients", "web", "src", "main.tsx"), "export {};\n");
     await writeFile(join(root, "clients", "mobile", "index.ts"), "export {};\n");
+    await writeFile(join(root, "clients", "web", "src", "web.css"), ":root { --brand: web; }\n");
+    await writeFile(join(root, "clients", "mobile", "src", "native.css"), ":root { --brand: native; }\n");
     await writeFile(join(root, "clients", "web", "src", "app-roots", "App.tsx"), [
       'import { SharedPanel } from "../components/SharedPanel";',
       "export function App() { return <main><SharedPanel /></main>; }",
@@ -149,6 +151,12 @@ describe("TypeScript-first source index", () => {
     expect(result.manifest.entries.find((entry) => entry.label === "App" && entry.targetId === "web")?.manifestDevices)
       .toEqual(["desktop", "tablet"]);
     expect(result.manifest.entries.find((entry) => entry.label === "AppMobile")?.manifestDevices).toEqual(["mobile"]);
+    expect(result.targetStylePaths?.get("web")).toEqual([
+      expect.stringMatching(/clients\/web\/src\/web\.css$/),
+    ]);
+    expect(result.targetStylePaths?.get("native")).toEqual([
+      expect.stringMatching(/clients\/mobile\/src\/native\.css$/),
+    ]);
   });
 
   it("indexes exported React pages and components from a real src tree without a generated manifest", async () => {

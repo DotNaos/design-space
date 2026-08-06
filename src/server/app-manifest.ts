@@ -9,11 +9,14 @@ import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 
 export const APP_MANIFEST_FILE = "app.manifest.json";
 
+// Schema parity source: DotNaos/project-template@4d39611f2f79a181944c560220ed9afb39e916a4
+// packages/config/src/app-manifest.ts and schema.template/app-manifest.schema.json.
+
 const projectPath = z.string().refine(isNormalizedProjectPath, {
   message: "Must be a normalized project-relative path",
 });
-const targetId = z.string().regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/).max(64);
-const appId = z.string().regex(/^[a-z][a-z0-9-]*$/).max(120);
+const targetId = z.string().regex(/^[a-z][a-z0-9-]*$/);
+const appId = z.string().regex(/^[a-z][a-z0-9-]*$/);
 const exportName = z.union([z.literal("default"), z.string().regex(/^[A-Za-z_$][A-Za-z0-9_$]*$/)]);
 const rootSchema = z.object({
   source: projectPath.refine((value) => value.endsWith(".tsx"), "Must name a .tsx source file"),
@@ -35,7 +38,7 @@ const manifestSchema = z.object({
   version: z.literal(1),
   app: z.object({
     id: appId,
-    displayName: z.string().trim().min(1).max(120),
+    displayName: z.string().min(1).regex(/\S/),
   }).strict(),
   targets: z.record(targetId, targetSchema).refine((targets) => Object.keys(targets).length > 0, "Declare at least one target"),
 }).strict();
@@ -53,6 +56,7 @@ export interface AppManifestTarget {
 }
 
 export interface AppManifest {
+  $schema?: string;
   version: 1;
   app: { id: string; displayName: string };
   targets: Readonly<Record<string, AppManifestTarget>>;
@@ -125,12 +129,11 @@ function invalidPath(target: string, field: string, value: string, sourceRoot: s
 }
 
 function isWithin(path: string, directory: string) {
-  return path.startsWith(`${directory}/`);
+  return path === directory || path.startsWith(`${directory}/`);
 }
 
 function isNormalizedProjectPath(value: string) {
   return value.length > 0
-    && value.length <= 1_024
     && !value.startsWith("/")
     && !value.startsWith("./")
     && !value.endsWith("/")

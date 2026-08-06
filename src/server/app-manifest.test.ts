@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseAppManifest } from "./app-manifest";
+import { appManifestParityFixtures } from "./app-manifest-parity-fixtures";
 
 const manifest = {
   version: 1,
@@ -27,6 +28,13 @@ const manifest = {
 } as const;
 
 describe("app.manifest.json v1", () => {
+  for (const fixture of appManifestParityFixtures) {
+    it(`matches Project Template parser parity: ${fixture.name}`, () => {
+      if (fixture.valid) expect(() => parseAppManifest(fixture.value)).not.toThrow();
+      else expect(() => parseAppManifest(fixture.value)).toThrow("app.manifest.json is invalid");
+    });
+  }
+
   it("accepts technical targets and keeps only declared devices", () => {
     const parsed = parseAppManifest(manifest);
     expect(Object.keys(parsed.targets.web!.devices)).toEqual(["desktop", "tablet"]);

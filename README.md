@@ -80,7 +80,7 @@ The manifest names technical targets first and declares only the device roots th
 
 Each root is an exact source file and export, not a hint. A missing target or device does not exist in Design Space and cannot be created there. Two devices share an implementation only when they name the same source and export; Design Space shows that relationship explicitly. Targets may use `react`, `react-native`, or `electron`. The target selector comes before device controls, and every device switch stays inside the selected target.
 
-`app.manifest.json` is an app contract, not Design Space configuration. Project Template owns its schema and validation; standalone repositories can adopt the same file without adopting the template. Design Space never adds the manifest to a production bundle and does not infer conventional roots, fallback devices, unavailable placeholders, or create-device actions from it.
+`app.manifest.json` is an app contract, not Design Space configuration. Project Template owns its schema and validation; standalone repositories can adopt the same file without adopting the template. Design Space's v1 parser is parity-locked to `DotNaos/project-template@4d39611f2f79a181944c560220ed9afb39e916a4` without adding a runtime dependency. Design Space never adds the manifest to a production bundle and does not infer conventional roots, fallback devices, unavailable placeholders, or create-device actions from it.
 
 The existing `.designspace.ts` format remains an explicit legacy adapter. `design-space init` may still create that adapter for older standalone React projects, but its responsive inference and component-creation capability do not apply to manifest-backed projects.
 

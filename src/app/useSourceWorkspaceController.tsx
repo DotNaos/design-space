@@ -40,6 +40,7 @@ import type { SourceCodeAnnotation, SourceCodeSelectionContext } from "./source/
 import { sourceImportedComponentTarget } from "./source/source-import-component-target";
 import { createSourceBoxModelPreviewStore } from "./source/source-box-model-preview";
 import { useSourceTargetDeviceController } from "./source/useSourceTargetDeviceController";
+import { sourceDeviceTransition, sourceTargetScopedInteractionReset } from "./source/source-workspace-transition";
 
 export function useSourceWorkspaceController({ nestedPreview = false, target }: { nestedPreview?: boolean; target: TargetModule }) {
   const registeredWorkspace = target.sourceWorkspace;
@@ -135,6 +136,7 @@ export function useSourceWorkspaceController({ nestedPreview = false, target }: 
     [selectedTarget, workspace.entries],
   );
   const activeRuntime = selectedTarget?.runtime ?? workspace.runtime;
+  const activeStyles = selectedTarget?.styles ?? workspace.styles;
   const componentReviewSequence = useMemo(() => sourceComponentReviewSequence(graph), [graph]);
   const appRootId = graph.roots[0] ?? initialFocusOccurrence(graph);
   const requestedDesignRootId = designRootId ?? focusId;
@@ -535,18 +537,24 @@ export function useSourceWorkspaceController({ nestedPreview = false, target }: 
       setSigningEntryId(undefined);
     }
   };
+  const clearTargetScopedInteraction = () => {
+    const reset = sourceTargetScopedInteractionReset();
+    setHoveredTreeSelection(reset.hoveredSelection);
+    setSelectedLayerMetrics(reset.layerMetrics);
+    setCanvasRevealRequest(reset.canvasRevealRequest);
+    setCodeContexts(reset.codeContexts);
+    setCodeAnnotations(reset.codeAnnotations);
+  };
   const changeAppDevice = (device: DesignSpaceDevice) => {
-    if (selectedTarget && !selectedTarget.devices.some((candidate) => candidate.id === device)) return;
-    const nextRootId = sourceTargetRootNodeId(nodes, selectedTarget, device);
-    const nextNode = selectedNode?.implementations[device].entry
-      ? selectedNode
-      : nodes.find((candidate) => candidate.id === nextRootId);
-    if (!nextNode) return;
-    setSelection((current) => ({
-      ...(current ?? {}),
-      nodeId: nextNode.id,
-      device,
-    }));
+    const next = sourceDeviceTransition(nodes, selectedTarget, device, selectedNode?.id);
+    if (!next) return;
+    setSelection(next.selection);
+    if (workspaceMode === "preview") setPreviewSelection(next.selection);
+    else setDesignSelection(next.selection);
+    setFocusId(next.focusId);
+    if (workspaceMode === "design") setDesignRootId(next.focusId);
+    setDraftSelection(undefined);
+    clearTargetScopedInteraction();
   };
   const changeTarget = (nextTargetId: string) => {
     const next = selectTarget(nextTargetId);
@@ -560,10 +568,11 @@ export function useSourceWorkspaceController({ nestedPreview = false, target }: 
     setWorkspaceSurface("app");
     setActivity("app");
     setDraftSelection(undefined);
+    clearTargetScopedInteraction();
   };
 
   return {
-    activeCodeDocument, activeEditable, activeEditor, activeLibraryCodeDocument, activeRuntime,
+    activeCodeDocument, activeEditable, activeEditor, activeLibraryCodeDocument, activeRuntime, activeStyles,
     activity, appCodeHeight, appCodeOpen, appRootId, applySlot, approvalReview, approvalSigningError,
     approvedComponentCount, baseLibraryEditEntry, boxModelPreviewStore, canvasAncestry,
     canvasMode, canvasRevealRequest, changeAppDevice, changeTarget, codeAnnotations,

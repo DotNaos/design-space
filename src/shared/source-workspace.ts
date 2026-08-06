@@ -272,6 +272,8 @@ export interface SourceWorkspaceTarget {
   sourceRoot: string;
   entrypoint: string;
   devices: readonly SourceWorkspaceTargetDevice[];
+  /** Runtime CSS owned by this target. Present after the server builds the browser workspace. */
+  styles?: readonly string[];
 }
 
 export interface SourceWorkspaceLibrary {
