@@ -96,6 +96,7 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
             App tree
           </Button>
         )}
+        {props.headerLeading}
         {drilldownOccurrence && props.onDeviceChange ? (
           <SourceDeviceTabs
             compact
@@ -104,7 +105,6 @@ export function SourceWorkspaceSidebar(props: SourceWorkspaceSidebarProps) {
             onChange={props.onDeviceChange}
           />
         ) : null}
-        {props.headerLeading}
         <div className="ml-auto flex items-center gap-1">
           {props.workspace.capabilities?.createComponents && props.onCreateComponent && (
             <Button aria-label="Create component" className="grid size-7 min-w-7 place-items-center rounded-lg text-zinc-500" isIconOnly size="sm" variant="ghost" onPress={props.onCreateComponent}>

@@ -4,7 +4,8 @@ import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { indexSourceWorkspace } from "./source-file-index";
+import { indexAppManifestWorkspace, indexSourceWorkspace } from "./source-file-index";
+import { parseAppManifest } from "./app-manifest";
 
 describe("TypeScript-first source index", () => {
   const roots: string[] = [];
@@ -90,6 +91,71 @@ describe("TypeScript-first source index", () => {
       "Dockerfile",
       "nginx.conf",
       "src/notes/readme.md",
+    ]);
+  });
+
+  it("indexes exact manifest targets, explicit devices, and shared roots without fallback", async () => {
+    const root = await mkdtemp(join(tmpdir(), "design-space-app-manifest-index-"));
+    roots.push(root);
+    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
+    await mkdir(join(root, "clients", "web", "src", "app-roots"), { recursive: true });
+    await mkdir(join(root, "clients", "web", "src", "components"), { recursive: true });
+    await mkdir(join(root, "clients", "mobile", "src", "app-roots"), { recursive: true });
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
+    await writeFile(join(root, "clients", "web", "src", "main.tsx"), "export {};\n");
+    await writeFile(join(root, "clients", "mobile", "index.ts"), "export {};\n");
+    await writeFile(join(root, "clients", "web", "src", "web.css"), ":root { --brand: web; }\n");
+    await writeFile(join(root, "clients", "mobile", "src", "native.css"), ":root { --brand: native; }\n");
+    await writeFile(join(root, "clients", "web", "src", "app-roots", "App.tsx"), [
+      'import { SharedPanel } from "../components/SharedPanel";',
+      "export function App() { return <main><SharedPanel /></main>; }",
+    ].join("\n"));
+    await writeFile(join(root, "clients", "web", "src", "components", "SharedPanel.tsx"), "export function SharedPanel() { return <section />; }\n");
+    await writeFile(join(root, "clients", "mobile", "src", "app-roots", "App.mobile.tsx"), "export default function AppMobile() { return <main />; }\n");
+
+    const result = await indexAppManifestWorkspace(root, parseAppManifest({
+      version: 1,
+      app: { id: "manifest-app", displayName: "Manifest App" },
+      targets: {
+        web: {
+          runtime: "react",
+          sourceRoot: "clients/web",
+          entrypoint: "clients/web/src/main.tsx",
+          devices: {
+            desktop: { root: { source: "clients/web/src/app-roots/App.tsx", export: "App" } },
+            tablet: { root: { source: "clients/web/src/app-roots/App.tsx", export: "App" } },
+          },
+        },
+        native: {
+          runtime: "react-native",
+          sourceRoot: "clients/mobile",
+          entrypoint: "clients/mobile/index.ts",
+          devices: {
+            mobile: { root: { source: "clients/mobile/src/app-roots/App.mobile.tsx", export: "default" } },
+          },
+        },
+      },
+    }));
+
+    expect(result.manifest.adapter).toBe("app-manifest");
+    expect(result.manifest.devices).toEqual([]);
+    expect(result.manifest.targets?.map(({ id, devices }) => ({
+      id,
+      devices: devices.map(({ id: device }) => device),
+      roots: devices.map(({ entryId }) => entryId),
+    }))).toEqual([
+      { id: "web", devices: ["desktop", "tablet"], roots: [expect.any(String), expect.any(String)] },
+      { id: "native", devices: ["mobile"], roots: [expect.any(String)] },
+    ]);
+    expect(result.manifest.targets?.[0]?.devices[0]?.entryId).toBe(result.manifest.targets?.[0]?.devices[1]?.entryId);
+    expect(result.manifest.entries.find((entry) => entry.label === "App" && entry.targetId === "web")?.manifestDevices)
+      .toEqual(["desktop", "tablet"]);
+    expect(result.manifest.entries.find((entry) => entry.label === "AppMobile")?.manifestDevices).toEqual(["mobile"]);
+    expect(result.targetStylePaths?.get("web")).toEqual([
+      expect.stringMatching(/clients\/web\/src\/web\.css$/),
+    ]);
+    expect(result.targetStylePaths?.get("native")).toEqual([
+      expect.stringMatching(/clients\/mobile\/src\/native\.css$/),
     ]);
   });
 

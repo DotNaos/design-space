@@ -1,4 +1,4 @@
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
@@ -48,6 +48,39 @@ describe("target project discovery", () => {
     const root = await mkdtemp(join(process.cwd(), ".design-space-test-unregistered-"));
     roots.push(root);
     await expect(loadRegisteredProject(root)).rejects.toBeDefined();
+  });
+
+  it("prefers the neutral app manifest and does not enable legacy device creation", async () => {
+    const root = await mkdtemp(join(process.cwd(), ".design-space-test-app-manifest-"));
+    roots.push(root);
+    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
+    await mkdir(join(root, "clients", "web", "src", "app-roots"), { recursive: true });
+    await writeFile(join(root, ".designspace.ts"), "throw new Error('legacy config must not load');\n");
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
+    await writeFile(join(root, "clients", "web", "src", "main.tsx"), "export {};\n");
+    await writeFile(join(root, "clients", "web", "src", "app-roots", "App.tsx"), "export function App() { return <main />; }\n");
+    await writeFile(join(root, "app.manifest.json"), JSON.stringify({
+      version: 1,
+      app: { id: "manifest-loader", displayName: "Manifest Loader" },
+      targets: {
+        web: {
+          runtime: "react",
+          sourceRoot: "clients/web",
+          entrypoint: "clients/web/src/main.tsx",
+          devices: {
+            desktop: { root: { source: "clients/web/src/app-roots/App.tsx", export: "App" } },
+            tablet: { root: { source: "clients/web/src/app-roots/App.tsx", export: "App" } },
+          },
+        },
+      },
+    }));
+
+    const target = await loadRegisteredProject(root);
+    expect(target.project).toEqual({ id: "manifest-loader", label: "Manifest Loader" });
+    expect(target.registrationPath).toBe(join(root, "app.manifest.json"));
+    expect(target.sourceWorkspace?.manifest.adapter).toBe("app-manifest");
+    expect(target.sourceWorkspace?.manifest.targets?.[0]?.devices.map(({ id }) => id)).toEqual(["desktop", "tablet"]);
+    expect(target.sourceComponentStore).toBeUndefined();
   });
 
   it("prefers the minimal frontend-root config and derives the target from TypeScript", async () => {

@@ -4,10 +4,11 @@ import { resolve } from "node:path";
 import { runnerImport } from "vite";
 
 import { DesignSpaceError } from "./errors";
+import { APP_MANIFEST_FILE, loadAppManifest } from "./app-manifest";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { registerTrustedTarget, type RegisteredTarget, type TrustedTargetConfig } from "./target-registration";
 import { parseSourceProjectConfig } from "./source-project-config";
-import { registerSourceProject } from "./source-project-registration";
+import { registerAppManifestProject, registerSourceProject } from "./source-project-registration";
 
 export const DESIGN_SPACE_CONFIG_FILE = ".designspace.ts";
 export const TARGET_REGISTRATION_FILE = "design-space.server.ts";
@@ -18,6 +19,10 @@ export interface TargetRegistrationModule {
 
 export async function loadRegisteredProject(projectRoot: string): Promise<RegisteredTarget> {
   const root = await canonicalRoot(projectRoot);
+  if (await isFile(resolve(root, APP_MANIFEST_FILE))) {
+    const loaded = await loadAppManifest(root);
+    return registerAppManifestProject(root, APP_MANIFEST_FILE, loaded.manifest);
+  }
   if (await isFile(resolve(root, DESIGN_SPACE_CONFIG_FILE))) {
     const configPath = await canonicalRegisteredFile(root, DESIGN_SPACE_CONFIG_FILE);
     const { module } = await runnerImport<Record<string, unknown>>(configPath, {
@@ -31,7 +36,7 @@ export async function loadRegisteredProject(projectRoot: string): Promise<Regist
   if (!await isFile(resolve(root, TARGET_REGISTRATION_FILE))) {
     throw new DesignSpaceError(
       "INVALID_REGISTRATION",
-      `The project root must contain ${DESIGN_SPACE_CONFIG_FILE}`,
+      `The project root must contain ${APP_MANIFEST_FILE}, ${DESIGN_SPACE_CONFIG_FILE}, or ${TARGET_REGISTRATION_FILE}`,
     );
   }
   const registrationPath = await canonicalRegisteredFile(root, TARGET_REGISTRATION_FILE);

@@ -4,6 +4,7 @@ import type { RuntimeSourceWorkspace, RuntimeSourceWorkspaceEntry } from "../../
 import {
   findSourceTreeLayer,
   initialSourceTreeSelection,
+  sourceTargetRootNodeId,
   sourceTreeNodes,
   sourceTreeRows,
   sharedSourceTreeRows,
@@ -100,6 +101,70 @@ it("overlays device implementations on one logical node", () => {
 
 it("starts with the desktop app layout when it exists", () => {
   expect(initialSourceTreeSelection(sourceTreeNodes(workspace))).toEqual({ nodeId: "layout:app", device: "desktop" });
+});
+
+it("uses the exact manifest target root and exposes only declared implementations", () => {
+  const manifestWorkspace: RuntimeSourceWorkspace = {
+    adapter: "app-manifest",
+    runtime: "react",
+    sourceRoot: "clients/web",
+    styles: [],
+    devices: [],
+    targets: [
+      {
+        id: "web",
+        runtime: "react",
+        sourceRoot: "clients/web",
+        entrypoint: "clients/web/src/main.tsx",
+        devices: [
+          { id: "desktop", entryId: "WebApp", root: { source: "clients/web/src/App.tsx", export: "App" } },
+          { id: "tablet", entryId: "WebApp", root: { source: "clients/web/src/App.tsx", export: "App" } },
+        ],
+      },
+      {
+        id: "native",
+        runtime: "react-native",
+        sourceRoot: "clients/mobile",
+        entrypoint: "clients/mobile/index.ts",
+        devices: [
+          { id: "mobile", entryId: "NativeApp", root: { source: "clients/mobile/src/App.mobile.tsx", export: "default" } },
+        ],
+      },
+    ],
+    entries: [
+      entry({
+        id: "WebApp",
+        label: "App",
+        exportName: "App",
+        targetId: "web",
+        manifestDevices: ["desktop", "tablet"],
+        area: "layout",
+        device: "desktop",
+        relativePath: "clients/web/src/App.tsx",
+      }),
+      entry({
+        id: "NativeApp",
+        label: "AppMobile",
+        exportName: "default",
+        targetId: "native",
+        manifestDevices: ["mobile"],
+        area: "layout",
+        device: "mobile",
+        relativePath: "clients/mobile/src/App.mobile.tsx",
+      }),
+    ],
+  };
+  const web = manifestWorkspace.targets![0]!;
+  const webNodes = sourceTreeNodes(manifestWorkspace, "web");
+  expect(webNodes.map(({ label }) => label)).toEqual(["App"]);
+  expect(webNodes[0]?.availableDevices).toEqual(["desktop", "tablet"]);
+  expect(webNodes[0]?.implementations.desktop.state).toBe("shared");
+  expect(webNodes[0]?.implementations.mobile.entry).toBeUndefined();
+  expect(initialSourceTreeSelection(webNodes, web)).toEqual({ nodeId: "layout:app", device: "desktop" });
+  expect(sourceTargetRootNodeId(webNodes, web, "tablet")).toBe("layout:app");
+  expect(sourceTargetRootNodeId(webNodes, web, "mobile")).toBeUndefined();
+
+  expect(sourceTreeNodes(manifestWorkspace, "native").map(({ label }) => label)).toEqual(["AppMobile"]);
 });
 
 it("orders one composition tree from layout to page to referenced component", () => {

@@ -249,13 +249,28 @@ Component, HTML, and Slot nodes.
 
 ## Source layout
 
-The frontend project root owns `.designspace.ts`. Shared components live above the shell's ownership tree;
-private components are colocated beneath their sole owner. Device implementations remain explicit.
+The app repository owns `app.manifest.json`. Project Template defines and validates that app contract;
+Design Space consumes the same file and does not turn it into Design Space-specific configuration. A
+standalone repository MAY adopt the manifest without adopting Project Template. `.designspace.ts` remains
+an explicit legacy adapter only. Shared components live above the shell's ownership tree; private components
+are colocated beneath their sole owner. Device implementations remain explicit.
 
 ```text
-frontend-project/
-├── .designspace.ts
-└── src/app/
+app-repository/
+├── app.manifest.json
+├── clients/web/src/
+│   ├── App.tsx                    exact shared Desktop + Tablet root
+│   └── components/
+└── clients/native/src/
+    ├── App.mobile.tsx             exact Mobile root
+    └── components/
+```
+
+Inside each target, shared components remain above the shell's ownership tree:
+
+```text
+target-source/
+└── app/
     ├── components/                 shared scope
     │   ├── Button/
     │   │   ├── desktop.tsx
@@ -280,9 +295,17 @@ frontend-project/
             └── pages/
 ```
 
-Tablet MAY explicitly reuse Desktop or Mobile through `.designspace.ts`. Design Space MUST NOT infer a
-fallback. A logical component appears once in navigation while the canvas HUD switches among its explicit
-Desktop, Tablet, and Mobile implementations.
+Every manifest target MUST declare its technical runtime, source root, entrypoint, and at least one device.
+Every declared device MUST name one exact source file and export as its root. Omitted targets and devices do
+not exist in Design Space. Design Space MUST NOT infer a root, a fallback implementation, an unavailable
+placeholder, or a device-creation action. Multiple devices share an implementation only when their exact
+source and export are identical, and the IDE MUST expose that shared relationship.
+
+Target selection precedes device selection. The IDE MUST show only devices declared by the selected target,
+and changing targets MUST move to that target's exact root without leaking the previous target's selection.
+A logical component appears once in navigation while the canvas HUD switches among its explicit device
+implementations. Layout components, including layouts imported from `@dotnaos/ui`, remain ordinary Component
+nodes; they do not introduce another source-tree node kind.
 
 ## IDE interaction contract
 

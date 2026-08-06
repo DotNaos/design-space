@@ -4,10 +4,11 @@ import {
   type DesignSpaceDevice,
   type RuntimeSourceWorkspace,
   type RuntimeSourceWorkspaceEntry,
+  type SourceWorkspaceTarget,
   type SourceWorkspaceLayer,
 } from "../../shared/source-workspace";
 
-export type SourceImplementationState = "direct" | "fallback" | "missing" | "responsive";
+export type SourceImplementationState = "direct" | "shared" | "fallback" | "missing" | "responsive";
 
 export interface SourceImplementation {
   requestedDevice: DesignSpaceDevice;
@@ -23,6 +24,8 @@ export interface SourceTreeNode {
   entries: readonly RuntimeSourceWorkspaceEntry[];
   uses: readonly string[];
   implementations: Readonly<Record<DesignSpaceDevice, SourceImplementation>>;
+  availableDevices?: readonly DesignSpaceDevice[];
+  manifestBacked?: boolean;
 }
 
 export interface SourceTreeRow {
@@ -53,10 +56,17 @@ export function findSourceTreeLayer(
   return undefined;
 }
 
-export function sourceTreeNodes(workspace: RuntimeSourceWorkspace): readonly SourceTreeNode[] {
+export function sourceTreeNodes(
+  workspace: RuntimeSourceWorkspace,
+  targetId?: string,
+): readonly SourceTreeNode[] {
   const groups = new Map<string, { area: DesignSpaceArea; label: string; entries: RuntimeSourceWorkspaceEntry[] }>();
+  const target = targetId ? workspace.targets?.find((candidate) => candidate.id === targetId) : undefined;
+  const workspaceEntries = target
+    ? workspace.entries.filter((entry) => entry.targetId === target.id)
+    : workspace.entries.filter((entry) => entry.targetId === undefined);
 
-  for (const entry of workspace.entries) {
+  for (const entry of workspaceEntries) {
     const key = logicalEntryKey(entry);
     const current = groups.get(key) ?? {
       area: entry.area,
@@ -74,7 +84,9 @@ export function sourceTreeNodes(workspace: RuntimeSourceWorkspace): readonly Sou
       label: group.label,
       entries: group.entries,
       uses: [...new Set(group.entries.flatMap((entry) => entry.uses ?? []))],
-      implementations: implementationsFor(workspace, group.area, group.entries),
+      implementations: implementationsFor(workspace, group.area, group.entries, target),
+      availableDevices: availableDevicesFor(workspace, group.area, group.entries, target),
+      manifestBacked: Boolean(target),
     }))
     .sort(compareNodes);
 }
@@ -181,7 +193,17 @@ export function visibleSourceTreeRows(
   return visible;
 }
 
-export function initialSourceTreeSelection(nodes: readonly SourceTreeNode[]): SourceTreeSelection | undefined {
+export function initialSourceTreeSelection(
+  nodes: readonly SourceTreeNode[],
+  target?: SourceWorkspaceTarget,
+): SourceTreeSelection | undefined {
+  if (target) {
+    for (const definition of target.devices) {
+      const node = nodes.find((candidate) => candidate.entries.some((entry) => entry.id === definition.entryId));
+      if (node) return { nodeId: node.id, device: definition.id };
+    }
+    return undefined;
+  }
   const priorities: readonly [DesignSpaceArea, DesignSpaceDevice][] = [
     ["layout", "desktop"],
     ["pages", "desktop"],
@@ -200,7 +222,22 @@ function implementationsFor(
   workspace: RuntimeSourceWorkspace,
   area: DesignSpaceArea,
   entries: readonly RuntimeSourceWorkspaceEntry[],
+  target?: SourceWorkspaceTarget,
 ): Readonly<Record<DesignSpaceDevice, SourceImplementation>> {
+  if (target) {
+    return Object.fromEntries(designSpaceDevices.map((device) => {
+      const entry = entries.find((candidate) => candidate.manifestDevices?.includes(device));
+      if (!entry || !target.devices.some((candidate) => candidate.id === device)) {
+        return [device, { requestedDevice: device, state: "missing" }];
+      }
+      return [device, {
+        requestedDevice: device,
+        sourceDevice: entry.device,
+        state: (entry.manifestDevices?.length ?? 0) > 1 ? "shared" : "direct",
+        entry,
+      }];
+    })) as unknown as Readonly<Record<DesignSpaceDevice, SourceImplementation>>;
+  }
   return Object.fromEntries(designSpaceDevices.map((device) => {
     const direct = entries.find((entry) => entry.device === device);
     if (direct) {
@@ -220,6 +257,29 @@ function implementationsFor(
     }
     return [device, { requestedDevice: device, state: "missing" }];
   })) as unknown as Readonly<Record<DesignSpaceDevice, SourceImplementation>>;
+}
+
+function availableDevicesFor(
+  workspace: RuntimeSourceWorkspace,
+  area: DesignSpaceArea,
+  entries: readonly RuntimeSourceWorkspaceEntry[],
+  target?: SourceWorkspaceTarget,
+): readonly DesignSpaceDevice[] {
+  const implementations = implementationsFor(workspace, area, entries, target);
+  return target
+    ? target.devices.map(({ id }) => id).filter((device) => implementations[device].entry !== undefined)
+    : designSpaceDevices;
+}
+
+export function sourceTargetRootNodeId(
+  nodes: readonly SourceTreeNode[],
+  target: SourceWorkspaceTarget | undefined,
+  device: DesignSpaceDevice,
+): string | undefined {
+  const entryId = target?.devices.find((candidate) => candidate.id === device)?.entryId;
+  return entryId
+    ? nodes.find((node) => node.entries.some((entry) => entry.id === entryId))?.id
+    : undefined;
 }
 
 function logicalEntryKey(entry: RuntimeSourceWorkspaceEntry): string {

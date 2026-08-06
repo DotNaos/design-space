@@ -1,5 +1,5 @@
 import { Button, Tooltip } from "@heroui/react";
-import { Monitor, Smartphone, Tablet } from "lucide-react";
+import { Link2, Monitor, Smartphone, Tablet } from "lucide-react";
 import { type DesignSpaceDevice } from "../../shared/source-workspace";
 import type { SourceImplementation } from "./source-workspace-tree";
 import { deviceLabels } from "./SourceDeviceTabs";
@@ -18,6 +18,8 @@ export function DeviceTab(props: {
       ? "Missing"
       : props.implementation.state === "responsive"
         ? "Responsive"
+        : props.implementation.state === "shared"
+          ? "Shared implementation"
       : undefined;
   const button = (
     <Button
@@ -32,6 +34,7 @@ export function DeviceTab(props: {
       <span className="relative flex size-4 shrink-0 items-center justify-center">
         <DeviceIcon aria-hidden="true" className={`block ${props.implementation.state === "missing" ? "text-zinc-700" : props.implementation.state === "fallback" ? "text-amber-300" : ""}`} size={15} />
         {(props.implementation.state === "missing" || props.implementation.state === "fallback") && <span aria-hidden="true" className="absolute h-px w-3 -rotate-45 bg-current" />}
+        {props.implementation.state === "shared" && <Link2 aria-hidden="true" className="absolute -bottom-1 -right-1 text-sky-300" size={8} />}
       </span>
     </Button>
   );

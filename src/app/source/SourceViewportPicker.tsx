@@ -31,6 +31,10 @@ export function SourceViewportPicker(props: {
   onResponsiveWidthChange: (width: number) => void;
 }) {
   const selectedPreset = sourceViewportPresets.find((preset) => preset.id === props.presetId);
+  const availableDevices = props.node?.availableDevices;
+  const visiblePresets = availableDevices
+    ? sourceViewportPresets.filter((preset) => preset.device === "responsive" || availableDevices.includes(preset.device))
+    : sourceViewportPresets;
   return (
     <div className="pointer-events-auto flex h-8 min-w-0 items-center gap-1 px-0.5 lg:h-7">
       {props.showDeviceTabs !== false ? <SourceDeviceTabs device={props.device} node={props.node} onChange={props.onDeviceChange} /> : null}
@@ -49,7 +53,7 @@ export function SourceViewportPicker(props: {
           <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
         </Select.Trigger>
         <Select.Popover placement="bottom" className="max-h-80 min-w-52 overflow-y-auto rounded-xl bg-[#1a1b1e] p-1.5 shadow-2xl">
-          <ListBox items={sourceViewportPresets} className="flex flex-col gap-0">
+          <ListBox items={visiblePresets} className="flex flex-col gap-0">
             {(preset) => (
               <ListBox.Item id={preset.id} textValue={preset.label} className="group !block !min-h-0 cursor-default !rounded-none !bg-transparent !p-0 outline-none">
                 {viewportSectionLabel[preset.id] ? <span className={`block px-2.5 pb-1 text-[9px] font-medium text-zinc-500 ${preset.id === "responsive" ? "pt-0.5" : "pt-2"}`}>{viewportSectionLabel[preset.id]}</span> : null}

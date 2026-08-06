@@ -18,6 +18,7 @@ export function useSourceWorkspaceUiState(options: {
   focusIds: ReadonlySet<string>;
   nodeIds: ReadonlySet<string>;
   projectId: string;
+  targetId?: string;
 }) {
   const restored = useMemo(
     () => loadSourceWorkspaceUiState(sourceWorkspaceBrowserStorage(), options.projectId),
@@ -140,6 +141,7 @@ export function useSourceWorkspaceUiState(options: {
       selectedLibraryLayerId,
       selectedProjectFileId,
       selection,
+      targetId: options.targetId,
       workspaceMode,
       workspaceSurface,
     });
@@ -161,6 +163,7 @@ export function useSourceWorkspaceUiState(options: {
     selectedLibraryLayerId,
     selectedProjectFileId,
     selection,
+    options.targetId,
     workspaceMode,
     workspaceSurface,
   ]);

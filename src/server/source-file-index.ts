@@ -13,7 +13,9 @@ import {
   type SourceWorkspaceEntry,
   type SourceWorkspaceManifest,
   type SourceWorkspaceLibrary,
+  type SourceWorkspaceTarget,
 } from "../shared/source-workspace";
+import type { AppManifest } from "./app-manifest";
 import { DesignSpaceError } from "./errors";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { readRegisteredFile } from "./registered-file-reader";
@@ -38,6 +40,7 @@ const safeSourceExtensions = new Set([
 ]);
 const safeRootFiles = new Set([
   ".designspace.ts",
+  "app.manifest.json",
   "Dockerfile",
   "app.json",
   "index.html",
@@ -63,6 +66,8 @@ export interface IndexedSourceWorkspace {
   files: readonly IndexedSourceFile[];
   entryFiles: ReadonlyMap<string, string>;
   stylePaths: readonly string[];
+  /** Manifest-only CSS paths keyed by target. Runtime generation keeps these scopes isolated. */
+  targetStylePaths?: ReadonlyMap<string, readonly string[]>;
 }
 
 export async function indexSourceWorkspace(
@@ -124,6 +129,7 @@ export async function indexSourceWorkspace(
   entries.sort(compareEntries);
 
   const manifest: SourceWorkspaceManifest = {
+    adapter: "legacy",
     runtime: config.runtime ?? "react",
     sourceRoot: inferredCatalog ? sourceRoot : SOURCE_ROOT,
     entries: Object.freeze(entries),
@@ -136,6 +142,122 @@ export async function indexSourceWorkspace(
     files: Object.freeze(files),
     entryFiles,
     stylePaths: Object.freeze(files.filter((file) => extname(file.relativePath) === ".css").map((file) => file.absolutePath)),
+  };
+}
+
+export async function indexAppManifestWorkspace(
+  unsafeRoot: string,
+  appManifest: AppManifest,
+): Promise<IndexedSourceWorkspace> {
+  const root = await canonicalRoot(unsafeRoot);
+  const targetDefinitions = Object.entries(appManifest.targets);
+  const relativePaths = await discoverBrowsableFilesForRoots(
+    root,
+    targetDefinitions.map(([, target]) => target.sourceRoot),
+  );
+  const files = await registerDiscoveredFiles(root, relativePaths);
+  const fileByPath = new Map(files.map((file) => [file.relativePath, file]));
+  const componentCandidates = files.filter((file) => (
+    targetDefinitions.some(([, target]) => isWithinSourceRoot(file.relativePath, target.sourceRoot))
+    && file.relativePath.endsWith(".tsx")
+    && !isDesignModule(file.relativePath)
+  ));
+  const indexedComponents = await indexTypeScriptComponents({
+    projectRoot: root,
+    filePaths: componentCandidates.map((file) => file.absolutePath),
+  });
+  const indexedDesigns = await indexSourceDesigns(root, files);
+  const entries: SourceWorkspaceEntry[] = [];
+  const entryFiles = new Map<string, string>();
+  const targets: SourceWorkspaceTarget[] = [];
+
+  for (const [targetId, target] of targetDefinitions) {
+    const declaredDevices = designSpaceDevices.filter((device) => target.devices[device]);
+    const roots = declaredDevices.map((device) => ({ device, ...target.devices[device]!.root }));
+    const targetEntries: SourceWorkspaceEntry[] = [];
+    for (const component of indexedComponents) {
+      const relativePath = isAbsolute(component.filePath)
+        ? portableRelative(root, component.filePath)
+        : component.filePath.replaceAll("\\", "/");
+      if (!isWithinSourceRoot(relativePath, target.sourceRoot)) continue;
+      const file = fileByPath.get(relativePath);
+      if (!file) continue;
+      const rootDevices = roots
+        .filter((candidate) => candidate.source === relativePath && candidate.export === component.exportName)
+        .map((candidate) => candidate.device);
+      const manifestDevices = rootDevices.length
+        ? rootDevices
+        : implementationDevices(relativePath, declaredDevices);
+      const id = stableId("source.entry", `${targetId}\0${relativePath}\0${component.exportName}`);
+      const entry: SourceWorkspaceEntry = {
+        id,
+        label: component.label,
+        area: rootDevices.length ? "layout" : "components",
+        device: manifestDevices[0] ?? "desktop",
+        fileId: file.id,
+        relativePath,
+        exportName: component.exportName,
+        props: component.props,
+        slots: component.slots,
+        findings: component.findings,
+        source: component.source,
+        uses: component.uses,
+        layers: component.layers,
+        previewable: true,
+        targetId,
+        manifestDevices: Object.freeze(manifestDevices),
+        ...componentDesign(indexedDesigns, relativePath, component.exportName),
+      };
+      entries.push(entry);
+      targetEntries.push(entry);
+      entryFiles.set(id, file.absolutePath);
+    }
+    const devices = roots.map(({ device, source, export: exportName }) => {
+      const entry = targetEntries.find((candidate) => (
+        candidate.relativePath === source && candidate.exportName === exportName
+      ));
+      if (!entry) {
+        throw new DesignSpaceError(
+          "INVALID_REGISTRATION",
+          `targets.${targetId}.devices.${device}.root must reference an exported JSX component (${source}#${exportName})`,
+        );
+      }
+      return { id: device, root: { source, export: exportName }, entryId: entry.id };
+    });
+    targets.push({
+      id: targetId,
+      runtime: target.runtime,
+      sourceRoot: target.sourceRoot,
+      entrypoint: target.entrypoint,
+      devices: Object.freeze(devices),
+    });
+  }
+  entries.sort(compareEntries);
+  const firstTarget = targets[0];
+  if (!firstTarget) throw new DesignSpaceError("INVALID_REGISTRATION", "app.manifest.json must declare a target");
+  const manifest: SourceWorkspaceManifest = {
+    adapter: "app-manifest",
+    // Compatibility only; manifest previews always resolve runtime from their selected target.
+    runtime: "react",
+    sourceRoot: firstTarget.sourceRoot,
+    entries: Object.freeze(entries),
+    devices: Object.freeze([]),
+    targets: Object.freeze(targets),
+    library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
+  };
+  const targetStylePaths = new Map(targetDefinitions.map(([targetId, target]) => [
+    targetId,
+    Object.freeze(files
+      .filter((file) => extname(file.relativePath) === ".css" && isWithinSourceRoot(file.relativePath, target.sourceRoot))
+      .map((file) => file.absolutePath)),
+  ]));
+  return {
+    root,
+    manifest: Object.freeze(manifest),
+    files: Object.freeze(files),
+    entryFiles,
+    stylePaths: Object.freeze(files.filter((file) => extname(file.relativePath) === ".css").map((file) => file.absolutePath)),
+    targetStylePaths,
   };
 }
 
@@ -271,6 +393,15 @@ async function discoverBrowsableFiles(root: string, sourceRoot: string): Promise
   return [...result].sort((left, right) => left.localeCompare(right, "en"));
 }
 
+async function discoverBrowsableFilesForRoots(root: string, sourceRoots: readonly string[]): Promise<string[]> {
+  const result = new Set<string>();
+  for (const file of safeRootFiles) {
+    if (await isSafeFile(resolve(root, file))) result.add(file);
+  }
+  for (const directory of new Set(sourceRoots)) await walkDirectory(root, directory, 0, result);
+  return [...result].sort((left, right) => left.localeCompare(right, "en"));
+}
+
 function inferredSourceRoot(config: DesignSpaceProjectConfig): string {
   const layout = normalizedConfiguredLayout(config);
   if (!layout) return "src";
@@ -379,6 +510,16 @@ function inferredDevice(relativePath: string): DesignSpaceDevice {
   if (/(?:^|\/|[.-])mobile(?:\/|[.-]|$)/i.test(relativePath)) return "mobile";
   if (/(?:^|\/|[.-])tablet(?:\/|[.-]|$)/i.test(relativePath)) return "tablet";
   return "desktop";
+}
+
+function implementationDevices(
+  relativePath: string,
+  declaredDevices: readonly DesignSpaceDevice[],
+): readonly DesignSpaceDevice[] {
+  const specific = designSpaceDevices.find((device) => (
+    new RegExp(`(?:^|[/.\\-])${device}(?:[/.\\-]|$)`, "i").test(relativePath)
+  ));
+  return specific && declaredDevices.includes(specific) ? [specific] : declaredDevices;
 }
 
 function deviceStates(

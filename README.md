@@ -43,25 +43,46 @@ Raw Vite startup is blocked. `DESIGN_SPACE_ALLOW_DIRECT=1` is a noisy debugging 
 
 ## Start from a target repository
 
-Install Design Space from the frontend project root and let the initializer create the package script and a minimal `.designspace.ts`:
+Install Design Space at the app repository root. A Project Template app supplies `app.manifest.json`; Design Space reads the same app-owned contract directly:
 
 ```bash
 pnpm add -D github:DotNaos/design-space#main
-pnpm exec design-space init
 pnpm design-space
 ```
 
-The initializer derives the project identity from `package.json`, detects a conventional app entry when present, and never overwrites an existing `.designspace.ts`. The generated configuration is self-contained and equivalent to:
+The manifest names technical targets first and declares only the device roots that really exist:
 
-```ts
-export default {
-  project: { id: "web", label: "Web App" },
-  devices: { mode: "responsive" },
-  source: { layout: "src/App.tsx" },
-} as const;
+```json
+{
+  "version": 1,
+  "app": { "id": "example-app", "displayName": "Example App" },
+  "targets": {
+    "web": {
+      "runtime": "react",
+      "sourceRoot": "clients/web",
+      "entrypoint": "clients/web/src/main.tsx",
+      "devices": {
+        "desktop": { "root": { "source": "clients/web/src/App.tsx", "export": "default" } },
+        "tablet": { "root": { "source": "clients/web/src/App.tsx", "export": "default" } }
+      }
+    },
+    "native": {
+      "runtime": "react-native",
+      "sourceRoot": "clients/native",
+      "entrypoint": "clients/native/src/main.tsx",
+      "devices": {
+        "mobile": { "root": { "source": "clients/native/src/App.mobile.tsx", "export": "default" } }
+      }
+    }
+  }
+}
 ```
 
-`source.layout` points to the app's normal exported React entry. It must be a project-relative `.tsx` file under either `src/` or the Next.js app-router `app/` directory. Only exported components that render JSX appear in the source tree. If `.designspace.ts` already exists, `init` leaves it untouched; fix the file or remove it before running `init` again.
+Each root is an exact source file and export, not a hint. A missing target or device does not exist in Design Space and cannot be created there. Two devices share an implementation only when they name the same source and export; Design Space shows that relationship explicitly. Targets may use `react`, `react-native`, or `electron`. The target selector comes before device controls, and every device switch stays inside the selected target.
+
+`app.manifest.json` is an app contract, not Design Space configuration. Project Template owns its schema and validation; standalone repositories can adopt the same file without adopting the template. Design Space's v1 parser is parity-locked to `DotNaos/project-template@4d39611f2f79a181944c560220ed9afb39e916a4` without adding a runtime dependency. Design Space never adds the manifest to a production bundle and does not infer conventional roots, fallback devices, unavailable placeholders, or create-device actions from it.
+
+The existing `.designspace.ts` format remains an explicit legacy adapter. `design-space init` may still create that adapter for older standalone React projects, but its responsive inference and component-creation capability do not apply to manifest-backed projects.
 
 App implementations are device-first. Each device owns its layout and pages, while reusable components are grouped once by component name:
 
@@ -83,17 +104,17 @@ src/app/
       mobile.tsx
 ```
 
-Only real exported React components make a device path configured. Tablet may explicitly reuse Desktop or Mobile; no other device fallback is inferred. The editor lists each reusable component once and switches between its available device implementations. Component props and explicitly named Strict UI slots come from the exported component's TypeScript props type. `children` is forbidden, broad `ReactNode` props are not slot evidence, and the preview never persists a parallel JSON description of that contract.
+Only real exported components under a selected target appear in its tree. The editor lists each reusable component once and switches between only its declared device implementations. Components imported from `@dotnaos/ui`, including layout components, remain ordinary Component nodes. Component props and explicitly named Strict UI slots come from the exported component's TypeScript props type. `children` is forbidden, broad `ReactNode` props are not slot evidence, and the preview never persists a parallel JSON description of that contract.
 
 Canvas execution is supplied by a colocated `.design.tsx` module. Design Space never calls an indexed source component with guessed or empty props. The design imports the real component, provides concrete preview values, and uses `defineComponentDesign`; TypeScript remains the only property and slot schema. Named `designs` or `states` are typed props presets selectable in Properties, and may provide compatible JSX content. An optional `preview` object controls only the isolated canvas background, dimensions, padding, and placement. Literal unions and booleans become automatic property-matrix axes. Use the explicit `isStateful` boolean only when the component has named semantic states. The complete normative contract lives in `STRICT_UI.md`.
 
 The TypeScript-first workspace provides indexing, rendering, navigation, contract inspection, and guarded whole-file TypeScript editing with an exact diff before save. Components with required props are not executed until source-owned preview arguments exist.
 
-The same contract can be placed at a React Native project root with `runtime: "react-native"`. Design Space currently indexes its source tree and TypeScript contracts separately; a simulator renderer is still required before native preview can be marked ready.
+A React Native target uses `runtime: "react-native"`. Design Space currently indexes its source tree and TypeScript contracts separately; a simulator renderer is still required before native preview can be marked ready. Electron targets use `runtime: "electron"` and retain the React preview path.
 
 The component-library connection is derived from the frontend project's package dependencies. A normal package version is shown as a read-only release. `workspace:`, `file:`, or `link:` dependencies prove that a development source is connected; Design Space does not claim it is editable until that second project root has its own trusted write registration.
 
-The CLI accepts `init` but no root, path, or module arguments. The local developer chooses the target by the directory where the CLI starts, while the browser receives only the server-indexed files and exports.
+The CLI accepts no browser-supplied root, path, or module arguments. The local developer chooses the app repository by the directory where the CLI starts, while the browser receives only the server-indexed targets, devices, files, and exports.
 
 ## Legacy document targets
 

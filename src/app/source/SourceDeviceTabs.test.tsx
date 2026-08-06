@@ -37,6 +37,23 @@ it("uses a compact canvas switcher and allows selecting missing implementations"
   expect(onChange).toHaveBeenCalledWith("mobile");
 });
 
+it("renders only explicit manifest devices and marks their shared implementation", () => {
+  const manifestNode: SourceTreeNode = {
+    ...node,
+    availableDevices: ["desktop", "tablet"],
+    manifestBacked: true,
+    implementations: {
+      desktop: { requestedDevice: "desktop", sourceDevice: "desktop", state: "shared", entry: undefined },
+      tablet: { requestedDevice: "tablet", sourceDevice: "desktop", state: "shared", entry: undefined },
+      mobile: { requestedDevice: "mobile", state: "missing" },
+    },
+  };
+  render(<SourceDeviceTabs device="desktop" node={manifestNode} onChange={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Desktop implementation, Shared implementation" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Tablet implementation, Shared implementation" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Mobile implementation/ })).not.toBeInTheDocument();
+});
+
 it("fits the implementation switcher into a component row", () => {
   render(<SourceDeviceTabs compact device="desktop" node={node} onChange={vi.fn()} />);
 
