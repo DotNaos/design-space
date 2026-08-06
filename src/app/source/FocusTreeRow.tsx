@@ -215,7 +215,7 @@ export function FocusTreeRow(props: {
         ) : null}
         <Icon aria-hidden="true" className={`shrink-0 ${row.kind === "component" ? withinCanvas && !outsideActiveFile ? "text-violet-400" : props.activePath ? "text-violet-400/65" : "text-violet-500/45" : ""}`} size={row.kind === "component" && !openedCanvas ? 12 : 13} />
         <span className={`flex-1 whitespace-nowrap text-xs ${row.kind === "html" ? "font-mono text-[10px]" : ""}`}>{row.label}</span>
-        {row.kind === "component" && row.occurrence && <MissingDeviceCluster implementations={row.occurrence.node.implementations} />}
+        {row.kind === "component" && row.occurrence && <MissingDeviceCluster node={row.occurrence.node} />}
         {status && <SlotStatus layer={slot!} />}
       </Button>
       {slot && row.occurrence && props.onApplySlot && (

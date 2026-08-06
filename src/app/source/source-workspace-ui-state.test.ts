@@ -52,6 +52,7 @@ it("round-trips project-scoped editor state", () => {
       renderedLayerOccurrence: 2,
       sourceNodeId: "components:Button",
     },
+    targetId: "web",
     workspaceMode: "design",
     workspaceSurface: "app",
   };
@@ -60,13 +61,45 @@ it("round-trips project-scoped editor state", () => {
 
   expect(loadSourceWorkspaceUiState(storage, "project alpha")).toEqual(state);
   expect(loadSourceWorkspaceUiState(storage, "project beta")).toEqual({});
-  expect(storage.getItem(sourceWorkspaceUiStorageKey("project alpha"))).toContain("\"version\":1");
+  expect(storage.getItem(sourceWorkspaceUiStorageKey("project alpha"))).toContain("\"version\":2");
+});
+
+it("migrates the version 1 device selection and adds a target on the next save", () => {
+  const storage = memoryStorage();
+  storage.setItem("design-space:source-workspace:v1:project", JSON.stringify({
+    version: 1,
+    selection: { device: "tablet", nodeId: "layout:app" },
+    workspaceMode: "preview",
+  }));
+
+  expect(loadSourceWorkspaceUiState(storage, "project")).toEqual({
+    selection: { device: "tablet", nodeId: "layout:app" },
+    workspaceMode: "preview",
+  });
+
+  saveSourceWorkspaceUiState(storage, "project", {
+    activity: "app",
+    appCodeOpen: false,
+    canvasMode: "design",
+    codeDocument: "source",
+    designCases: {},
+    mobilePane: "canvas",
+    rightMode: "design",
+    selection: { device: "tablet", nodeId: "layout:app" },
+    targetId: "web",
+    workspaceMode: "preview",
+    workspaceSurface: "app",
+  });
+  expect(loadSourceWorkspaceUiState(storage, "project")).toMatchObject({
+    targetId: "web",
+    selection: { device: "tablet" },
+  });
 });
 
 it("ignores corrupt or unsupported editor state instead of breaking startup", () => {
   const storage = memoryStorage();
   storage.setItem(sourceWorkspaceUiStorageKey("project"), JSON.stringify({
-    version: 1,
+    version: 2,
     activity: "unknown",
     canvasMode: "broken",
     rightMode: "design",
@@ -82,7 +115,7 @@ it("ignores corrupt or unsupported editor state instead of breaking startup", ()
 it("never restores the temporary interactive canvas state", () => {
   const storage = memoryStorage();
   storage.setItem(sourceWorkspaceUiStorageKey("project"), JSON.stringify({
-    version: 1,
+    version: 2,
     canvasMode: "play",
     workspaceMode: "preview",
   }));

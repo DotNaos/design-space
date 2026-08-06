@@ -74,11 +74,13 @@ export function designSpaceTargetPlugin(target: RegisteredTarget, draftPreviews?
         });
       }
       if (sourceWorkspace) {
-        const appRoot = normalizePath(`${target.root}/${sourceWorkspace.manifest.sourceRoot}/`);
-        server.watcher.add([appRoot, ...sourceWorkspace.files.map((file) => file.absolutePath)]);
+        const appRoots = (sourceWorkspace.manifest.targets?.map(({ sourceRoot }) => sourceRoot)
+          ?? [sourceWorkspace.manifest.sourceRoot])
+          .map((sourceRoot) => normalizePath(`${target.root}/${sourceRoot}/`));
+        server.watcher.add([...appRoots, ...sourceWorkspace.files.map((file) => file.absolutePath)]);
         const restartForSourceShape = (changedPath: string) => {
           const normalized = normalizePath(changedPath);
-          if (normalized.startsWith(appRoot) && /\.[cm]?[jt]sx?$/.test(normalized)) void server.restart();
+          if (appRoots.some((appRoot) => normalized.startsWith(appRoot)) && /\.[cm]?[jt]sx?$/.test(normalized)) void server.restart();
         };
         server.watcher.on("add", restartForSourceShape);
         server.watcher.on("unlink", restartForSourceShape);
@@ -146,10 +148,9 @@ function previewScriptLoader(relativePath: string): "js" | "jsx" | "ts" | "tsx" 
 function sourceTargetModule(target: RegisteredTarget): string {
   const workspace = target.sourceWorkspace;
   if (!workspace) throw new Error("Missing source workspace");
-  const web = workspace.manifest.runtime === "react";
-  const sourceRuntime = runtimeWorkspaceModule(workspace, "Source", web);
+  const sourceRuntime = runtimeWorkspaceModule(workspace, "Source");
   const developmentRuntime = target.sourceLibrary?.development
-    ? runtimeWorkspaceModule(target.sourceLibrary.development, "LibraryDevelopment", true)
+    ? runtimeWorkspaceModule(target.sourceLibrary.development, "LibraryDevelopment")
     : undefined;
   const release = target.sourceLibrary?.release;
   const releaseImport = release?.modulePath
@@ -173,9 +174,11 @@ function sourceTargetModule(target: RegisteredTarget): string {
     "  defaultFixture: { instanceId: \"source-workspace-root\", adapterId: sourceHostAdapter.component.id, slots: {} },",
     `  files: ${JSON.stringify(files)},`,
     "  sourceWorkspace: {",
+    `    adapter: ${JSON.stringify(workspace.manifest.adapter)},`,
     `    runtime: ${JSON.stringify(workspace.manifest.runtime)},`,
     `    sourceRoot: ${JSON.stringify(workspace.manifest.sourceRoot)},`,
     `    devices: ${JSON.stringify(workspace.manifest.devices)},`,
+    `    targets: ${JSON.stringify(workspace.manifest.targets)},`,
     `    library: ${JSON.stringify(workspace.manifest.library)},`,
     `    approvals: ${JSON.stringify(workspace.manifest.approvals)},`,
     `    capabilities: ${JSON.stringify({ createComponents: Boolean(target.sourceComponentStore) })},`,
@@ -218,7 +221,6 @@ function sourceTargetModule(target: RegisteredTarget): string {
 function runtimeWorkspaceModule(
   workspace: NonNullable<RegisteredTarget["sourceWorkspace"]>,
   prefix: string,
-  web: boolean,
 ) {
   const entries = workspace.manifest.entries.map((entry) => {
     const absolutePath = workspace.entryFiles.get(entry.id);
@@ -226,12 +228,14 @@ function runtimeWorkspaceModule(
     const designPath = entry.design
       ? workspace.files.find((file) => file.id === entry.design?.fileId)?.absolutePath
       : undefined;
-    const design = web && entry.design && designPath
+    const runtime = workspace.manifest.targets?.find((target) => target.id === entry.targetId)?.runtime
+      ?? workspace.manifest.runtime;
+    const design = runtime !== "react-native" && entry.design && designPath
       ? `{ ...${JSON.stringify(entry.design)}, load: () => import(${JSON.stringify(normalizePath(designPath))}).then((module) => module.default) }`
       : "undefined";
     return `{ ...${JSON.stringify(entry)}, component: NativePreviewUnavailable, design: ${design} }`;
   });
-  const styleImports = web ? workspace.stylePaths.map((path, index) => ({
+  const styleImports = workspace.manifest.runtime !== "react-native" ? workspace.stylePaths.map((path, index) => ({
     statement: `import ${prefix}Style${index} from ${JSON.stringify(`${normalizePath(path)}?inline`)};`,
     variable: `${prefix}Style${index}`,
   })) : [];

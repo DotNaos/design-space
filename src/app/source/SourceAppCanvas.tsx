@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 
-import type { DesignSpaceDevice, RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
+import type { DesignSpaceDevice, DesignSpaceRuntime, RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
 import type { SourcePreviewMode, SourceWorkspaceMode } from "./source-layer-design";
 import type { SourceTreeNode } from "./source-workspace-tree";
 import type { SourceCanvasAncestryItem } from "./source-canvas-ancestry";
@@ -31,7 +31,7 @@ export function SourceAppCanvas(props: {
   previewEntry?: RuntimeSourceWorkspaceEntry;
   revealSelectedLayerKey?: number;
   reviewCheckpoint?: Omit<SourceComponentReviewCheckpointProps, "onRequestChanges">;
-  runtime: "react" | "react-native";
+  runtime: DesignSpaceRuntime;
   selectedClassCss?: string;
   selectedClassName?: string;
   selectedDesignCase?: string;

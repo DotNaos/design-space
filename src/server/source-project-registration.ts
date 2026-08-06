@@ -1,6 +1,6 @@
 import type { DesignSpaceProjectConfig } from "../shared/source-workspace";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import { runnerImport } from "vite";
 
@@ -8,6 +8,8 @@ import { DesignSpaceError } from "./errors";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { verifySourceComponentApprovals } from "./source-approval-registration";
 import { indexSourceWorkspace } from "./source-file-index";
+import { indexAppManifestWorkspace } from "./source-file-index";
+import type { AppManifest } from "./app-manifest";
 import { parseSourceProjectConfig } from "./source-project-config";
 import { registerSourceComponentStore } from "./source-component-creation";
 import { resolveConfiguredLibraryDevelopmentRoot } from "./library-development-project";
@@ -54,6 +56,47 @@ export async function registerSourceProject(
     sourceComponentStore,
     sourceLibrary,
     libraryProject: config.library?.project,
+  };
+}
+
+export async function registerAppManifestProject(
+  unsafeRoot: string,
+  manifestPath: string,
+  manifest: AppManifest,
+): Promise<RegisteredTarget> {
+  const root = await canonicalRoot(unsafeRoot);
+  const registrationPath = await canonicalRegisteredFile(root, manifestPath);
+  for (const [targetId, target] of Object.entries(manifest.targets)) {
+    const targetRoot = await canonicalRoot(resolve(root, target.sourceRoot));
+    const traversal = relative(root, targetRoot);
+    if (traversal === ".." || traversal.startsWith(`..${sep}`) || isAbsolute(traversal)) {
+      throw new DesignSpaceError("INVALID_REGISTRATION", `targets.${targetId}.sourceRoot escapes the project root`);
+    }
+    await canonicalRegisteredFile(root, target.entrypoint);
+    await Promise.all(Object.values(target.devices).map((device) => (
+      canonicalRegisteredFile(root, device!.root.source)
+    )));
+  }
+  const sourceWorkspace = await indexAppManifestWorkspace(root, manifest);
+  const sourceRoots = sourceWorkspace.manifest.targets?.map((target) => target.sourceRoot) ?? [];
+  const editableFileIds = new Set(
+    sourceWorkspace.files
+      .filter((file) => sourceRoots.some((sourceRoot) => isEditableTypeScriptSource(file.relativePath, sourceRoot)))
+      .map((file) => file.id),
+  );
+  return {
+    project: { id: manifest.app.id, label: manifest.app.displayName },
+    root,
+    targetModulePath: registrationPath,
+    registrationPath,
+    files: new Map(sourceWorkspace.files.map((file) => [file.id, {
+      id: file.id,
+      path: file.absolutePath,
+      displayName: file.relativePath,
+    }])),
+    editTargets: new Map(),
+    editableFileIds,
+    sourceWorkspace,
   };
 }
 

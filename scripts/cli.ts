@@ -11,7 +11,7 @@ const projectRoot = process.cwd();
 const arguments_ = process.argv.slice(2);
 
 if (arguments_.includes("--help")) {
-  console.log("Run Design Space for the current frontend project. Use `design-space init` once to create .designspace.ts and the package script.");
+  console.log("Run Design Space for the current app project. Neutral app.manifest.json projects work directly; legacy projects can use `design-space init` to create .designspace.ts.");
   process.exit(0);
 }
 if (arguments_.length === 1 && arguments_[0] === "init") {
@@ -30,9 +30,10 @@ if (arguments_.length > 0) {
 }
 if (
   !existsSync(resolve(projectRoot, ".designspace.ts")) &&
+  !existsSync(resolve(projectRoot, "app.manifest.json")) &&
   !existsSync(resolve(projectRoot, "design-space.server.ts"))
 ) {
-  throw new Error("The current frontend project has no .designspace.ts config.");
+  throw new Error("The current project has no app.manifest.json, .designspace.ts, or server registration.");
 }
 
 const { loadRegisteredProject } = await import("../src/server/project-loader");

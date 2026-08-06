@@ -7,7 +7,7 @@ export const designSpaceDevices = ["desktop", "tablet", "mobile"] as const;
 
 export type DesignSpaceArea = (typeof designSpaceAreas)[number];
 export type DesignSpaceDevice = (typeof designSpaceDevices)[number];
-export type DesignSpaceRuntime = "react" | "react-native";
+export type DesignSpaceRuntime = "react" | "react-native" | "electron";
 
 export interface DesignSpaceLibraryProjectConfig {
   /** Trusted Git remote used when the independent library project is not cloned yet. */
@@ -24,7 +24,7 @@ export interface DesignSpaceProjectConfig {
     label: string;
   };
   /** Web is the default. React Native targets use their own project root and config. */
-  runtime?: DesignSpaceRuntime;
+  runtime?: Exclude<DesignSpaceRuntime, "electron">;
   /** Tablet may intentionally reuse one existing implementation. */
   tablet?: {
     fallback: Extract<DesignSpaceDevice, "desktop" | "mobile">;
@@ -154,6 +154,10 @@ export interface SourceWorkspaceEntry {
   previewable?: boolean;
   /** Colocated executable preview evidence. Missing means the component is not previewable. */
   design?: SourceComponentDesign;
+  /** Present only for app.manifest.json projects. */
+  targetId?: string;
+  /** Explicit manifest devices that use this implementation. */
+  manifestDevices?: readonly DesignSpaceDevice[];
 }
 
 export type SourceApprovalState = "approved" | "missing" | "stale" | "invalid";
@@ -243,11 +247,31 @@ export interface SourceWorkspaceManifest {
   sourceRoot: string;
   entries: readonly SourceWorkspaceEntry[];
   devices: readonly SourceWorkspaceDeviceState[];
+  adapter?: "legacy" | "app-manifest";
+  targets?: readonly SourceWorkspaceTarget[];
   library?: SourceWorkspaceLibrary;
   capabilities?: {
     createComponents: boolean;
   };
   approvals?: SourceApprovalEvidence;
+}
+
+export interface SourceWorkspaceTargetDevice {
+  id: DesignSpaceDevice;
+  root: {
+    source: string;
+    export: string;
+  };
+  /** Stable source entry shared by devices that declare the same root. */
+  entryId: string;
+}
+
+export interface SourceWorkspaceTarget {
+  id: string;
+  runtime: DesignSpaceRuntime;
+  sourceRoot: string;
+  entrypoint: string;
+  devices: readonly SourceWorkspaceTargetDevice[];
 }
 
 export interface SourceWorkspaceLibrary {

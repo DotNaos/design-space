@@ -21,12 +21,13 @@ export interface SourceWorkspaceUiState {
   selectedLibraryLayerId?: string;
   selectedProjectFileId?: string;
   selection?: SourceWorkspaceSelection;
+  targetId?: string;
   workspaceMode: SourceWorkspaceMode;
   workspaceSurface: "app" | "library";
 }
 
 type PersistedSourceWorkspaceUiState = Partial<SourceWorkspaceUiState> & {
-  version: 1;
+  version: 2;
 };
 
 type PersistedSourceTreeState = {
@@ -34,7 +35,8 @@ type PersistedSourceTreeState = {
   version: 1;
 };
 
-const WORKSPACE_STORAGE_PREFIX = "design-space:source-workspace:v1";
+const WORKSPACE_STORAGE_PREFIX = "design-space:source-workspace:v2";
+const LEGACY_WORKSPACE_STORAGE_PREFIX = "design-space:source-workspace:v1";
 const TREE_STORAGE_PREFIX = "design-space:source-tree:v1";
 const activities: readonly WorkspaceActivity[] = ["app", "library", "files"];
 const canvasModes: readonly SourcePreviewMode[] = ["design", "play"];
@@ -58,8 +60,14 @@ export function loadSourceWorkspaceUiState(
   storage: Pick<Storage, "getItem"> | undefined,
   projectId: string,
 ): Partial<SourceWorkspaceUiState> {
-  const parsed = readJson(storage, sourceWorkspaceUiStorageKey(projectId));
-  if (!isRecord(parsed) || parsed.version !== 1) return {};
+  const current = readJson(storage, sourceWorkspaceUiStorageKey(projectId));
+  const legacy = readJson(storage, `${LEGACY_WORKSPACE_STORAGE_PREFIX}:${encodeURIComponent(projectId)}`);
+  const parsed = isRecord(current) && current.version === 2
+    ? current
+    : isRecord(legacy) && legacy.version === 1
+      ? legacy
+      : undefined;
+  if (!parsed) return {};
 
   return {
     ...(isOneOf(parsed.activity, activities) ? { activity: parsed.activity } : {}),
@@ -92,6 +100,7 @@ export function loadSourceWorkspaceUiState(
     ...(sourceWorkspaceSelection(parsed.selection)
       ? { selection: sourceWorkspaceSelection(parsed.selection) }
       : {}),
+    ...(typeof parsed.targetId === "string" ? { targetId: parsed.targetId } : {}),
     ...(isOneOf(parsed.workspaceMode, workspaceModes) ? { workspaceMode: parsed.workspaceMode } : {}),
     ...(isOneOf(parsed.workspaceSurface, workspaceSurfaces) ? { workspaceSurface: parsed.workspaceSurface } : {}),
   };
@@ -103,7 +112,7 @@ export function saveSourceWorkspaceUiState(
   state: SourceWorkspaceUiState,
 ) {
   writeJson(storage, sourceWorkspaceUiStorageKey(projectId), {
-    version: 1,
+    version: 2,
     ...state,
   } satisfies PersistedSourceWorkspaceUiState);
 }

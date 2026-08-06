@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "app": {
+    "id": "manifest-device-dogfood",
+    "displayName": "Manifest Device Dogfood"
+  },
+  "targets": {
+    "web": {
+      "runtime": "react",
+      "sourceRoot": "clients/web",
+      "entrypoint": "clients/web/src/main.tsx",
+      "devices": {
+        "desktop": {
+          "root": { "source": "clients/web/src/app-roots/App.tsx", "export": "App" }
+        },
+        "tablet": {
+          "root": { "source": "clients/web/src/app-roots/App.tsx", "export": "App" }
+        }
+      }
+    },
+    "native": {
+      "runtime": "react-native",
+      "sourceRoot": "clients/mobile",
+      "entrypoint": "clients/mobile/index.ts",
+      "devices": {
+        "mobile": {
+          "root": { "source": "clients/mobile/src/app-roots/App.mobile.tsx", "export": "default" }
+        }
+      }
+    }
+  }
+}
