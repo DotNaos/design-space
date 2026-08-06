@@ -1,10 +1,9 @@
 import { defineComponentDesign } from "../../../../../../src/shared/component-design";
+import { AppTablet } from "./App.tablet";
 
-import { App } from "./App";
-
-export default defineComponentDesign(App, {
+export default defineComponentDesign(AppTablet, {
   isStateful: false,
   defaults: {},
   designs: { default: {} },
-  render: () => <App />,
+  render: () => <AppTablet />,
 });
