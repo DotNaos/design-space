@@ -324,7 +324,9 @@ function sourceEntryComponentGroupKey(entry: RuntimeSourceWorkspaceEntry): strin
   return `file:${[...directories, baseStem].join("/")}`;
 }
 
-export function sourceEntryComponentPath(entry: RuntimeSourceWorkspaceEntry): readonly string[] {
+export function sourceEntryComponentPath(
+  entry: Pick<RuntimeSourceWorkspaceEntry, "area" | "relativePath" | "label">,
+): readonly string[] {
   if (entry.area !== "components") return [entry.label];
   const componentSegments = sourceEntryComponentSegments(entry);
   if (!componentSegments) return [entry.label];
@@ -343,7 +345,7 @@ export function sourceEntryComponentPath(entry: RuntimeSourceWorkspaceEntry): re
 }
 
 function sourceEntryComponentSegments(
-  entry: RuntimeSourceWorkspaceEntry,
+  entry: Pick<RuntimeSourceWorkspaceEntry, "relativePath">,
 ): { directories: readonly string[]; stem: string } | undefined {
   const segments = entry.relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
   let rootIndex = -1;

@@ -187,6 +187,51 @@ it("categorizes and filters external library components", () => {
   expect(filterSourceCatalog(components, "chat", "all").map((component) => component.label)).toEqual(["AiChat"]);
 });
 
+it("groups library components by the nearest named package", () => {
+  const components = sourceCatalogComponents({
+    catalog: {
+      packageName: "@dotnaos/ui",
+      development: {
+        devices: [],
+        entries: [
+          entry({ id: "base-button", label: "Button", relativePath: "src/components/base/Button.tsx" }),
+          entry({ id: "layout-button", label: "Button", relativePath: "src/components/layout/Button.tsx" }),
+          entry({ id: "chat-message", label: "Message", relativePath: "src/components/chat/messages/Message.tsx" }),
+        ],
+        packages: [
+          { directory: "src/components/base", name: "@dotnaos/ui/base" },
+          { directory: "src/components/layout", name: "@dotnaos/ui/layout" },
+          { directory: "src/components/chat", name: "@dotnaos/ui/ai" },
+        ],
+        runtime: "react",
+        sourceRoot: "src",
+        styles: [],
+      },
+    },
+    device: "desktop",
+    kind: "library",
+    library: {
+      components: [
+        { name: "Button", evidence: "package-export" },
+        { name: "Button", evidence: "package-export" },
+        { name: "Message", evidence: "package-export" },
+      ],
+      editable: true,
+      mode: "development",
+      packageName: "@dotnaos/ui",
+      version: "0.0.0",
+    },
+    mode: "development",
+  });
+
+  expect(components.map(({ label, path }) => ({ label, path }))).toEqual([
+    { label: "Button", path: ["@dotnaos/ui/base", "Button"] },
+    { label: "Button", path: ["@dotnaos/ui/layout", "Button"] },
+    { label: "Message", path: ["@dotnaos/ui/ai", "messages", "Message"] },
+  ]);
+  expect(components[0]?.packagePaths).toEqual([["@dotnaos/ui/base"]]);
+});
+
 it("uses the public component label as the leaf without repeating its source folder", () => {
   const action = entry({
     id: "action-button",

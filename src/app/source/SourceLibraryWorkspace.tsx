@@ -3,14 +3,13 @@ import { Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { DesignSpaceDevice, RuntimeSourceLibraryCatalog, RuntimeSourceWorkspace, RuntimeSourceWorkspaceEntry, SourceWorkspaceLibrary } from "../../shared/source-workspace";
-import { filterSourceCatalog, selectedSourceCatalogComponent, sourceCatalogComponents, type SourceCatalogComponent, type SourceCatalogKind, type SourceLibraryCategory } from "./source-library-catalog";
+import { filterSourceCatalog, selectedSourceCatalogComponent, sourceCatalogComponents, type SourceCatalogComponent, type SourceCatalogKind } from "./source-library-catalog";
 import type { SourceLibraryMode } from "./useSourceLibraryRuntime";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 import type { SourceCodeAnnotation, SourceCodeSelectionContext } from "./source-feedback";
 import { LibraryDevelopmentSourceControl } from "./LibraryDevelopmentSourceControl";
 import { SourceCatalogTree } from "./SourceCatalogTree";
 import { sourceCatalogTree } from "./source-catalog-tree";
-import { CategoryFilter } from "./CategoryFilter";
 import { SourceLibraryCanvas } from "./SourceLibraryCanvas";
 import { SourceLibraryInspector } from "./SourceLibraryInspector";
 import type { SourceBoxModelPreviewStore } from "./source-box-model-preview";
@@ -60,7 +59,6 @@ export function SourceLibrarySidebar(
   },
 ) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<SourceLibraryCategory>("all");
   const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(new Set());
   const components = useMemo(() => catalogComponents(props, props.catalogKind), [
     props.appWorkspace,
@@ -72,8 +70,8 @@ export function SourceLibrarySidebar(
     props.mode,
   ]);
   const visible = useMemo(
-    () => filterSourceCatalog(components, query, props.catalogKind === "app" ? "all" : category),
-    [category, components, props.catalogKind, query],
+    () => filterSourceCatalog(components, query, "all"),
+    [components, query],
   );
   const sections = useMemo(
     () => catalogSections(visible, props.catalogKind),
@@ -109,9 +107,6 @@ export function SourceLibrarySidebar(
                   <Input className="min-w-0 flex-1 rounded-full bg-transparent text-[11px] text-zinc-300 outline-none placeholder:text-zinc-600" placeholder="Search components" />
                 </div>
               </TextField>
-              {props.catalogKind === "library" ? (
-                <CategoryFilter value={category} onChange={setCategory} />
-              ) : null}
             </div>
           </>
         )}
@@ -122,10 +117,7 @@ export function SourceLibrarySidebar(
       ) : (
         <div aria-label="Component list" className="min-h-0 flex-1 overflow-y-auto py-2" role="list">
           {sections.map((section) => (
-            <div aria-label={section.label} className="pb-2" key={section.id} role={section.label ? "group" : undefined}>
-              {section.label ? (
-                <h3 className="px-4 pb-1.5 pt-2 text-[9px] font-medium text-zinc-500">{section.label}</h3>
-              ) : null}
+            <div className="pb-2" key={section.id}>
               <SourceCatalogTree
                 collapsed={query.trim() ? new Set() : collapsedFolders}
                 items={sourceCatalogTree(section.components)}
@@ -154,7 +146,7 @@ export function SourceLibrarySidebar(
 
 function catalogSections(components: readonly SourceCatalogComponent[], kind: SourceCatalogKind) {
   if (kind === "app") return [{ id: "app", label: undefined, components }];
-  return components.length ? [{ id: "components", label: "Components", components }] : [];
+  return components.length ? [{ id: "packages", label: undefined, components }] : [];
 }
 
 type SourceLibrarySelectionProps = Pick<

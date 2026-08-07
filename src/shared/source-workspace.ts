@@ -258,6 +258,8 @@ export interface SourceWorkspaceManifest {
   folderIcons?: readonly SourceWorkspaceFolderIcon[];
   /** Project-relative directories containing a package.json, used only for catalog navigation. */
   packageDirectories?: readonly string[];
+  /** Package names discovered from package.json files, used only for catalog navigation. */
+  packages?: readonly SourceWorkspacePackage[];
   adapter?: "legacy" | "app-manifest";
   targets?: readonly SourceWorkspaceTarget[];
   library?: SourceWorkspaceLibrary;
@@ -265,6 +267,13 @@ export interface SourceWorkspaceManifest {
     createComponents: boolean;
   };
   approvals?: SourceApprovalEvidence;
+}
+
+export interface SourceWorkspacePackage {
+  /** Project-relative directory containing the package.json. The project root is ".". */
+  directory: string;
+  /** Package name read from package.json. */
+  name: string;
 }
 
 export interface SourceWorkspaceFolderIcon {

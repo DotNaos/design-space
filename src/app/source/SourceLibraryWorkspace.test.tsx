@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -55,6 +55,7 @@ const catalog: RuntimeSourceLibraryCatalog = {
     entries: [entry],
     devices: [],
     styles: [],
+    packages: [{ directory: ".", name: "@dotnaos/ui/base" }],
   },
   release: { version: "0.0.5", entries: [entry], styles: [] },
 };
@@ -75,12 +76,12 @@ it("shows only the development source with a design coverage audit", () => {
   );
 
   expect(screen.getByText("1/2")).toBeVisible();
-  const componentsGroup = screen.getByRole("group", { name: "Components" });
-  expect(componentsGroup).toBeVisible();
-  expect(within(componentsGroup).getByRole("button", { name: "Button", pressed: true })).toBeVisible();
-  expect(within(componentsGroup).getByRole("button", { name: "Card" })).toBeVisible();
+  expect(screen.queryByRole("group", { name: "Components" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "@dotnaos/ui/base / Button", pressed: true })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Card" })).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Button", pressed: true })).toHaveClass("rounded-full", "bg-violet-500/[0.14]", "text-violet-200");
+  expect(screen.getByRole("button", { name: "@dotnaos/ui/base / Button", pressed: true })).toHaveClass("rounded-full", "bg-violet-500/[0.14]", "text-violet-200");
   expect(screen.getByRole("button", { name: "Card" })).toBeVisible();
   expect(screen.getByLabelText("Card design missing")).toBeVisible();
   expect(screen.queryByText("Component")).not.toBeInTheDocument();
@@ -237,6 +238,7 @@ it("mirrors nested app component folders and keeps duplicate leaf names selectab
       appWorkspace={{
         ...catalog.development!,
         entries: appEntries,
+        packages: undefined,
         folderIcons: [
           { directory: "src/app/components/Agents", name: "bot" },
           { directory: "src/app/components/Git", name: "not-a-real-lucide-icon" },
@@ -307,9 +309,9 @@ it("renders source-derived icons for development-library folders", async () => {
     />,
   );
 
-  const actionsFolder = screen.getByRole("button", { name: "Collapse folder actions" });
+  const actionsFolder = screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base / actions" });
   await waitFor(() => expect(actionsFolder.querySelector("svg.lucide-sparkles")).toBeVisible());
-  expect(screen.getByRole("button", { name: "actions / ActionButton" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "@dotnaos/ui/base / actions / ActionButton" })).toBeVisible();
 });
 
 it("does not duplicate the library identity from the global workspace switch", () => {
@@ -333,7 +335,7 @@ it("does not duplicate the library identity from the global workspace switch", (
   expect(screen.queryByText("Installed")).not.toBeInTheDocument();
 });
 
-it("keeps the compact category filter beside component search", () => {
+it("keeps package navigation beside component search without category sections", () => {
   render(
     <SourceLibrarySidebar
       catalog={catalog}
@@ -349,7 +351,8 @@ it("keeps the compact category filter beside component search", () => {
   );
 
   expect(screen.getByRole("textbox", { name: "Search components" })).toBeVisible();
-  expect(screen.getByRole("button", { name: /Component category/ })).toHaveClass("size-9", "rounded-full");
+  expect(screen.queryByRole("button", { name: /Component category/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("group", { name: "Components" })).not.toBeInTheDocument();
 });
 
 it("fills the available canvas with its empty state", () => {

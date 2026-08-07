@@ -13,6 +13,7 @@ import {
   type SourceWorkspaceEntry,
   type SourceWorkspaceFolderIcon,
   type SourceWorkspaceManifest,
+  type SourceWorkspacePackage,
   type SourceWorkspaceLibrary,
   type SourceWorkspaceTarget,
 } from "../shared/source-workspace";
@@ -138,6 +139,7 @@ export async function indexSourceWorkspace(
     devices: Object.freeze(deviceStates(entries, config)),
     folderIcons: sourceFolderIcons(files),
     packageDirectories: sourcePackageDirectories(files),
+    packages: await sourcePackages(root, files),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
   };
   return {
@@ -248,6 +250,7 @@ export async function indexAppManifestWorkspace(
     devices: Object.freeze([]),
     folderIcons: sourceFolderIcons(files),
     packageDirectories: sourcePackageDirectories(files),
+    packages: await sourcePackages(root, files),
     targets: Object.freeze(targets),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
   };
@@ -481,6 +484,32 @@ function sourcePackageDirectories(files: readonly IndexedSourceFile[]): readonly
       .map((file) => dirname(file.relativePath).replaceAll("\\", "/"))
       .filter((directory) => directory !== "."),
   )].sort((left, right) => left.localeCompare(right, "en")));
+}
+
+async function sourcePackages(
+  root: string,
+  files: readonly IndexedSourceFile[],
+): Promise<readonly SourceWorkspacePackage[]> {
+  const packages: SourceWorkspacePackage[] = [];
+  for (const file of files) {
+    if (basename(file.relativePath).toLocaleLowerCase() !== "package.json") continue;
+    const directory = dirname(file.relativePath).replaceAll("\\", "/");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await readRegisteredFile(root, file.absolutePath, {
+        unavailableMessage: "The discovered package manifest is unavailable",
+      }));
+    } catch {
+      continue;
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) continue;
+    const name = (parsed as { name?: unknown }).name;
+    if (typeof name !== "string" || !name.trim()) continue;
+    packages.push({ directory, name: name.trim() });
+  }
+  return Object.freeze(packages.sort((left, right) => (
+    left.directory.localeCompare(right.directory, "en") || left.name.localeCompare(right.name, "en")
+  )));
 }
 
 async function registerDiscoveredFiles(root: string, relativePaths: readonly string[]): Promise<IndexedSourceFile[]> {

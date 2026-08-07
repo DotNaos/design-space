@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ComponentType } from "react";
-import { Folder, Package, type LucideProps } from "lucide-react";
+import { Folder, type LucideProps } from "lucide-react";
 import dynamicIconImports from "lucide-react/dynamicIconImports";
+import { NpmBrandIcon } from "./NpmBrandIcon";
 
 const folderIconComponents = new Map<string, ComponentType<LucideProps>>();
 const defaultFolderIcon = <Folder aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />;
@@ -21,7 +22,7 @@ export function CatalogFolderIcon(props: { name?: string; isPackage?: boolean })
           <Icon aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />
         </Suspense>
       ) : defaultFolderIcon}
-      {props.isPackage ? <Package aria-label="npm package" className="text-orange-300" size={12} /> : null}
+      {props.isPackage ? <NpmBrandIcon /> : null}
     </span>
   );
 }
