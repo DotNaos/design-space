@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -75,7 +75,10 @@ it("shows only the development source with a design coverage audit", () => {
   );
 
   expect(screen.getByText("1/2")).toBeVisible();
-  expect(screen.getByRole("group", { name: "Primitives" })).toBeVisible();
+  const componentsGroup = screen.getByRole("group", { name: "Components" });
+  expect(componentsGroup).toBeVisible();
+  expect(within(componentsGroup).getByRole("button", { name: "Button", pressed: true })).toBeVisible();
+  expect(within(componentsGroup).getByRole("button", { name: "Card" })).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Button", pressed: true })).toHaveClass("rounded-full", "bg-violet-500/[0.14]", "text-violet-200");
   expect(screen.getByRole("button", { name: "Card" })).toBeVisible();

@@ -154,10 +154,7 @@ export function SourceLibrarySidebar(
 
 function catalogSections(components: readonly SourceCatalogComponent[], kind: SourceCatalogKind) {
   if (kind === "app") return [{ id: "app", label: undefined, components }];
-  return [
-    { id: "composed", label: "Components", components: components.filter((component) => component.category === "composed") },
-    { id: "primitive", label: "Primitives", components: components.filter((component) => component.category === "primitive") },
-  ].filter((section) => section.components.length > 0);
+  return components.length ? [{ id: "components", label: "Components", components }] : [];
 }
 
 type SourceLibrarySelectionProps = Pick<
