@@ -242,12 +242,17 @@ it("mirrors nested app component folders and keeps duplicate leaf names selectab
     />,
   );
 
-  expect(screen.getByRole("button", { name: "Agents / AgentCard" })).toBeVisible();
+  const agentsFolder = screen.getByRole("button", { name: "Collapse folder Agents" });
+  const agentsCard = screen.getByRole("button", { name: "Agents / AgentCard" });
+  expect(agentsCard).toBeVisible();
   expect(screen.getByRole("button", { name: "Git / AgentCard" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Agents / Tools / ToolCall" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Button" })).toBeVisible();
+  expect(agentsFolder).toHaveClass("relative", "px-3.5");
+  expect(agentsCard).toHaveClass("px-3.5");
+  expect(agentsFolder.querySelector("svg")).toHaveClass("absolute", "-start-0.5", "size-3");
 
-  await userEvent.click(screen.getByRole("button", { name: "Collapse folder Agents" }));
+  await userEvent.click(agentsFolder);
   expect(screen.queryByRole("button", { name: "Agents / AgentCard" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Git / AgentCard" })).toBeVisible();
 

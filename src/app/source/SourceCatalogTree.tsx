@@ -37,12 +37,14 @@ function CatalogFolderBranch(props: Parameters<typeof SourceCatalogTree>[0] & {
         <Button
           aria-expanded={!collapsed}
           aria-label={`${collapsed ? "Expand" : "Collapse"} folder ${props.item.path.join(" / ")}`}
-          className="min-h-8 min-w-0 flex-1 justify-start gap-1.5 rounded-lg px-2 text-left text-xs font-medium text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
+          className="relative min-h-8 min-w-0 flex-1 justify-start gap-1.5 rounded-lg px-3.5 text-left text-xs font-medium text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
           fullWidth
           variant="ghost"
           onPress={() => props.onToggle(props.item.id)}
         >
-          {collapsed ? <ChevronRight aria-hidden="true" size={12} /> : <ChevronDown aria-hidden="true" size={12} />}
+          {collapsed
+            ? <ChevronRight aria-hidden="true" className="absolute -start-0.5 size-3" />
+            : <ChevronDown aria-hidden="true" className="absolute -start-0.5 size-3" />}
           <Folder aria-hidden="true" className="text-zinc-500" size={13} />
           <span className="whitespace-nowrap">{props.item.label}</span>
         </Button>
