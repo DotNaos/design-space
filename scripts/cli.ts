@@ -48,7 +48,23 @@ const child = spawn("bun", [resolve(packageRoot, "scripts/dev.ts")], {
   },
   stdio: "inherit",
 });
+const forwardedSignals = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
+let requestedSignal: NodeJS.Signals | undefined;
+for (const signal of forwardedSignals) {
+  process.on(signal, () => {
+    if (requestedSignal) return;
+    requestedSignal = signal;
+    child.kill(signal);
+  });
+}
 child.on("exit", (code, signal) => {
-  if (signal) process.kill(process.pid, signal);
-  else process.exit(code ?? 0);
+  const exitSignal = requestedSignal ?? signal ?? undefined;
+  if (exitSignal) {
+    for (const forwardedSignal of forwardedSignals) {
+      process.removeAllListeners(forwardedSignal);
+    }
+    process.kill(process.pid, exitSignal);
+  } else {
+    process.exit(code ?? 0);
+  }
 });
