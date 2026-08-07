@@ -19,6 +19,7 @@ export type SourceCatalogComponent = {
   label: string;
   path: readonly string[];
   folderIcons?: readonly CatalogFolderIcon[];
+  packagePaths?: readonly (readonly string[])[];
   searchText: string;
 };
 
@@ -63,6 +64,7 @@ export function sourceCatalogComponents(options: {
         label: node.label,
         path: node.area === "components" ? replacePathLeaf(node.path ?? [node.label], node.label) : [node.label],
         folderIcons: entry ? catalogFolderIcons(options.appWorkspace, entry) : undefined,
+        packagePaths: entry ? catalogPackagePaths(options.appWorkspace, entry) : undefined,
         searchText: `${node.label} ${(node.path ?? []).join(" ")} ${entry?.exportName ?? ""} ${entry?.relativePath ?? ""} ${node.area}`.toLocaleLowerCase(),
       };
     });
@@ -90,6 +92,9 @@ export function sourceCatalogComponents(options: {
       folderIcons: entry && options.mode === "development"
         ? catalogFolderIcons(options.catalog?.development, entry)
         : undefined,
+      packagePaths: entry && options.mode === "development"
+        ? catalogPackagePaths(options.catalog?.development, entry)
+        : undefined,
       searchText: `${name} ${entry?.exportName ?? ""} ${entry?.relativePath ?? ""} ${category}`.toLocaleLowerCase(),
     };
   }).sort((left, right) => left.label.localeCompare(right.label, "en"));
@@ -111,6 +116,24 @@ function catalogFolderIcons(
     return path.length ? [{ name: icon.name, path }] : [];
   });
   return icons.length ? icons : undefined;
+}
+
+function catalogPackagePaths(
+  workspace: Pick<RuntimeSourceWorkspace, "packageDirectories"> | undefined,
+  entry: Pick<RuntimeSourceWorkspaceEntry, "relativePath">,
+): readonly (readonly string[])[] | undefined {
+  const entryPath = entry.relativePath.replaceAll("\\", "/");
+  const paths = (workspace?.packageDirectories ?? []).flatMap((directory) => {
+    if (!entryPath.startsWith(`${directory}/`)) return [];
+    const segments = directory.split("/").filter(Boolean);
+    const rootIndex = segments.findIndex((segment) => {
+      const normalized = segment.toLocaleLowerCase();
+      return normalized === "components" || normalized === "primitives";
+    });
+    const path = rootIndex < 0 ? [] : segments.slice(rootIndex + 1);
+    return path.length ? [path] : [];
+  });
+  return paths.length ? paths : undefined;
 }
 
 function replacePathLeaf(path: readonly string[], label: string): readonly string[] {

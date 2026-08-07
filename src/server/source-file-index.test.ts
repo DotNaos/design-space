@@ -87,6 +87,7 @@ describe("TypeScript-first source index", () => {
     await writeFile(join(root, "src", "app", "desktop", "layout.tsx"), "export function Layout() { return <main />; }\n");
     await writeFile(join(root, "src", "app", "components", "Agents", "AgentCard", "desktop.tsx"), "export function AgentCard() { return <article />; }\n");
     await writeFile(join(root, "src", "app", "components", "Agents", ".bot.lucide-icon"), "");
+    await writeFile(join(root, "src", "app", "components", "Agents", "package.json"), "{}\n");
     await writeFile(join(root, "src", "app", "components", "Git", "AgentCard", "desktop.tsx"), "export function AgentCard() { return <article />; }\n");
     await writeFile(join(root, "src", "app", "components", "Git", ".git-commit.lucide-icon"), "");
     await writeFile(join(root, "src", "app", "components", "FlatButton", "desktop.tsx"), "export function FlatButton() { return <button />; }\n");
@@ -111,6 +112,9 @@ describe("TypeScript-first source index", () => {
       { directory: "src/app/components/Agents", name: "bot" },
       { directory: "src/app/components/Empty", name: "archive" },
       { directory: "src/app/components/Git", name: "git-commit" },
+    ]);
+    expect(result.manifest.packageDirectories).toEqual([
+      "src/app/components/Agents",
     ]);
     expect(result.files.map((file) => file.relativePath)).toContain("src/app/components/Agents/.bot.lucide-icon");
   });

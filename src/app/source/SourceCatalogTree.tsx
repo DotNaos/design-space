@@ -46,7 +46,7 @@ function CatalogFolderBranch(props: Parameters<typeof SourceCatalogTree>[0] & {
           {collapsed
             ? <ChevronRight aria-hidden="true" className="absolute -start-0.5 size-3" />
             : <ChevronDown aria-hidden="true" className="absolute -start-0.5 size-3" />}
-          <CatalogFolderIcon name={props.item.iconName} />
+          <CatalogFolderIcon isPackage={props.item.isPackage} name={props.item.iconName} />
           <span className="whitespace-nowrap">{props.item.label}</span>
         </Button>
       </div>

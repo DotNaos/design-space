@@ -72,6 +72,7 @@ it("derives nested app catalog paths from component source files", () => {
           relativePath: "src/app/components/Button.tsx",
         }),
       ],
+      packageDirectories: ["src/app/components/Agents"],
       runtime: "react",
       sourceRoot: "src/app",
       styles: [],
@@ -86,6 +87,8 @@ it("derives nested app catalog paths from component source files", () => {
     { label: "ToolCall", path: ["Agents", "Tools", "ToolCall"] },
     { label: "Button", path: ["Button"] },
   ]);
+
+  expect(components.find((component) => component.label === "AgentCard")?.packagePaths).toEqual([["Agents"]]);
 });
 
 it("keeps manifest target folders and mixed-case marker roots scoped to the selected target", () => {

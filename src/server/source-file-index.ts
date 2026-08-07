@@ -137,6 +137,7 @@ export async function indexSourceWorkspace(
     entries: Object.freeze(entries),
     devices: Object.freeze(deviceStates(entries, config)),
     folderIcons: sourceFolderIcons(files),
+    packageDirectories: sourcePackageDirectories(files),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
   };
   return {
@@ -246,6 +247,7 @@ export async function indexAppManifestWorkspace(
     entries: Object.freeze(entries),
     devices: Object.freeze([]),
     folderIcons: sourceFolderIcons(files),
+    packageDirectories: sourcePackageDirectories(files),
     targets: Object.freeze(targets),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
   };
@@ -470,6 +472,15 @@ function sourceFolderIcons(files: readonly IndexedSourceFile[]): readonly Source
     icons.set(directory, { directory, name: match[1]! });
   }
   return Object.freeze([...icons.values()].sort((left, right) => left.directory.localeCompare(right.directory, "en")));
+}
+
+function sourcePackageDirectories(files: readonly IndexedSourceFile[]): readonly string[] {
+  return Object.freeze([...new Set(
+    files
+      .filter((file) => basename(file.relativePath).toLocaleLowerCase() === "package.json")
+      .map((file) => dirname(file.relativePath).replaceAll("\\", "/"))
+      .filter((directory) => directory !== "."),
+  )].sort((left, right) => left.localeCompare(right, "en")));
 }
 
 async function registerDiscoveredFiles(root: string, relativePaths: readonly string[]): Promise<IndexedSourceFile[]> {

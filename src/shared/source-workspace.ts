@@ -256,6 +256,8 @@ export interface SourceWorkspaceManifest {
   devices: readonly SourceWorkspaceDeviceState[];
   /** Presentation-only Lucide icon markers discovered in source directories. */
   folderIcons?: readonly SourceWorkspaceFolderIcon[];
+  /** Project-relative directories containing a package.json, used only for catalog navigation. */
+  packageDirectories?: readonly string[];
   adapter?: "legacy" | "app-manifest";
   targets?: readonly SourceWorkspaceTarget[];
   library?: SourceWorkspaceLibrary;

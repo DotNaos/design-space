@@ -8,6 +8,7 @@ export interface SourceCatalogFolder {
   kind: "folder";
   label: string;
   iconName?: string;
+  isPackage?: boolean;
   path: readonly string[];
 }
 
@@ -22,6 +23,7 @@ interface MutableCatalogFolder {
   label: string;
   iconConflict?: true;
   iconName?: string;
+  packagePath?: readonly string[];
   path: readonly string[];
 }
 
@@ -43,12 +45,14 @@ export function sourceCatalogTree(
       };
       folder.children.set(segment, child);
       const iconName = component.folderIcons?.find((icon) => pathsEqual(icon.path, nextPath))?.name;
+      const packagePath = component.packagePaths?.find((packagePath) => pathsEqual(packagePath, nextPath));
       if (iconName && child.iconName && child.iconName !== iconName) {
         child.iconConflict = true;
         child.iconName = undefined;
       } else if (iconName && !child.iconConflict) {
         child.iconName = iconName;
       }
+      if (packagePath) child.packagePath = packagePath;
       folder = child;
     }
     folder.components.push(component);
@@ -63,7 +67,7 @@ function catalogChildren(folder: MutableCatalogFolder, scope: string): readonly 
   }));
   for (const child of folder.children.values()) {
     const children = catalogChildren(child, scope);
-    if (child.children.size === 0) {
+    if (child.children.size === 0 && child.packagePath === undefined && child.iconName === undefined) {
       items.push(...children);
       continue;
     }
@@ -73,6 +77,7 @@ function catalogChildren(folder: MutableCatalogFolder, scope: string): readonly 
       kind: "folder",
       label: child.label,
       iconName: child.iconName,
+      isPackage: child.packagePath !== undefined,
       path: child.path,
     });
   }

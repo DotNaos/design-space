@@ -1,24 +1,27 @@
 import { lazy, Suspense, type ComponentType } from "react";
-import { Folder, type LucideProps } from "lucide-react";
+import { Folder, Package, type LucideProps } from "lucide-react";
 import dynamicIconImports from "lucide-react/dynamicIconImports";
 
 const folderIconComponents = new Map<string, ComponentType<LucideProps>>();
 const defaultFolderIcon = <Folder aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />;
 
-export function CatalogFolderIcon(props: { name?: string }) {
+export function CatalogFolderIcon(props: { name?: string; isPackage?: boolean }) {
   const importer = props.name
     ? dynamicIconImports[props.name as keyof typeof dynamicIconImports]
     : undefined;
-  if (!props.name || !importer) return defaultFolderIcon;
-
-  let Icon = folderIconComponents.get(props.name);
-  if (!Icon) {
+  let Icon = props.name && importer ? folderIconComponents.get(props.name) : undefined;
+  if (props.name && importer && !Icon) {
     Icon = lazy(importer) as ComponentType<LucideProps>;
     folderIconComponents.set(props.name, Icon);
   }
   return (
-    <Suspense fallback={defaultFolderIcon}>
-      <Icon aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />
-    </Suspense>
+    <span className="inline-flex shrink-0 items-center gap-1">
+      {Icon ? (
+        <Suspense fallback={defaultFolderIcon}>
+          <Icon aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />
+        </Suspense>
+      ) : defaultFolderIcon}
+      {props.isPackage ? <Package aria-label="npm package" className="text-orange-300" size={12} /> : null}
+    </span>
   );
 }
