@@ -7,6 +7,8 @@ const folderIconComponents = new Map<string, ComponentType<LucideProps>>();
 const defaultFolderIcon = <Folder aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />;
 
 export function CatalogFolderIcon(props: { name?: string; isPackage?: boolean }) {
+  if (props.isPackage) return <NpmBrandIcon />;
+
   const importer = props.name
     ? dynamicIconImports[props.name as keyof typeof dynamicIconImports]
     : undefined;
@@ -22,7 +24,6 @@ export function CatalogFolderIcon(props: { name?: string; isPackage?: boolean })
           <Icon aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />
         </Suspense>
       ) : defaultFolderIcon}
-      {props.isPackage ? <NpmBrandIcon /> : null}
     </span>
   );
 }

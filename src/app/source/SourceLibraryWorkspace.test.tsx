@@ -78,6 +78,8 @@ it("shows only the development source with a design coverage audit", () => {
   expect(screen.getByText("1/2")).toBeVisible();
   expect(screen.queryByRole("group", { name: "Components" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base" })).toBeVisible();
+  expect(screen.getByText("base")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base" }).querySelector("svg.lucide-folder")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "@dotnaos/ui/base / Button", pressed: true })).toBeVisible();
   expect(screen.getByRole("button", { name: "Card" })).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
