@@ -100,7 +100,14 @@ export class LibraryDevelopmentProjectService implements OperationExecutor {
   #scheduleRestart(): void {
     const server = this.#server;
     if (!server) throw new DesignSpaceError("VALIDATION_ERROR", "The Design Space dev server is unavailable");
-    setTimeout(() => void server.restart(), this.#restartDelayMs);
+    setTimeout(() => {
+      void server.restart().then(() => {
+        // The selected worktree is part of the generated target module. Once
+        // the server has re-indexed it, tell the browser to load that module
+        // again instead of leaving the old catalog mounted in memory.
+        server.ws.send({ type: "full-reload" });
+      }).catch(() => undefined);
+    }, this.#restartDelayMs);
   }
 }
 
