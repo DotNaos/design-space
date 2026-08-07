@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { lstat, opendir, realpath } from "node:fs/promises";
-import { extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 
 import {
@@ -11,6 +11,7 @@ import {
   type DesignSpaceProjectConfig,
   type SourceWorkspaceDeviceState,
   type SourceWorkspaceEntry,
+  type SourceWorkspaceFolderIcon,
   type SourceWorkspaceManifest,
   type SourceWorkspaceLibrary,
   type SourceWorkspaceTarget,
@@ -53,6 +54,7 @@ const safeRootFiles = new Set([
   "vite.config.js",
   "vite.config.ts",
 ]);
+const folderIconMarkerPattern = /^\.([a-z0-9]+(?:-[a-z0-9]+)*)\.lucide-icon$/;
 
 export interface IndexedSourceFile {
   id: string;
@@ -134,6 +136,7 @@ export async function indexSourceWorkspace(
     sourceRoot: inferredCatalog ? sourceRoot : SOURCE_ROOT,
     entries: Object.freeze(entries),
     devices: Object.freeze(deviceStates(entries, config)),
+    folderIcons: sourceFolderIcons(files),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
   };
   return {
@@ -242,6 +245,7 @@ export async function indexAppManifestWorkspace(
     sourceRoot: firstTarget.sourceRoot,
     entries: Object.freeze(entries),
     devices: Object.freeze([]),
+    folderIcons: sourceFolderIcons(files),
     targets: Object.freeze(targets),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
   };
@@ -437,12 +441,35 @@ async function walkDirectory(root: string, relativeDirectory: string, depth: num
       if (!ignoredDirectories.has(entry.name)) await walkDirectory(root, relativePath, depth + 1, result);
       continue;
     }
-    if (!metadata.isFile() || !safeSourceExtensions.has(extname(entry.name).toLowerCase())) continue;
+    if (
+      !metadata.isFile()
+      || (!safeSourceExtensions.has(extname(entry.name).toLowerCase()) && !entry.name.endsWith(".lucide-icon"))
+    ) continue;
     result.add(relativePath);
     if (result.size > maximumIndexedFiles) {
       throw new DesignSpaceError("INVALID_REGISTRATION", "The source project contains too many browsable files");
     }
   }
+}
+
+function sourceFolderIcons(files: readonly IndexedSourceFile[]): readonly SourceWorkspaceFolderIcon[] {
+  const icons = new Map<string, SourceWorkspaceFolderIcon>();
+  const conflicts = new Set<string>();
+  for (const file of files) {
+    if (!file.relativePath.endsWith(".lucide-icon")) continue;
+    const markerName = basename(file.relativePath);
+    const match = folderIconMarkerPattern.exec(markerName);
+    if (!match) continue;
+    const directory = dirname(file.relativePath).replaceAll("\\", "/");
+    if (icons.has(directory)) {
+      conflicts.add(directory);
+      icons.delete(directory);
+      continue;
+    }
+    if (conflicts.has(directory)) continue;
+    icons.set(directory, { directory, name: match[1]! });
+  }
+  return Object.freeze([...icons.values()].sort((left, right) => left.directory.localeCompare(right.directory, "en")));
 }
 
 async function registerDiscoveredFiles(root: string, relativePaths: readonly string[]): Promise<IndexedSourceFile[]> {

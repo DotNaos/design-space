@@ -16,6 +16,7 @@ import { SourceLibraryInspector } from "./SourceLibraryInspector";
 import type { SourceBoxModelPreviewStore } from "./source-box-model-preview";
 
 export interface SourceLibraryProps {
+  appTargetId?: string;
   appWorkspace?: RuntimeSourceWorkspace;
   boxModelPreviewStore?: SourceBoxModelPreviewStore;
   catalog?: RuntimeSourceLibraryCatalog;
@@ -63,6 +64,7 @@ export function SourceLibrarySidebar(
   const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(new Set());
   const components = useMemo(() => catalogComponents(props, props.catalogKind), [
     props.appWorkspace,
+    props.appTargetId,
     props.catalog,
     props.catalogKind,
     props.device,
@@ -160,7 +162,7 @@ function catalogSections(components: readonly SourceCatalogComponent[], kind: So
 
 type SourceLibrarySelectionProps = Pick<
   SourceLibraryProps,
-  "appWorkspace" | "catalog" | "catalogKind" | "device" | "library" | "mode" | "selected"
+  "appTargetId" | "appWorkspace" | "catalog" | "catalogKind" | "device" | "library" | "mode" | "selected"
 >;
 
 export function selectedSourceLibraryCatalog(props: Pick<SourceLibraryProps, "catalog" | "mode">) {
@@ -188,10 +190,11 @@ export function selectedCatalogWorkspace(
 }
 
 function catalogComponents(
-  props: Pick<SourceLibraryProps, "appWorkspace" | "catalog" | "device" | "library" | "mode">,
+  props: Pick<SourceLibraryProps, "appTargetId" | "appWorkspace" | "catalog" | "device" | "library" | "mode">,
   kind: SourceCatalogKind,
 ) {
   return sourceCatalogComponents({
+    appTargetId: props.appTargetId,
     appWorkspace: props.appWorkspace,
     catalog: props.catalog,
     device: props.device,

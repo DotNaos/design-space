@@ -86,9 +86,12 @@ describe("TypeScript-first source index", () => {
     await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
     await writeFile(join(root, "src", "app", "desktop", "layout.tsx"), "export function Layout() { return <main />; }\n");
     await writeFile(join(root, "src", "app", "components", "Agents", "AgentCard", "desktop.tsx"), "export function AgentCard() { return <article />; }\n");
+    await writeFile(join(root, "src", "app", "components", "Agents", ".bot.lucide-icon"), "");
     await writeFile(join(root, "src", "app", "components", "Git", "AgentCard", "desktop.tsx"), "export function AgentCard() { return <article />; }\n");
+    await writeFile(join(root, "src", "app", "components", "Git", ".git-commit.lucide-icon"), "");
     await writeFile(join(root, "src", "app", "components", "FlatButton", "desktop.tsx"), "export function FlatButton() { return <button />; }\n");
     await writeFile(join(root, "src", "app", "components", "Empty", "README.md"), "No components here.\n");
+    await writeFile(join(root, "src", "app", "components", "Empty", ".archive.lucide-icon"), "");
     await writeFile(join(root, "src", "app", "components", "Notes", "helper.tsx"), "export const meaning = 42;\n");
     await writeFile(join(root, "src", "app", "components", "Mobile", "Navigation.tsx"), "export function Navigation() { return <nav />; }\n");
 
@@ -104,6 +107,34 @@ describe("TypeScript-first source index", () => {
       { label: "Navigation", relativePath: "src/app/components/Mobile/Navigation.tsx" },
     ]);
     expect(result.manifest.entries.find((entry) => entry.label === "Navigation")?.device).toBe("desktop");
+    expect(result.manifest.folderIcons).toEqual([
+      { directory: "src/app/components/Agents", name: "bot" },
+      { directory: "src/app/components/Empty", name: "archive" },
+      { directory: "src/app/components/Git", name: "git-commit" },
+    ]);
+    expect(result.files.map((file) => file.relativePath)).toContain("src/app/components/Agents/.bot.lucide-icon");
+  });
+
+  it("falls back safely when folder icon markers are invalid or ambiguous", async () => {
+    const root = await mkdtemp(join(tmpdir(), "design-space-folder-icons-"));
+    roots.push(root);
+    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
+    await mkdir(join(root, "src", "app", "components", "Actions"), { recursive: true });
+    await mkdir(join(root, "src", "app", "components", "Navigation"), { recursive: true });
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
+    await writeFile(join(root, "src", "app", "components", "Actions", "Button.tsx"), "export function Button() { return <button />; }\n");
+    await writeFile(join(root, "src", "app", "components", "Actions", ".mouse-pointer.lucide-icon"), "");
+    await writeFile(join(root, "src", "app", "components", "Actions", ".zap.lucide-icon"), "");
+    await writeFile(join(root, "src", "app", "components", "Navigation", "Link.tsx"), "export function Link() { return <a />; }\n");
+    await writeFile(join(root, "src", "app", "components", "Navigation", ".Not Valid.lucide-icon"), "");
+
+    const result = await indexSourceWorkspace(root, {
+      project: { id: "folder-icons", label: "Folder icons" },
+      source: { layout: "src/app.tsx" },
+    });
+
+    expect(result.manifest.entries.map((entry) => entry.label)).toEqual(["Button", "Link"]);
+    expect(result.manifest.folderIcons).toEqual([]);
   });
 
   it("indexes safe project source but excludes dependencies, secrets and symlinks", async () => {
@@ -145,6 +176,7 @@ describe("TypeScript-first source index", () => {
       "export function App() { return <main><SharedPanel /></main>; }",
     ].join("\n"));
     await writeFile(join(root, "clients", "web", "src", "components", "SharedPanel.tsx"), "export function SharedPanel() { return <section />; }\n");
+    await writeFile(join(root, "clients", "web", "src", "components", ".panels-top-left.lucide-icon"), "");
     await writeFile(join(root, "clients", "mobile", "src", "app-roots", "App.mobile.tsx"), "export default function AppMobile() { return <main />; }\n");
 
     const result = await indexAppManifestWorkspace(root, parseAppManifest({
@@ -185,6 +217,9 @@ describe("TypeScript-first source index", () => {
     expect(result.manifest.entries.find((entry) => entry.label === "App" && entry.targetId === "web")?.manifestDevices)
       .toEqual(["desktop", "tablet"]);
     expect(result.manifest.entries.find((entry) => entry.label === "AppMobile")?.manifestDevices).toEqual(["mobile"]);
+    expect(result.manifest.folderIcons).toEqual([
+      { directory: "clients/web/src/components", name: "panels-top-left" },
+    ]);
     expect(result.targetStylePaths?.get("web")).toEqual([
       expect.stringMatching(/clients\/web\/src\/web\.css$/),
     ]);

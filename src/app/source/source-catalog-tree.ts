@@ -7,6 +7,7 @@ export interface SourceCatalogFolder {
   id: string;
   kind: "folder";
   label: string;
+  iconName?: string;
   path: readonly string[];
 }
 
@@ -19,6 +20,8 @@ interface MutableCatalogFolder {
   children: Map<string, MutableCatalogFolder>;
   components: SourceCatalogComponent[];
   label: string;
+  iconConflict?: true;
+  iconName?: string;
   path: readonly string[];
 }
 
@@ -32,13 +35,20 @@ export function sourceCatalogTree(
     let folder = root;
     for (const segment of path) {
       const nextPath = [...folder.path, segment];
-      const child = folder.children.get(segment) ?? {
+      const child: MutableCatalogFolder = folder.children.get(segment) ?? {
         children: new Map(),
         components: [],
         label: segment,
         path: nextPath,
       };
       folder.children.set(segment, child);
+      const iconName = component.folderIcons?.find((icon) => pathsEqual(icon.path, nextPath))?.name;
+      if (iconName && child.iconName && child.iconName !== iconName) {
+        child.iconConflict = true;
+        child.iconName = undefined;
+      } else if (iconName && !child.iconConflict) {
+        child.iconName = iconName;
+      }
       folder = child;
     }
     folder.components.push(component);
@@ -62,10 +72,15 @@ function catalogChildren(folder: MutableCatalogFolder, scope: string): readonly 
       id: `folder:${scope}:${child.path.join("/")}`,
       kind: "folder",
       label: child.label,
+      iconName: child.iconName,
       path: child.path,
     });
   }
   return items.sort(compareCatalogItems);
+}
+
+function pathsEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((segment, index) => segment === right[index]);
 }
 
 function compareCatalogItems(left: SourceCatalogTreeItem, right: SourceCatalogTreeItem): number {

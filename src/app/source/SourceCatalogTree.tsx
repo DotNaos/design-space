@@ -1,8 +1,9 @@
 import { Button } from "@heroui/react";
-import { ChevronDown, ChevronRight, Folder } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 import type { RuntimeSourceWorkspaceEntry } from "../../shared/source-workspace";
 import { CatalogComponentRow } from "./CatalogComponentRow";
+import { CatalogFolderIcon } from "./CatalogFolderIcon";
 import type { SourceCatalogTreeItem } from "./source-catalog-tree";
 
 export function SourceCatalogTree(props: {
@@ -45,7 +46,7 @@ function CatalogFolderBranch(props: Parameters<typeof SourceCatalogTree>[0] & {
           {collapsed
             ? <ChevronRight aria-hidden="true" className="absolute -start-0.5 size-3" />
             : <ChevronDown aria-hidden="true" className="absolute -start-0.5 size-3" />}
-          <Folder aria-hidden="true" className="text-zinc-500" size={13} />
+          <CatalogFolderIcon name={props.item.iconName} />
           <span className="whitespace-nowrap">{props.item.label}</span>
         </Button>
       </div>

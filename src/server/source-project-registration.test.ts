@@ -90,7 +90,7 @@ it("indexes a selected library checkout without requiring its own Design Space c
 
   try {
     await mkdir(resolve(appRoot, "src", "app"), { recursive: true });
-    await mkdir(resolve(libraryRoot, "src"), { recursive: true });
+    await mkdir(resolve(libraryRoot, "src", "components", "actions"), { recursive: true });
     await writeFile(resolve(appRoot, ".designspace.ts"), "export default {};\n");
     await writeFile(resolve(appRoot, "package.json"), JSON.stringify({
       name: "fallback-test-app",
@@ -104,9 +104,10 @@ it("indexes a selected library checkout without requiring its own Design Space c
       name: "@dotnaos/react-ui",
     }));
     await writeFile(
-      resolve(libraryRoot, "src", "Button.tsx"),
+      resolve(libraryRoot, "src", "components", "actions", "Button.tsx"),
       "export function Button() { return <button type=\"button\" />; }\n",
     );
+    await writeFile(resolve(libraryRoot, "src", "components", "actions", ".sparkles.lucide-icon"), "");
 
     const target = await registerSourceProject(appRoot, {
       project: { id: "library-fallback-test", label: "Library fallback test" },
@@ -124,7 +125,7 @@ it("indexes a selected library checkout without requiring its own Design Space c
         entries: [
           expect.objectContaining({
             label: "Button",
-            relativePath: "src/Button.tsx",
+            relativePath: "src/components/actions/Button.tsx",
           }),
         ],
       },
@@ -134,6 +135,7 @@ it("indexes a selected library checkout without requiring its own Design Space c
     ) as string;
     expect(runtimeSource).not.toContain('"label":"Button.tsx"');
     expect(runtimeSource).not.toContain('"files":[{"id":"library.source.');
+    expect(runtimeSource).toContain('folderIcons: [{"directory":"src/components/actions","name":"sparkles"}]');
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

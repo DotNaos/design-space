@@ -119,6 +119,7 @@ it("keeps native-first, web, and Electron target runtimes and CSS isolated", asy
   expect(source).toContain('"id":"native","runtime":"react-native"');
   expect(source).toContain('"id":"web","runtime":"react"');
   expect(source).toContain('"id":"desktop","runtime":"electron"');
+  expect(source).toContain('folderIcons: [{"directory":"clients/web/src/components","name":"layout-grid"}]');
   expect(source).toContain("styles: [SourceTarget1Style0]");
   expect(source).toContain("styles: [SourceTarget2Style0]");
   expect(source).toContain("    styles: [],");
@@ -171,6 +172,7 @@ function manifestRuntimeTarget(
         runtime: "react",
         sourceRoot: targets[0]!.sourceRoot,
         devices: [],
+        folderIcons: [{ directory: "clients/web/src/components", name: "layout-grid" }],
         targets,
         entries: definitions.map(({ id, runtime }) => ({
           id: `${id}-entry`,

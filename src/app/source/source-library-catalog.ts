@@ -3,6 +3,7 @@ import type {
   RuntimeSourceLibraryCatalog,
   RuntimeSourceWorkspace,
   RuntimeSourceWorkspaceEntry,
+  SourceWorkspaceFolderIcon,
   SourceWorkspaceLibrary,
 } from "../../shared/source-workspace";
 import { sourceEntryComponentPath, sourceTreeNodes } from "./source-workspace-tree";
@@ -17,7 +18,12 @@ export type SourceCatalogComponent = {
   id: string;
   label: string;
   path: readonly string[];
+  folderIcons?: readonly CatalogFolderIcon[];
   searchText: string;
+};
+
+export type CatalogFolderIcon = Pick<SourceWorkspaceFolderIcon, "name"> & {
+  path: readonly string[];
 };
 
 const primitiveNames = new Set([
@@ -39,6 +45,7 @@ const primitiveNames = new Set([
 ]);
 
 export function sourceCatalogComponents(options: {
+  appTargetId?: string;
   appWorkspace?: RuntimeSourceWorkspace;
   catalog?: RuntimeSourceLibraryCatalog;
   device: DesignSpaceDevice;
@@ -47,7 +54,7 @@ export function sourceCatalogComponents(options: {
   mode: SourceLibraryMode;
 }): readonly SourceCatalogComponent[] {
   if (options.kind === "app") {
-    return sourceTreeNodes(options.appWorkspace ?? emptyWorkspace()).map((node) => {
+    return sourceTreeNodes(options.appWorkspace ?? emptyWorkspace(), options.appTargetId).map((node) => {
       const entry = node.implementations[options.device].entry ?? node.entries[0];
       return {
         category: "app",
@@ -55,6 +62,7 @@ export function sourceCatalogComponents(options: {
         id: `app.${node.id}`,
         label: node.label,
         path: node.area === "components" ? replacePathLeaf(node.path ?? [node.label], node.label) : [node.label],
+        folderIcons: entry ? catalogFolderIcons(options.appWorkspace, entry) : undefined,
         searchText: `${node.label} ${(node.path ?? []).join(" ")} ${entry?.exportName ?? ""} ${entry?.relativePath ?? ""} ${node.area}`.toLocaleLowerCase(),
       };
     });
@@ -79,9 +87,30 @@ export function sourceCatalogComponents(options: {
       id: entry?.id ?? `library.${options.mode}.${name}`,
       label: name,
       path: entry ? replacePathLeaf(sourceEntryComponentPath(entry), name) : [name],
+      folderIcons: entry && options.mode === "development"
+        ? catalogFolderIcons(options.catalog?.development, entry)
+        : undefined,
       searchText: `${name} ${entry?.exportName ?? ""} ${entry?.relativePath ?? ""} ${category}`.toLocaleLowerCase(),
     };
   }).sort((left, right) => left.label.localeCompare(right.label, "en"));
+}
+
+function catalogFolderIcons(
+  workspace: Pick<RuntimeSourceWorkspace, "folderIcons"> | undefined,
+  entry: Pick<RuntimeSourceWorkspaceEntry, "relativePath">,
+): readonly CatalogFolderIcon[] | undefined {
+  const entryPath = entry.relativePath.replaceAll("\\", "/");
+  const icons = (workspace?.folderIcons ?? []).flatMap((icon) => {
+    if (!entryPath.startsWith(`${icon.directory}/`)) return [];
+    const segments = icon.directory.split("/").filter(Boolean);
+    const rootIndex = segments.findIndex((segment) => {
+      const normalized = segment.toLocaleLowerCase();
+      return normalized === "components" || normalized === "primitives";
+    });
+    const path = rootIndex < 0 ? [] : segments.slice(rootIndex + 1);
+    return path.length ? [{ name: icon.name, path }] : [];
+  });
+  return icons.length ? icons : undefined;
 }
 
 function replacePathLeaf(path: readonly string[], label: string): readonly string[] {

@@ -254,6 +254,8 @@ export interface SourceWorkspaceManifest {
   sourceRoot: string;
   entries: readonly SourceWorkspaceEntry[];
   devices: readonly SourceWorkspaceDeviceState[];
+  /** Presentation-only Lucide icon markers discovered in source directories. */
+  folderIcons?: readonly SourceWorkspaceFolderIcon[];
   adapter?: "legacy" | "app-manifest";
   targets?: readonly SourceWorkspaceTarget[];
   library?: SourceWorkspaceLibrary;
@@ -261,6 +263,13 @@ export interface SourceWorkspaceManifest {
     createComponents: boolean;
   };
   approvals?: SourceApprovalEvidence;
+}
+
+export interface SourceWorkspaceFolderIcon {
+  /** Project-relative directory containing the marker file. */
+  directory: string;
+  /** Kebab-case Lucide icon name taken from .<name>.lucide-icon. */
+  name: string;
 }
 
 export interface SourceWorkspaceTargetDevice {

@@ -88,6 +88,69 @@ it("derives nested app catalog paths from component source files", () => {
   ]);
 });
 
+it("keeps manifest target folders and mixed-case marker roots scoped to the selected target", () => {
+  const workspace: RuntimeSourceWorkspace = {
+    devices: [],
+    entries: [
+      entry({
+        id: "web-card",
+        label: "AgentCard",
+        manifestDevices: ["desktop"],
+        relativePath: "clients/web/src/Components/Agents/AgentCard.tsx",
+        targetId: "web",
+      }),
+      entry({
+        id: "native-card",
+        label: "AgentCard",
+        manifestDevices: ["mobile"],
+        relativePath: "clients/native/src/components/Agents/AgentCard.tsx",
+        targetId: "native",
+      }),
+    ],
+    folderIcons: [
+      { directory: "clients/web/src/Components/Agents", name: "globe" },
+      { directory: "clients/native/src/components/Agents", name: "smartphone" },
+    ],
+    runtime: "react",
+    sourceRoot: "clients/web",
+    styles: [],
+    targets: [
+      {
+        id: "web",
+        devices: [{ id: "desktop", entryId: "web-card", root: { export: "AgentCard", source: "clients/web/src/Components/Agents/AgentCard.tsx" } }],
+        entrypoint: "clients/web/src/main.tsx",
+        runtime: "react",
+        sourceRoot: "clients/web",
+      },
+      {
+        id: "native",
+        devices: [{ id: "mobile", entryId: "native-card", root: { export: "AgentCard", source: "clients/native/src/components/Agents/AgentCard.tsx" } }],
+        entrypoint: "clients/native/index.ts",
+        runtime: "react-native",
+        sourceRoot: "clients/native",
+      },
+    ],
+  };
+
+  const web = sourceCatalogComponents({
+    appTargetId: "web",
+    appWorkspace: workspace,
+    device: "desktop",
+    kind: "app",
+    mode: "development",
+  });
+  const native = sourceCatalogComponents({
+    appTargetId: "native",
+    appWorkspace: workspace,
+    device: "mobile",
+    kind: "app",
+    mode: "development",
+  });
+
+  expect(web).toMatchObject([{ entry: { id: "web-card" }, folderIcons: [{ name: "globe", path: ["Agents"] }] }]);
+  expect(native).toMatchObject([{ entry: { id: "native-card" }, folderIcons: [{ name: "smartphone", path: ["Agents"] }] }]);
+});
+
 it("categorizes and filters external library components", () => {
   const button = entry({
     id: "button",

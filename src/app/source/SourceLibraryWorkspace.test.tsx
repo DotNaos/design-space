@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -231,7 +231,14 @@ it("mirrors nested app component folders and keeps duplicate leaf names selectab
   ];
   render(
     <SourceLibrarySidebar
-      appWorkspace={{ ...catalog.development!, entries: appEntries }}
+      appWorkspace={{
+        ...catalog.development!,
+        entries: appEntries,
+        folderIcons: [
+          { directory: "src/app/components/Agents", name: "bot" },
+          { directory: "src/app/components/Git", name: "not-a-real-lucide-icon" },
+        ],
+      }}
       catalogKind="app"
       device="desktop"
       mode="development"
@@ -251,6 +258,8 @@ it("mirrors nested app component folders and keeps duplicate leaf names selectab
   expect(agentsFolder).toHaveClass("relative", "px-3.5");
   expect(agentsCard).toHaveClass("px-3.5");
   expect(agentsFolder.querySelector("svg")).toHaveClass("absolute", "-start-0.5", "size-3");
+  await waitFor(() => expect(agentsFolder.querySelector("svg.lucide-bot")).toBeVisible());
+  expect(screen.getByRole("button", { name: "Collapse folder Git" }).querySelector("svg.lucide-folder")).toBeVisible();
 
   await userEvent.click(agentsFolder);
   expect(screen.queryByRole("button", { name: "Agents / AgentCard" })).not.toBeInTheDocument();
@@ -259,6 +268,45 @@ it("mirrors nested app component folders and keeps duplicate leaf names selectab
   await userEvent.click(screen.getByRole("button", { name: "Expand folder Agents" }));
   await userEvent.click(screen.getByRole("button", { name: "Git / AgentCard" }));
   expect(onSelect).toHaveBeenCalledWith(expect.stringContaining("components:implementation:Git/AgentCard:AgentCard"));
+});
+
+it("renders source-derived icons for development-library folders", async () => {
+  const actionEntry: RuntimeSourceWorkspaceEntry = {
+    ...entry,
+    id: "action-button",
+    label: "ActionButton",
+    exportName: "ActionButton",
+    relativePath: "src/components/actions/ActionButton/render.tsx",
+  };
+  render(
+    <SourceLibrarySidebar
+      catalog={{
+        packageName: "@dotnaos/react-ui",
+        development: {
+          ...catalog.development!,
+          entries: [actionEntry],
+          folderIcons: [{ directory: "src/components/actions", name: "sparkles" }],
+        },
+      }}
+      catalogKind="library"
+      device="desktop"
+      library={{
+        ...library,
+        components: [{ name: "ActionButton", evidence: "package-export", category: "component" }],
+        editable: true,
+        mode: "development",
+      }}
+      mode="development"
+      onCatalogKindChange={vi.fn()}
+      onDeviceChange={vi.fn()}
+      onModeChange={vi.fn()}
+      onSelect={vi.fn()}
+    />,
+  );
+
+  const actionsFolder = screen.getByRole("button", { name: "Collapse folder actions" });
+  await waitFor(() => expect(actionsFolder.querySelector("svg.lucide-sparkles")).toBeVisible());
+  expect(screen.getByRole("button", { name: "actions / ActionButton" })).toBeVisible();
 });
 
 it("does not duplicate the library identity from the global workspace switch", () => {
