@@ -16,6 +16,7 @@ import {
 } from "./path-security";
 import { sourceWorkspaceJsxLayerId, sourceWorkspaceLayerId } from "./source-layer-annotation";
 import { extractComponentContract } from "./typescript-component-contract";
+import { jsxComponentReference, sourceComponentReferenceKey } from "./typescript-component-reference";
 import { jsxClassName } from "./typescript-jsx-class-binding";
 
 export interface IndexedTypeScriptComponent {
@@ -69,6 +70,7 @@ export async function indexTypeScriptComponents(
   for (const component of initial) {
     contracts.set(component.label, component.slots);
     contracts.set(component.exportName, component.slots);
+    contracts.set(sourceComponentReferenceKey({ relativePath: component.filePath, exportName: component.exportName }), component.slots);
   }
   const components = indexFiles(contracts);
 
@@ -174,6 +176,7 @@ function indexSourceFile(
       localComponents,
       new Set([label]),
       relativePath,
+      projectRoot,
       new Set(contract.slots.map((slot) => slot.name)),
       checker,
       componentContracts,
@@ -211,6 +214,7 @@ function jsxLayers(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  projectRoot: string,
   slotNames: ReadonlySet<string>,
   checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
@@ -222,7 +226,7 @@ function jsxLayers(
       return;
     }
     if (ts.isJsxSelfClosingElement(node) && isFragmentTag(node.tagName.getText())) return;
-    const layer = jsxLayer(node, localComponents, path, relativePath, slotNames, checker, componentContracts);
+    const layer = jsxLayer(node, localComponents, path, relativePath, projectRoot, slotNames, checker, componentContracts);
     if (layer) {
       layers.push(layer);
       return;
@@ -238,6 +242,7 @@ function jsxLayer(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  projectRoot: string,
   slotNames: ReadonlySet<string>,
   checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
@@ -245,34 +250,44 @@ function jsxLayer(
   if (ts.isJsxElement(node)) {
     const label = node.openingElement.tagName.getText();
     const kind = jsxLayerKind(label);
+    const component = jsxComponentReference(node.openingElement.tagName, kind, checker, projectRoot);
+    const contracts = component.component
+      ? componentContracts?.get(sourceComponentReferenceKey(component.component))
+      : componentContracts?.get(label);
     return {
       id: sourceWorkspaceJsxLayerId(relativePath, node),
       label,
       kind,
       source: { start: node.getStart(), end: node.getEnd() },
+      ...component,
       ...localComponentDefinition(label, kind, localComponents),
       ...jsxClassName(node.openingElement, kind, checker),
       ...jsxStaticText(node),
       children: [
-        ...componentUsageSlots(node.openingElement, componentContracts?.get(label), localComponents, path, relativePath, checker, componentContracts),
-        ...localComponentLayers(label, kind, localComponents, path, relativePath, checker, componentContracts),
-        ...jsxChildLayers(node.children, localComponents, path, relativePath, slotNames, checker, componentContracts),
+        ...componentUsageSlots(node.openingElement, contracts, localComponents, path, relativePath, projectRoot, checker, componentContracts),
+        ...localComponentLayers(label, kind, localComponents, path, relativePath, projectRoot, checker, componentContracts),
+        ...jsxChildLayers(node.children, localComponents, path, relativePath, projectRoot, slotNames, checker, componentContracts),
       ],
     };
   }
   if (ts.isJsxSelfClosingElement(node)) {
     const label = node.tagName.getText();
     const kind = jsxLayerKind(label);
+    const component = jsxComponentReference(node.tagName, kind, checker, projectRoot);
+    const contracts = component.component
+      ? componentContracts?.get(sourceComponentReferenceKey(component.component))
+      : componentContracts?.get(label);
     return {
       id: sourceWorkspaceJsxLayerId(relativePath, node),
       label,
       kind,
       source: { start: node.getStart(), end: node.getEnd() },
+      ...component,
       ...localComponentDefinition(label, kind, localComponents),
       ...jsxClassName(node, kind, checker),
       children: [
-        ...componentUsageSlots(node, componentContracts?.get(label), localComponents, path, relativePath, checker, componentContracts),
-        ...localComponentLayers(label, kind, localComponents, path, relativePath, checker, componentContracts),
+        ...componentUsageSlots(node, contracts, localComponents, path, relativePath, projectRoot, checker, componentContracts),
+        ...localComponentLayers(label, kind, localComponents, path, relativePath, projectRoot, checker, componentContracts),
       ],
     };
   }
@@ -319,26 +334,27 @@ function jsxChildLayers(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  projectRoot: string,
   slotNames: ReadonlySet<string>,
   checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
   return children.flatMap((child) => {
     if (ts.isJsxFragment(child)) {
-      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames, checker, componentContracts);
+      return jsxChildLayers(child.children, localComponents, path, relativePath, projectRoot, slotNames, checker, componentContracts);
     }
     if (ts.isJsxElement(child) && isFragmentTag(child.openingElement.tagName.getText())) {
-      return jsxChildLayers(child.children, localComponents, path, relativePath, slotNames, checker, componentContracts);
+      return jsxChildLayers(child.children, localComponents, path, relativePath, projectRoot, slotNames, checker, componentContracts);
     }
     if (ts.isJsxSelfClosingElement(child) && isFragmentTag(child.tagName.getText())) return [];
     const slot = sourceSlotLayer(child, slotNames, relativePath);
     if (slot) return [slot];
-    const direct = jsxLayer(child, localComponents, path, relativePath, slotNames, checker, componentContracts);
+    const direct = jsxLayer(child, localComponents, path, relativePath, projectRoot, slotNames, checker, componentContracts);
     if (direct) return [direct];
     if (!ts.isJsxExpression(child) || !child.expression) return [];
     const nested: SourceWorkspaceLayer[] = [];
     const visit = (node: ts.Node): void => {
-      const layer = jsxLayer(node, localComponents, path, relativePath, slotNames, checker, componentContracts);
+      const layer = jsxLayer(node, localComponents, path, relativePath, projectRoot, slotNames, checker, componentContracts);
       if (layer) {
         nested.push(layer);
         return;
@@ -386,6 +402,7 @@ function componentUsageSlots(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  projectRoot: string,
   checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
@@ -404,7 +421,7 @@ function componentUsageSlots(
     ));
     const value = property?.initializer;
     const children = value
-      ? slotValueLayers(value, localComponents, path, relativePath, checker, componentContracts)
+      ? slotValueLayers(value, localComponents, path, relativePath, projectRoot, checker, componentContracts)
       : [];
     const received = children.filter((child) => child.kind === "component").map((child) => child.label);
     const incompatible = received.some((label) => !contract.accepts.includes(label));
@@ -456,13 +473,14 @@ function slotValueLayers(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  projectRoot: string,
   checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
   const values = ts.isArrayLiteralExpression(value) ? value.elements : [value];
   return values.flatMap((candidate) => {
     if (!ts.isExpression(candidate)) return [];
-    const layer = jsxLayer(candidate, localComponents, path, relativePath, new Set(), checker, componentContracts);
+    const layer = jsxLayer(candidate, localComponents, path, relativePath, projectRoot, new Set(), checker, componentContracts);
     return layer ? [layer] : [];
   });
 }
@@ -510,13 +528,14 @@ function localComponentLayers(
   localComponents: ReadonlyMap<string, ts.Declaration>,
   path: ReadonlySet<string>,
   relativePath: string,
+  projectRoot: string,
   checker: ts.TypeChecker,
   componentContracts?: ReadonlyMap<string, readonly SourceComponentSlot[]>,
 ): readonly SourceWorkspaceLayer[] {
   if (kind !== "component" || path.has(label) || componentContracts?.has(label)) return [];
   const declaration = localComponents.get(label);
   if (!declaration) return [];
-  return jsxLayers(declaration, localComponents, new Set(path).add(label), relativePath, new Set(), checker, componentContracts);
+  return jsxLayers(declaration, localComponents, new Set(path).add(label), relativePath, projectRoot, new Set(), checker, componentContracts);
 }
 
 function localComponentDefinition(

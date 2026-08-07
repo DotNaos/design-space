@@ -72,6 +72,40 @@ describe("TypeScript-first source index", () => {
     ]));
   });
 
+  it("discovers nested and flat component folders without inventing entries for empty or non-component directories", async () => {
+    const root = await mkdtemp(join(tmpdir(), "design-space-nested-components-"));
+    roots.push(root);
+    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
+    await mkdir(join(root, "src", "app", "desktop"), { recursive: true });
+    await mkdir(join(root, "src", "app", "components", "Agents", "AgentCard"), { recursive: true });
+    await mkdir(join(root, "src", "app", "components", "Git", "AgentCard"), { recursive: true });
+    await mkdir(join(root, "src", "app", "components", "FlatButton"), { recursive: true });
+    await mkdir(join(root, "src", "app", "components", "Empty"), { recursive: true });
+    await mkdir(join(root, "src", "app", "components", "Notes"), { recursive: true });
+    await mkdir(join(root, "src", "app", "components", "Mobile"), { recursive: true });
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", module: "ESNext", moduleResolution: "Bundler" } }));
+    await writeFile(join(root, "src", "app", "desktop", "layout.tsx"), "export function Layout() { return <main />; }\n");
+    await writeFile(join(root, "src", "app", "components", "Agents", "AgentCard", "desktop.tsx"), "export function AgentCard() { return <article />; }\n");
+    await writeFile(join(root, "src", "app", "components", "Git", "AgentCard", "desktop.tsx"), "export function AgentCard() { return <article />; }\n");
+    await writeFile(join(root, "src", "app", "components", "FlatButton", "desktop.tsx"), "export function FlatButton() { return <button />; }\n");
+    await writeFile(join(root, "src", "app", "components", "Empty", "README.md"), "No components here.\n");
+    await writeFile(join(root, "src", "app", "components", "Notes", "helper.tsx"), "export const meaning = 42;\n");
+    await writeFile(join(root, "src", "app", "components", "Mobile", "Navigation.tsx"), "export function Navigation() { return <nav />; }\n");
+
+    const result = await indexSourceWorkspace(root, {
+      project: { id: "nested-components", label: "Nested components" },
+    });
+
+    expect(result.manifest.entries.map(({ label, relativePath }) => ({ label, relativePath }))).toEqual([
+      { label: "Layout", relativePath: "src/app/desktop/layout.tsx" },
+      { label: "AgentCard", relativePath: "src/app/components/Agents/AgentCard/desktop.tsx" },
+      { label: "FlatButton", relativePath: "src/app/components/FlatButton/desktop.tsx" },
+      { label: "AgentCard", relativePath: "src/app/components/Git/AgentCard/desktop.tsx" },
+      { label: "Navigation", relativePath: "src/app/components/Mobile/Navigation.tsx" },
+    ]);
+    expect(result.manifest.entries.find((entry) => entry.label === "Navigation")?.device).toBe("desktop");
+  });
+
   it("indexes safe project source but excludes dependencies, secrets and symlinks", async () => {
     const root = await mkdtemp(join(tmpdir(), "design-space-source-index-"));
     roots.push(root);

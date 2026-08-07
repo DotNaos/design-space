@@ -183,6 +183,8 @@ export interface SourceWorkspaceLayer {
   kind: "component" | "html" | "slot";
   children: readonly SourceWorkspaceLayer[];
   source: SourceLayerBinding;
+  /** Compiler-resolved component export referenced by this JSX layer. */
+  component?: SourceWorkspaceComponentReference;
   /** Definition of a same-file component referenced by this JSX layer. */
   definition?: SourceLayerBinding;
   /** Exact source binding for a static or currently absent JSX className. */
@@ -195,6 +197,11 @@ export interface SourceWorkspaceLayer {
   slot?: SourceSlotUsage;
   /** Definition-owned contract for an isolated Slot placeholder; it is not an editable component use. */
   slotContract?: SourceComponentSlot;
+}
+
+export interface SourceWorkspaceComponentReference {
+  relativePath: string;
+  exportName: string;
 }
 
 export type SourceSlotValidity = "valid" | "missing" | "incompatible" | "full" | "optional";

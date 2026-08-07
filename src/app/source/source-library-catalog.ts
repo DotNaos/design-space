@@ -5,7 +5,7 @@ import type {
   RuntimeSourceWorkspaceEntry,
   SourceWorkspaceLibrary,
 } from "../../shared/source-workspace";
-import { sourceTreeNodes } from "./source-workspace-tree";
+import { sourceEntryComponentPath, sourceTreeNodes } from "./source-workspace-tree";
 import type { SourceLibraryMode } from "./useSourceLibraryRuntime";
 
 export type SourceCatalogKind = "app" | "library";
@@ -16,6 +16,7 @@ export type SourceCatalogComponent = {
   entry?: RuntimeSourceWorkspaceEntry;
   id: string;
   label: string;
+  path: readonly string[];
   searchText: string;
 };
 
@@ -53,7 +54,8 @@ export function sourceCatalogComponents(options: {
         entry,
         id: `app.${node.id}`,
         label: node.label,
-        searchText: `${node.label} ${entry?.exportName ?? ""} ${entry?.relativePath ?? ""} ${node.area}`.toLocaleLowerCase(),
+        path: node.area === "components" ? replacePathLeaf(node.path ?? [node.label], node.label) : [node.label],
+        searchText: `${node.label} ${(node.path ?? []).join(" ")} ${entry?.exportName ?? ""} ${entry?.relativePath ?? ""} ${node.area}`.toLocaleLowerCase(),
       };
     });
   }
@@ -76,9 +78,18 @@ export function sourceCatalogComponents(options: {
       entry,
       id: entry?.id ?? `library.${options.mode}.${name}`,
       label: name,
+      path: entry ? replacePathLeaf(sourceEntryComponentPath(entry), name) : [name],
       searchText: `${name} ${entry?.exportName ?? ""} ${entry?.relativePath ?? ""} ${category}`.toLocaleLowerCase(),
     };
   }).sort((left, right) => left.label.localeCompare(right.label, "en"));
+}
+
+function replacePathLeaf(path: readonly string[], label: string): readonly string[] {
+  if (path.length <= 1) return [label];
+  const parentPath = path.slice(0, -1);
+  return parentPath.at(-1)?.toLocaleLowerCase() === label.toLocaleLowerCase()
+    ? parentPath
+    : [...parentPath, label];
 }
 
 export function filterSourceCatalog(

@@ -464,12 +464,26 @@ function sourceLocation(relativePath: string): { area: DesignSpaceArea; device: 
   const page = /^src\/app\/(desktop|tablet|mobile)\/pages\/.+\.tsx?$/.exec(relativePath);
   if (page) return { area: "pages", device: page[1] as DesignSpaceDevice };
 
-  const component = /^src\/app\/components\/[^/]+\/(desktop|tablet|mobile|index)\.tsx?$/.exec(relativePath);
-  if (component) {
-    return { area: "components", device: component[1] === "index" ? "desktop" : component[1] as DesignSpaceDevice };
+  const component = /^src\/app\/components\/(.+\.tsx?)$/.exec(relativePath);
+  if (component && !/(?:^|\/)[^/]+\.(?:test|spec|stories|design)\.tsx?$/.test(relativePath)) {
+    const implementation = /\/(desktop|tablet|mobile|index)\.tsx?$/.exec(relativePath)?.[1];
+    return {
+      area: "components",
+      device: implementation && implementation !== "index"
+        ? implementation as DesignSpaceDevice
+        : componentFileDevice(relativePath),
+    };
   }
 
   return undefined;
+}
+
+function componentFileDevice(relativePath: string): DesignSpaceDevice {
+  const stem = relativePath.split("/").at(-1)?.replace(/\.tsx?$/, "") ?? "";
+  const device = /[.-](desktop|tablet|mobile)$/i.exec(stem)?.[1]?.toLocaleLowerCase();
+  return designSpaceDevices.includes(device as DesignSpaceDevice)
+    ? device as DesignSpaceDevice
+    : "desktop";
 }
 
 function inferredSourceLocation(

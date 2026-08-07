@@ -8,7 +8,8 @@ import type { SourceLibraryMode } from "./useSourceLibraryRuntime";
 import type { SourceLayerMetrics, SourcePreviewMode } from "./source-layer-design";
 import type { SourceCodeAnnotation, SourceCodeSelectionContext } from "./source-feedback";
 import { LibraryDevelopmentSourceControl } from "./LibraryDevelopmentSourceControl";
-import { CatalogComponentRow } from "./CatalogComponentRow";
+import { SourceCatalogTree } from "./SourceCatalogTree";
+import { sourceCatalogTree } from "./source-catalog-tree";
 import { CategoryFilter } from "./CategoryFilter";
 import { SourceLibraryCanvas } from "./SourceLibraryCanvas";
 import { SourceLibraryInspector } from "./SourceLibraryInspector";
@@ -59,6 +60,7 @@ export function SourceLibrarySidebar(
 ) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<SourceLibraryCategory>("all");
+  const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(new Set());
   const components = useMemo(() => catalogComponents(props, props.catalogKind), [
     props.appWorkspace,
     props.catalog,
@@ -122,15 +124,19 @@ export function SourceLibrarySidebar(
               {section.label ? (
                 <h3 className="px-4 pb-1.5 pt-2 text-[9px] font-medium text-zinc-500">{section.label}</h3>
               ) : null}
-              {section.components.map((component) => (
-                <CatalogComponentRow
-                  component={component}
-                  key={component.id}
-                  selected={selected === component.id}
-                  source={selectedCatalogWorkspace(props)}
-                  onSelect={props.onOpenDetails ?? props.onSelect}
-                />
-              ))}
+              <SourceCatalogTree
+                collapsed={query.trim() ? new Set() : collapsedFolders}
+                items={sourceCatalogTree(section.components)}
+                selected={selected}
+                source={selectedCatalogWorkspace(props)}
+                onSelect={props.onOpenDetails ?? props.onSelect}
+                onToggle={(id) => setCollapsedFolders((current) => {
+                  const next = new Set(current);
+                  if (next.has(id)) next.delete(id);
+                  else next.add(id);
+                  return next;
+                })}
+              />
             </div>
           ))}
           {!visible.length ? (

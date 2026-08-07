@@ -133,6 +133,40 @@ describe("focused source tree", () => {
     ]);
   });
 
+  it("resolves duplicate component labels through their exact compiler source", () => {
+    const agentsCard = node("AgentCard", {
+      ...entry("AgentCard"),
+      id: "entry.agents-card",
+      relativePath: "src/components/Agents/AgentCard.tsx",
+    });
+    const gitCard = {
+      ...node("AgentCard", {
+        ...entry("AgentCard"),
+        id: "entry.git-card",
+        relativePath: "src/components/Git/AgentCard.tsx",
+      }),
+      id: "node.git-card",
+    };
+    const app = node("App", entry("App", [
+      {
+        ...component("AgentCard"),
+        id: "component.agents-card",
+        component: { relativePath: "src/components/Agents/AgentCard.tsx", exportName: "AgentCard" },
+      },
+      {
+        ...component("AgentCard"),
+        id: "component.git-card",
+        component: { relativePath: "src/components/Git/AgentCard.tsx", exportName: "AgentCard" },
+      },
+    ]));
+
+    const graph = sourceFocusGraph([app, agentsCard, gitCard], "desktop");
+    const children = graph.occurrences.get(graph.roots[0]!)?.children
+      .map((id) => graph.occurrences.get(id)?.entry?.id);
+
+    expect(children).toEqual(["entry.agents-card", "entry.git-card"]);
+  });
+
   it("shows a repeated source body once and leaves rendered instances to the navigator", () => {
     const repeated = { ...component("RailButton"), id: "component.RailButton.repeated" };
     const app = node("App", entry("App", [repeated, repeated]));

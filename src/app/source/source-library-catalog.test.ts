@@ -48,6 +48,44 @@ it("flattens logical app components without repeating device implementations", (
   });
 
   expect(components.map((component) => component.label)).toEqual(["WorkspaceShell", "ProjectSummary"]);
+  expect(components.find((component) => component.label === "ProjectSummary")?.path).toEqual(["ProjectSummary"]);
+});
+
+it("derives nested app catalog paths from component source files", () => {
+  const components = sourceCatalogComponents({
+    appWorkspace: {
+      devices: [],
+      entries: [
+        entry({
+          id: "agent-card",
+          label: "AgentCard",
+          relativePath: "src/app/components/Agents/AgentCard/AgentCard.tsx",
+        }),
+        entry({
+          id: "tool-call",
+          label: "ToolCall",
+          relativePath: "src/app/components/Agents/Tools/ToolCall.tsx",
+        }),
+        entry({
+          id: "flat-button",
+          label: "Button",
+          relativePath: "src/app/components/Button.tsx",
+        }),
+      ],
+      runtime: "react",
+      sourceRoot: "src/app",
+      styles: [],
+    },
+    device: "desktop",
+    kind: "app",
+    mode: "development",
+  });
+
+  expect(components.map(({ label, path }) => ({ label, path }))).toEqual([
+    { label: "AgentCard", path: ["Agents", "AgentCard"] },
+    { label: "ToolCall", path: ["Agents", "Tools", "ToolCall"] },
+    { label: "Button", path: ["Button"] },
+  ]);
 });
 
 it("categorizes and filters external library components", () => {
@@ -81,6 +119,39 @@ it("categorizes and filters external library components", () => {
 
   expect(filterSourceCatalog(components, "", "primitive").map((component) => component.label)).toEqual(["Button"]);
   expect(filterSourceCatalog(components, "chat", "all").map((component) => component.label)).toEqual(["AiChat"]);
+});
+
+it("uses the public component label as the leaf without repeating its source folder", () => {
+  const action = entry({
+    id: "action-button",
+    label: "ActionButton",
+    exportName: "ActionButton",
+    relativePath: "src/components/actions/ActionButton/render.tsx",
+  });
+  const components = sourceCatalogComponents({
+    catalog: {
+      packageName: "@dotnaos/react-ui",
+      development: {
+        devices: [],
+        entries: [action],
+        runtime: "react",
+        sourceRoot: "src",
+        styles: [],
+      },
+    },
+    device: "desktop",
+    kind: "library",
+    library: {
+      components: [{ evidence: "package-export", name: "ActionButton" }],
+      editable: true,
+      mode: "development",
+      packageName: "@dotnaos/react-ui",
+      version: "0.0.0",
+    },
+    mode: "development",
+  });
+
+  expect(components[0]?.path).toEqual(["actions", "ActionButton"]);
 });
 
 it("keeps Development scoped to the public package catalog while resolving live source entries", () => {

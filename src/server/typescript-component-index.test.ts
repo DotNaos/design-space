@@ -150,6 +150,38 @@ describe("TypeScript component index", () => {
     expect(controlSection?.definition).not.toEqual(controlSection?.source);
   });
 
+  it("records the exact imported source export for duplicate component labels", async () => {
+    const root = await createProject();
+    await mkdir(join(root, "src/components/Agents"), { recursive: true });
+    await mkdir(join(root, "src/components/Git"), { recursive: true });
+    await writeFile(join(root, "src/components/Agents/AgentCard.tsx"), `
+      export function AgentCard() { return <article>Agent</article>; }
+    `);
+    await writeFile(join(root, "src/components/Git/AgentCard.tsx"), `
+      export function AgentCard() { return <article>Commit</article>; }
+    `);
+    await writeFile(join(root, "src/components/DuplicateComposition.tsx"), `
+      import { AgentCard as AgentsCard } from "./Agents/AgentCard";
+      import { AgentCard as GitCard } from "./Git/AgentCard";
+      export function DuplicateComposition() { return <main><AgentsCard /><GitCard /></main>; }
+    `);
+
+    const components = await indexTypeScriptComponents({
+      filePaths: [
+        "src/components/Agents/AgentCard.tsx",
+        "src/components/Git/AgentCard.tsx",
+        "src/components/DuplicateComposition.tsx",
+      ],
+      projectRoot: root,
+    });
+    const composition = components.find((component) => component.exportName === "DuplicateComposition");
+
+    expect(composition?.layers[0]?.children.map((layer) => layer.component)).toEqual([
+      { relativePath: "src/components/Agents/AgentCard.tsx", exportName: "AgentCard" },
+      { relativePath: "src/components/Git/AgentCard.tsx", exportName: "AgentCard" },
+    ]);
+  });
+
   it("keeps rendered JSX layer IDs stable when an earlier source edit shifts offsets", async () => {
     const root = await createProject();
     const filePath = join(root, "src/components/StableLayers.tsx");

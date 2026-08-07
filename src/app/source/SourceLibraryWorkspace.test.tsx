@@ -199,6 +199,63 @@ it("can render app-built components without adding another source switch", () =>
   expect(screen.queryByRole("group", { name: "Component source" })).not.toBeInTheDocument();
 });
 
+it("mirrors nested app component folders and keeps duplicate leaf names selectable", async () => {
+  const onSelect = vi.fn();
+  const appEntries: RuntimeSourceWorkspaceEntry[] = [
+    {
+      ...entry,
+      id: "agents-card",
+      label: "AgentCard",
+      exportName: "AgentCard",
+      relativePath: "src/app/components/Agents/AgentCard/desktop.tsx",
+    },
+    {
+      ...entry,
+      id: "agents-tool-call",
+      label: "ToolCall",
+      exportName: "ToolCall",
+      relativePath: "src/app/components/Agents/Tools/ToolCall.tsx",
+    },
+    {
+      ...entry,
+      id: "git-card",
+      label: "AgentCard",
+      exportName: "AgentCard",
+      relativePath: "src/app/components/Git/AgentCard/desktop.tsx",
+    },
+    {
+      ...entry,
+      id: "flat-button",
+      relativePath: "src/app/components/Button.tsx",
+    },
+  ];
+  render(
+    <SourceLibrarySidebar
+      appWorkspace={{ ...catalog.development!, entries: appEntries }}
+      catalogKind="app"
+      device="desktop"
+      mode="development"
+      onCatalogKindChange={vi.fn()}
+      onDeviceChange={vi.fn()}
+      onModeChange={vi.fn()}
+      onSelect={onSelect}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Agents / AgentCard" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Git / AgentCard" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Agents / Tools / ToolCall" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Button" })).toBeVisible();
+
+  await userEvent.click(screen.getByRole("button", { name: "Collapse folder Agents" }));
+  expect(screen.queryByRole("button", { name: "Agents / AgentCard" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Git / AgentCard" })).toBeVisible();
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand folder Agents" }));
+  await userEvent.click(screen.getByRole("button", { name: "Git / AgentCard" }));
+  expect(onSelect).toHaveBeenCalledWith(expect.stringContaining("components:implementation:Git/AgentCard:AgentCard"));
+});
+
 it("does not duplicate the library identity from the global workspace switch", () => {
   render(
     <SourceLibrarySidebar
