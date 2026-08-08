@@ -15,16 +15,25 @@ export function registeredFileCatalog(target: RegisteredTarget): readonly Docume
 
 export function sourceWorkspaceFileCatalog(
   workspace: IndexedSourceWorkspace,
-): readonly DocumentCatalogFileEntry[] {
-  return fileCatalog(workspace.files.map((file) => ({
+  includeIgnored = false,
+  catalogFiles = workspace.catalogFiles ?? workspace.files,
+): { files: readonly DocumentCatalogFileEntry[]; ignoredFileCount: number } {
+  const files = catalogFiles;
+  return {
+    files: fileCatalog(files
+    .filter((file) => includeIgnored || !file.ignored)
+    .map((file) => ({
     id: file.id,
     displayName: file.relativePath,
-    editable: workspace.editableFileIds?.has(file.id) ?? /\.[cm]?tsx?$/.test(file.relativePath),
-  })));
+    editable: !file.ignored && (workspace.editableFileIds?.has(file.id) ?? /\.[cm]?tsx?$/.test(file.relativePath)),
+    ignored: file.ignored,
+    }))),
+    ignoredFileCount: workspace.ignoredFileCount ?? files.filter((file) => file.ignored).length,
+  };
 }
 
 function fileCatalog(
-  registeredFiles: readonly { id: string; displayName: string; editable: boolean }[],
+  registeredFiles: readonly { id: string; displayName: string; editable: boolean; ignored?: boolean }[],
 ): readonly DocumentCatalogFileEntry[] {
   const entries: DocumentCatalogFileEntry[] = [];
   const directoryIds = new Map<string, string>();
@@ -53,6 +62,7 @@ function fileCatalog(
       kind: "file",
       parentId,
       editable: file.editable,
+      ignored: file.ignored,
     });
   }
   return entries;

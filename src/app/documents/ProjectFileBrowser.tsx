@@ -9,6 +9,7 @@ export interface ProjectFileBrowserProps {
   files: readonly SourceWorkspaceFileEntry[];
   title?: string;
   selectedFileId?: string;
+  showIgnored?: boolean;
   header?: ReactNode;
   onSelect: (fileId: string) => void;
 }
@@ -18,19 +19,13 @@ export function ProjectFileBrowser(props: ProjectFileBrowserProps) {
     () => props.files.filter((entry) => entry.kind === "directory").map((entry) => entry.id),
     [props.files],
   );
-  const rootDirectoryIds = useMemo(
-    () => props.files.filter((entry) => entry.kind === "directory" && !entry.parentId).map((entry) => entry.id),
-    [props.files],
-  );
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(rootDirectoryIds));
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     setExpanded((current) => {
-      const next = new Set([...current].filter((id) => directoryIds.includes(id)));
-      for (const id of rootDirectoryIds) next.add(id);
-      return next;
+      return new Set([...current].filter((id) => directoryIds.includes(id)));
     });
-  }, [directoryIds.join("\u0000"), rootDirectoryIds.join("\u0000")]);
+  }, [directoryIds.join("\u0000")]);
 
   useEffect(() => {
     if (!props.selectedFileId) return;
@@ -91,7 +86,7 @@ export function ProjectFileBrowser(props: ProjectFileBrowserProps) {
       </div>
 
       <p className="border-t border-white/10 p-3 text-[9px] leading-4 text-zinc-600">
-        Source navigation is limited to files registered by the target server.
+        Repository files are read-only unless the source is registered for editing.
       </p>
     </aside>
   );

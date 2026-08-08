@@ -110,3 +110,13 @@ it("keeps activation failures visible in the confirmation dialog", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent("Dependency installation failed.");
   expect(screen.getByRole("dialog", { name: "Switch library branch" })).toBeInTheDocument();
 });
+
+it("offers a toggle for gitignored files", async () => {
+  const onChange = vi.fn();
+  runLocalOperation.mockResolvedValueOnce(status);
+  render(<LibraryFilesHeader fileCount={12} ignoredFileCount={4} onShowIgnoredFilesChange={onChange} />);
+
+  const toggle = await screen.findByRole("button", { name: "Show gitignored files" });
+  await userEvent.click(toggle);
+  expect(onChange).toHaveBeenCalledWith(true);
+});

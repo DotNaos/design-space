@@ -16,6 +16,8 @@ import { DesignSpaceError } from "./errors";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { verifySourceComponentApprovals } from "./source-approval-registration";
 import {
+  countIgnoredRepositoryFiles,
+  discoverRepositoryFiles,
   indexSourceWorkspace,
   type IndexedSourceFile,
   type IndexedSourceWorkspace,
@@ -55,7 +57,12 @@ export async function loadSourceLibraryRepository(unsafeRoot: string): Promise<I
   const root = await canonicalRoot(unsafeRoot);
   const packages = await discoverSourceLibraryPackages(root);
   const indexed = await Promise.all(packages.map((pkg) => indexPackage(root, pkg)));
-  return mergePackageWorkspaces(root, indexed.filter((candidate): candidate is IndexedPackage => Boolean(candidate)));
+  const available = indexed.filter((candidate): candidate is IndexedPackage => Boolean(candidate));
+  const componentScope = available.some(({ pkg }) => isComponentPackageDirectory(pkg.directory));
+  const selected = componentScope
+    ? available.filter(({ pkg }) => isComponentPackageDirectory(pkg.directory))
+    : available;
+  return mergePackageWorkspaces(root, selected);
 }
 
 export async function discoverSourceLibraryPackages(unsafeRoot: string): Promise<readonly DiscoveredPackage[]> {
@@ -94,7 +101,7 @@ export async function discoverSourceLibraryPackages(unsafeRoot: string): Promise
 async function indexPackage(root: string, pkg: DiscoveredPackage): Promise<IndexedPackage | undefined> {
   const config = await packageConfig(root, pkg);
   const workspace = await indexSourceWorkspace(root, repositoryRelativeConfig(pkg.directory, config));
-  if (!workspace.manifest.entries.some((entry) => entry.design)) return undefined;
+  if (!workspace.manifest.entries.length) return undefined;
   const approvals = await verifySourceComponentApprovals(
     root,
     repositoryRelativeConfig(pkg.directory, config),
@@ -127,6 +134,7 @@ async function packageConfig(root: string, pkg: DiscoveredPackage): Promise<Desi
   return {
     project: { id, label: pkg.name },
     devices: { mode: "responsive" },
+    ...(pkg.directory === "." ? {} : { source: { components: "." } }),
   };
 }
 
@@ -134,20 +142,25 @@ function repositoryRelativeConfig(
   packageDirectory: string,
   config: DesignSpaceProjectConfig,
 ): DesignSpaceProjectConfig {
-  const layout = config.source?.layout.replace(/^\.\//, "")
-    ?? "src/__designspace_inferred__.tsx";
+  const layout = config.source?.layout?.replace(/^\.\//, "");
+  const components = config.source?.components?.replace(/^\.\//, "");
   const policy = config.approvals?.policy?.replace(/^\.\//, "");
   return {
     ...config,
-    source: { layout: packagePath(packageDirectory, layout) },
+    source: {
+      ...(layout ? { layout: packagePath(packageDirectory, layout) } : {}),
+      ...(components ? { components: components === "." ? packageDirectory : packagePath(packageDirectory, components) } : {}),
+    },
     ...(config.approvals ? {
       approvals: { ...config.approvals, ...(policy ? { policy: packagePath(packageDirectory, policy) } : {}) },
     } : {}),
   };
 }
 
-function mergePackageWorkspaces(root: string, indexed: readonly IndexedPackage[]): IndexedSourceWorkspace {
+async function mergePackageWorkspaces(root: string, indexed: readonly IndexedPackage[]): Promise<IndexedSourceWorkspace> {
   const files = uniqueFiles(indexed.flatMap(({ workspace }) => workspace.files));
+  const catalogFiles = uniqueFiles(await discoverRepositoryFiles(root));
+  const ignoredFileCount = await countIgnoredRepositoryFiles(root);
   const entryFiles = new Map<string, string>();
   const entries = indexed.flatMap(({ workspace }) => {
     for (const [id, path] of workspace.entryFiles) {
@@ -168,6 +181,10 @@ function mergePackageWorkspaces(root: string, indexed: readonly IndexedPackage[]
   }
   const styles = [...new Set(indexed.flatMap(({ workspace }) => workspace.stylePaths))];
   const packages = Object.freeze(indexed.map(({ pkg }) => pkg));
+  const componentRoot = commonComponentRoot(packages);
+  const componentRoots = Object.freeze(indexed
+    .map(({ workspace }) => workspace.manifest.componentRoot)
+    .filter((root): root is string => Boolean(root)));
   const sourceRoots = Object.freeze([...new Set(indexed.map(({ workspace }) => workspace.manifest.sourceRoot))]);
   const editableFileIds = new Set(indexed.flatMap(({ workspace }) => workspace.files
     .filter((file) => (
@@ -178,6 +195,8 @@ function mergePackageWorkspaces(root: string, indexed: readonly IndexedPackage[]
   return {
     root,
     files: Object.freeze(files),
+    catalogFiles: Object.freeze(catalogFiles),
+    ignoredFileCount,
     entryFiles,
     stylePaths: Object.freeze(styles),
     sourceRoots,
@@ -186,6 +205,8 @@ function mergePackageWorkspaces(root: string, indexed: readonly IndexedPackage[]
       adapter: "legacy",
       runtime: indexed[0]?.workspace.manifest.runtime ?? "react",
       sourceRoot: ".",
+      ...(componentRoot ? { componentRoot } : {}),
+      ...(componentRoots.length ? { componentRoots } : {}),
       entries: Object.freeze(entries),
       devices: mergeDeviceStates(indexed),
       folderIcons: mergeFolderIcons(indexed),
@@ -196,6 +217,18 @@ function mergePackageWorkspaces(root: string, indexed: readonly IndexedPackage[]
       approvals: mergeApprovals(indexed),
     }),
   };
+}
+
+function commonComponentRoot(packages: readonly SourceWorkspacePackage[]): string | undefined {
+  const directories = packages.map((pkg) => pkg.directory).filter((directory) => directory !== ".");
+  if (!directories.length || !directories.every((directory) => directory === "components" || directory.startsWith("components/"))) {
+    return undefined;
+  }
+  return "components";
+}
+
+function isComponentPackageDirectory(directory: string): boolean {
+  return directory === "components" || directory.startsWith("components/");
 }
 
 function uniqueFiles(files: readonly IndexedSourceFile[]): IndexedSourceFile[] {

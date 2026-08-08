@@ -15,7 +15,7 @@ const entry: RuntimeSourceWorkspaceEntry = {
   area: "components",
   device: "desktop",
   fileId: "source.file.button",
-  relativePath: "src/shared/button/index.ts",
+  relativePath: "components/ui/base/src/components/Button.tsx",
   exportName: "Button",
   props: [],
   slots: [],
@@ -55,12 +55,12 @@ const catalog: RuntimeSourceLibraryCatalog = {
     entries: [entry],
     devices: [],
     styles: [],
-    packages: [{ directory: ".", name: "@dotnaos/ui/base" }],
+    packages: [{ directory: "components/ui/base", name: "@dotnaos/ui/base" }],
   },
   release: { version: "0.0.5", entries: [entry], styles: [] },
 };
 
-it("shows only the development source with a design coverage audit", () => {
+it("shows only the development source with a design coverage audit", async () => {
   render(
     <SourceLibrarySidebar
       catalog={catalog}
@@ -77,12 +77,16 @@ it("shows only the development source with a design coverage audit", () => {
 
   expect(screen.getByText("1/1")).toBeVisible();
   expect(screen.queryByRole("group", { name: "Components" })).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base" })).toBeVisible();
-  expect(screen.getByText("base")).toBeVisible();
-  expect(screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base" }).querySelector("svg.lucide-folder")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "@dotnaos/ui/base / Button", pressed: true })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Expand folder ui" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Expand folder ui / base" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Expand folder ui" }));
+  const baseFolder = screen.getByRole("button", { name: "Expand folder ui / base" });
+  expect(baseFolder).toBeVisible();
+  expect(baseFolder.querySelector("[aria-label='npm package']")).toBeVisible();
+  await userEvent.click(baseFolder);
+  expect(screen.getByRole("button", { name: "ui / base / Button", pressed: true })).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "@dotnaos/ui/base / Button", pressed: true })).toHaveClass("rounded-full", "bg-violet-500/[0.14]", "text-violet-200");
+  expect(screen.getByRole("button", { name: "ui / base / Button", pressed: true })).toHaveClass("rounded-full", "bg-violet-500/[0.14]", "text-violet-200");
   expect(screen.queryByRole("button", { name: "Card" })).not.toBeInTheDocument();
   expect(screen.queryByText("Component")).not.toBeInTheDocument();
   expect(screen.queryByText("Primitive")).not.toBeInTheDocument();
@@ -166,6 +170,8 @@ it("drills from the component catalog into its layers and back", async () => {
     />,
   );
 
+  await userEvent.click(screen.getByRole("button", { name: "Expand folder ui" }));
+  await userEvent.click(screen.getByRole("button", { name: "Expand folder ui / base" }));
   const componentButton = screen.getByRole("button", { name: /Button/, pressed: true });
   expect(componentButton).toBeVisible();
   expect(screen.queryByRole("region", { name: "Selected component layers" })).not.toBeInTheDocument();
@@ -184,7 +190,7 @@ it("drills from the component catalog into its layers and back", async () => {
 it("can render app-built components without adding another source switch", () => {
   render(
     <SourceLibrarySidebar
-      appWorkspace={{ ...catalog.development!, entries: [entry] }}
+      appWorkspace={{ ...catalog.development!, entries: [{ ...entry, relativePath: "src/app/components/Button.tsx" }], packages: undefined }}
       catalog={catalog}
       catalogKind="app"
       device="desktop"
@@ -254,10 +260,15 @@ it("mirrors nested app component folders and keeps duplicate leaf names selectab
     />,
   );
 
-  const agentsFolder = screen.getByRole("button", { name: "Collapse folder Agents" });
+  const agentsFolder = screen.getByRole("button", { name: "Expand folder Agents" });
+  await userEvent.click(agentsFolder);
   const agentsCard = screen.getByRole("button", { name: "Agents / AgentCard" });
   expect(agentsCard).toBeVisible();
+  const gitFolder = screen.getByRole("button", { name: "Expand folder Git" });
+  await userEvent.click(gitFolder);
   expect(screen.getByRole("button", { name: "Git / AgentCard" })).toBeVisible();
+  const toolsFolder = screen.getByRole("button", { name: "Expand folder Agents / Tools" });
+  await userEvent.click(toolsFolder);
   expect(screen.getByRole("button", { name: "Agents / Tools / ToolCall" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Button" })).toBeVisible();
   expect(agentsFolder).toHaveClass("relative", "px-3.5");
@@ -281,7 +292,7 @@ it("renders source-derived icons for development-library folders", async () => {
     id: "action-button",
     label: "ActionButton",
     exportName: "ActionButton",
-    relativePath: "src/components/actions/ActionButton/render.tsx",
+    relativePath: "components/ui/base/src/components/actions/ActionButton/render.tsx",
   };
   render(
     <SourceLibrarySidebar
@@ -290,7 +301,7 @@ it("renders source-derived icons for development-library folders", async () => {
         development: {
           ...catalog.development!,
           entries: [actionEntry],
-          folderIcons: [{ directory: "src/components/actions", name: "sparkles" }],
+          folderIcons: [{ directory: "components/ui/base/src/components/actions", name: "sparkles" }],
         },
       }}
       catalogKind="library"
@@ -309,9 +320,14 @@ it("renders source-derived icons for development-library folders", async () => {
     />,
   );
 
-  const actionsFolder = screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base / actions" });
+  const uiFolder = screen.getByRole("button", { name: "Expand folder ui" });
+  await userEvent.click(uiFolder);
+  const baseFolder = screen.getByRole("button", { name: "Expand folder ui / base" });
+  await userEvent.click(baseFolder);
+  const actionsFolder = screen.getByRole("button", { name: "Expand folder ui / base / actions" });
   await waitFor(() => expect(actionsFolder.querySelector("svg.lucide-sparkles")).toBeVisible());
-  expect(screen.getByRole("button", { name: "@dotnaos/ui/base / actions / ActionButton" })).toBeVisible();
+  await userEvent.click(actionsFolder);
+  expect(screen.getByRole("button", { name: "ui / base / actions / ActionButton" })).toBeVisible();
 });
 
 it("does not duplicate the library identity from the global workspace switch", () => {

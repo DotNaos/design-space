@@ -12,7 +12,7 @@ afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { force: true, recursive: true })));
 });
 
-it("loads every designed package with repository-relative component identities", async () => {
+it("loads every component package with repository-relative identities", async () => {
   const root = await repositoryFixture();
   await writeFile(resolve(root, "package.json"), JSON.stringify({ name: "workspace", private: true }));
   await componentPackage(root, "packages/alpha", "@example/alpha", "Button", true);
@@ -27,6 +27,7 @@ it("loads every designed package with repository-relative component identities",
   expect(workspace.manifest.packages).toEqual([
     { directory: "packages/alpha", name: "@example/alpha" },
     { directory: "packages/beta", name: "@example/beta" },
+    { directory: "packages/no-design", name: "@example/no-design" },
   ]);
   const buttons = workspace.manifest.entries.filter((entry) => entry.label === "Button" && entry.design);
   expect(buttons).toHaveLength(2);
@@ -36,7 +37,7 @@ it("loads every designed package with repository-relative component identities",
   ]);
   expect(new Set(buttons.map((entry) => entry.id)).size).toBe(2);
   expect(new Set(buttons.map((entry) => entry.fileId)).size).toBe(2);
-  expect(workspace.manifest.entries.some((entry) => entry.label === "Hidden")).toBe(false);
+  expect(workspace.manifest.entries.some((entry) => entry.label === "Hidden")).toBe(true);
   expect(workspace.manifest.entries.some((entry) => entry.label === "NotAPackage")).toBe(false);
 }, 15_000);
 

@@ -31,6 +31,12 @@ it("builds folders only for real component descendants", () => {
   ]);
 
   expect(tree).toMatchObject([
+    { kind: "component", component: { id: "button" } },
+    {
+      kind: "folder",
+      label: "Git",
+      children: [{ kind: "component", component: { id: "git-card" } }],
+    },
     {
       kind: "folder",
       label: "Agents",
@@ -45,12 +51,6 @@ it("builds folders only for real component descendants", () => {
           children: [{ kind: "component", component: { id: "agents-tools-call" } }],
         },
       ],
-    },
-    { kind: "component", component: { id: "button" } },
-    {
-      kind: "folder",
-      label: "Git",
-      children: [{ kind: "component", component: { id: "git-card" } }],
     },
   ]);
 });

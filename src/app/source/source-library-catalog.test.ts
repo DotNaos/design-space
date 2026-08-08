@@ -104,6 +104,39 @@ it("derives nested app catalog paths from component source files", () => {
   expect(components.find((component) => component.label === "AgentCard")?.packagePaths).toEqual([["Agents"]]);
 });
 
+it("uses the configured component roots instead of exposing package implementation folders", () => {
+  const components = sourceCatalogComponents({
+    catalog: {
+      packageName: "@dotnaos/react-ui",
+      development: {
+        componentRoots: ["components/react-ui/src/components"],
+        devices: [],
+        entries: [entry({
+          id: "action-button",
+          label: "ActionButton",
+          relativePath: "components/react-ui/src/components/actions/ActionButton/render.tsx",
+          design: design("action-button"),
+        }), entry({
+          id: "app-layout",
+          label: "AppLayout",
+          relativePath: "components/react-ui/src/web/layouts/app-layout/render.tsx",
+        })],
+        packages: [{ directory: "components/react-ui", name: "@dotnaos/react-ui" }],
+        runtime: "react",
+        sourceRoot: ".",
+        styles: [],
+      },
+    } satisfies RuntimeSourceLibraryCatalog,
+    device: "desktop",
+    kind: "library",
+    library: { packageName: "@dotnaos/react-ui", version: "workspace:*", mode: "development", editable: false, components: [] },
+    mode: "development",
+  });
+
+  expect(components.map((component) => component.label)).toEqual(["ActionButton", "AppLayout"]);
+  expect(components[0]?.path).toEqual(["react-ui", "actions", "ActionButton"]);
+});
+
 it("keeps manifest target folders and mixed-case marker roots scoped to the selected target", () => {
   const workspace: RuntimeSourceWorkspace = {
     devices: [],
@@ -238,11 +271,11 @@ it("groups library components by the nearest named package", () => {
   });
 
   expect(components.map(({ label, path }) => ({ label, path }))).toEqual([
-    { label: "Button", path: ["@dotnaos/ui/base", "Button"] },
-    { label: "Button", path: ["@dotnaos/ui/layout", "Button"] },
-    { label: "Message", path: ["@dotnaos/ui/ai", "messages", "Message"] },
+    { label: "Button", path: ["base", "Button"] },
+    { label: "Button", path: ["layout", "Button"] },
+    { label: "Message", path: ["chat", "messages", "Message"] },
   ]);
-  expect(components[0]?.packagePaths).toEqual([["@dotnaos/ui/base"]]);
+  expect(components[0]?.packagePaths).toEqual([["base"]]);
 });
 
 it("uses the public component label as the leaf without repeating its source folder", () => {
@@ -326,7 +359,8 @@ it("uses designed Development source entries instead of an older installed packa
     mode: "development",
   });
 
-  expect(components.map((component) => component.label)).toEqual(["Button", "SourceOnly"]);
+  expect(components.map((component) => component.label)).toEqual(["Button", "ButtonInternal", "SourceOnly"]);
   expect(components[0].entry).toBe(button);
-  expect(components[1].entry).toBe(sourceOnly);
+  expect(components[1].entry).toBe(internalButton);
+  expect(components[2].entry).toBe(sourceOnly);
 });

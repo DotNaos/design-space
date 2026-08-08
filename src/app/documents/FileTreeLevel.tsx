@@ -1,6 +1,8 @@
 
 import { Button } from "@heroui/react";
-import { ChevronRight, FileCode2, Folder, FolderOpen } from "lucide-react";
+import { FileIcon as DesignSystemFileIcon } from "@dotnaos/react-ui/web";
+import { ChevronRight, Folder, FolderOpen } from "lucide-react";
+import { NpmBrandIcon } from "../source/NpmBrandIcon";
 import type { SourceWorkspaceFileEntry } from "../../shared/source-workspace";
 
 export function FileTreeLevel(props: {
@@ -44,7 +46,7 @@ export function FileTreeLevel(props: {
           ) : (
             <>
               <span aria-hidden="true" className="w-[13px] shrink-0" />
-              <FileCode2 aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />
+              <FileIcon label={entry.label} />
             </>
           )}
           <span className="min-w-0 flex-1 truncate text-left">{entry.label}</span>
@@ -62,4 +64,9 @@ export function FileTreeLevel(props: {
       </li>
     );
   });
+}
+
+function FileIcon(props: { label: string }) {
+  if (props.label.toLocaleLowerCase() === "package.json") return <NpmBrandIcon />;
+  return <DesignSystemFileIcon filename={props.label} size={14} />;
 }

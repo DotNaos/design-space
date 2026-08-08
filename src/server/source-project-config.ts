@@ -16,7 +16,11 @@ const sourceProjectConfigSchema = z.object({
     layout: z.string().refine(
       isProjectRelativeSourceLayout,
       "Source layout must be a project-relative .tsx file inside a src/ or app/ directory",
-    ),
+    ).optional(),
+    components: z.string().refine(
+      isProjectRelativeSourceDirectory,
+      "Source components must be a project-relative directory",
+    ).optional(),
   }).strict().optional(),
   library: z.object({
     package: z.string().regex(/^@?[a-z0-9][a-z0-9._/-]*$/i).max(160),
@@ -50,6 +54,13 @@ function isProjectRelativeSourceLayout(value: string): boolean {
 
   const sourceDirectoryIndex = segments.findIndex((segment) => segment === "src" || segment === "app");
   return sourceDirectoryIndex >= 0 && sourceDirectoryIndex < segments.length - 1;
+}
+
+function isProjectRelativeSourceDirectory(value: string): boolean {
+  if (value.startsWith("/") || value.includes("\\")) return false;
+  const relativePath = value.startsWith("./") ? value.slice(2) : value;
+  const segments = relativePath.split("/");
+  return segments.length > 0 && segments.every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
 
 export function parseSourceProjectConfig(value: unknown): DesignSpaceProjectConfig {

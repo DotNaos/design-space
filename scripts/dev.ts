@@ -101,11 +101,17 @@ function siblingUiLibraryRoot(): string | undefined {
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
     const repository = resolve(commonDirectory, "..", "..", "ui");
-    const candidate = resolve(repository, "packages", "react-ui");
-    return existsSync(resolve(candidate, "package.json"))
-      && existsSync(resolve(candidate, ".designspace.ts"))
-      ? candidate
-      : undefined;
+    if (existsSync(resolve(repository, "package.json")) && existsSync(resolve(repository, "components"))) {
+      return repository;
+    }
+    for (const candidate of [
+      resolve(repository, "components", "ui"),
+      resolve(repository, "components", "react-ui"),
+      resolve(repository, "packages", "react-ui"),
+    ]) {
+      if (existsSync(resolve(candidate, "package.json")) && existsSync(resolve(candidate, ".designspace.ts"))) return candidate;
+    }
+    return undefined;
   } catch {
     return undefined;
   }

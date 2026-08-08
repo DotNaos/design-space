@@ -1,6 +1,6 @@
 import { Input, Label, TextField } from "@heroui/react";
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { DesignSpaceDevice, RuntimeSourceLibraryCatalog, RuntimeSourceWorkspace, RuntimeSourceWorkspaceEntry, SourceWorkspaceLibrary } from "../../shared/source-workspace";
 import { filterSourceCatalog, selectedSourceCatalogComponent, sourceCatalogComponents, type SourceCatalogComponent, type SourceCatalogKind } from "./source-library-catalog";
@@ -59,7 +59,6 @@ export function SourceLibrarySidebar(
   },
 ) {
   const [query, setQuery] = useState("");
-  const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(new Set());
   const components = useMemo(() => catalogComponents(props, props.catalogKind), [
     props.appWorkspace,
     props.appTargetId,
@@ -77,6 +76,23 @@ export function SourceLibrarySidebar(
     () => catalogSections(visible, props.catalogKind),
     [props.catalogKind, visible],
   );
+  const trees = useMemo(
+    () => sections.map((section) => sourceCatalogTree(section.components)),
+    [sections],
+  );
+  const folderIds = useMemo(() => new Set(trees.flatMap((tree) => collectCatalogFolderIds(tree))), [trees]);
+  const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(() => new Set(folderIds));
+  const previousFolderIds = useRef(folderIds);
+  useEffect(() => {
+    setCollapsedFolders((current) => {
+      const next = new Set([...current].filter((id) => folderIds.has(id)));
+      for (const id of folderIds) {
+        if (!previousFolderIds.current.has(id)) next.add(id);
+      }
+      return next;
+    });
+    previousFolderIds.current = folderIds;
+  }, [folderIds]);
   const selected = selectedSourceCatalogComponent(components, props.selected)?.id;
   useEffect(() => {
     const fallback = visible[0];
@@ -116,11 +132,11 @@ export function SourceLibrarySidebar(
         <div className="min-h-0 flex-1 bg-white/[0.012]">{props.details}</div>
       ) : (
         <div aria-label="Component list" className="min-h-0 flex-1 overflow-y-auto py-2" role="list">
-          {sections.map((section) => (
+          {sections.map((section, index) => (
             <div className="pb-2" key={section.id}>
               <SourceCatalogTree
                 collapsed={query.trim() ? new Set() : collapsedFolders}
-                items={sourceCatalogTree(section.components)}
+                items={trees[index] ?? []}
                 selected={selected}
                 source={selectedCatalogWorkspace(props)}
                 onSelect={props.onOpenDetails ?? props.onSelect}
@@ -142,6 +158,14 @@ export function SourceLibrarySidebar(
       )}
     </aside>
   );
+}
+
+function collectCatalogFolderIds(
+  items: readonly import("./source-catalog-tree").SourceCatalogTreeItem[],
+): readonly string[] {
+  return items.flatMap((item) => item.kind === "folder"
+    ? [item.id, ...collectCatalogFolderIds(item.children)]
+    : []);
 }
 
 function catalogSections(components: readonly SourceCatalogComponent[], kind: SourceCatalogKind) {
