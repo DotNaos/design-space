@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 
 import react from "@vitejs/plugin-react";
@@ -49,6 +50,10 @@ export default defineConfig(async () => {
   const libraryAliases = registeredTarget.sourceLibrary?.development
     ? targetTypeScriptAliases(registeredTarget.sourceLibrary.development.root)
     : [];
+  const targetCacheKey = createHash("sha256")
+    .update(registeredTarget.sourceLibrary?.development?.root ?? "installed-library")
+    .digest("hex")
+    .slice(0, 12);
   const api = new LocalOperationService(
     new EditService(registeredTarget, { sourceDraftPreviews }),
     new DocumentService(registeredTarget),
@@ -58,7 +63,7 @@ export default defineConfig(async () => {
   );
 
   return {
-    cacheDir: resolve(root, "node_modules/.vite-design-space", `port-${serverPort}`),
+    cacheDir: resolve(root, "node_modules/.vite-design-space", `port-${serverPort}`, targetCacheKey),
     resolve: {
       alias: [...targetAliases, ...libraryAliases],
       dedupe: ["react", "react-dom"],

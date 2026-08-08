@@ -243,18 +243,13 @@ export const libraryDevelopmentOperationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("get-library-development") }).strict(),
   z.object({ type: z.literal("clone-library-development") }).strict(),
   z.object({
-    type: z.literal("clone-library-development-worktree"),
+    type: z.literal("activate-library-development-branch"),
     branch: z.string()
       .trim()
       .min(1)
       .max(200)
       .regex(/^[^\s~^:?*\\[\]]+$/),
   }).strict(),
-  z.object({
-    type: z.literal("start-library-development"),
-    worktreeId: opaqueIdSchema,
-  }).strict(),
-  z.object({ type: z.literal("stop-library-development") }).strict(),
 ]);
 
 export type LibraryDevelopmentOperation = z.infer<typeof libraryDevelopmentOperationSchema>;
