@@ -14,7 +14,7 @@ export interface DesignSpaceLibraryProjectConfig {
   repository: string;
   /** Directory name below the shared projects directory. */
   checkoutName: string;
-  /** Package directory inside each checkout or worktree. */
+  /** Repository directory inside each checkout or worktree. Use "." for the whole repository. */
   packageRoot: string;
 }
 

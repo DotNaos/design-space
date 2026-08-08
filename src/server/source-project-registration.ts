@@ -2,17 +2,15 @@ import type { DesignSpaceProjectConfig } from "../shared/source-workspace";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
-import { runnerImport } from "vite";
-
 import { DesignSpaceError } from "./errors";
 import { canonicalRegisteredFile, canonicalRoot } from "./path-security";
 import { verifySourceComponentApprovals } from "./source-approval-registration";
 import { indexSourceWorkspace } from "./source-file-index";
 import { indexAppManifestWorkspace } from "./source-file-index";
 import type { AppManifest } from "./app-manifest";
-import { parseSourceProjectConfig } from "./source-project-config";
 import { registerSourceComponentStore } from "./source-component-creation";
 import { resolveConfiguredLibraryDevelopmentRoot } from "./library-development-project";
+import { loadSourceLibraryRepository } from "./source-library-repository";
 import type { RegisteredTarget } from "./target-registration";
 
 export async function registerSourceProject(
@@ -126,40 +124,7 @@ async function registerSourceLibrary(
         modulePath: await resolveLibraryDesignModule(root, configuredPackage ?? detected.packageName),
       },
     } : {}),
-    ...(developmentRoot ? { development: await loadLibraryWorkspace(developmentRoot) } : {}),
-  };
-}
-
-async function loadLibraryWorkspace(root: string) {
-  const configPath = await canonicalRegisteredFile(root, ".designspace.ts").catch(() => undefined);
-  if (configPath) {
-    const { module } = await runnerImport<Record<string, unknown>>(configPath, {
-      root,
-      logLevel: "silent",
-    });
-    return indexRegisteredSourceWorkspace(root, parseSourceProjectConfig(module.default ?? module.designSpace));
-  }
-  return indexRegisteredSourceWorkspace(root, await inferredLibraryConfig(root));
-}
-
-async function inferredLibraryConfig(root: string): Promise<DesignSpaceProjectConfig> {
-  const manifest = await readFile(resolve(root, "package.json"), "utf8")
-    .then((source) => JSON.parse(source) as { name?: unknown })
-    .catch(() => undefined);
-  const packageName = typeof manifest?.name === "string" ? manifest.name : "Component library";
-  const id = packageName
-    .replace(/^@/, "")
-    .replace(/[^a-z0-9._-]+/gi, "-")
-    .replace(/^[^a-z]+/i, "")
-    .slice(0, 96) || "component-library";
-  return {
-    project: {
-      id,
-      label: packageName,
-    },
-    devices: {
-      mode: "responsive",
-    },
+    ...(developmentRoot ? { development: await loadSourceLibraryRepository(developmentRoot) } : {}),
   };
 }
 

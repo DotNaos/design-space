@@ -79,14 +79,14 @@ describe("source project config", () => {
         project: {
           repository: "https://github.com/DotNaos/ui.git",
           checkoutName: "ui",
-          packageRoot: "packages/react-ui",
+          packageRoot: ".",
         },
       },
     })).toMatchObject({
       library: {
         project: {
           checkoutName: "ui",
-          packageRoot: "packages/react-ui",
+          packageRoot: ".",
         },
       },
     });

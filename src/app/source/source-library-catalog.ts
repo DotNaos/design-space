@@ -74,12 +74,12 @@ export function sourceCatalogComponents(options: {
   const source = selectedLibraryCatalog(options.catalog, options.mode);
   const exported = options.library?.components ?? [];
   const entries = source?.entries ?? [];
-  const sources = exported.length
-    ? exported.map((component) => ({ name: component.name, evidence: component }))
-    : [...new Map(entries.map((entry) => [
-        `${entry.label}:${catalogComponentPath(options.catalog?.development, entry, entry.label).join("/")}`,
-        { name: entry.label, entry },
-      ])).values()];
+  const designedSources = entries.filter((entry) => entry.design).map((entry) => ({ name: entry.label, entry }));
+  const sources = options.mode === "development"
+    ? developmentCatalogSources(entries, exported)
+    : exported.length
+      ? exported.map((component) => ({ name: component.name, evidence: component }))
+      : designedSources;
   const occurrences = new Map<string, number>();
 
   return sources.map((sourceItem) => {
@@ -87,7 +87,7 @@ export function sourceCatalogComponents(options: {
     const occurrence = occurrences.get(name) ?? 0;
     occurrences.set(name, occurrence + 1);
     const entry = options.mode === "development"
-      ? ("entry" in sourceItem ? sourceItem.entry : developmentEntry(entries, name, occurrence))
+      ? ("entry" in sourceItem ? sourceItem.entry : undefined)
       : entries.find((candidate) => candidate.label === name || candidate.exportName === name);
     const evidence = "evidence" in sourceItem ? sourceItem.evidence : undefined;
     const category = libraryCategory(name, entry, evidence?.category);
@@ -242,6 +242,28 @@ function selectedLibraryCatalog(
   return mode === "development" ? catalog?.development : catalog?.release;
 }
 
+function developmentCatalogSources(
+  entries: readonly RuntimeSourceWorkspaceEntry[],
+  exported: SourceWorkspaceLibrary["components"],
+) {
+  const sources = new Map<string, {
+    name: string;
+    entry: RuntimeSourceWorkspaceEntry;
+    evidence?: SourceWorkspaceLibrary["components"][number];
+  }>();
+  const occurrences = new Map<string, number>();
+  for (const evidence of exported) {
+    const occurrence = occurrences.get(evidence.name) ?? 0;
+    occurrences.set(evidence.name, occurrence + 1);
+    const entry = developmentEntry(entries, evidence.name, occurrence);
+    if (entry) sources.set(entry.id, { name: evidence.name, entry, evidence });
+  }
+  for (const entry of entries) {
+    if (entry.design && !sources.has(entry.id)) sources.set(entry.id, { name: entry.label, entry });
+  }
+  return [...sources.values()];
+}
+
 function developmentEntry(entries: readonly RuntimeSourceWorkspaceEntry[], name: string, occurrence = 0) {
   const exact = entries.filter((entry) => entry.exportName === name || entry.label === name);
   const exactDesign = exact.filter((entry) => entry.design)[occurrence];
@@ -249,8 +271,7 @@ function developmentEntry(entries: readonly RuntimeSourceWorkspaceEntry[], name:
   if (name.startsWith("Primitive")) {
     const primitiveName = name.slice("Primitive".length);
     const primitive = entries.find((entry) => (
-      entry.design
-      && entry.label === primitiveName
+      entry.label === primitiveName
       && entry.relativePath.includes("/primitives/")
     ));
     if (primitive) return primitive;
