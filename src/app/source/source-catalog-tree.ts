@@ -89,6 +89,8 @@ function pathsEqual(left: readonly string[], right: readonly string[]): boolean 
 }
 
 function compareCatalogItems(left: SourceCatalogTreeItem, right: SourceCatalogTreeItem): number {
+  const packageOrder = Number(left.kind === "folder" && left.isPackage) - Number(right.kind === "folder" && right.isPackage);
+  if (packageOrder !== 0) return packageOrder;
   const label = left.kind === "folder" ? left.label : left.component.label;
   const otherLabel = right.kind === "folder" ? right.label : right.component.label;
   return label.localeCompare(otherLabel, "en") || (left.kind === "folder" ? -1 : 1);
