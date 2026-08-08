@@ -116,6 +116,10 @@ it("uses the configured component roots instead of exposing package implementati
           label: "ActionButton",
           relativePath: "components/react-ui/src/components/actions/ActionButton/render.tsx",
           design: design("action-button"),
+        }), entry({
+          id: "app-layout",
+          label: "AppLayout",
+          relativePath: "components/react-ui/src/web/layouts/app-layout/render.tsx",
         })],
         packages: [{ directory: "components/react-ui", name: "@dotnaos/react-ui" }],
         runtime: "react",
@@ -129,6 +133,7 @@ it("uses the configured component roots instead of exposing package implementati
     mode: "development",
   });
 
+  expect(components.map((component) => component.label)).toEqual(["ActionButton"]);
   expect(components[0]?.path).toEqual(["@dotnaos/react-ui", "actions", "ActionButton"]);
 });
 

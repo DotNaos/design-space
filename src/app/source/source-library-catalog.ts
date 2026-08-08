@@ -73,7 +73,10 @@ export function sourceCatalogComponents(options: {
 
   const source = selectedLibraryCatalog(options.catalog, options.mode);
   const exported = options.library?.components ?? [];
-  const entries = source?.entries ?? [];
+  const entries = sourceEntriesForComponents(
+    source?.entries ?? [],
+    options.mode === "development" ? options.catalog?.development : undefined,
+  );
   const designedSources = entries.filter((entry) => entry.design).map((entry) => ({ name: entry.label, entry }));
   const sources = options.mode === "development"
     ? developmentCatalogSources(entries, exported)
@@ -106,6 +109,19 @@ export function sourceCatalogComponents(options: {
       searchText: `${name} ${entry?.exportName ?? ""} ${entry?.relativePath ?? ""} ${category} ${entry ? catalogComponentPath(options.catalog?.development, entry, name).join(" ") : ""}`.toLocaleLowerCase(),
     };
   }).sort((left, right) => left.label.localeCompare(right.label, "en") || left.path.join("/").localeCompare(right.path.join("/"), "en"));
+}
+
+function sourceEntriesForComponents(
+  entries: readonly RuntimeSourceWorkspaceEntry[],
+  workspace: Pick<RuntimeSourceWorkspace, "componentRoots" | "componentRoot"> | undefined,
+): readonly RuntimeSourceWorkspaceEntry[] {
+  const roots = workspace?.componentRoots?.length
+    ? workspace.componentRoots
+    : workspace?.componentRoot
+      ? [workspace.componentRoot]
+      : [];
+  if (!roots.length) return entries;
+  return entries.filter((entry) => roots.some((root) => isPathWithin(entry.relativePath, root)));
 }
 
 function catalogFolderIcons(
