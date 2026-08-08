@@ -24,6 +24,19 @@ const entry = (
   ...options,
 });
 
+const design = (id: string): NonNullable<RuntimeSourceWorkspaceEntry["design"]> => ({
+  fileId: `${id}-design`,
+  relativePath: `src/components/${id}.design.tsx`,
+  load: async () => ({
+    component: () => null,
+    defaults: {},
+    initialCase: "default",
+    isStateful: false,
+    cases: { default: {} },
+    render: () => null,
+  }),
+});
+
 it("flattens logical app components without repeating device implementations", () => {
   const desktop = entry({ id: "summary.desktop", label: "ProjectSummary" });
   const mobile = entry({
@@ -194,9 +207,9 @@ it("groups library components by the nearest named package", () => {
       development: {
         devices: [],
         entries: [
-          entry({ id: "base-button", label: "Button", relativePath: "src/components/base/Button.tsx" }),
-          entry({ id: "layout-button", label: "Button", relativePath: "src/components/layout/Button.tsx" }),
-          entry({ id: "chat-message", label: "Message", relativePath: "src/components/chat/messages/Message.tsx" }),
+          entry({ id: "base-button", label: "Button", relativePath: "src/components/base/Button.tsx", design: design("base-button") }),
+          entry({ id: "layout-button", label: "Button", relativePath: "src/components/layout/Button.tsx", design: design("layout-button") }),
+          entry({ id: "chat-message", label: "Message", relativePath: "src/components/chat/messages/Message.tsx", design: design("chat-message") }),
         ],
         packages: [
           { directory: "src/components/base", name: "@dotnaos/ui/base" },
@@ -238,6 +251,7 @@ it("uses the public component label as the leaf without repeating its source fol
     label: "ActionButton",
     exportName: "ActionButton",
     relativePath: "src/components/actions/ActionButton/render.tsx",
+    design: design("action-button"),
   });
   const components = sourceCatalogComponents({
     catalog: {
@@ -265,22 +279,29 @@ it("uses the public component label as the leaf without repeating its source fol
   expect(components[0]?.path).toEqual(["actions", "ActionButton"]);
 });
 
-it("keeps Development scoped to the public package catalog while resolving live source entries", () => {
+it("uses designed Development source entries instead of an older installed package catalog", () => {
   const button = entry({
     id: "button",
     label: "Button",
     relativePath: "src/primitives/Button/index.tsx",
+    design: design("button"),
   });
   const internalButton = entry({
     id: "button-internal",
     label: "ButtonInternal",
     relativePath: "src/primitives/Button/ButtonInternal.tsx",
   });
+  const sourceOnly = entry({
+    id: "source-only",
+    label: "SourceOnly",
+    relativePath: "src/components/SourceOnly.tsx",
+    design: design("source-only"),
+  });
   const catalog: RuntimeSourceLibraryCatalog = {
     packageName: "@dotnaos/react-ui",
     development: {
       devices: [],
-      entries: [button, internalButton],
+      entries: [button, internalButton, sourceOnly],
       runtime: "react",
       sourceRoot: "src",
       styles: [],
@@ -305,7 +326,7 @@ it("keeps Development scoped to the public package catalog while resolving live 
     mode: "development",
   });
 
-  expect(components.map((component) => component.label)).toEqual(["Button", "InstalledOnly"]);
+  expect(components.map((component) => component.label)).toEqual(["Button", "SourceOnly"]);
   expect(components[0].entry).toBe(button);
-  expect(components[1].entry).toBeUndefined();
+  expect(components[1].entry).toBe(sourceOnly);
 });

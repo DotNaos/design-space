@@ -133,14 +133,16 @@ async function strictUiFixture(): Promise<StrictUiFixture> {
 }
 
 function workspace(root: string, files: Record<string, RegisteredFile>): IndexedSourceWorkspace {
+  const indexedFiles = Object.values(files).map((file) => ({
+    id: file.id,
+    relativePath: file.displayName,
+    absolutePath: file.path,
+  }));
   return {
     root,
     manifest: { runtime: "react", sourceRoot: "src", entries: [], devices: [] },
-    files: Object.values(files).map((file) => ({
-      id: file.id,
-      relativePath: file.displayName,
-      absolutePath: file.path,
-    })),
+    files: indexedFiles,
+    editableFileIds: new Set(indexedFiles.map((file) => file.id)),
     entryFiles: new Map(),
     stylePaths: [],
   };

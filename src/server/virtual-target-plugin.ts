@@ -90,12 +90,13 @@ export function designSpaceTargetPlugin(target: RegisteredTarget, draftPreviews?
         server.watcher.on("change", restartForSourceShape);
       }
       if (developmentLibrary) {
-        const libraryRoot = normalizePath(`${developmentLibrary.root}/${developmentLibrary.manifest.sourceRoot}/`);
-        server.watcher.add([libraryRoot, ...developmentLibrary.files.map((file) => file.absolutePath)]);
+        const libraryRoots = (developmentLibrary.sourceRoots ?? [developmentLibrary.manifest.sourceRoot])
+          .map((sourceRoot) => normalizePath(`${developmentLibrary.root}/${sourceRoot}/`));
+        server.watcher.add([...libraryRoots, ...developmentLibrary.files.map((file) => file.absolutePath)]);
         const restartForLibraryShape = (changedPath: string) => {
           const normalized = normalizePath(changedPath);
           if (
-            normalized.startsWith(libraryRoot)
+            libraryRoots.some((libraryRoot) => normalized.startsWith(libraryRoot))
             && (/\.[cm]?[jt]sx?$/.test(normalized) || normalized.endsWith(".lucide-icon"))
           ) void server.restart();
         };

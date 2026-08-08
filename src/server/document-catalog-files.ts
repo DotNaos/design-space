@@ -19,7 +19,7 @@ export function sourceWorkspaceFileCatalog(
   return fileCatalog(workspace.files.map((file) => ({
     id: file.id,
     displayName: file.relativePath,
-    editable: /\.[cm]?tsx?$/.test(file.relativePath),
+    editable: workspace.editableFileIds?.has(file.id) ?? /\.[cm]?tsx?$/.test(file.relativePath),
   })));
 }
 

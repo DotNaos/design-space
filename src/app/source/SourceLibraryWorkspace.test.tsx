@@ -75,17 +75,15 @@ it("shows only the development source with a design coverage audit", () => {
     />,
   );
 
-  expect(screen.getByText("1/2")).toBeVisible();
+  expect(screen.getByText("1/1")).toBeVisible();
   expect(screen.queryByRole("group", { name: "Components" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base" })).toBeVisible();
   expect(screen.getByText("base")).toBeVisible();
   expect(screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base" }).querySelector("svg.lucide-folder")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "@dotnaos/ui/base / Button", pressed: true })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Card" })).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "@dotnaos/ui/base / Button", pressed: true })).toHaveClass("rounded-full", "bg-violet-500/[0.14]", "text-violet-200");
-  expect(screen.getByRole("button", { name: "Card" })).toBeVisible();
-  expect(screen.getByLabelText("Card design missing")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Card" })).not.toBeInTheDocument();
   expect(screen.queryByText("Component")).not.toBeInTheDocument();
   expect(screen.queryByText("Primitive")).not.toBeInTheDocument();
   expect(screen.queryByText("Installed")).not.toBeInTheDocument();

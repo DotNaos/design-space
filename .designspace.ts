@@ -16,7 +16,7 @@ export default defineDesignSpace({
     project: {
       repository: "https://github.com/DotNaos/ui.git",
       checkoutName: "ui",
-      packageRoot: "packages/react-ui",
+      packageRoot: ".",
     },
     development: process.env.DESIGN_SPACE_UI_LIBRARY_ROOT ? {
       root: process.env.DESIGN_SPACE_UI_LIBRARY_ROOT,

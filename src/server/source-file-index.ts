@@ -69,6 +69,10 @@ export interface IndexedSourceWorkspace {
   files: readonly IndexedSourceFile[];
   entryFiles: ReadonlyMap<string, string>;
   stylePaths: readonly string[];
+  /** Canonical source scopes watched for file-shape changes in aggregated repositories. */
+  sourceRoots?: readonly string[];
+  /** Server-owned source files that may participate in reviewed change sets. */
+  editableFileIds?: ReadonlySet<string>;
   /** Manifest-only CSS paths keyed by target. Runtime generation keeps these scopes isolated. */
   targetStylePaths?: ReadonlyMap<string, readonly string[]>;
 }

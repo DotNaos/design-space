@@ -107,6 +107,15 @@ it("indexes a selected library checkout without requiring its own Design Space c
       resolve(libraryRoot, "src", "components", "actions", "Button.tsx"),
       "export function Button() { return <button type=\"button\" />; }\n",
     );
+    await writeFile(
+      resolve(libraryRoot, "src", "components", "actions", "Button.design.tsx"),
+      [
+        'import { Button } from "./Button";',
+        "const defineComponentDesign = (component: unknown, options: unknown) => ({ component, options });",
+        "export default defineComponentDesign(Button, {});",
+        "",
+      ].join("\n"),
+    );
     await writeFile(resolve(libraryRoot, "src", "components", "actions", ".sparkles.lucide-icon"), "");
 
     const target = await registerSourceProject(appRoot, {
@@ -121,7 +130,8 @@ it("indexes a selected library checkout without requiring its own Design Space c
     expect(target.sourceLibrary?.development).toMatchObject({
       root: await realpath(libraryRoot),
       manifest: {
-        sourceRoot: "src",
+        packages: [{ directory: ".", name: "@dotnaos/react-ui" }],
+        sourceRoot: ".",
         entries: [
           expect.objectContaining({
             label: "Button",
@@ -135,6 +145,7 @@ it("indexes a selected library checkout without requiring its own Design Space c
     ) as string;
     expect(runtimeSource).not.toContain('"label":"Button.tsx"');
     expect(runtimeSource).not.toContain('"files":[{"id":"library.source.');
+    expect(runtimeSource).toContain('packages: [{"directory":".","name":"@dotnaos/react-ui"}]');
     expect(runtimeSource).toContain('folderIcons: [{"directory":"src/components/actions","name":"sparkles"}]');
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
