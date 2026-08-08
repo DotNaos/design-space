@@ -1,6 +1,7 @@
 
 import { Button } from "@heroui/react";
-import { Braces, ChevronRight, FileCode2, FileImage, FileJson2, FileText, Folder, FolderOpen, LockKeyhole, Palette } from "lucide-react";
+import { FileIcon as DesignSystemFileIcon } from "@dotnaos/react-ui/web";
+import { ChevronRight, Folder, FolderOpen } from "lucide-react";
 import { NpmBrandIcon } from "../source/NpmBrandIcon";
 import type { SourceWorkspaceFileEntry } from "../../shared/source-workspace";
 
@@ -66,14 +67,6 @@ export function FileTreeLevel(props: {
 }
 
 function FileIcon(props: { label: string }) {
-  const label = props.label.toLocaleLowerCase();
-  if (label === "package.json") return <NpmBrandIcon />;
-  if (label.endsWith(".lock") || label === "bun.lockb") return <LockKeyhole aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />;
-  if (label.endsWith(".json") || label.endsWith(".jsonc")) return <Braces aria-hidden="true" className="shrink-0 text-amber-300/70" size={13} />;
-  if (label.endsWith(".ts") || label.endsWith(".tsx") || label.endsWith(".js") || label.endsWith(".jsx")) return <FileCode2 aria-hidden="true" className="shrink-0 text-sky-300/70" size={13} />;
-  if (label.endsWith(".css") || label.endsWith(".scss") || label.endsWith(".sass")) return <Palette aria-hidden="true" className="shrink-0 text-fuchsia-300/70" size={13} />;
-  if (label.endsWith(".svg") || /\.(?:png|jpe?g|gif|webp|ico)$/.test(label)) return <FileImage aria-hidden="true" className="shrink-0 text-emerald-300/70" size={13} />;
-  if (/\.(?:md|mdx|txt|log)$/.test(label)) return <FileText aria-hidden="true" className="shrink-0 text-zinc-400" size={13} />;
-  if (label.endsWith(".html")) return <FileJson2 aria-hidden="true" className="shrink-0 text-orange-300/70" size={13} />;
-  return <FileText aria-hidden="true" className="shrink-0 text-zinc-500" size={13} />;
+  if (props.label.toLocaleLowerCase() === "package.json") return <NpmBrandIcon />;
+  return <DesignSystemFileIcon filename={props.label} size={14} />;
 }
