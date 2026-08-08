@@ -57,7 +57,12 @@ export async function loadSourceLibraryRepository(unsafeRoot: string): Promise<I
   const root = await canonicalRoot(unsafeRoot);
   const packages = await discoverSourceLibraryPackages(root);
   const indexed = await Promise.all(packages.map((pkg) => indexPackage(root, pkg)));
-  return mergePackageWorkspaces(root, indexed.filter((candidate): candidate is IndexedPackage => Boolean(candidate)));
+  const available = indexed.filter((candidate): candidate is IndexedPackage => Boolean(candidate));
+  const componentScope = available.some(({ pkg }) => isComponentPackageDirectory(pkg.directory));
+  const selected = componentScope
+    ? available.filter(({ pkg }) => isComponentPackageDirectory(pkg.directory))
+    : available;
+  return mergePackageWorkspaces(root, selected);
 }
 
 export async function discoverSourceLibraryPackages(unsafeRoot: string): Promise<readonly DiscoveredPackage[]> {
@@ -96,7 +101,7 @@ export async function discoverSourceLibraryPackages(unsafeRoot: string): Promise
 async function indexPackage(root: string, pkg: DiscoveredPackage): Promise<IndexedPackage | undefined> {
   const config = await packageConfig(root, pkg);
   const workspace = await indexSourceWorkspace(root, repositoryRelativeConfig(pkg.directory, config));
-  if (!workspace.manifest.entries.some((entry) => entry.design)) return undefined;
+  if (!workspace.manifest.entries.length) return undefined;
   const approvals = await verifySourceComponentApprovals(
     root,
     repositoryRelativeConfig(pkg.directory, config),
@@ -129,6 +134,7 @@ async function packageConfig(root: string, pkg: DiscoveredPackage): Promise<Desi
   return {
     project: { id, label: pkg.name },
     devices: { mode: "responsive" },
+    ...(pkg.directory === "." ? {} : { source: { components: "." } }),
   };
 }
 
@@ -136,15 +142,14 @@ function repositoryRelativeConfig(
   packageDirectory: string,
   config: DesignSpaceProjectConfig,
 ): DesignSpaceProjectConfig {
-  const layout = config.source?.layout?.replace(/^\.\//, "")
-    ?? "src/__designspace_inferred__.tsx";
+  const layout = config.source?.layout?.replace(/^\.\//, "");
   const components = config.source?.components?.replace(/^\.\//, "");
   const policy = config.approvals?.policy?.replace(/^\.\//, "");
   return {
     ...config,
     source: {
-      layout: packagePath(packageDirectory, layout),
-      ...(components ? { components: packagePath(packageDirectory, components) } : {}),
+      ...(layout ? { layout: packagePath(packageDirectory, layout) } : {}),
+      ...(components ? { components: components === "." ? packageDirectory : packagePath(packageDirectory, components) } : {}),
     },
     ...(config.approvals ? {
       approvals: { ...config.approvals, ...(policy ? { policy: packagePath(packageDirectory, policy) } : {}) },
@@ -220,6 +225,10 @@ function commonComponentRoot(packages: readonly SourceWorkspacePackage[]): strin
     return undefined;
   }
   return "components";
+}
+
+function isComponentPackageDirectory(directory: string): boolean {
+  return directory === "components" || directory.startsWith("components/");
 }
 
 function uniqueFiles(files: readonly IndexedSourceFile[]): IndexedSourceFile[] {

@@ -434,7 +434,7 @@ async function discoverBrowsableFilesForRoots(root: string, sourceRoots: readonl
 
 function inferredSourceRoot(config: DesignSpaceProjectConfig): string {
   const layout = normalizedConfiguredLayout(config);
-  if (!layout) return "src";
+  if (!layout) return normalizedConfiguredComponents(config) ?? "src";
   const segments = layout.split("/");
   const rootIndex = segments.findIndex((segment) => segment === "src" || segment === "app");
   return rootIndex === -1 ? "src" : segments.slice(0, rootIndex + 1).join("/");

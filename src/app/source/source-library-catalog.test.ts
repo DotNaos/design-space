@@ -133,8 +133,8 @@ it("uses the configured component roots instead of exposing package implementati
     mode: "development",
   });
 
-  expect(components.map((component) => component.label)).toEqual(["ActionButton"]);
-  expect(components[0]?.path).toEqual(["@dotnaos/react-ui", "actions", "ActionButton"]);
+  expect(components.map((component) => component.label)).toEqual(["ActionButton", "AppLayout"]);
+  expect(components[0]?.path).toEqual(["react-ui", "actions", "ActionButton"]);
 });
 
 it("keeps manifest target folders and mixed-case marker roots scoped to the selected target", () => {
@@ -271,11 +271,11 @@ it("groups library components by the nearest named package", () => {
   });
 
   expect(components.map(({ label, path }) => ({ label, path }))).toEqual([
-    { label: "Button", path: ["@dotnaos/ui/base", "Button"] },
-    { label: "Button", path: ["@dotnaos/ui/layout", "Button"] },
-    { label: "Message", path: ["@dotnaos/ui/ai", "messages", "Message"] },
+    { label: "Button", path: ["base", "Button"] },
+    { label: "Button", path: ["layout", "Button"] },
+    { label: "Message", path: ["chat", "messages", "Message"] },
   ]);
-  expect(components[0]?.packagePaths).toEqual([["@dotnaos/ui/base"]]);
+  expect(components[0]?.packagePaths).toEqual([["base"]]);
 });
 
 it("uses the public component label as the leaf without repeating its source folder", () => {
@@ -359,7 +359,8 @@ it("uses designed Development source entries instead of an older installed packa
     mode: "development",
   });
 
-  expect(components.map((component) => component.label)).toEqual(["Button", "SourceOnly"]);
+  expect(components.map((component) => component.label)).toEqual(["Button", "ButtonInternal", "SourceOnly"]);
   expect(components[0].entry).toBe(button);
-  expect(components[1].entry).toBe(sourceOnly);
+  expect(components[1].entry).toBe(internalButton);
+  expect(components[2].entry).toBe(sourceOnly);
 });

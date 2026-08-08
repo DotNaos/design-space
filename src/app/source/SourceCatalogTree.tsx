@@ -32,7 +32,6 @@ function CatalogFolderBranch(props: Parameters<typeof SourceCatalogTree>[0] & {
   item: Extract<SourceCatalogTreeItem, { kind: "folder" }>;
 }) {
   const collapsed = props.collapsed.has(props.item.id);
-  const label = props.item.isPackage ? packageDisplayName(props.item.label) : props.item.label;
   return (
     <div aria-label={props.item.path.join(" / ")} role="group">
       <div className="mx-2.5 flex min-h-9 items-center" role="listitem" style={{ paddingLeft: props.depth * 14 }}>
@@ -48,7 +47,7 @@ function CatalogFolderBranch(props: Parameters<typeof SourceCatalogTree>[0] & {
             ? <ChevronRight aria-hidden="true" className="absolute -start-0.5 size-3" />
             : <ChevronDown aria-hidden="true" className="absolute -start-0.5 size-3" />}
           <CatalogFolderIcon isPackage={props.item.isPackage} name={props.item.iconName} />
-          <span className="whitespace-nowrap">{label}</span>
+          <span className="whitespace-nowrap">{props.item.label}</span>
         </Button>
       </div>
       {!collapsed ? props.item.children.map((child) => child.kind === "component" ? (
@@ -65,8 +64,4 @@ function CatalogFolderBranch(props: Parameters<typeof SourceCatalogTree>[0] & {
       )) : null}
     </div>
   );
-}
-
-function packageDisplayName(name: string): string {
-  return name.split("/").filter(Boolean).at(-1) ?? name;
 }
