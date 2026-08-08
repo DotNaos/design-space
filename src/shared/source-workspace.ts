@@ -35,7 +35,9 @@ export interface DesignSpaceProjectConfig {
   };
   /** Optional target-owned app preview entry inside the trusted src tree. */
   source?: {
-    layout: string;
+    layout?: string;
+    /** Project-relative directory rendered by the component catalog. */
+    components?: string;
   };
   /** Optional trusted component-library lifecycle owned by the local Design Space server. */
   library?: {
@@ -252,6 +254,10 @@ export interface SourceWorkspaceDeviceState {
 export interface SourceWorkspaceManifest {
   runtime: DesignSpaceRuntime;
   sourceRoot: string;
+  /** Project-relative component source root used by the presentation catalog. */
+  componentRoot?: string;
+  /** Component roots retained when a repository aggregates several package configs. */
+  componentRoots?: readonly string[];
   entries: readonly SourceWorkspaceEntry[];
   devices: readonly SourceWorkspaceDeviceState[];
   /** Presentation-only Lucide icon markers discovered in source directories. */
@@ -339,6 +345,8 @@ export interface SourceWorkspaceFileEntry {
   kind: "file" | "directory";
   parentId?: string;
   editable?: boolean;
+  /** True when Git excludes this file. Hidden by default in the library browser. */
+  ignored?: boolean;
 }
 
 export interface RuntimeSourceLibraryCatalog {

@@ -87,6 +87,8 @@ export function useSourceWorkspaceController({ nestedPreview = false, target }: 
   const [approvalEvidence, setApprovalEvidence] = useState<SourceApprovalEvidence>();
   const [signingEntryId, setSigningEntryId] = useState<string>();
   const [approvalSigningError, setApprovalSigningError] = useState<string>();
+  const [showIgnoredFiles, setShowIgnoredFiles] = useState(false);
+  const [ignoredFileCount, setIgnoredFileCount] = useState(0);
   const [draftWorkspace] = useState(createLocalSourceDraftWorkspace);
   const { state: draftWorkspaceState } = useSourceDraftWorkspace(draftWorkspace);
   const libraryRootId = `${target.project.id}:${target.sourceLibrary?.packageName ?? "library-development"}`;
@@ -342,7 +344,13 @@ export function useSourceWorkspaceController({ nestedPreview = false, target }: 
     scope: "library-development",
   });
   const fileScope = workspaceSurface === "library" ? "library-development" : "app";
-  const workspaceFiles = useSourceWorkspaceFiles(fileScope, target.files, target.sourceLibrary?.development);
+  const workspaceFiles = useSourceWorkspaceFiles(
+    fileScope,
+    target.files,
+    target.sourceLibrary?.development,
+    showIgnoredFiles,
+    setIgnoredFileCount,
+  );
   const selectedProjectFile = workspaceFiles.find((file) => file.id === selectedProjectFileId && file.kind === "file");
   const fileEditor = useSourceFileEditor(selectedProjectFile?.id, fileScope);
   const activeEditor = activity === "files"
@@ -591,6 +599,8 @@ export function useSourceWorkspaceController({ nestedPreview = false, target }: 
     selectedLabel, selectedLayer, selectedLayerMetrics, selectedLibraryComponent,
     selectedLibraryDesignCase, selectedLibraryLayerId, selectedNode, selectedOccurrence,
     selectedProjectFile, selectedProjectFileId, selectedSlotTarget, selectedTarget,
+    ignoredFileCount,
+    showIgnoredFiles,
     selection, signingEntryId, signCurrentComponent, slotEditorReady, styleEditor, target,
     targetEntries, visualLayer, workspace, workspaceFiles, workspaceMode, workspaceSurface,
     workspaceWithApprovals,
@@ -600,5 +610,6 @@ export function useSourceWorkspaceController({ nestedPreview = false, target }: 
     setPreviewRuntime, setPreviewSelection, setSelectedLayerMetrics,
     setSelectedLibraryComponent, setSelectedLibraryLayerId, setSelectedProjectFileId,
     setSelection, setWorkspaceMode, setWorkspaceSurface,
+    setShowIgnoredFiles,
   } as const;
 }

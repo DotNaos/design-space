@@ -171,6 +171,7 @@ export const browserOperationSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("list-project-files"),
     scope: z.enum(["app", "library-development"]),
+    includeIgnored: z.boolean().optional(),
   }).strict(),
   z.object({
     type: z.literal("read-project-file"),
@@ -285,6 +286,7 @@ export interface ProjectFileSnapshot {
 
 export interface ProjectFileCatalog {
   files: readonly SourceWorkspaceFileEntry[];
+  ignoredFileCount?: number;
 }
 
 export interface SourceDraftComponent {

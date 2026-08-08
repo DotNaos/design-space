@@ -52,6 +52,7 @@ export interface DocumentCatalogFileEntry {
   kind: "directory" | "file";
   parentId?: string;
   editable?: boolean;
+  ignored?: boolean;
 }
 
 export interface DocumentCatalog {

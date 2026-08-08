@@ -44,6 +44,13 @@ describe("source project config", () => {
     })).toMatchObject({ source: { layout: "./apps/production/src/App.tsx" } });
   });
 
+  it("accepts an explicit component catalog root without a layout", () => {
+    expect(parseSourceProjectConfig({
+      project: { id: "components-only", label: "Components only" },
+      source: { components: "components" },
+    })).toMatchObject({ source: { components: "components" } });
+  });
+
   it("rejects unsafe or non-source monorepo layouts", () => {
     for (const layout of [
       "/apps/production/src/App.tsx",

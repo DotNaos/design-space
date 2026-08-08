@@ -9,6 +9,7 @@ export interface ProjectFileBrowserProps {
   files: readonly SourceWorkspaceFileEntry[];
   title?: string;
   selectedFileId?: string;
+  showIgnored?: boolean;
   header?: ReactNode;
   onSelect: (fileId: string) => void;
 }
@@ -91,7 +92,7 @@ export function ProjectFileBrowser(props: ProjectFileBrowserProps) {
       </div>
 
       <p className="border-t border-white/10 p-3 text-[9px] leading-4 text-zinc-600">
-        Source navigation is limited to files registered by the target server.
+        Repository files are read-only unless the source is registered for editing.
       </p>
     </aside>
   );

@@ -25,6 +25,7 @@ import {
 } from "../shared/contracts";
 import type { SourceDesignScope } from "../shared/source-design";
 import { createUnifiedDiff } from "./diff";
+import { discoverRepositoryFiles } from "./source-file-index";
 import { ChallengeStore } from "./challenge-store";
 import { registeredFileCatalog, sourceWorkspaceFileCatalog } from "./document-catalog-files";
 import { DesignSpaceError } from "./errors";
@@ -184,7 +185,7 @@ export class EditService {
         }
         return (await this.#tailwind.compile(operation.value)).preview;
       case "list-project-files":
-        return this.listProjectFiles(operation.scope);
+        return this.listProjectFiles(operation.scope, operation.includeIgnored);
       case "read-project-file":
         return this.readProjectFile(operation.fileId, operation.scope);
       case "analyze-source-file-draft":
@@ -220,11 +221,14 @@ export class EditService {
     this.#tailwindIntelligence.dispose();
   }
 
-  listProjectFiles(scope: SourceDesignScope): ProjectFileCatalog {
+  async listProjectFiles(scope: SourceDesignScope, includeIgnored = false): Promise<ProjectFileCatalog> {
     if (scope === "app") return { files: registeredFileCatalog(this.#target) };
     const workspace = this.#target.sourceLibrary?.development;
     if (!workspace) throw new DesignSpaceError("ACCESS_DENIED", "The development library source is not attached");
-    return { files: sourceWorkspaceFileCatalog(workspace) };
+    const catalogFiles = includeIgnored
+      ? await discoverRepositoryFiles(workspace.root, true)
+      : workspace.catalogFiles ?? workspace.files;
+    return sourceWorkspaceFileCatalog(workspace, includeIgnored, catalogFiles);
   }
 
   async readProjectFile(fileId: string, scope?: SourceDesignScope): Promise<ProjectFileSnapshot> {
@@ -389,7 +393,7 @@ export class EditService {
     if (scope === "library-development") {
       const workspace = this.#target.sourceLibrary?.development;
       if (!workspace) throw new DesignSpaceError("ACCESS_DENIED", "The development library source is not attached");
-      const indexed = workspace.files.find((candidate) => candidate.id === fileId);
+      const indexed = (workspace.catalogFiles ?? workspace.files).find((candidate) => candidate.id === fileId);
       if (!indexed) throw new DesignSpaceError("NOT_FOUND", "The library source file is not registered");
       return {
         root: workspace.root,

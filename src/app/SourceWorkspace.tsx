@@ -54,6 +54,8 @@ export function SourceWorkspace(props: { nestedPreview?: boolean; target: Target
     selectedLabel, selectedLayer, selectedLayerMetrics, selectedLibraryComponent,
     selectedLibraryDesignCase, selectedLibraryLayerId, selectedNode, selectedOccurrence,
     selectedProjectFile, selectedProjectFileId, selectedSlotTarget, selectedTarget,
+    ignoredFileCount,
+    showIgnoredFiles,
     selection, signingEntryId, signCurrentComponent, slotEditorReady, styleEditor, target,
     targetEntries, visualLayer, workspace, workspaceFiles, workspaceMode, workspaceSurface,
     workspaceWithApprovals,
@@ -63,6 +65,7 @@ export function SourceWorkspace(props: { nestedPreview?: boolean; target: Target
     setPreviewRuntime, setPreviewSelection, setSelectedLayerMetrics,
     setSelectedLibraryComponent, setSelectedLibraryLayerId, setSelectedProjectFileId,
     setSelection, setWorkspaceMode, setWorkspaceSurface,
+    setShowIgnoredFiles,
   } = controller;
   const targetPicker = selectedTarget ? (
     <SourceTargetPicker
@@ -219,9 +222,15 @@ export function SourceWorkspace(props: { nestedPreview?: boolean; target: Target
       className="flex h-full w-full border-r-0"
       files={workspaceFiles}
       header={workspaceSurface === "library" ? (
-        <LibraryFilesHeader fileCount={workspaceFiles.filter((file) => file.kind === "file").length} />
+        <LibraryFilesHeader
+          fileCount={workspaceFiles.filter((file) => file.kind === "file" && !file.ignored).length}
+          ignoredFileCount={ignoredFileCount}
+          showIgnoredFiles={showIgnoredFiles}
+          onShowIgnoredFilesChange={setShowIgnoredFiles}
+        />
       ) : undefined}
       selectedFileId={selectedProjectFileId}
+      showIgnored={showIgnoredFiles}
       title={workspaceSurface === "library" ? "Library files" : "Project files"}
       onSelect={(fileId) => {
         setSelectedProjectFileId(fileId);

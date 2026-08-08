@@ -148,18 +148,44 @@ function catalogPackagePaths(
 }
 
 function catalogComponentPath(
-  workspace: Pick<RuntimeSourceWorkspace, "packages"> | undefined,
+  workspace: Pick<RuntimeSourceWorkspace, "packages" | "componentRoot" | "componentRoots"> | undefined,
   entry: Pick<RuntimeSourceWorkspaceEntry, "area" | "label" | "relativePath">,
   label: string,
 ): readonly string[] {
+  const configuredRoot = (workspace?.componentRoots ?? [])
+    .filter((root) => isPathWithin(entry.relativePath, root))
+    .sort((left, right) => right.length - left.length)[0];
+  if (configuredRoot) {
+    const componentPath = componentPathFromRoot(entry.relativePath, configuredRoot, label);
+    const pkg = catalogPackageForEntry(workspace, entry.relativePath);
+    return pkg ? [pkg.name, ...componentPath] : componentPath;
+  }
   const sourcePath = replacePathLeaf(sourceEntryComponentPath(entry), label);
   const pkg = catalogPackageForEntry(workspace, entry.relativePath);
-  if (!pkg) return sourcePath;
+  if (!pkg) {
+    const root = workspace?.componentRoot?.replace(/^\.\//, "");
+    if (root && isPathWithin(entry.relativePath, root)) {
+      const rootSegments = root.split("/").filter(Boolean);
+      const relativePath = sourcePath.slice(rootSegments.length);
+      return relativePath.length ? relativePath : [label];
+    }
+    return sourcePath;
+  }
   const prefix = sourceDirectoryPath(pkg.directory);
   const remainder = prefix.length && startsWithPath(sourcePath, prefix)
     ? sourcePath.slice(prefix.length)
     : sourcePath;
   return [pkg.name, ...remainder];
+}
+
+function componentPathFromRoot(relativePath: string, root: string, label: string): readonly string[] {
+  const remainder = relativePath.slice(root.length).replace(/^\//, "");
+  const segments = remainder.split("/").filter(Boolean);
+  const filename = segments.pop() ?? label;
+  const stem = filename.replace(/\.[cm]?[jt]sx?$/i, "");
+  if (/^(?:render|index|desktop|tablet|mobile)$/i.test(stem)) return segments.length ? segments : [label];
+  const componentStem = stem.replace(/[.-](?:desktop|tablet|mobile)$/i, "");
+  return [...segments, componentStem || label];
 }
 
 function catalogPackageForEntry(

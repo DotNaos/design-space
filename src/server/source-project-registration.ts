@@ -160,7 +160,7 @@ function isEditableTypeScriptSource(relativePath: string, sourceRoot: string): b
 }
 
 function componentStoreDirectory(config: DesignSpaceProjectConfig, sourceRoot: string): string {
-  const layout = config.source?.layout.replace(/^\.\//, "");
+  const layout = config.source?.layout?.replace(/^\.\//, "");
   if (!layout) return `${sourceRoot}/components`;
   const layoutDirectory = layout.slice(0, Math.max(0, layout.lastIndexOf("/")));
   return `${layoutDirectory}/components`;

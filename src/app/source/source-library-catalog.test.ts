@@ -104,6 +104,34 @@ it("derives nested app catalog paths from component source files", () => {
   expect(components.find((component) => component.label === "AgentCard")?.packagePaths).toEqual([["Agents"]]);
 });
 
+it("uses the configured component roots instead of exposing package implementation folders", () => {
+  const components = sourceCatalogComponents({
+    catalog: {
+      packageName: "@dotnaos/react-ui",
+      development: {
+        componentRoots: ["components/react-ui/src/components"],
+        devices: [],
+        entries: [entry({
+          id: "action-button",
+          label: "ActionButton",
+          relativePath: "components/react-ui/src/components/actions/ActionButton/render.tsx",
+          design: design("action-button"),
+        })],
+        packages: [{ directory: "components/react-ui", name: "@dotnaos/react-ui" }],
+        runtime: "react",
+        sourceRoot: ".",
+        styles: [],
+      },
+    } satisfies RuntimeSourceLibraryCatalog,
+    device: "desktop",
+    kind: "library",
+    library: { packageName: "@dotnaos/react-ui", version: "workspace:*", mode: "development", editable: false, components: [] },
+    mode: "development",
+  });
+
+  expect(components[0]?.path).toEqual(["@dotnaos/react-ui", "actions", "ActionButton"]);
+});
+
 it("keeps manifest target folders and mixed-case marker roots scoped to the selected target", () => {
   const workspace: RuntimeSourceWorkspace = {
     devices: [],

@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
+import { execFile } from "node:child_process";
 import { lstat, opendir, realpath } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { promisify } from "node:util";
 import ts from "typescript";
 
 import {
@@ -26,6 +28,7 @@ import { indexTypeScriptComponents } from "./typescript-component-index";
 
 const SOURCE_ROOT = "src/app" as const;
 const maximumIndexedFiles = 2_000;
+const maximumCatalogFiles = 50_000;
 const maximumDirectoryDepth = 24;
 const ignoredDirectories = new Set([
   ".expo",
@@ -61,12 +64,16 @@ export interface IndexedSourceFile {
   id: string;
   relativePath: string;
   absolutePath: string;
+  ignored?: boolean;
 }
 
 export interface IndexedSourceWorkspace {
   root: string;
   manifest: SourceWorkspaceManifest;
   files: readonly IndexedSourceFile[];
+  /** Complete repository file catalog, including non-source and optionally ignored files. */
+  catalogFiles?: readonly IndexedSourceFile[];
+  ignoredFileCount?: number;
   entryFiles: ReadonlyMap<string, string>;
   stylePaths: readonly string[];
   /** Canonical source scopes watched for file-shape changes in aggregated repositories. */
@@ -85,6 +92,8 @@ export async function indexSourceWorkspace(
   const sourceRoot = inferredSourceRoot(config);
   const relativePaths = await discoverBrowsableFiles(root, sourceRoot);
   const files = await registerDiscoveredFiles(root, relativePaths);
+  const catalogFiles = await discoverRepositoryFiles(root);
+  const ignoredFileCount = await countIgnoredRepositoryFiles(root);
   const fileByPath = new Map(files.map((file) => [file.relativePath, file]));
   const conventionCandidates = files.filter((file) => sourceLocation(file.relativePath));
   const inferredCatalog = Boolean(config.source?.layout) || conventionCandidates.length === 0;
@@ -139,6 +148,8 @@ export async function indexSourceWorkspace(
     adapter: "legacy",
     runtime: config.runtime ?? "react",
     sourceRoot: inferredCatalog ? sourceRoot : SOURCE_ROOT,
+    ...(config.source?.components ? { componentRoot: normalizedConfiguredComponents(config) } : {}),
+    ...(config.source?.components ? { componentRoots: [normalizedConfiguredComponents(config)!] } : {}),
     entries: Object.freeze(entries),
     devices: Object.freeze(deviceStates(entries, config)),
     folderIcons: sourceFolderIcons(files),
@@ -150,6 +161,8 @@ export async function indexSourceWorkspace(
     root,
     manifest: Object.freeze(manifest),
     files: Object.freeze(files),
+    catalogFiles: Object.freeze(catalogFiles),
+    ignoredFileCount,
     entryFiles,
     stylePaths: Object.freeze(files.filter((file) => extname(file.relativePath) === ".css").map((file) => file.absolutePath)),
   };
@@ -166,6 +179,8 @@ export async function indexAppManifestWorkspace(
     targetDefinitions.map(([, target]) => target.sourceRoot),
   );
   const files = await registerDiscoveredFiles(root, relativePaths);
+  const catalogFiles = await discoverRepositoryFiles(root);
+  const ignoredFileCount = await countIgnoredRepositoryFiles(root);
   const fileByPath = new Map(files.map((file) => [file.relativePath, file]));
   const componentCandidates = files.filter((file) => (
     targetDefinitions.some(([, target]) => isWithinSourceRoot(file.relativePath, target.sourceRoot))
@@ -268,6 +283,8 @@ export async function indexAppManifestWorkspace(
     root,
     manifest: Object.freeze(manifest),
     files: Object.freeze(files),
+    catalogFiles: Object.freeze(catalogFiles),
+    ignoredFileCount,
     entryFiles,
     stylePaths: Object.freeze(files.filter((file) => extname(file.relativePath) === ".css").map((file) => file.absolutePath)),
     targetStylePaths,
@@ -424,7 +441,53 @@ function inferredSourceRoot(config: DesignSpaceProjectConfig): string {
 }
 
 function normalizedConfiguredLayout(config: DesignSpaceProjectConfig): string | undefined {
-  return config.source?.layout.replace(/^\.\//, "");
+  return config.source?.layout?.replace(/^\.\//, "");
+}
+
+function normalizedConfiguredComponents(config: DesignSpaceProjectConfig): string | undefined {
+  return config.source?.components?.replace(/^\.\//, "");
+}
+
+export async function discoverRepositoryFiles(root: string, includeIgnored = false): Promise<IndexedSourceFile[]> {
+  const visible = await gitFileList(root, ["ls-files", "-co", "--exclude-standard"]);
+  const ignored = includeIgnored ? await gitFileList(root, ["ls-files", "-o", "--ignored", "--exclude-standard"]) : [];
+  const paths = new Map<string, boolean>();
+  for (const path of visible) paths.set(path, false);
+  for (const path of ignored) if (!paths.has(path)) paths.set(path, true);
+  const entries: IndexedSourceFile[] = [];
+  for (const [relativePath, isIgnored] of paths) {
+    if (isIgnored && ignoredCatalogDirectory(relativePath)) continue;
+    if (entries.length >= maximumCatalogFiles) {
+      throw new DesignSpaceError("INVALID_REGISTRATION", "The source project contains too many files for browsing");
+    }
+    if (!(await isSafeFile(resolve(root, relativePath)))) continue;
+    entries.push({
+      id: stableId("source.file", relativePath),
+      relativePath,
+      absolutePath: await canonicalRegisteredFile(root, relativePath),
+      ...(isIgnored ? { ignored: true } : {}),
+    });
+  }
+  return entries.sort((left, right) => left.relativePath.localeCompare(right.relativePath, "en"));
+}
+
+export async function countIgnoredRepositoryFiles(root: string): Promise<number> {
+  return (await gitFileList(root, ["ls-files", "-o", "--ignored", "--exclude-standard"]))
+    .filter((path) => !ignoredCatalogDirectory(path)).length;
+}
+
+function ignoredCatalogDirectory(relativePath: string): boolean {
+  return ignoredDirectories.has(relativePath.split("/")[0] ?? "");
+}
+
+async function gitFileList(root: string, args: readonly string[]): Promise<readonly string[]> {
+  const run = promisify(execFile);
+  try {
+    const { stdout } = await run("git", args as string[], { cwd: root, maxBuffer: 16 * 1024 * 1024 });
+    return stdout.split(/\r?\n/).map((path) => path.trim()).filter(Boolean).map((path) => path.replaceAll("\\", "/"));
+  } catch {
+    return [];
+  }
 }
 
 function isWithinSourceRoot(relativePath: string, sourceRoot: string): boolean {

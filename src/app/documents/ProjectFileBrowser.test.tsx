@@ -46,4 +46,12 @@ describe("ProjectFileBrowser", () => {
     expect(screen.getByRole("complementary", { name: "Library files browser" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Library files" })).toBeInTheDocument();
   });
+
+  it("uses the npm brand for package manifests", async () => {
+    render(<ProjectFileBrowser files={[
+      { id: "package", label: "package.json", kind: "file" },
+    ]} onSelect={() => undefined} />);
+
+    expect(screen.getByRole("img", { name: "npm package" })).toBeInTheDocument();
+  });
 });

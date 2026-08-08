@@ -1,5 +1,5 @@
 import { Button, Popover, SearchField } from "@heroui/react";
-import { Check, ChevronDown, GitBranch, SearchX } from "lucide-react";
+import { Check, ChevronDown, Eye, EyeOff, GitBranch, SearchX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import type {
@@ -9,7 +9,12 @@ import type {
 import { runLocalOperation } from "../api";
 import { LibraryBranchReloadDialog } from "../source/LibraryBranchReloadDialog";
 
-export function LibraryFilesHeader(props: { fileCount: number }) {
+export function LibraryFilesHeader(props: {
+  fileCount: number;
+  ignoredFileCount?: number;
+  showIgnoredFiles?: boolean;
+  onShowIgnoredFilesChange?: (show: boolean) => void;
+}) {
   const [status, setStatus] = useState<LibraryDevelopmentProjectStatus>();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -70,12 +75,25 @@ export function LibraryFilesHeader(props: { fileCount: number }) {
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1.5">
           <h2 className="truncate text-xs font-medium text-zinc-300">Library files</h2>
-          <span className="shrink-0 text-[9px] text-zinc-600">{props.fileCount}</span>
+          <span className="shrink-0 text-[9px] text-zinc-600">
+            {props.fileCount}{props.showIgnoredFiles && props.ignoredFileCount ? ` + ${props.ignoredFileCount} ignored` : ""}
+          </span>
         </div>
         <p className="mt-0.5 truncate font-mono text-[9px] text-zinc-600" title={path}>
           {path ?? "Resolving project path…"}
         </p>
       </div>
+
+      <Button
+        aria-label={props.showIgnoredFiles ? "Hide gitignored files" : "Show gitignored files"}
+        className={`h-7 min-w-7 rounded-full px-2 text-[9px] ${props.showIgnoredFiles ? "bg-white/[0.09] text-zinc-200" : "text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-300"}`}
+        isDisabled={!props.ignoredFileCount}
+        size="sm"
+        variant="ghost"
+        onPress={() => props.onShowIgnoredFilesChange?.(!props.showIgnoredFiles)}
+      >
+        {props.showIgnoredFiles ? <EyeOff aria-hidden="true" className="size-3" /> : <Eye aria-hidden="true" className="size-3" />}
+      </Button>
 
       <Popover isOpen={open} onOpenChange={(next) => {
         setOpen(next);
