@@ -1,5 +1,5 @@
 import type { DesignSpaceDevice, RuntimeSourceWorkspaceEntry, SourceWorkspaceLayer } from "../../shared/source-workspace";
-import type { SourceTreeNode } from "./source-workspace-tree";
+import { sourceComponentReferenceKey, type SourceTreeNode } from "./source-workspace-tree";
 
 export interface SourceOccurrence {
   id: string;
@@ -38,9 +38,13 @@ export function sourceFocusGraph(
   rootNodeIds?: readonly string[],
 ): SourceFocusGraph {
   const references = new Map<string, SourceTreeNode>();
+  const sourceReferences = new Map<string, SourceTreeNode>();
   for (const node of nodes) {
-    references.set(node.label, node);
-    node.entries.forEach((entry) => references.set(entry.exportName, node));
+    if (!references.has(node.label)) references.set(node.label, node);
+    node.entries.forEach((entry) => {
+      if (!references.has(entry.exportName)) references.set(entry.exportName, node);
+      sourceReferences.set(sourceComponentReferenceKey(entry), node);
+    });
   }
   const mutable = new Map<string, SourceOccurrence>();
   const requestedRoots = rootNodeIds?.flatMap((id) => {
@@ -91,7 +95,9 @@ export function sourceFocusGraph(
           if (layer.slot) appendLayers(layer.children, layer, ownerId, `${prefix}.s${index}`);
           return;
         }
-        const referenced = references.get(layer.label);
+        const referenced = layer.component
+          ? sourceReferences.get(sourceComponentReferenceKey(layer.component))
+          : references.get(layer.label);
         if (!referenced) return;
         const childId = `${id}/${prefix}.c${index}:${referenced.id}`;
         const child = addOccurrence(referenced, childId, nextPath, occurrence, layer, slot, ownerId);

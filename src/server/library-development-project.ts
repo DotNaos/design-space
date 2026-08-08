@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 
 import type { ViteDevServer } from "vite";
@@ -64,13 +64,11 @@ export class LibraryDevelopmentProjectService implements OperationExecutor {
       case "clone-library-development":
         await cloneLibraryProject(config, projectsRoot);
         return libraryDevelopmentStatus(this.#target, config, projectsRoot);
-      case "clone-library-development-worktree":
-        await cloneLibraryWorktree(config, projectsRoot, operation.data.branch);
-        return libraryDevelopmentStatus(this.#target, config, projectsRoot);
-      case "start-library-development": {
-        const worktreeId = operation.data.worktreeId;
+      case "activate-library-development-branch": {
+        const branch = operation.data.branch;
+        await ensureLibraryWorktree(config, projectsRoot, branch);
         const status = await libraryDevelopmentStatus(this.#target, config, projectsRoot);
-        const worktree = status.worktrees.find((candidate) => candidate.id === worktreeId);
+        const worktree = status.worktrees.find((candidate) => candidate.branch === branch);
         if (!worktree?.packageReady) {
           throw new DesignSpaceError("NOT_FOUND", "The selected library worktree is unavailable");
         }
@@ -83,24 +81,17 @@ export class LibraryDevelopmentProjectService implements OperationExecutor {
           worktrees: status.worktrees.map((candidate) => ({ ...candidate, active: candidate.id === worktree.id })),
         };
       }
-      case "stop-library-development": {
-        await writeSelection(this.#target.root, { mode: "stopped" });
-        this.#scheduleRestart();
-        const status = await libraryDevelopmentStatus(this.#target, config, projectsRoot);
-        return {
-          ...status,
-          state: "stopped",
-          activeWorktreeId: undefined,
-          worktrees: status.worktrees.map((candidate) => ({ ...candidate, active: false })),
-        };
-      }
     }
   }
 
   #scheduleRestart(): void {
     const server = this.#server;
     if (!server) throw new DesignSpaceError("VALIDATION_ERROR", "The Design Space dev server is unavailable");
-    setTimeout(() => void server.restart(), this.#restartDelayMs);
+    setTimeout(() => {
+      void server.restart().then(() => {
+        server.ws.send({ type: "full-reload" });
+      }).catch(() => undefined);
+    }, this.#restartDelayMs);
   }
 }
 
@@ -241,7 +232,7 @@ async function cloneLibraryProject(config: DesignSpaceLibraryProjectConfig, proj
   }
 }
 
-async function cloneLibraryWorktree(
+export async function ensureLibraryWorktree(
   config: DesignSpaceLibraryProjectConfig,
   projectsRoot: string,
   branch: string,
@@ -255,16 +246,18 @@ async function cloneLibraryWorktree(
     throw new DesignSpaceError("NOT_FOUND", "The selected component-library branch does not exist");
   }
   const worktrees = await listLibraryWorktrees(checkoutPath, config.packageRoot);
-  if (worktrees.some((worktree) => worktree.branch === branch)) return;
+  const existing = worktrees.find((worktree) => worktree.branch === branch);
+  if (existing) {
+    await ensureLibraryDependencies(existing.path);
+    return;
+  }
 
   const worktreesRoot = resolve(projectsRoot, ".worktrees", config.checkoutName);
-  const branchSlug = branch.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "branch";
-  const suffix = createHash("sha256").update(branch).digest("hex").slice(0, 8);
-  const destination = resolve(worktreesRoot, `${branchSlug}-${suffix}`);
+  const destination = libraryWorktreePath(worktreesRoot, branch);
   if (await pathExists(destination)) {
     throw new DesignSpaceError("VALIDATION_ERROR", "The worktree destination already exists");
   }
-  await mkdir(worktreesRoot, { recursive: true, mode: 0o700 });
+  await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
   try {
     await execFileAsync("git", ["-C", checkoutPath, "worktree", "add", destination, branch], {
       encoding: "utf8",
@@ -273,6 +266,51 @@ async function cloneLibraryWorktree(
   } catch {
     throw new DesignSpaceError("VALIDATION_ERROR", "The component-library worktree could not be created");
   }
+  await ensureLibraryDependencies(destination);
+}
+
+export function libraryWorktreePath(worktreesRoot: string, branch: string): string {
+  const destination = resolve(worktreesRoot, branch);
+  const traversal = relative(worktreesRoot, destination);
+  if (!traversal || traversal === ".." || traversal.startsWith(`..${sep}`)) {
+    throw new DesignSpaceError("ACCESS_DENIED", "The library branch cannot escape its worktree directory");
+  }
+  return destination;
+}
+
+async function ensureLibraryDependencies(worktreePath: string): Promise<void> {
+  if (await pathExists(resolve(worktreePath, "node_modules"))) return;
+  const command = await dependencyInstallCommand(worktreePath);
+  if (!command) {
+    throw new DesignSpaceError("VALIDATION_ERROR", "The component-library package manager could not be determined");
+  }
+  try {
+    await execFileAsync(command.file, command.args, {
+      cwd: worktreePath,
+      encoding: "utf8",
+      maxBuffer: 10_000_000,
+    });
+  } catch {
+    throw new DesignSpaceError("VALIDATION_ERROR", "The component-library worktree dependencies could not be installed");
+  }
+}
+
+async function dependencyInstallCommand(
+  worktreePath: string,
+): Promise<{ file: string; args: string[] } | undefined> {
+  if (await pathExists(resolve(worktreePath, "bun.lock")) || await pathExists(resolve(worktreePath, "bun.lockb"))) {
+    return { file: "bun", args: ["install", "--frozen-lockfile"] };
+  }
+  if (await pathExists(resolve(worktreePath, "pnpm-lock.yaml"))) {
+    return { file: "pnpm", args: ["install", "--frozen-lockfile"] };
+  }
+  if (await pathExists(resolve(worktreePath, "package-lock.json"))) {
+    return { file: "npm", args: ["ci"] };
+  }
+  if (await pathExists(resolve(worktreePath, "yarn.lock"))) {
+    return { file: "yarn", args: ["install", "--immutable"] };
+  }
+  return undefined;
 }
 
 async function resolveSharedProjectsRoot(targetRoot: string): Promise<string> {

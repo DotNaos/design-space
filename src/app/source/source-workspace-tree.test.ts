@@ -99,6 +99,102 @@ it("overlays device implementations on one logical node", () => {
   expect(summary?.implementations.mobile.state).toBe("missing");
 });
 
+it("keeps nested component paths distinct while overlaying device implementations", () => {
+  const nestedWorkspace: RuntimeSourceWorkspace = {
+    ...workspace,
+    entries: [
+      entry({
+        id: "AgentsCardDesktop",
+        label: "AgentCard",
+        exportName: "AgentCard",
+        area: "components",
+        device: "desktop",
+        relativePath: "src/app/components/Agents/AgentCard/desktop.tsx",
+      }),
+      entry({
+        id: "AgentsCardMobile",
+        label: "AgentCard",
+        exportName: "AgentCard",
+        area: "components",
+        device: "mobile",
+        relativePath: "src/app/components/Agents/AgentCard/mobile.tsx",
+      }),
+      entry({
+        id: "GitCardDesktop",
+        label: "AgentCard",
+        exportName: "AgentCard",
+        area: "components",
+        device: "desktop",
+        relativePath: "src/app/components/Git/AgentCard/desktop.tsx",
+      }),
+    ],
+  };
+
+  const nodes = sourceTreeNodes(nestedWorkspace);
+  expect(nodes.map(({ id, path, entries }) => ({ id, path, entries: entries.map((candidate) => candidate.id) }))).toEqual([
+    {
+      id: "components:implementation:Agents/AgentCard:AgentCard",
+      path: ["Agents", "AgentCard"],
+      entries: ["AgentsCardDesktop", "AgentsCardMobile"],
+    },
+    {
+      id: "components:implementation:Git/AgentCard:AgentCard",
+      path: ["Git", "AgentCard"],
+      entries: ["GitCardDesktop"],
+    },
+  ]);
+});
+
+it("keeps distinct source family shapes and moved components as distinct identities", () => {
+  const collisionWorkspace: RuntimeSourceWorkspace = {
+    ...workspace,
+    entries: [
+      entry({
+        id: "FlatAgentCard",
+        label: "AgentCard",
+        exportName: "AgentCard",
+        area: "components",
+        device: "desktop",
+        relativePath: "src/app/components/AgentCard.tsx",
+      }),
+      entry({
+        id: "IndexedAgentCard",
+        label: "AgentCard",
+        exportName: "AgentCard",
+        area: "components",
+        device: "desktop",
+        relativePath: "src/app/components/AgentCard/index.tsx",
+      }),
+      entry({
+        id: "RepeatedAgentCard",
+        label: "AgentCard",
+        exportName: "AgentCard",
+        area: "components",
+        device: "desktop",
+        relativePath: "src/app/components/AgentCard/AgentCard.tsx",
+      }),
+      entry({
+        id: "MovedAgentCard",
+        label: "AgentCard",
+        exportName: "AgentCard",
+        area: "components",
+        device: "desktop",
+        relativePath: "src/app/components/Agents/AgentCard.tsx",
+      }),
+    ],
+  };
+
+  expect(sourceTreeNodes(collisionWorkspace).map(({ id, entries }) => ({
+    id,
+    entries: entries.map((candidate) => candidate.id),
+  }))).toEqual([
+    { id: "components:file:AgentCard:AgentCard", entries: ["FlatAgentCard"] },
+    { id: "components:implementation:AgentCard:AgentCard", entries: ["IndexedAgentCard"] },
+    { id: "components:file:AgentCard/AgentCard:AgentCard", entries: ["RepeatedAgentCard"] },
+    { id: "components:file:Agents/AgentCard:AgentCard", entries: ["MovedAgentCard"] },
+  ]);
+});
+
 it("starts with the desktop app layout when it exists", () => {
   expect(initialSourceTreeSelection(sourceTreeNodes(workspace))).toEqual({ nodeId: "layout:app", device: "desktop" });
 });

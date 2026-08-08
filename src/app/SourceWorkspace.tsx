@@ -232,6 +232,7 @@ export function SourceWorkspace(props: { nestedPreview?: boolean; target: Target
   );
   const librarySidebar = (
     <SourceLibraryExplorer
+      appTargetId={selectedTarget?.id}
       appWorkspace={workspace}
       catalog={effectiveLibraryCatalog}
       catalogKind={libraryRuntime.catalogKind}
@@ -309,6 +310,7 @@ export function SourceWorkspace(props: { nestedPreview?: boolean; target: Target
   );
   const canvas = activity === "library" ? (
     <SourceLibraryCanvas
+      appTargetId={selectedTarget?.id}
       appWorkspace={workspace}
       boxModelPreviewStore={boxModelPreviewStore}
       catalog={effectiveLibraryCatalog}

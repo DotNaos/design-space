@@ -21,6 +21,8 @@ export interface SourceTreeNode {
   id: string;
   area: DesignSpaceArea;
   label: string;
+  /** Source-derived catalog path. Folder segments are presentation only. */
+  path?: readonly string[];
   entries: readonly RuntimeSourceWorkspaceEntry[];
   uses: readonly string[];
   implementations: Readonly<Record<DesignSpaceDevice, SourceImplementation>>;
@@ -60,7 +62,12 @@ export function sourceTreeNodes(
   workspace: RuntimeSourceWorkspace,
   targetId?: string,
 ): readonly SourceTreeNode[] {
-  const groups = new Map<string, { area: DesignSpaceArea; label: string; entries: RuntimeSourceWorkspaceEntry[] }>();
+  const groups = new Map<string, {
+    area: DesignSpaceArea;
+    label: string;
+    path: readonly string[];
+    entries: RuntimeSourceWorkspaceEntry[];
+  }>();
   const target = targetId ? workspace.targets?.find((candidate) => candidate.id === targetId) : undefined;
   const workspaceEntries = target
     ? workspace.entries.filter((entry) => entry.targetId === target.id)
@@ -71,6 +78,7 @@ export function sourceTreeNodes(
     const current = groups.get(key) ?? {
       area: entry.area,
       label: logicalEntryLabel(entry),
+      path: sourceEntryComponentPath(entry),
       entries: [],
     };
     current.entries.push(entry);
@@ -82,6 +90,7 @@ export function sourceTreeNodes(
       id,
       area: group.area,
       label: group.label,
+      path: group.path,
       entries: group.entries,
       uses: [...new Set(group.entries.flatMap((entry) => entry.uses ?? []))],
       implementations: implementationsFor(workspace, group.area, group.entries, target),
@@ -111,9 +120,13 @@ function compositionRows(
   sharedDefinitions: boolean,
 ): readonly SourceTreeRow[] {
   const references = new Map<string, SourceTreeNode>();
+  const sourceReferences = new Map<string, SourceTreeNode>();
   for (const node of nodes) {
-    references.set(node.label, node);
-    for (const entry of node.entries) references.set(entry.exportName, node);
+    if (!references.has(node.label)) references.set(node.label, node);
+    for (const entry of node.entries) {
+      if (!references.has(entry.exportName)) references.set(entry.exportName, node);
+      sourceReferences.set(sourceComponentReferenceKey(entry), node);
+    }
   }
 
   const rows: SourceTreeRow[] = [];
@@ -151,7 +164,11 @@ function compositionRows(
     path: ReadonlySet<string>,
     occurrence: string,
   ): void => {
-    const referenced = layer.kind === "component" ? references.get(layer.label) : undefined;
+    const referenced = layer.kind === "component"
+      ? layer.component
+        ? sourceReferences.get(sourceComponentReferenceKey(layer.component))
+        : references.get(layer.label)
+      : undefined;
     if (referenced && !path.has(referenced.id)) {
       appendNode(referenced, depth, path, occurrence);
       return;
@@ -285,9 +302,7 @@ export function sourceTargetRootNodeId(
 function logicalEntryKey(entry: RuntimeSourceWorkspaceEntry): string {
   if (entry.area === "layout") return "layout:app";
   if (entry.area === "components") {
-    const folder = /^src\/app\/components\/([^/]+)\//.exec(entry.relativePath)?.[1]
-      ?? entry.relativePath.replace(/\/(?:desktop|tablet|mobile)\.tsx?$/, "").replace(/\.tsx?$/, "");
-    return `components:${folder}:${entry.exportName}`;
+    return `components:${sourceEntryComponentGroupKey(entry)}:${entry.exportName}`;
   }
   if (/^src\/app\/(?:desktop|tablet|mobile)\/pages\//.test(entry.relativePath)) {
     return `pages:${entry.exportName}`;
@@ -298,11 +313,69 @@ function logicalEntryKey(entry: RuntimeSourceWorkspaceEntry): string {
   return `pages:${pagePath}:${entry.exportName}`;
 }
 
+function sourceEntryComponentGroupKey(entry: RuntimeSourceWorkspaceEntry): string {
+  const segments = sourceEntryComponentSegments(entry);
+  if (!segments) return `file:${entry.relativePath.replaceAll("\\", "/")}`;
+  const { directories, stem } = segments;
+  if (/^(?:desktop|tablet|mobile|index)$/i.test(stem)) {
+    return `implementation:${directories.join("/")}`;
+  }
+  const baseStem = stem.replace(/[.-](?:desktop|tablet|mobile)$/i, "");
+  return `file:${[...directories, baseStem].join("/")}`;
+}
+
+export function sourceEntryComponentPath(
+  entry: Pick<RuntimeSourceWorkspaceEntry, "area" | "relativePath" | "label">,
+): readonly string[] {
+  if (entry.area !== "components") return [entry.label];
+  const componentSegments = sourceEntryComponentSegments(entry);
+  if (!componentSegments) return [entry.label];
+  const scoped = [...componentSegments.directories];
+  const { stem } = componentSegments;
+  if (!/^(?:desktop|tablet|mobile|index)$/i.test(stem)) {
+    scoped.push(stem.replace(/[.-](?:desktop|tablet|mobile)$/i, ""));
+  }
+  if (
+    scoped.length > 1
+    && scoped.at(-1)!.toLocaleLowerCase() === scoped.at(-2)!.toLocaleLowerCase()
+  ) {
+    scoped.pop();
+  }
+  return scoped.length ? scoped : [entry.label];
+}
+
+function sourceEntryComponentSegments(
+  entry: Pick<RuntimeSourceWorkspaceEntry, "relativePath">,
+): { directories: readonly string[]; stem: string } | undefined {
+  const segments = entry.relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
+  let rootIndex = -1;
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index]!.toLocaleLowerCase();
+    if (segment !== "components" && segment !== "primitives") continue;
+    rootIndex = index;
+    break;
+  }
+  if (rootIndex < 0) return undefined;
+  const scoped = segments.slice(rootIndex + 1);
+  const fileName = scoped.pop();
+  if (!fileName) return undefined;
+  const stem = fileName.replace(/\.[cm]?[jt]sx?$/i, "");
+  return { directories: scoped, stem };
+}
+
+export function sourceComponentReferenceKey(
+  reference: Pick<RuntimeSourceWorkspaceEntry, "relativePath" | "exportName">,
+): string {
+  return `${reference.relativePath.replaceAll("\\", "/")}#${reference.exportName}`;
+}
+
 function logicalEntryLabel(entry: RuntimeSourceWorkspaceEntry): string {
   return entry.label;
 }
 
 function compareNodes(left: SourceTreeNode, right: SourceTreeNode): number {
   const areaOrder: Record<DesignSpaceArea, number> = { layout: 0, pages: 1, components: 2 };
-  return areaOrder[left.area] - areaOrder[right.area] || left.label.localeCompare(right.label, "en");
+  return areaOrder[left.area] - areaOrder[right.area]
+    || (left.path ?? [left.label]).join("/").localeCompare((right.path ?? [right.label]).join("/"), "en")
+    || left.label.localeCompare(right.label, "en");
 }

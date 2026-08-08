@@ -183,6 +183,8 @@ export interface SourceWorkspaceLayer {
   kind: "component" | "html" | "slot";
   children: readonly SourceWorkspaceLayer[];
   source: SourceLayerBinding;
+  /** Compiler-resolved component export referenced by this JSX layer. */
+  component?: SourceWorkspaceComponentReference;
   /** Definition of a same-file component referenced by this JSX layer. */
   definition?: SourceLayerBinding;
   /** Exact source binding for a static or currently absent JSX className. */
@@ -195,6 +197,11 @@ export interface SourceWorkspaceLayer {
   slot?: SourceSlotUsage;
   /** Definition-owned contract for an isolated Slot placeholder; it is not an editable component use. */
   slotContract?: SourceComponentSlot;
+}
+
+export interface SourceWorkspaceComponentReference {
+  relativePath: string;
+  exportName: string;
 }
 
 export type SourceSlotValidity = "valid" | "missing" | "incompatible" | "full" | "optional";
@@ -247,6 +254,12 @@ export interface SourceWorkspaceManifest {
   sourceRoot: string;
   entries: readonly SourceWorkspaceEntry[];
   devices: readonly SourceWorkspaceDeviceState[];
+  /** Presentation-only Lucide icon markers discovered in source directories. */
+  folderIcons?: readonly SourceWorkspaceFolderIcon[];
+  /** Project-relative directories containing a package.json, used only for catalog navigation. */
+  packageDirectories?: readonly string[];
+  /** Package names discovered from package.json files, used only for catalog navigation. */
+  packages?: readonly SourceWorkspacePackage[];
   adapter?: "legacy" | "app-manifest";
   targets?: readonly SourceWorkspaceTarget[];
   library?: SourceWorkspaceLibrary;
@@ -254,6 +267,20 @@ export interface SourceWorkspaceManifest {
     createComponents: boolean;
   };
   approvals?: SourceApprovalEvidence;
+}
+
+export interface SourceWorkspacePackage {
+  /** Project-relative directory containing the package.json. The project root is ".". */
+  directory: string;
+  /** Package name read from package.json. */
+  name: string;
+}
+
+export interface SourceWorkspaceFolderIcon {
+  /** Project-relative directory containing the marker file. */
+  directory: string;
+  /** Kebab-case Lucide icon name taken from .<name>.lucide-icon. */
+  name: string;
 }
 
 export interface SourceWorkspaceTargetDevice {

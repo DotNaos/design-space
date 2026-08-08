@@ -56,14 +56,18 @@ it("shows the active project path and switches to an existing worktree", async (
   expect(screen.getByText("12")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Library branch and worktree" }));
   await userEvent.click(screen.getByRole("button", { name: "feature/available" }));
+  expect(await screen.findByRole("dialog", { name: "Switch library branch" })).toHaveTextContent(
+    "The existing branch worktree will be reused",
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Switch and reload" }));
 
   await waitFor(() => expect(runLocalOperation).toHaveBeenLastCalledWith({
-    type: "start-library-development",
-    worktreeId: "worktree-available",
+    type: "activate-library-development-branch",
+    branch: "feature/available",
   }));
 });
 
-it("offers to clone branches that do not have a worktree yet", async () => {
+it("confirms creation before activating a branch without a worktree", async () => {
   runLocalOperation.mockResolvedValueOnce(status).mockResolvedValueOnce({
     ...status,
     worktrees: [
@@ -82,10 +86,27 @@ it("offers to clone branches that do not have a worktree yet", async () => {
   render(<LibraryFilesHeader fileCount={0} />);
 
   await userEvent.click(await screen.findByRole("button", { name: "Library branch and worktree" }));
-  await userEvent.click(screen.getByRole("button", { name: "Clone feature/not-cloned worktree" }));
+  await userEvent.click(screen.getByRole("button", { name: "feature/not-cloned" }));
+  expect(await screen.findByRole("dialog", { name: "Switch library branch" })).toHaveTextContent(
+    "A dedicated worktree will be created",
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Switch and reload" }));
 
   await waitFor(() => expect(runLocalOperation).toHaveBeenLastCalledWith({
-    type: "clone-library-development-worktree",
+    type: "activate-library-development-branch",
     branch: "feature/not-cloned",
   }));
+});
+
+it("keeps activation failures visible in the confirmation dialog", async () => {
+  runLocalOperation.mockResolvedValueOnce(status).mockRejectedValueOnce(new Error("Dependency installation failed."));
+
+  render(<LibraryFilesHeader fileCount={0} />);
+
+  await userEvent.click(await screen.findByRole("button", { name: "Library branch and worktree" }));
+  await userEvent.click(screen.getByRole("button", { name: "feature/not-cloned" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Switch and reload" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Dependency installation failed.");
+  expect(screen.getByRole("dialog", { name: "Switch library branch" })).toBeInTheDocument();
 });

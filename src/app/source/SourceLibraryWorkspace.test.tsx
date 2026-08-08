@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -55,6 +55,7 @@ const catalog: RuntimeSourceLibraryCatalog = {
     entries: [entry],
     devices: [],
     styles: [],
+    packages: [{ directory: ".", name: "@dotnaos/ui/base" }],
   },
   release: { version: "0.0.5", entries: [entry], styles: [] },
 };
@@ -75,9 +76,14 @@ it("shows only the development source with a design coverage audit", () => {
   );
 
   expect(screen.getByText("1/2")).toBeVisible();
-  expect(screen.getByRole("group", { name: "Primitives" })).toBeVisible();
+  expect(screen.queryByRole("group", { name: "Components" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base" })).toBeVisible();
+  expect(screen.getByText("base")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base" }).querySelector("svg.lucide-folder")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "@dotnaos/ui/base / Button", pressed: true })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Card" })).toBeVisible();
   expect(screen.queryByLabelText("Button design missing")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Button", pressed: true })).toHaveClass("rounded-full", "bg-violet-500/[0.14]", "text-violet-200");
+  expect(screen.getByRole("button", { name: "@dotnaos/ui/base / Button", pressed: true })).toHaveClass("rounded-full", "bg-violet-500/[0.14]", "text-violet-200");
   expect(screen.getByRole("button", { name: "Card" })).toBeVisible();
   expect(screen.getByLabelText("Card design missing")).toBeVisible();
   expect(screen.queryByText("Component")).not.toBeInTheDocument();
@@ -199,6 +205,117 @@ it("can render app-built components without adding another source switch", () =>
   expect(screen.queryByRole("group", { name: "Component source" })).not.toBeInTheDocument();
 });
 
+it("mirrors nested app component folders and keeps duplicate leaf names selectable", async () => {
+  const onSelect = vi.fn();
+  const appEntries: RuntimeSourceWorkspaceEntry[] = [
+    {
+      ...entry,
+      id: "agents-card",
+      label: "AgentCard",
+      exportName: "AgentCard",
+      relativePath: "src/app/components/Agents/AgentCard/desktop.tsx",
+    },
+    {
+      ...entry,
+      id: "agents-tool-call",
+      label: "ToolCall",
+      exportName: "ToolCall",
+      relativePath: "src/app/components/Agents/Tools/ToolCall.tsx",
+    },
+    {
+      ...entry,
+      id: "git-card",
+      label: "AgentCard",
+      exportName: "AgentCard",
+      relativePath: "src/app/components/Git/AgentCard/desktop.tsx",
+    },
+    {
+      ...entry,
+      id: "flat-button",
+      relativePath: "src/app/components/Button.tsx",
+    },
+  ];
+  render(
+    <SourceLibrarySidebar
+      appWorkspace={{
+        ...catalog.development!,
+        entries: appEntries,
+        packages: undefined,
+        folderIcons: [
+          { directory: "src/app/components/Agents", name: "bot" },
+          { directory: "src/app/components/Git", name: "not-a-real-lucide-icon" },
+        ],
+      }}
+      catalogKind="app"
+      device="desktop"
+      mode="development"
+      onCatalogKindChange={vi.fn()}
+      onDeviceChange={vi.fn()}
+      onModeChange={vi.fn()}
+      onSelect={onSelect}
+    />,
+  );
+
+  const agentsFolder = screen.getByRole("button", { name: "Collapse folder Agents" });
+  const agentsCard = screen.getByRole("button", { name: "Agents / AgentCard" });
+  expect(agentsCard).toBeVisible();
+  expect(screen.getByRole("button", { name: "Git / AgentCard" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Agents / Tools / ToolCall" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Button" })).toBeVisible();
+  expect(agentsFolder).toHaveClass("relative", "px-3.5");
+  expect(agentsCard).toHaveClass("px-3.5");
+  expect(agentsFolder.querySelector("svg")).toHaveClass("absolute", "-start-0.5", "size-3");
+  await waitFor(() => expect(agentsFolder.querySelector("svg.lucide-bot")).toBeVisible());
+  expect(screen.getByRole("button", { name: "Collapse folder Git" }).querySelector("svg.lucide-folder")).toBeVisible();
+
+  await userEvent.click(agentsFolder);
+  expect(screen.queryByRole("button", { name: "Agents / AgentCard" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Git / AgentCard" })).toBeVisible();
+
+  await userEvent.click(screen.getByRole("button", { name: "Expand folder Agents" }));
+  await userEvent.click(screen.getByRole("button", { name: "Git / AgentCard" }));
+  expect(onSelect).toHaveBeenCalledWith(expect.stringContaining("components:implementation:Git/AgentCard:AgentCard"));
+});
+
+it("renders source-derived icons for development-library folders", async () => {
+  const actionEntry: RuntimeSourceWorkspaceEntry = {
+    ...entry,
+    id: "action-button",
+    label: "ActionButton",
+    exportName: "ActionButton",
+    relativePath: "src/components/actions/ActionButton/render.tsx",
+  };
+  render(
+    <SourceLibrarySidebar
+      catalog={{
+        packageName: "@dotnaos/react-ui",
+        development: {
+          ...catalog.development!,
+          entries: [actionEntry],
+          folderIcons: [{ directory: "src/components/actions", name: "sparkles" }],
+        },
+      }}
+      catalogKind="library"
+      device="desktop"
+      library={{
+        ...library,
+        components: [{ name: "ActionButton", evidence: "package-export", category: "component" }],
+        editable: true,
+        mode: "development",
+      }}
+      mode="development"
+      onCatalogKindChange={vi.fn()}
+      onDeviceChange={vi.fn()}
+      onModeChange={vi.fn()}
+      onSelect={vi.fn()}
+    />,
+  );
+
+  const actionsFolder = screen.getByRole("button", { name: "Collapse folder @dotnaos/ui/base / actions" });
+  await waitFor(() => expect(actionsFolder.querySelector("svg.lucide-sparkles")).toBeVisible());
+  expect(screen.getByRole("button", { name: "@dotnaos/ui/base / actions / ActionButton" })).toBeVisible();
+});
+
 it("does not duplicate the library identity from the global workspace switch", () => {
   render(
     <SourceLibrarySidebar
@@ -220,7 +337,7 @@ it("does not duplicate the library identity from the global workspace switch", (
   expect(screen.queryByText("Installed")).not.toBeInTheDocument();
 });
 
-it("keeps the compact category filter beside component search", () => {
+it("keeps package navigation beside component search without category sections", () => {
   render(
     <SourceLibrarySidebar
       catalog={catalog}
@@ -236,7 +353,8 @@ it("keeps the compact category filter beside component search", () => {
   );
 
   expect(screen.getByRole("textbox", { name: "Search components" })).toBeVisible();
-  expect(screen.getByRole("button", { name: /Component category/ })).toHaveClass("size-9", "rounded-full");
+  expect(screen.queryByRole("button", { name: /Component category/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("group", { name: "Components" })).not.toBeInTheDocument();
 });
 
 it("fills the available canvas with its empty state", () => {

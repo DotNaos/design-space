@@ -34,7 +34,10 @@ export function SourceLibraryExplorer(props: SourceLibraryExplorerProps) {
     ...props,
     selected: drilldownComponentId ?? props.selected,
   });
-  const nodes = useMemo(() => sourceTreeNodes(workspace ?? emptyWorkspace()), [workspace]);
+  const nodes = useMemo(
+    () => sourceTreeNodes(workspace ?? emptyWorkspace(), props.catalogKind === "app" ? props.appTargetId : undefined),
+    [props.appTargetId, props.catalogKind, workspace],
+  );
   const rootNode = useMemo(() => selectedComponentNode(nodes, component?.entry), [component?.entry, nodes]);
   const graph = useMemo(
     () => sourceFocusGraph(nodes, props.device, rootNode ? [rootNode.id] : undefined),
@@ -56,6 +59,7 @@ export function SourceLibraryExplorer(props: SourceLibraryExplorerProps) {
     const entryId = occurrence?.entry?.id;
     if (!entryId) return;
     const next = sourceCatalogComponents({
+      appTargetId: props.appTargetId,
       appWorkspace: props.appWorkspace,
       catalog: props.catalog,
       device: props.device,

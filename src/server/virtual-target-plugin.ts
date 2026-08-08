@@ -80,7 +80,10 @@ export function designSpaceTargetPlugin(target: RegisteredTarget, draftPreviews?
         server.watcher.add([...appRoots, ...sourceWorkspace.files.map((file) => file.absolutePath)]);
         const restartForSourceShape = (changedPath: string) => {
           const normalized = normalizePath(changedPath);
-          if (appRoots.some((appRoot) => normalized.startsWith(appRoot)) && /\.[cm]?[jt]sx?$/.test(normalized)) void server.restart();
+          if (
+            appRoots.some((appRoot) => normalized.startsWith(appRoot))
+            && (/\.[cm]?[jt]sx?$/.test(normalized) || normalized.endsWith(".lucide-icon"))
+          ) void server.restart();
         };
         server.watcher.on("add", restartForSourceShape);
         server.watcher.on("unlink", restartForSourceShape);
@@ -91,7 +94,10 @@ export function designSpaceTargetPlugin(target: RegisteredTarget, draftPreviews?
         server.watcher.add([libraryRoot, ...developmentLibrary.files.map((file) => file.absolutePath)]);
         const restartForLibraryShape = (changedPath: string) => {
           const normalized = normalizePath(changedPath);
-          if (normalized.startsWith(libraryRoot) && /\.[cm]?[jt]sx?$/.test(normalized)) void server.restart();
+          if (
+            normalized.startsWith(libraryRoot)
+            && (/\.[cm]?[jt]sx?$/.test(normalized) || normalized.endsWith(".lucide-icon"))
+          ) void server.restart();
         };
         server.watcher.on("add", restartForLibraryShape);
         server.watcher.on("unlink", restartForLibraryShape);
@@ -178,6 +184,9 @@ function sourceTargetModule(target: RegisteredTarget): string {
     `    runtime: ${JSON.stringify(workspace.manifest.runtime)},`,
     `    sourceRoot: ${JSON.stringify(workspace.manifest.sourceRoot)},`,
     `    devices: ${JSON.stringify(workspace.manifest.devices)},`,
+    `    folderIcons: ${JSON.stringify(workspace.manifest.folderIcons)},`,
+    `    packageDirectories: ${JSON.stringify(workspace.manifest.packageDirectories)},`,
+    `    packages: ${JSON.stringify(workspace.manifest.packages)},`,
     `    targets: ${sourceRuntime.targets},`,
     `    library: ${JSON.stringify(workspace.manifest.library)},`,
     `    approvals: ${JSON.stringify(workspace.manifest.approvals)},`,
@@ -194,6 +203,9 @@ function sourceTargetModule(target: RegisteredTarget): string {
         `      runtime: ${JSON.stringify(target.sourceLibrary.development?.manifest.runtime)},`,
         `      sourceRoot: ${JSON.stringify(target.sourceLibrary.development?.manifest.sourceRoot)},`,
         `      devices: ${JSON.stringify(target.sourceLibrary.development?.manifest.devices)},`,
+        `      folderIcons: ${JSON.stringify(target.sourceLibrary.development?.manifest.folderIcons)},`,
+        `      packageDirectories: ${JSON.stringify(target.sourceLibrary.development?.manifest.packageDirectories)},`,
+        `      packages: ${JSON.stringify(target.sourceLibrary.development?.manifest.packages)},`,
         `      approvals: ${JSON.stringify(target.sourceLibrary.development?.manifest.approvals)},`,
         "      capabilities: { createComponents: false },",
         `      entries: [${developmentRuntime.entries.join(",\n")}],`,

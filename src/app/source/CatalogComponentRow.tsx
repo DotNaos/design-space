@@ -7,13 +7,19 @@ import { type SourceCatalogComponent } from "./source-library-catalog";
 
 export function CatalogComponentRow(props: {
   component: SourceCatalogComponent;
+  depth?: number;
   selected: boolean;
   source?: { entries: readonly RuntimeSourceWorkspaceEntry[] };
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="relative mx-2.5 flex min-h-10 items-center" role="listitem">
+    <div
+      className="relative mx-2.5 flex min-h-10 items-center"
+      role="listitem"
+      style={{ paddingLeft: (props.depth ?? 0) * 14 }}
+    >
       <Button
+        aria-label={props.component.path.join(" / ")}
         aria-pressed={props.selected}
         className={`min-h-9 min-w-0 flex-1 justify-start gap-2 rounded-full px-3.5 pr-10 text-left text-xs transition-colors ${
           props.selected

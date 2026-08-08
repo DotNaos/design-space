@@ -1,5 +1,5 @@
 import { Button, Popover, SearchField } from "@heroui/react";
-import { Check, ChevronDown, Download, GitBranch, LoaderCircle, SearchX } from "lucide-react";
+import { Check, ChevronDown, GitBranch, SearchX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import type {
@@ -7,12 +7,14 @@ import type {
   LibraryDevelopmentWorktree,
 } from "../../shared/source-workspace";
 import { runLocalOperation } from "../api";
+import { LibraryBranchReloadDialog } from "../source/LibraryBranchReloadDialog";
 
 export function LibraryFilesHeader(props: { fileCount: number }) {
   const [status, setStatus] = useState<LibraryDevelopmentProjectStatus>();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [busyBranch, setBusyBranch] = useState<string>();
+  const [pendingChoice, setPendingChoice] = useState<BranchChoice>();
   const [error, setError] = useState<string>();
 
   useEffect(() => {
@@ -35,36 +37,27 @@ export function LibraryFilesHeader(props: { fileCount: number }) {
   }, [branches, query]);
   const path = active?.path ?? status?.checkoutPath;
 
-  async function activate(worktree: LibraryDevelopmentWorktree) {
-    if (worktree.active || busyBranch) {
+  function requestActivation(choice: BranchChoice) {
+    if (choice.worktree?.active || busyBranch) {
       setOpen(false);
       return;
     }
-    setBusyBranch(worktree.branch);
+    setError(undefined);
+    setPendingChoice(choice);
+    setOpen(false);
+  }
+
+  async function activate() {
+    if (!pendingChoice || busyBranch) return;
+    setBusyBranch(pendingChoice.name);
     setError(undefined);
     try {
       const next = await runLocalOperation<LibraryDevelopmentProjectStatus>({
-        type: "start-library-development",
-        worktreeId: worktree.id,
+        type: "activate-library-development-branch",
+        branch: pendingChoice.name,
       });
       setStatus(next);
-      setOpen(false);
-    } catch (cause) {
-      setError(operationMessage(cause));
-    } finally {
-      setBusyBranch(undefined);
-    }
-  }
-
-  async function clone(branch: string) {
-    if (busyBranch) return;
-    setBusyBranch(branch);
-    setError(undefined);
-    try {
-      setStatus(await runLocalOperation<LibraryDevelopmentProjectStatus>({
-        type: "clone-library-development-worktree",
-        branch,
-      }));
+      setPendingChoice(undefined);
     } catch (cause) {
       setError(operationMessage(cause));
     } finally {
@@ -127,7 +120,6 @@ export function LibraryFilesHeader(props: { fileCount: number }) {
             </div>
             <div className="max-h-72 overflow-y-auto px-1.5 pb-1.5" role="listbox" aria-label="Library branches">
               {visibleBranches.map((choice) => {
-                const pending = busyBranch === choice.name;
                 return (
                   <div
                     key={choice.name}
@@ -140,29 +132,15 @@ export function LibraryFilesHeader(props: { fileCount: number }) {
                     <GitBranch aria-hidden="true" className={`size-3 shrink-0 ${choice.worktree?.active ? "text-violet-300" : "text-zinc-600"}`} />
                     <Button
                       className="h-auto min-w-0 flex-1 justify-start truncate rounded-none bg-transparent p-0 text-left text-[10px] text-zinc-300 outline-none disabled:cursor-default"
-                      isDisabled={!choice.worktree || pending}
+                      isDisabled={choice.worktree?.active || Boolean(busyBranch)}
                       variant="ghost"
-                      onPress={() => choice.worktree && void activate(choice.worktree)}
+                      onPress={() => requestActivation(choice)}
                     >
                       {choice.name}
                     </Button>
-                    {choice.worktree ? (
-                      choice.worktree.active
-                        ? <Check aria-label="Current worktree" className="size-3 shrink-0 text-violet-300" />
-                        : <span className="shrink-0 text-[8px] text-zinc-600">Worktree</span>
-                    ) : (
-                      <Button
-                        aria-label={`Clone ${choice.name} worktree`}
-                        className="h-6 gap-1 rounded-full bg-violet-500/15 px-2 text-[8px] font-medium text-violet-200 hover:bg-violet-500/25"
-                        isDisabled={Boolean(busyBranch)}
-                        size="sm"
-                        variant="ghost"
-                        onPress={() => void clone(choice.name)}
-                      >
-                        {pending ? <LoaderCircle className="size-2.5 animate-spin" /> : <Download className="size-2.5" />}
-                        Clone
-                      </Button>
-                    )}
+                    {choice.worktree?.active
+                      ? <Check aria-label="Current worktree" className="size-3 shrink-0 text-violet-300" />
+                      : <span className="shrink-0 text-[8px] text-zinc-600">{choice.worktree ? "Worktree" : "Creates worktree"}</span>}
                   </div>
                 );
               })}
@@ -177,6 +155,17 @@ export function LibraryFilesHeader(props: { fileCount: number }) {
           </Popover.Dialog>
         </Popover.Content>
       </Popover>
+      <LibraryBranchReloadDialog
+        branch={pendingChoice?.name}
+        busy={Boolean(busyBranch)}
+        createsWorktree={!pendingChoice?.worktree}
+        error={error}
+        onCancel={() => {
+          setPendingChoice(undefined);
+          setError(undefined);
+        }}
+        onConfirm={() => void activate()}
+      />
     </div>
   );
 }

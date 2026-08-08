@@ -1,9 +1,10 @@
 import { Button, Input, ListBox, Select } from "@heroui/react";
-import { Download, GitBranch, LoaderCircle, Play, Search, Square } from "lucide-react";
+import { Download, GitBranch, LoaderCircle, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { LibraryDevelopmentProjectStatus } from "../../shared/source-workspace";
+import type { LibraryDevelopmentProjectStatus, LibraryDevelopmentWorktree } from "../../shared/source-workspace";
 import { runLocalOperation } from "../api";
+import { LibraryBranchReloadDialog } from "./LibraryBranchReloadDialog";
 import { OperationError } from "./OperationError";
 
 interface LibraryDevelopmentSourceControlProps {
@@ -13,8 +14,9 @@ interface LibraryDevelopmentSourceControlProps {
 export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceControlProps) {
   const [status, setStatus] = useState<LibraryDevelopmentProjectStatus>();
   const [selection, setSelection] = useState<string>();
+  const [pendingBranch, setPendingBranch] = useState<string>();
   const [worktreeQuery, setWorktreeQuery] = useState("");
-  const [busy, setBusy] = useState<"clone" | "start" | "stop">();
+  const [busy, setBusy] = useState<"clone" | "activate">();
   const [error, setError] = useState<string>();
 
   const load = useCallback(async () => {
@@ -23,7 +25,7 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
         type: "get-library-development",
       });
       setStatus(next);
-      setSelection((current) => chooseWorktree(next, current));
+      setSelection(activeWorktree(next)?.branch);
       setError(undefined);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Library development is unavailable.");
@@ -34,16 +36,13 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
     void load();
   }, [load]);
 
-  const selected = useMemo(
-    () => status?.worktrees.find((worktree) => worktree.id === selection),
-    [selection, status?.worktrees],
-  );
+  const branches = useMemo(() => branchChoices(status), [status]);
   const visibleWorktrees = useMemo(() => {
     const query = worktreeQuery.trim().toLocaleLowerCase();
-    return status?.worktrees.filter((worktree) => !query || worktree.branch.toLocaleLowerCase().includes(query)) ?? [];
-  }, [status?.worktrees, worktreeQuery]);
+    return branches.filter((choice) => !query || choice.name.toLocaleLowerCase().includes(query));
+  }, [branches, worktreeQuery]);
 
-  async function run(action: "clone" | "start" | "stop") {
+  async function run(action: "clone" | "activate", branch = pendingBranch) {
     setBusy(action);
     setError(undefined);
     try {
@@ -52,18 +51,17 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
           type: "clone-library-development",
         });
         setStatus(next);
-        setSelection(chooseWorktree(next));
-      } else if (action === "start" && selected) {
+        setSelection(activeWorktree(next)?.branch);
+      } else if (action === "activate" && branch) {
         try { localStorage.setItem("design-space.library-source", "development"); } catch { /* optional preference */ }
         props.onModeChange("development");
-        setStatus(await runLocalOperation<LibraryDevelopmentProjectStatus>({
-          type: "start-library-development",
-          worktreeId: selected.id,
-        }));
-      } else if (action === "stop") {
-        setStatus(await runLocalOperation<LibraryDevelopmentProjectStatus>({
-          type: "stop-library-development",
-        }));
+        const next = await runLocalOperation<LibraryDevelopmentProjectStatus>({
+          type: "activate-library-development-branch",
+          branch,
+        });
+        setStatus(next);
+        setSelection(branch);
+        setPendingBranch(undefined);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The library operation failed.");
@@ -95,23 +93,27 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
   }
 
   return (
-    <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
+    <div className="mt-2">
       <Select
         aria-label="Development library worktree"
         className="min-w-0"
-        isDisabled={Boolean(busy) || status.state === "running"}
+        isDisabled={Boolean(busy)}
         selectedKey={selection}
         onOpenChange={(open) => {
           if (!open) setWorktreeQuery("");
         }}
         onSelectionChange={(key) => {
-          setSelection(String(key));
+          const branch = String(key);
           setWorktreeQuery("");
+          if (branch !== selection) {
+            setError(undefined);
+            setPendingBranch(branch);
+          }
         }}
       >
         <Select.Trigger className="flex h-9 min-w-0 items-center gap-2 rounded-full bg-white/[0.055] px-3 text-[10px] text-zinc-300 outline-none transition-colors data-[focus-visible]:bg-white/[0.09]">
           <GitBranch className="size-3 shrink-0 text-zinc-500" />
-          <span className="min-w-0 flex-1 truncate text-left font-medium">{selected?.branch ?? "Choose branch"}</span>
+          <span className="min-w-0 flex-1 truncate text-left font-medium">{selection ?? "Choose branch"}</span>
           <Select.Indicator className="size-3 shrink-0 text-zinc-500" />
         </Select.Trigger>
         <Select.Popover className="min-w-64 rounded-lg bg-[#1b1c20] p-1 shadow-2xl" placement="bottom">
@@ -130,16 +132,15 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
             />
           </div>
           <ListBox items={visibleWorktrees}>
-            {(worktree) => (
+            {(choice) => (
               <ListBox.Item
                 className="flex min-h-8 cursor-default items-center gap-2 rounded-md px-2 text-[10px] text-zinc-300 outline-none data-[disabled]:opacity-40 data-[focused]:bg-white/10 data-[selected]:text-sky-300"
-                id={worktree.id}
-                isDisabled={!worktree.packageReady}
-                textValue={worktree.branch}
+                id={choice.name}
+                textValue={choice.name}
               >
                 <GitBranch className="size-3 shrink-0 text-zinc-600" />
-                <span className="min-w-0 flex-1 truncate">{worktree.branch}</span>
-                {!worktree.packageReady ? <span className="shrink-0 text-[8px] text-amber-300/70">Package missing</span> : null}
+                <span className="min-w-0 flex-1 truncate">{choice.name}</span>
+                {!choice.worktree ? <span className="shrink-0 text-[8px] text-zinc-600">Creates worktree</span> : null}
                 <ListBox.ItemIndicator className="ml-auto size-3 shrink-0" />
               </ListBox.Item>
             )}
@@ -149,37 +150,43 @@ export function LibraryDevelopmentSourceControl(props: LibraryDevelopmentSourceC
           ) : null}
         </Select.Popover>
       </Select>
-      <Button
-        aria-label={status.state === "running" ? "Stop development source" : "Start development source"}
-        className={`h-9 gap-1.5 rounded-full px-3 text-[10px] font-semibold text-white transition-colors ${
-          status.state === "running"
-            ? "bg-rose-500 hover:bg-rose-400"
-            : "bg-sky-500 hover:bg-sky-400"
-        }`}
-        isDisabled={Boolean(busy) || (status.state !== "running" && !selected?.packageReady)}
-        size="sm"
-        onPress={() => void run(status.state === "running" ? "stop" : "start")}
-      >
-        {busy
-          ? <LoaderCircle className="animate-spin" size={12} />
-          : status.state === "running" ? <Square size={11} /> : <Play size={12} />}
-        <span>{status.state === "running" ? "Stop" : "Start"}</span>
-      </Button>
-      {error ? <div className="col-span-2"><OperationError message={error} /></div> : null}
+      {error ? <OperationError message={error} /> : null}
+      <LibraryBranchReloadDialog
+        branch={pendingBranch}
+        busy={busy === "activate"}
+        createsWorktree={Boolean(pendingBranch && !branches.find((choice) => choice.name === pendingBranch)?.worktree)}
+        error={error}
+        onCancel={() => {
+          setPendingBranch(undefined);
+          setError(undefined);
+        }}
+        onConfirm={() => void run("activate")}
+      />
     </div>
   );
 }
 
-function chooseWorktree(
-  status: LibraryDevelopmentProjectStatus,
-  current?: string,
-): string | undefined {
-  if (current && status.worktrees.some((worktree) => worktree.id === current && worktree.packageReady)) {
-    return current;
-  }
-  return status.activeWorktreeId
-    ?? status.worktrees.find((worktree) => worktree.path === status.checkoutPath && worktree.packageReady)?.id
-    ?? status.worktrees.find((worktree) => worktree.packageReady)?.id;
+interface BranchChoice {
+  name: string;
+  worktree?: LibraryDevelopmentWorktree;
+}
+
+function branchChoices(status?: LibraryDevelopmentProjectStatus): BranchChoice[] {
+  if (!status) return [];
+  const branches = status.branches?.length ? status.branches : status.worktrees.map((worktree) => worktree.branch);
+  const byBranch = new Map(status.worktrees.map((worktree) => [worktree.branch, worktree]));
+  return branches.map((name) => ({ name, worktree: byBranch.get(name) })).sort((left, right) => {
+    if (left.worktree?.active) return -1;
+    if (right.worktree?.active) return 1;
+    if (left.name === "main") return -1;
+    if (right.name === "main") return 1;
+    return left.name.localeCompare(right.name, "en");
+  });
+}
+
+function activeWorktree(status: LibraryDevelopmentProjectStatus): LibraryDevelopmentWorktree | undefined {
+  return status.worktrees.find((worktree) => worktree.active)
+    ?? status.worktrees.find((worktree) => worktree.id === status.activeWorktreeId);
 }
 
 function repositoryLabel(repository?: string): string {

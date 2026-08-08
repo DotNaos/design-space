@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { lstat, opendir, realpath } from "node:fs/promises";
-import { extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 
 import {
@@ -11,7 +11,9 @@ import {
   type DesignSpaceProjectConfig,
   type SourceWorkspaceDeviceState,
   type SourceWorkspaceEntry,
+  type SourceWorkspaceFolderIcon,
   type SourceWorkspaceManifest,
+  type SourceWorkspacePackage,
   type SourceWorkspaceLibrary,
   type SourceWorkspaceTarget,
 } from "../shared/source-workspace";
@@ -53,6 +55,7 @@ const safeRootFiles = new Set([
   "vite.config.js",
   "vite.config.ts",
 ]);
+const folderIconMarkerPattern = /^\.([a-z0-9]+(?:-[a-z0-9]+)*)\.lucide-icon$/;
 
 export interface IndexedSourceFile {
   id: string;
@@ -134,6 +137,9 @@ export async function indexSourceWorkspace(
     sourceRoot: inferredCatalog ? sourceRoot : SOURCE_ROOT,
     entries: Object.freeze(entries),
     devices: Object.freeze(deviceStates(entries, config)),
+    folderIcons: sourceFolderIcons(files),
+    packageDirectories: sourcePackageDirectories(files),
+    packages: await sourcePackages(root, files),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
   };
   return {
@@ -242,6 +248,9 @@ export async function indexAppManifestWorkspace(
     sourceRoot: firstTarget.sourceRoot,
     entries: Object.freeze(entries),
     devices: Object.freeze([]),
+    folderIcons: sourceFolderIcons(files),
+    packageDirectories: sourcePackageDirectories(files),
+    packages: await sourcePackages(root, files),
     targets: Object.freeze(targets),
     library: await detectComponentLibrary(root, fileByPath.get("package.json"), files),
   };
@@ -437,12 +446,70 @@ async function walkDirectory(root: string, relativeDirectory: string, depth: num
       if (!ignoredDirectories.has(entry.name)) await walkDirectory(root, relativePath, depth + 1, result);
       continue;
     }
-    if (!metadata.isFile() || !safeSourceExtensions.has(extname(entry.name).toLowerCase())) continue;
+    if (
+      !metadata.isFile()
+      || (!safeSourceExtensions.has(extname(entry.name).toLowerCase()) && !entry.name.endsWith(".lucide-icon"))
+    ) continue;
     result.add(relativePath);
     if (result.size > maximumIndexedFiles) {
       throw new DesignSpaceError("INVALID_REGISTRATION", "The source project contains too many browsable files");
     }
   }
+}
+
+function sourceFolderIcons(files: readonly IndexedSourceFile[]): readonly SourceWorkspaceFolderIcon[] {
+  const icons = new Map<string, SourceWorkspaceFolderIcon>();
+  const conflicts = new Set<string>();
+  for (const file of files) {
+    if (!file.relativePath.endsWith(".lucide-icon")) continue;
+    const markerName = basename(file.relativePath);
+    const match = folderIconMarkerPattern.exec(markerName);
+    if (!match) continue;
+    const directory = dirname(file.relativePath).replaceAll("\\", "/");
+    if (icons.has(directory)) {
+      conflicts.add(directory);
+      icons.delete(directory);
+      continue;
+    }
+    if (conflicts.has(directory)) continue;
+    icons.set(directory, { directory, name: match[1]! });
+  }
+  return Object.freeze([...icons.values()].sort((left, right) => left.directory.localeCompare(right.directory, "en")));
+}
+
+function sourcePackageDirectories(files: readonly IndexedSourceFile[]): readonly string[] {
+  return Object.freeze([...new Set(
+    files
+      .filter((file) => basename(file.relativePath).toLocaleLowerCase() === "package.json")
+      .map((file) => dirname(file.relativePath).replaceAll("\\", "/"))
+      .filter((directory) => directory !== "."),
+  )].sort((left, right) => left.localeCompare(right, "en")));
+}
+
+async function sourcePackages(
+  root: string,
+  files: readonly IndexedSourceFile[],
+): Promise<readonly SourceWorkspacePackage[]> {
+  const packages: SourceWorkspacePackage[] = [];
+  for (const file of files) {
+    if (basename(file.relativePath).toLocaleLowerCase() !== "package.json") continue;
+    const directory = dirname(file.relativePath).replaceAll("\\", "/");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await readRegisteredFile(root, file.absolutePath, {
+        unavailableMessage: "The discovered package manifest is unavailable",
+      }));
+    } catch {
+      continue;
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) continue;
+    const name = (parsed as { name?: unknown }).name;
+    if (typeof name !== "string" || !name.trim()) continue;
+    packages.push({ directory, name: name.trim() });
+  }
+  return Object.freeze(packages.sort((left, right) => (
+    left.directory.localeCompare(right.directory, "en") || left.name.localeCompare(right.name, "en")
+  )));
 }
 
 async function registerDiscoveredFiles(root: string, relativePaths: readonly string[]): Promise<IndexedSourceFile[]> {
@@ -464,12 +531,26 @@ function sourceLocation(relativePath: string): { area: DesignSpaceArea; device: 
   const page = /^src\/app\/(desktop|tablet|mobile)\/pages\/.+\.tsx?$/.exec(relativePath);
   if (page) return { area: "pages", device: page[1] as DesignSpaceDevice };
 
-  const component = /^src\/app\/components\/[^/]+\/(desktop|tablet|mobile|index)\.tsx?$/.exec(relativePath);
-  if (component) {
-    return { area: "components", device: component[1] === "index" ? "desktop" : component[1] as DesignSpaceDevice };
+  const component = /^src\/app\/components\/(.+\.tsx?)$/.exec(relativePath);
+  if (component && !/(?:^|\/)[^/]+\.(?:test|spec|stories|design)\.tsx?$/.test(relativePath)) {
+    const implementation = /\/(desktop|tablet|mobile|index)\.tsx?$/.exec(relativePath)?.[1];
+    return {
+      area: "components",
+      device: implementation && implementation !== "index"
+        ? implementation as DesignSpaceDevice
+        : componentFileDevice(relativePath),
+    };
   }
 
   return undefined;
+}
+
+function componentFileDevice(relativePath: string): DesignSpaceDevice {
+  const stem = relativePath.split("/").at(-1)?.replace(/\.tsx?$/, "") ?? "";
+  const device = /[.-](desktop|tablet|mobile)$/i.exec(stem)?.[1]?.toLocaleLowerCase();
+  return designSpaceDevices.includes(device as DesignSpaceDevice)
+    ? device as DesignSpaceDevice
+    : "desktop";
 }
 
 function inferredSourceLocation(
