@@ -19,9 +19,10 @@ describe("ProjectFileBrowser", () => {
     const onSelect = vi.fn();
     render(<ProjectFileBrowser files={files} onSelect={onSelect} />);
 
-    expect(screen.getByRole("treeitem", { name: /demo-target/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("treeitem", { name: /demo-target/ })).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("button", { name: /Card.tsx/ })).not.toBeInTheDocument();
 
+    await userEvent.click(screen.getByRole("button", { name: /demo-target/ }));
     await userEvent.click(screen.getByRole("button", { name: /src/ }));
     expect(screen.getByRole("button", { name: /Card.tsx/ })).toBeInTheDocument();
     expect(onSelect).not.toHaveBeenCalled();

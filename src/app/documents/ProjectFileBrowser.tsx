@@ -19,19 +19,13 @@ export function ProjectFileBrowser(props: ProjectFileBrowserProps) {
     () => props.files.filter((entry) => entry.kind === "directory").map((entry) => entry.id),
     [props.files],
   );
-  const rootDirectoryIds = useMemo(
-    () => props.files.filter((entry) => entry.kind === "directory" && !entry.parentId).map((entry) => entry.id),
-    [props.files],
-  );
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(rootDirectoryIds));
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     setExpanded((current) => {
-      const next = new Set([...current].filter((id) => directoryIds.includes(id)));
-      for (const id of rootDirectoryIds) next.add(id);
-      return next;
+      return new Set([...current].filter((id) => directoryIds.includes(id)));
     });
-  }, [directoryIds.join("\u0000"), rootDirectoryIds.join("\u0000")]);
+  }, [directoryIds.join("\u0000")]);
 
   useEffect(() => {
     if (!props.selectedFileId) return;
